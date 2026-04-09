@@ -6,7 +6,9 @@ import openpyxl
 import pandas as pd
 from openpyxl import load_workbook
 
+from utils.calculations import calc_monthly
 from utils.drive_manifest import load_drive_manifest
+from utils.project_schema import build_project_schema
 
 warnings.filterwarnings("ignore")
 
@@ -237,6 +239,7 @@ def parse_full_project(filepath):
     proj_df, proj_sheet = parse_projection(filepath)
     scen_df = parse_scenarios(filepath)
     budget_df, capex_total, address = parse_budget(filepath)
+    schema = build_project_schema(inputs, project_name=name, address=address, capex_total=capex_total)
 
     kpis = {}
     for label, info in inputs.items():
@@ -255,6 +258,8 @@ def parse_full_project(filepath):
         "relative_path": os.path.relpath(filepath, EXCEL_DIR),
         "source": get_project_source(filepath),
         "inputs": inputs,
+        "schema": schema,
+        "monthly": calc_monthly(schema) if inputs else {},
         "kpis": kpis,
         "projection": proj_df,
         "scenarios": scen_df,

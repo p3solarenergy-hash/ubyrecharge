@@ -11,6 +11,7 @@ from utils.calculations import calc_annual_projection, calc_monthly, calc_sensit
 from utils.drive_sync import GOOGLE_SHEETS_MIME_TYPE, update_google_sheet_inputs
 from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project, save_inputs_to_excel
 from utils.manager_auth import is_manager_authenticated
+from utils.project_schema import build_project_schema
 
 st.set_page_config(page_title="Projetos | UBY RECHARGE", page_icon="📁", layout="wide")
 st.title("📁 Projetos")
@@ -117,7 +118,13 @@ with tabs[0]:
             label: {"value": edited.get(label, info["value"]), "unit": info.get("unit", "")}
             for label, info in inputs.items()
         }
-        monthly = calc_monthly(live_inputs)
+        live_schema = build_project_schema(
+            live_inputs,
+            project_name=project.get("name", ""),
+            address=project.get("address", ""),
+            capex_total=project.get("capex_total"),
+        )
+        monthly = calc_monthly(live_schema)
         st.markdown("#### KPIs em tempo real")
         st.metric("Receita mensal", f"R$ {monthly['receita']:,.0f}")
         st.metric("EBITDA mensal", f"R$ {monthly['ebitda']:,.0f}")
@@ -144,7 +151,13 @@ with tabs[1]:
             for label in inputs
         }
         years = st.slider("Horizonte (anos)", 1, 15, 10)
-        projection = pd.DataFrame(calc_annual_projection(projection_inputs, anos=years))
+        projection_schema = build_project_schema(
+            projection_inputs,
+            project_name=project.get("name", ""),
+            address=project.get("address", ""),
+            capex_total=project.get("capex_total"),
+        )
+        projection = pd.DataFrame(calc_annual_projection(projection_schema, anos=years))
         st.caption("Fonte: recálculo interno da plataforma.")
 
     fig = go.Figure()
@@ -201,7 +214,7 @@ with tabs[2]:
         sensitivity = _dedupe_columns(sensitivity)
         st.caption("Fonte: aba calculada da planilha.")
     else:
-        sensitivity = pd.DataFrame(calc_sensitivity(inputs))
+        sensitivity = pd.DataFrame(calc_sensitivity(project.get("schema", inputs)))
         st.caption("Fonte: recálculo interno da plataforma.")
     if not is_manager:
         visible_columns = [column for column in sensitivity.columns if "Payback" not in column and "Retorno" not in column]

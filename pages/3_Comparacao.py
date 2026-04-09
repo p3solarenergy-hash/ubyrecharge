@@ -8,7 +8,7 @@ import streamlit as st
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from utils.calculations import calc_annual_projection, calc_monthly
+from utils.calculations import calc_annual_projection
 from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project
 from utils.manager_auth import is_manager_authenticated
 
@@ -40,7 +40,6 @@ for filename in selected:
     filepath = os.path.join(EXCEL_DIR, filename)
     project = load_project(filepath)
     if project["inputs"]:
-        project["monthly"] = calc_monthly(project["inputs"])
         projects.append(project)
 
 if not projects:
@@ -149,7 +148,7 @@ years = st.slider("Horizonte (anos)", 1, 15, 10)
 
 fig3 = go.Figure()
 for index, project in enumerate(projects):
-    projection = pd.DataFrame(calc_annual_projection(project["inputs"], anos=years))
+    projection = pd.DataFrame(calc_annual_projection(project.get("schema", project["inputs"]), anos=years))
     fig3.add_trace(
         go.Scatter(
             x=projection["Ano"],

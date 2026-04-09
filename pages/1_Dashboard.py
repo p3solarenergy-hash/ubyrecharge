@@ -8,7 +8,6 @@ import streamlit as st
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from utils.calculations import calc_monthly
 from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project
 from utils.manager_auth import is_manager_authenticated, show_manager_hint
 
@@ -35,7 +34,6 @@ def load_all():
         filepath = os.path.join(EXCEL_DIR, filename)
         project = parse_full_project(filepath)
         if project["inputs"]:
-            project["monthly"] = calc_monthly(project["inputs"])
             projects.append(project)
     return projects
 

@@ -4,6 +4,8 @@ All calculations in Python, independent of Excel formulas.
 """
 import unicodedata
 
+from utils.project_schema import schema_to_calc_inputs
+
 
 def ascii_key(s):
     s = unicodedata.normalize("NFKD", str(s))
@@ -49,6 +51,9 @@ def _weighted_energy_cost(inputs):
 
 def _inputs_to_params(inputs):
     """Extract all needed parameters from the inputs dict."""
+    if isinstance(inputs, dict) and "operational" in inputs and "pricing" in inputs:
+        return schema_to_calc_inputs(inputs)
+
     p = {}
     # Support both new format (DC/AC split) and old format (single charger type)
     p["n_dc"] = _get(inputs, "n carregadores dc", "no carregadores dc", "numero de carregadores")
