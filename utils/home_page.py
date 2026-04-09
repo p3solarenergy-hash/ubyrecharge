@@ -300,17 +300,36 @@ def render_home():
                 key=f"sta_{name}",
             )
 
+            coord_col1, coord_col2 = st.columns(2)
+            new_lat = coord_col1.number_input(
+                "Latitude",
+                value=float(lat) if lat is not None else 0.0,
+                format="%.6f",
+                key=f"lat_{name}",
+            )
+            new_lon = coord_col2.number_input(
+                "Longitude",
+                value=float(lon) if lon is not None else 0.0,
+                format="%.6f",
+                key=f"lon_{name}",
+            )
+
             if lat and lon:
                 st.caption(f"📌 Coordenadas: {lat:.4f}, {lon:.4f} — [Ver no Google Maps]({gmaps_link(new_address or address)})")
             else:
                 st.caption("⚠️ Sem coordenadas — salve o endereço para geocodificar.")
 
+            st.caption("Dica: se a busca automática posicionar errado no mapa, corrija latitude e longitude manualmente.")
+
+            manual_coords_filled = bool(new_lat or new_lon)
+            coords_changed = (lat is None or lon is None or abs(new_lat - (lat or 0.0)) > 0.000001 or abs(new_lon - (lon or 0.0)) > 0.000001)
+
             updated[name] = {
                 "endereco_completo": new_address,
-                "lat": lat,
-                "lon": lon,
+                "lat": new_lat if manual_coords_filled else lat,
+                "lon": new_lon if manual_coords_filled else lon,
                 "status": new_status,
-                "_needs_geocode": new_address != address and bool(new_address),
+                "_needs_geocode": new_address != address and bool(new_address) and not coords_changed,
             }
             st.markdown("<hr style='margin:8px 0;border-color:#2a2d3e;'>", unsafe_allow_html=True)
 
