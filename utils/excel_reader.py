@@ -391,6 +391,8 @@ def parse_uby_schema(filepath, project_name="", fallback_address="", fallback_ca
 
 def parse_full_project(filepath):
     name = os.path.splitext(os.path.basename(filepath))[0]
+    wb = load_workbook(filepath, data_only=True)
+    has_uby_schema = "UBY_SCHEMA" in wb.sheetnames
     inputs = parse_inputs(filepath)
     proj_df, proj_sheet = parse_projection(filepath)
     scen_df = parse_scenarios(filepath)
@@ -398,7 +400,7 @@ def parse_full_project(filepath):
     schema = parse_uby_schema(filepath, project_name=name, fallback_address=address, fallback_capex=capex_total)
     if schema is None:
         schema = build_project_schema(inputs, project_name=name, address=address, capex_total=capex_total)
-    display_inputs = inputs or schema_to_display_inputs(schema)
+    display_inputs = schema_to_display_inputs(schema) if has_uby_schema else (inputs or schema_to_display_inputs(schema))
 
     kpis = {}
     for label, info in inputs.items():
@@ -419,7 +421,7 @@ def parse_full_project(filepath):
         "inputs": display_inputs,
         "raw_inputs": inputs,
         "schema": schema,
-        "schema_source": "UBY_SCHEMA" if "UBY_SCHEMA" in load_workbook(filepath, data_only=True).sheetnames else "legacy",
+        "schema_source": "UBY_SCHEMA" if has_uby_schema else "legacy",
         "monthly": calc_monthly(schema),
         "kpis": kpis,
         "projection": proj_df,

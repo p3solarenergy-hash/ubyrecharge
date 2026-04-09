@@ -11,7 +11,7 @@ from utils.calculations import calc_annual_projection, calc_monthly, calc_sensit
 from utils.drive_sync import GOOGLE_SHEETS_MIME_TYPE, update_google_sheet_inputs
 from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project, save_inputs_to_excel
 from utils.manager_auth import is_manager_authenticated
-from utils.project_schema import build_project_schema
+from utils.project_schema import apply_display_inputs_to_schema, build_project_schema
 
 st.set_page_config(page_title="Projetos | UBY RECHARGE", page_icon="📁", layout="wide")
 st.title("📁 Projetos")
@@ -114,16 +114,19 @@ with tabs[0]:
             st.info("Preços, custos de implantação, CAPEX e estrutura financeira ficam bloqueados na Área do Gestor.")
 
     with col_kpis:
-        live_inputs = {
-            label: {"value": edited.get(label, info["value"]), "unit": info.get("unit", "")}
-            for label, info in inputs.items()
-        }
-        live_schema = build_project_schema(
-            live_inputs,
-            project_name=project.get("name", ""),
-            address=project.get("address", ""),
-            capex_total=project.get("capex_total"),
-        )
+        if project.get("schema_source") == "UBY_SCHEMA":
+            live_schema = apply_display_inputs_to_schema(project["schema"], edited)
+        else:
+            live_inputs = {
+                label: {"value": edited.get(label, info["value"]), "unit": info.get("unit", "")}
+                for label, info in inputs.items()
+            }
+            live_schema = build_project_schema(
+                live_inputs,
+                project_name=project.get("name", ""),
+                address=project.get("address", ""),
+                capex_total=project.get("capex_total"),
+            )
         monthly = calc_monthly(live_schema)
         st.markdown("#### KPIs em tempo real")
         st.metric("Receita mensal", f"R$ {monthly['receita']:,.0f}")
@@ -146,17 +149,20 @@ with tabs[1]:
         projection = _dedupe_columns(projection)
         st.caption("Fonte: aba calculada da planilha.")
     else:
-        projection_inputs = {
-            label: {"value": inputs[label]["value"], "unit": inputs[label].get("unit", "")}
-            for label in inputs
-        }
         years = st.slider("Horizonte (anos)", 1, 15, 10)
-        projection_schema = build_project_schema(
-            projection_inputs,
-            project_name=project.get("name", ""),
-            address=project.get("address", ""),
-            capex_total=project.get("capex_total"),
-        )
+        if project.get("schema_source") == "UBY_SCHEMA":
+            projection_schema = project["schema"]
+        else:
+            projection_inputs = {
+                label: {"value": inputs[label]["value"], "unit": inputs[label].get("unit", "")}
+                for label in inputs
+            }
+            projection_schema = build_project_schema(
+                projection_inputs,
+                project_name=project.get("name", ""),
+                address=project.get("address", ""),
+                capex_total=project.get("capex_total"),
+            )
         projection = pd.DataFrame(calc_annual_projection(projection_schema, anos=years))
         st.caption("Fonte: recálculo interno da plataforma.")
 
