@@ -34,6 +34,21 @@ project = load_project(filepath)
 inputs = project["inputs"]
 project_source = project.get("source", {})
 
+
+def _dedupe_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Make DataFrame columns unique for Plotly/Streamlit consumers."""
+    renamed = []
+    counts = {}
+    for column in df.columns:
+        base = str(column).strip() if column is not None else ""
+        base = base or "coluna"
+        count = counts.get(base, 0)
+        renamed.append(base if count == 0 else f"{base}_{count + 1}")
+        counts[base] = count + 1
+    copy = df.copy()
+    copy.columns = renamed
+    return copy
+
 if not inputs:
     st.warning("Esta planilha não tem aba 'Inputs' compatível.")
     st.stop()
@@ -121,7 +136,7 @@ with tabs[1]:
     using_sheet_projection = projection is not None and not projection.empty
 
     if using_sheet_projection:
-        projection = projection.copy()
+        projection = _dedupe_columns(projection)
         st.caption("Fonte: aba calculada da planilha.")
     else:
         projection_inputs = {
@@ -183,7 +198,7 @@ with tabs[2]:
     using_sheet_scenarios = sensitivity is not None and not sensitivity.empty
 
     if using_sheet_scenarios:
-        sensitivity = sensitivity.copy()
+        sensitivity = _dedupe_columns(sensitivity)
         st.caption("Fonte: aba calculada da planilha.")
     else:
         sensitivity = pd.DataFrame(calc_sensitivity(inputs))
