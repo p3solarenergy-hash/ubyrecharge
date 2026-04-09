@@ -8,6 +8,7 @@ import streamlit as st
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.calculations import calc_annual_projection, calc_monthly, calc_sensitivity
+from utils.drive_sync import GOOGLE_SHEETS_MIME_TYPE, update_google_sheet_inputs
 from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project, save_inputs_to_excel
 from utils.manager_auth import is_manager_authenticated
 
@@ -31,6 +32,7 @@ def load_project(path):
 
 project = load_project(filepath)
 inputs = project["inputs"]
+project_source = project.get("source", {})
 
 if not inputs:
     st.warning("Esta planilha não tem aba 'Inputs' compatível.")
@@ -72,14 +74,25 @@ with tabs[0]:
                             format="%.4f" if 0 < current_value < 1 else "%.2f",
                         )
 
-        if st.button("💾 Salvar no Excel", type="primary"):
-            ok = save_inputs_to_excel(filepath, edited)
-            if ok:
-                st.success("Planilha atualizada com sucesso.")
-                st.cache_data.clear()
-                st.rerun()
-            else:
-                st.error("Não foi possível salvar. Verifique se o arquivo está aberto no Excel.")
+        if st.button("💾 Salvar alterações", type="primary"):
+            try:
+                if project_source.get("mimeType") == GOOGLE_SHEETS_MIME_TYPE and project_source.get("id"):
+                    ok = update_google_sheet_inputs(project_source["id"], edited)
+                    success_message = "Google Sheets atualizado com sucesso."
+                    error_message = "Não foi possível salvar no Google Sheets. Verifique as permissões do Drive."
+                else:
+                    ok = save_inputs_to_excel(filepath, edited)
+                    success_message = "Planilha atualizada com sucesso."
+                    error_message = "Não foi possível salvar. Verifique se o arquivo está aberto no Excel."
+
+                if ok:
+                    st.success(success_message)
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error(error_message)
+            except Exception as exc:
+                st.error(f"Erro ao salvar alterações: {exc}")
 
         if not is_manager:
             st.info("Preços, custos de implantação, CAPEX e estrutura financeira ficam bloqueados na Área do Gestor.")

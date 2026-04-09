@@ -25,6 +25,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
+from utils.drive_manifest import save_drive_manifest
 from utils.excel_reader import EXCEL_DIR
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
@@ -411,6 +412,61 @@ def save_locations_to_drive(data: dict, folder_id: str | None = None):
     save_json_file_to_drive(LOCATIONS_FILENAME, data, folder_id)
 
 
+def update_google_sheet_inputs(spreadsheet_id: str, edited_inputs: dict) -> bool:
+    require_drive_write_access()
+
+    service = build("sheets", "v4", credentials=get_credentials())
+    response = service.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range="'Inputs'!A:G").execute()
+    values = response.get("values", [])
+    updates = []
+
+    for row_index, row in enumerate(values, start=1):
+        if not row or not row[0]:
+            continue
+
+        label = str(row[0]).strip()
+        if label not in edited_inputs:
+            continue
+
+        target_col = None
+        col1_value = row[1] if len(row) > 1 else None
+        col4_value = row[3] if len(row) > 3 else None
+
+        if _is_numeric_like(col1_value):
+            target_col = "B"
+        elif _is_numeric_like(col4_value):
+            target_col = "D"
+
+        if target_col:
+            updates.append(
+                {
+                    "range": f"'Inputs'!{target_col}{row_index}",
+                    "values": [[edited_inputs[label]]],
+                }
+            )
+
+    if not updates:
+        return False
+
+    service.spreadsheets().values().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={"valueInputOption": "USER_ENTERED", "data": updates},
+    ).execute()
+    return True
+
+
+def _is_numeric_like(value) -> bool:
+    if value is None or value == "":
+        return False
+    if isinstance(value, (int, float)):
+        return True
+    try:
+        float(str(value).replace(",", "."))
+        return True
+    except Exception:
+        return False
+
+
 def sync_all(folder_id: str | None = None, dest_dir: str | None = None) -> tuple[list[str], list[str]]:
     """
     Sync all .xlsx files from the Drive folder into the local data directory.
@@ -427,6 +483,7 @@ def sync_all(folder_id: str | None = None, dest_dir: str | None = None) -> tuple
     downloaded = []
     errors = []
     remote_names = set()
+    manifest = {}
 
     for item in files:
         name = item["name"]
@@ -440,6 +497,13 @@ def sync_all(folder_id: str | None = None, dest_dir: str | None = None) -> tuple
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             download_file(item["id"], dest_path, item.get("mimeType", XLSX_MIME_TYPE))
             downloaded.append(relative_path)
+            manifest[relative_path] = {
+                "id": item["id"],
+                "mimeType": item.get("mimeType", XLSX_MIME_TYPE),
+                "source_name": item.get("source_name", name),
+                "relative_path": relative_path,
+                "folder_path": item.get("folder_path", ""),
+            }
         except Exception as exc:
             errors.append(f"{relative_path}: {exc}")
 
@@ -455,5 +519,7 @@ def sync_all(folder_id: str | None = None, dest_dir: str | None = None) -> tuple
 
         if root != target_dir and not os.listdir(root):
             os.rmdir(root)
+
+    save_drive_manifest(manifest)
 
     return downloaded, errors

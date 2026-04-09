@@ -6,6 +6,8 @@ import openpyxl
 import pandas as pd
 from openpyxl import load_workbook
 
+from utils.drive_manifest import load_drive_manifest
+
 warnings.filterwarnings("ignore")
 
 APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -248,6 +250,8 @@ def parse_full_project(filepath):
     return {
         "name": name,
         "filepath": filepath,
+        "relative_path": os.path.relpath(filepath, EXCEL_DIR),
+        "source": get_project_source(filepath),
         "inputs": inputs,
         "kpis": kpis,
         "projection": proj_df,
@@ -255,6 +259,12 @@ def parse_full_project(filepath):
         "budget": budget_df,
         "capex_total": capex_total,
     }
+
+
+def get_project_source(filepath):
+    relative_path = os.path.relpath(filepath, EXCEL_DIR)
+    manifest = load_drive_manifest()
+    return manifest.get(relative_path, {})
 
 
 def save_inputs_to_excel(filepath, edited_inputs):
