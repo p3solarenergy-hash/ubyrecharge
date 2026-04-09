@@ -136,3 +136,156 @@ def schema_to_calc_inputs(schema: dict) -> dict:
         "cresc_preco": safe_float(growth.get("sale_price_annual"), 0.05),
         "inflacao_fixos": safe_float(growth.get("fixed_costs_annual"), 0.0),
     }
+
+
+def default_project_schema(project_name: str = "", address: str = "", capex_total: float | None = None) -> dict:
+    return {
+        "project_name": project_name,
+        "address": address,
+        "operational": {
+            "chargers_dc": 0.0,
+            "chargers_ac": 0.0,
+            "power_dc_kw": 0.0,
+            "power_ac_kw": 0.0,
+            "plugs_total": 0.0,
+            "power_total_kw": 0.0,
+            "hours_per_day": 24.0,
+            "days_per_month": 30.0,
+            "efficiency_factor": 1.0,
+            "battery_capacity_kwh": 0.0,
+        },
+        "pricing": {
+            "sale_price_dc": 0.0,
+            "sale_price_ac": 0.0,
+            "energy_cost_kwh": 0.88,
+            "other_variable_cost_kwh": 0.0,
+        },
+        "occupancy": {
+            "dc_pessimistic": 0.15,
+            "dc_base": 0.3,
+            "dc_optimistic": 0.45,
+            "ac_pessimistic": 0.1,
+            "ac_base": 0.1,
+            "ac_optimistic": 0.1,
+        },
+        "costs": {
+            "area_share_pct": 0.0,
+            "management_pct": 0.15,
+            "taxes_pct": 0.05,
+            "fixed_costs_monthly": 0.0,
+            "replacement_capex_monthly": 0.0,
+        },
+        "investment": {
+            "capex_total": float(capex_total or 0.0),
+            "project_horizon_months": 60.0,
+            "discount_rate_annual": 0.1475,
+        },
+        "growth": {
+            "energy_cost_annual": 0.05,
+            "sale_price_annual": 0.05,
+            "fixed_costs_annual": 0.0,
+        },
+        "units": {
+            "sale_price_dc": "R$/kWh",
+            "sale_price_ac": "R$/kWh",
+            "energy_cost_kwh": "R$/kWh",
+            "capex_total": "R$",
+        },
+    }
+
+
+DISPLAY_FIELDS = [
+    ("Número de carregadores DC", "operational.chargers_dc", ""),
+    ("Número de carregadores AC", "operational.chargers_ac", ""),
+    ("Potência por carregador DC", "operational.power_dc_kw", "kW"),
+    ("Potência por carregador AC", "operational.power_ac_kw", "kW"),
+    ("Número de vagas / plugs", "operational.plugs_total", "vagas"),
+    ("Potência total", "operational.power_total_kw", "kW"),
+    ("Horas disponíveis por dia", "operational.hours_per_day", "h/dia"),
+    ("Dias por mês", "operational.days_per_month", "dias"),
+    ("Eficiência / perdas (fator)", "operational.efficiency_factor", "fator"),
+    ("Capacidade média da bateria", "operational.battery_capacity_kwh", "kWh"),
+    ("Preço de venda DC", "pricing.sale_price_dc", "R$/kWh"),
+    ("Preço de venda AC", "pricing.sale_price_ac", "R$/kWh"),
+    ("Custo energia efetivo", "pricing.energy_cost_kwh", "R$/kWh"),
+    ("Outros custos variáveis", "pricing.other_variable_cost_kwh", "R$/kWh"),
+    ("Ocupação DC (% do tempo)", "occupancy.dc_base", ""),
+    ("Ocupação AC (% do tempo)", "occupancy.ac_base", ""),
+    ("Participação Área (% receita)", "costs.area_share_pct", "%"),
+    ("Gestão P3 / Adquirência (% receita)", "costs.management_pct", "%"),
+    ("Impostos sobre receita (% receita)", "costs.taxes_pct", "%"),
+    ("Custos fixos ajustados", "costs.fixed_costs_monthly", "R$/mês"),
+    ("CAPEX total", "investment.capex_total", "R$"),
+    ("CAPEX reposição mensal", "costs.replacement_capex_monthly", "R$/mês"),
+    ("Horizonte do projeto", "investment.project_horizon_months", "meses"),
+    ("Taxa de desconto (a.a.)", "investment.discount_rate_annual", "% a.a."),
+    ("Crescimento custo energia (a.a.)", "growth.energy_cost_annual", "%"),
+    ("Crescimento preço venda (a.a.)", "growth.sale_price_annual", "%"),
+    ("Inflação custos fixos (a.a.)", "growth.fixed_costs_annual", "%"),
+]
+
+
+def get_schema_value(schema: dict, path: str, default=None):
+    current = schema
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return default
+        current = current[part]
+    return current
+
+
+def set_schema_value(schema: dict, path: str, value):
+    current = schema
+    parts = path.split(".")
+    for part in parts[:-1]:
+        current = current.setdefault(part, {})
+    current[parts[-1]] = value
+
+
+def schema_to_display_inputs(schema: dict) -> dict:
+    inputs = {}
+    for label, path, unit in DISPLAY_FIELDS:
+        value = get_schema_value(schema, path, 0.0)
+        inputs[label] = {
+            "value": value,
+            "unit": unit,
+            "akey": normalize_text(label),
+        }
+    return inputs
+
+
+def apply_display_inputs_to_schema(schema: dict, edited_inputs: dict) -> dict:
+    updated = default_project_schema(
+        project_name=schema.get("project_name", ""),
+        address=schema.get("address", ""),
+        capex_total=get_schema_value(schema, "investment.capex_total", 0.0),
+    )
+    for key, value in schema.items():
+        if isinstance(value, dict):
+            updated[key] = dict(value)
+        else:
+            updated[key] = value
+
+    for label, path, _unit in DISPLAY_FIELDS:
+        if label in edited_inputs:
+            set_schema_value(updated, path, safe_float(edited_inputs[label], 0.0))
+    return updated
+
+
+def schema_to_rows(schema: dict) -> list[list]:
+    rows = [["campo", "valor"]]
+    rows.append(["project_name", schema.get("project_name", "")])
+    rows.append(["address", schema.get("address", "")])
+
+    for label, path, _unit in DISPLAY_FIELDS:
+        rows.append([path, get_schema_value(schema, path, "")])
+
+    rows.extend(
+        [
+            ["occupancy.dc_pessimistic", get_schema_value(schema, "occupancy.dc_pessimistic", 0.0)],
+            ["occupancy.dc_optimistic", get_schema_value(schema, "occupancy.dc_optimistic", 0.0)],
+            ["occupancy.ac_pessimistic", get_schema_value(schema, "occupancy.ac_pessimistic", 0.0)],
+            ["occupancy.ac_optimistic", get_schema_value(schema, "occupancy.ac_optimistic", 0.0)],
+        ]
+    )
+    return rows

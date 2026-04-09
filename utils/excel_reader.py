@@ -8,7 +8,13 @@ from openpyxl import load_workbook
 
 from utils.calculations import calc_monthly
 from utils.drive_manifest import load_drive_manifest
-from utils.project_schema import build_project_schema
+from utils.project_schema import (
+    apply_display_inputs_to_schema,
+    build_project_schema,
+    default_project_schema,
+    safe_float,
+    schema_to_display_inputs,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -233,13 +239,166 @@ def parse_budget(filepath):
         return None, None, ""
 
 
+def parse_uby_schema(filepath, project_name="", fallback_address="", fallback_capex=None):
+    try:
+        wb = load_workbook(filepath, data_only=True)
+        if "UBY_SCHEMA" not in wb.sheetnames:
+            return None
+
+        ws = wb["UBY_SCHEMA"]
+        schema = default_project_schema(
+            project_name=project_name,
+            address=fallback_address,
+            capex_total=fallback_capex,
+        )
+
+        numeric_fields = {
+            "operational.chargers_dc",
+            "operational.chargers_ac",
+            "operational.power_dc_kw",
+            "operational.power_ac_kw",
+            "operational.plugs_total",
+            "operational.power_total_kw",
+            "operational.hours_per_day",
+            "operational.days_per_month",
+            "operational.efficiency_factor",
+            "operational.battery_capacity_kwh",
+            "pricing.sale_price_dc",
+            "pricing.sale_price_ac",
+            "pricing.energy_cost_kwh",
+            "pricing.other_variable_cost_kwh",
+            "occupancy.dc_pessimistic",
+            "occupancy.dc_base",
+            "occupancy.dc_optimistic",
+            "occupancy.ac_pessimistic",
+            "occupancy.ac_base",
+            "occupancy.ac_optimistic",
+            "costs.area_share_pct",
+            "costs.management_pct",
+            "costs.taxes_pct",
+            "costs.fixed_costs_monthly",
+            "costs.replacement_capex_monthly",
+            "investment.capex_total",
+            "investment.project_horizon_months",
+            "investment.discount_rate_annual",
+            "growth.energy_cost_annual",
+            "growth.sale_price_annual",
+            "growth.fixed_costs_annual",
+        }
+
+        alias_map = {
+            "project_name": "project_name",
+            "address": "address",
+            "operational.chargers_dc": "operational.chargers_dc",
+            "operational.chargers_ac": "operational.chargers_ac",
+            "operational.power_dc_kw": "operational.power_dc_kw",
+            "operational.power_ac_kw": "operational.power_ac_kw",
+            "operational.plugs_total": "operational.plugs_total",
+            "operational.power_total_kw": "operational.power_total_kw",
+            "operational.hours_per_day": "operational.hours_per_day",
+            "operational.days_per_month": "operational.days_per_month",
+            "operational.efficiency_factor": "operational.efficiency_factor",
+            "operational.battery_capacity_kwh": "operational.battery_capacity_kwh",
+            "pricing.sale_price_dc": "pricing.sale_price_dc",
+            "pricing.sale_price_ac": "pricing.sale_price_ac",
+            "pricing.energy_cost_kwh": "pricing.energy_cost_kwh",
+            "pricing.other_variable_cost_kwh": "pricing.other_variable_cost_kwh",
+            "occupancy.dc_pessimistic": "occupancy.dc_pessimistic",
+            "occupancy.dc_base": "occupancy.dc_base",
+            "occupancy.dc_optimistic": "occupancy.dc_optimistic",
+            "occupancy.ac_pessimistic": "occupancy.ac_pessimistic",
+            "occupancy.ac_base": "occupancy.ac_base",
+            "occupancy.ac_optimistic": "occupancy.ac_optimistic",
+            "costs.area_share_pct": "costs.area_share_pct",
+            "costs.management_pct": "costs.management_pct",
+            "costs.taxes_pct": "costs.taxes_pct",
+            "costs.fixed_costs_monthly": "costs.fixed_costs_monthly",
+            "costs.replacement_capex_monthly": "costs.replacement_capex_monthly",
+            "investment.capex_total": "investment.capex_total",
+            "investment.project_horizon_months": "investment.project_horizon_months",
+            "investment.discount_rate_annual": "investment.discount_rate_annual",
+            "growth.energy_cost_annual": "growth.energy_cost_annual",
+            "growth.sale_price_annual": "growth.sale_price_annual",
+            "growth.fixed_costs_annual": "growth.fixed_costs_annual",
+            "units.sale_price_dc": "units.sale_price_dc",
+            "units.sale_price_ac": "units.sale_price_ac",
+            "units.energy_cost_kwh": "units.energy_cost_kwh",
+            "units.capex_total": "units.capex_total",
+            "chargers_dc": "operational.chargers_dc",
+            "chargers_ac": "operational.chargers_ac",
+            "power_dc_kw": "operational.power_dc_kw",
+            "power_ac_kw": "operational.power_ac_kw",
+            "plugs_total": "operational.plugs_total",
+            "power_total_kw": "operational.power_total_kw",
+            "hours_per_day": "operational.hours_per_day",
+            "days_per_month": "operational.days_per_month",
+            "efficiency_factor": "operational.efficiency_factor",
+            "battery_capacity_kwh": "operational.battery_capacity_kwh",
+            "sale_price_dc": "pricing.sale_price_dc",
+            "sale_price_ac": "pricing.sale_price_ac",
+            "energy_cost_kwh": "pricing.energy_cost_kwh",
+            "other_variable_cost_kwh": "pricing.other_variable_cost_kwh",
+            "dc_pessimistic": "occupancy.dc_pessimistic",
+            "dc_base": "occupancy.dc_base",
+            "dc_optimistic": "occupancy.dc_optimistic",
+            "ac_pessimistic": "occupancy.ac_pessimistic",
+            "ac_base": "occupancy.ac_base",
+            "ac_optimistic": "occupancy.ac_optimistic",
+            "area_share_pct": "costs.area_share_pct",
+            "management_pct": "costs.management_pct",
+            "taxes_pct": "costs.taxes_pct",
+            "fixed_costs_monthly": "costs.fixed_costs_monthly",
+            "replacement_capex_monthly": "costs.replacement_capex_monthly",
+            "capex_total": "investment.capex_total",
+            "project_horizon_months": "investment.project_horizon_months",
+            "discount_rate_annual": "investment.discount_rate_annual",
+            "energy_cost_annual": "growth.energy_cost_annual",
+            "sale_price_annual": "growth.sale_price_annual",
+            "fixed_costs_annual": "growth.fixed_costs_annual",
+        }
+
+        for row in ws.iter_rows(min_row=1, values_only=True):
+            key_raw = row[0] if len(row) > 0 else None
+            value_raw = row[1] if len(row) > 1 else None
+            if not key_raw:
+                continue
+            key = str(key_raw).strip()
+            key_lower = key.lower()
+            if key_lower in {"campo", "key", "chave"} or key.startswith("#"):
+                continue
+
+            target_path = alias_map.get(key_lower, alias_map.get(key))
+            if not target_path:
+                continue
+
+            value = safe_float(value_raw, None) if target_path in numeric_fields else value_raw
+            if value is None and target_path in numeric_fields:
+                continue
+
+            if "." not in target_path:
+                schema[target_path] = value
+                continue
+
+            root, child = target_path.split(".", 1)
+            if root not in schema or not isinstance(schema[root], dict):
+                continue
+            schema[root][child] = value
+
+        return schema
+    except Exception:
+        return None
+
+
 def parse_full_project(filepath):
     name = os.path.splitext(os.path.basename(filepath))[0]
     inputs = parse_inputs(filepath)
     proj_df, proj_sheet = parse_projection(filepath)
     scen_df = parse_scenarios(filepath)
     budget_df, capex_total, address = parse_budget(filepath)
-    schema = build_project_schema(inputs, project_name=name, address=address, capex_total=capex_total)
+    schema = parse_uby_schema(filepath, project_name=name, fallback_address=address, fallback_capex=capex_total)
+    if schema is None:
+        schema = build_project_schema(inputs, project_name=name, address=address, capex_total=capex_total)
+    display_inputs = inputs or schema_to_display_inputs(schema)
 
     kpis = {}
     for label, info in inputs.items():
@@ -257,9 +416,11 @@ def parse_full_project(filepath):
         "filepath": filepath,
         "relative_path": os.path.relpath(filepath, EXCEL_DIR),
         "source": get_project_source(filepath),
-        "inputs": inputs,
+        "inputs": display_inputs,
+        "raw_inputs": inputs,
         "schema": schema,
-        "monthly": calc_monthly(schema) if inputs else {},
+        "schema_source": "UBY_SCHEMA" if "UBY_SCHEMA" in load_workbook(filepath, data_only=True).sheetnames else "legacy",
+        "monthly": calc_monthly(schema),
         "kpis": kpis,
         "projection": proj_df,
         "scenarios": scen_df,
@@ -279,6 +440,13 @@ def save_inputs_to_excel(filepath, edited_inputs):
     """Write edited values back to Excel Inputs sheet."""
     try:
         wb = load_workbook(filepath)
+        if "UBY_SCHEMA" in wb.sheetnames:
+            current_project = parse_full_project(filepath)
+            schema = apply_display_inputs_to_schema(current_project["schema"], edited_inputs)
+            _write_schema_sheet(wb, schema)
+            wb.save(filepath)
+            return True
+
         if "Inputs" not in wb.sheetnames:
             return False
         ws = wb["Inputs"]
@@ -297,3 +465,17 @@ def save_inputs_to_excel(filepath, edited_inputs):
         return True
     except Exception:
         return False
+
+
+def _write_schema_sheet(workbook, schema: dict):
+    from utils.project_schema import schema_to_rows
+
+    if "UBY_SCHEMA" in workbook.sheetnames:
+        ws = workbook["UBY_SCHEMA"]
+        ws.delete_rows(1, ws.max_row)
+    else:
+        ws = workbook.create_sheet("UBY_SCHEMA")
+
+    for row_index, row in enumerate(schema_to_rows(schema), start=1):
+        ws.cell(row=row_index, column=1, value=row[0])
+        ws.cell(row=row_index, column=2, value=row[1])

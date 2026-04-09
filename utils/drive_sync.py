@@ -27,6 +27,7 @@ from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 from utils.drive_manifest import save_drive_manifest
 from utils.excel_reader import EXCEL_DIR
+from utils.project_schema import apply_display_inputs_to_schema, default_project_schema, schema_to_rows
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -416,6 +417,26 @@ def update_google_sheet_inputs(spreadsheet_id: str, edited_inputs: dict) -> bool
     require_drive_write_access()
 
     service = build("sheets", "v4", credentials=get_credentials())
+    metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    sheet_names = {sheet["properties"]["title"] for sheet in metadata.get("sheets", [])}
+
+    if "UBY_SCHEMA" in sheet_names:
+        current_schema = _read_schema_from_google_sheet(service, spreadsheet_id)
+        schema = apply_display_inputs_to_schema(current_schema, edited_inputs)
+        rows = schema_to_rows(schema)
+        service.spreadsheets().values().clear(
+            spreadsheetId=spreadsheet_id,
+            range="'UBY_SCHEMA'!A:B",
+            body={},
+        ).execute()
+        service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range="'UBY_SCHEMA'!A1:B{}".format(len(rows)),
+            valueInputOption="USER_ENTERED",
+            body={"values": rows},
+        ).execute()
+        return True
+
     response = service.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range="'Inputs'!A:G").execute()
     values = response.get("values", [])
     updates = []
@@ -453,6 +474,35 @@ def update_google_sheet_inputs(spreadsheet_id: str, edited_inputs: dict) -> bool
         body={"valueInputOption": "USER_ENTERED", "data": updates},
     ).execute()
     return True
+
+
+def _read_schema_from_google_sheet(service, spreadsheet_id: str) -> dict:
+    response = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range="'UBY_SCHEMA'!A:B",
+    ).execute()
+    values = response.get("values", [])
+    schema = default_project_schema()
+
+    for row in values:
+        if not row or not row[0]:
+            continue
+        key = str(row[0]).strip()
+        if key.lower() in {"campo", "key", "chave"}:
+            continue
+        value = row[1] if len(row) > 1 else ""
+        if key == "project_name":
+            schema["project_name"] = value
+        elif key == "address":
+            schema["address"] = value
+        elif "." in key:
+            current = schema
+            parts = key.split(".")
+            for part in parts[:-1]:
+                current = current.setdefault(part, {})
+            current[parts[-1]] = value
+
+    return schema
 
 
 def _is_numeric_like(value) -> bool:
