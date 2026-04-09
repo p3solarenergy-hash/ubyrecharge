@@ -62,7 +62,7 @@ project_id = "SEU_PROJECT_ID"
 [google_token]
 refresh_token = "SEU_REFRESH_TOKEN"
 token_uri = "https://oauth2.googleapis.com/token"
-scopes = ["https://www.googleapis.com/auth/drive.readonly"]
+scopes = ["https://www.googleapis.com/auth/drive"]
 
 [google_drive]
 folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
@@ -76,6 +76,7 @@ folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
         st.caption(
             "O credentials.json e o drive_token.json continuam funcionando localmente como fallback, mas nao sao mais necessarios no deploy."
         )
+        st.warning("Para salvar localizações e outras configurações no próprio Google Drive, o token precisa usar escopo de escrita (`https://www.googleapis.com/auth/drive`).")
 
     with st.expander("2. Como gerar o refresh token localmente", expanded=creds_ok and not token_ok):
         st.markdown(
@@ -86,6 +87,7 @@ folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
 4. Clique em **Sincronizar agora** nesta tela.
 5. O navegador vai pedir login e permissao.
 6. Depois copie o valor de `refresh_token` do arquivo `drive_token.json` para o Streamlit Cloud.
+7. Se for usar salvamento de localizações no Drive, gere o token com escopo `https://www.googleapis.com/auth/drive`.
 
 Se o Google continuar retornando `403 access_denied`, quase sempre falta publicar o usuario de teste correto ou usar outro email nao autorizado.
 """

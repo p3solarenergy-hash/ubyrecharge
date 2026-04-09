@@ -23,14 +23,16 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 from utils.excel_reader import EXCEL_DIR
 
-SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 GOOGLE_SHEETS_MIME_TYPE = "application/vnd.google-apps.spreadsheet"
 GOOGLE_DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+JSON_MIME_TYPE = "application/json"
+LOCATIONS_FILENAME = "locations.json"
 
 APP_DIR = Path(__file__).resolve().parent.parent
 CFG_FILE = APP_DIR / "drive_config.json"
@@ -241,14 +243,33 @@ def get_credentials() -> Credentials:
     )
 
 
+def build_drive_service():
+    return build("drive", "v3", credentials=get_credentials())
+
+
+def has_drive_write_access() -> bool:
+    creds = get_credentials()
+    scopes = set(creds.scopes or [])
+    return "https://www.googleapis.com/auth/drive" in scopes
+
+
+def require_drive_write_access():
+    if has_drive_write_access():
+        return
+
+    raise RuntimeError(
+        "A conta Google atual está com acesso somente leitura. Para salvar localizações no Drive, "
+        "gere um novo refresh token com o escopo https://www.googleapis.com/auth/drive e atualize os secrets."
+    )
+
+
 def list_drive_files(folder_id: str | None = None) -> list[dict]:
     """List .xlsx files and native Google Sheets from the configured folder tree."""
     effective_folder_id = (folder_id or get_folder_id()).strip()
     if not effective_folder_id:
         raise RuntimeError("Google Drive folder ID is not configured.")
 
-    creds = get_credentials()
-    service = build("drive", "v3", credentials=creds)
+    service = build_drive_service()
 
     return _list_drive_files_recursive(service, effective_folder_id)
 
@@ -308,8 +329,7 @@ def _list_drive_files_recursive(service, folder_id: str, current_path: str = "")
 
 
 def download_file(file_id: str, dest_path: str, mime_type: str = XLSX_MIME_TYPE):
-    creds = get_credentials()
-    service = build("drive", "v3", credentials=creds)
+    service = build_drive_service()
 
     if mime_type == GOOGLE_SHEETS_MIME_TYPE:
         request = service.files().export_media(fileId=file_id, mimeType=XLSX_MIME_TYPE)
@@ -325,6 +345,70 @@ def download_file(file_id: str, dest_path: str, mime_type: str = XLSX_MIME_TYPE)
 
     with open(dest_path, "wb") as file:
         file.write(buffer.getvalue())
+
+
+def find_file_in_folder(file_name: str, folder_id: str | None = None):
+    effective_folder_id = (folder_id or get_folder_id()).strip()
+    if not effective_folder_id:
+        raise RuntimeError("Google Drive folder ID is not configured.")
+
+    service = build_drive_service()
+    safe_name = file_name.replace("'", "\\'")
+    query = f"name='{safe_name}' and '{effective_folder_id}' in parents and trashed=false"
+    response = (
+        service.files()
+        .list(q=query, fields="files(id, name, mimeType, modifiedTime, size)", pageSize=10)
+        .execute()
+    )
+    files = response.get("files", [])
+    return files[0] if files else None
+
+
+def load_json_file_from_drive(file_name: str, folder_id: str | None = None):
+    file_meta = find_file_in_folder(file_name, folder_id)
+    if not file_meta:
+        return None
+
+    service = build_drive_service()
+    request = service.files().get_media(fileId=file_meta["id"])
+    buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(buffer, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+
+    buffer.seek(0)
+    return json.loads(buffer.read().decode("utf-8"))
+
+
+def save_json_file_to_drive(file_name: str, data: dict, folder_id: str | None = None):
+    require_drive_write_access()
+
+    effective_folder_id = (folder_id or get_folder_id()).strip()
+    if not effective_folder_id:
+        raise RuntimeError("Google Drive folder ID is not configured.")
+
+    service = build_drive_service()
+    body_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    media = MediaIoBaseUpload(io.BytesIO(body_bytes), mimetype=JSON_MIME_TYPE, resumable=False)
+
+    existing = find_file_in_folder(file_name, effective_folder_id)
+    if existing:
+        service.files().update(fileId=existing["id"], media_body=media).execute()
+    else:
+        service.files().create(
+            body={"name": file_name, "parents": [effective_folder_id], "mimeType": JSON_MIME_TYPE},
+            media_body=media,
+            fields="id",
+        ).execute()
+
+
+def load_locations_from_drive(folder_id: str | None = None) -> dict | None:
+    return load_json_file_from_drive(LOCATIONS_FILENAME, folder_id)
+
+
+def save_locations_to_drive(data: dict, folder_id: str | None = None):
+    save_json_file_to_drive(LOCATIONS_FILENAME, data, folder_id)
 
 
 def sync_all(folder_id: str | None = None, dest_dir: str | None = None) -> tuple[list[str], list[str]]:

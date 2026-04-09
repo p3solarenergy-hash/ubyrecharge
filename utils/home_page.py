@@ -9,6 +9,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 from utils.calculations import calc_monthly
+from utils.drive_sync import get_folder_id, load_locations_from_drive, save_locations_to_drive
 from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project
 from utils.manager_auth import is_manager_authenticated
 from utils.ui_settings import load_ui_settings
@@ -18,6 +19,15 @@ LOC_FILE = os.path.join(APP_DIR, "locations.json")
 
 
 def load_locations():
+    folder_id = get_folder_id()
+    if folder_id:
+        try:
+            drive_data = load_locations_from_drive(folder_id)
+            if isinstance(drive_data, dict):
+                return drive_data
+        except Exception:
+            pass
+
     if os.path.exists(LOC_FILE):
         with open(LOC_FILE, "r", encoding="utf-8") as file:
             return json.load(file)
@@ -25,6 +35,18 @@ def load_locations():
 
 
 def save_locations(data):
+    folder_id = get_folder_id()
+    if folder_id:
+        try:
+            save_locations_to_drive(data, folder_id)
+        except Exception as exc:
+            with open(LOC_FILE, "w", encoding="utf-8") as file:
+                json.dump(data, file, ensure_ascii=False, indent=2)
+            raise RuntimeError(
+                "Não foi possível salvar as localizações no Google Drive. "
+                f"O app usou fallback local temporário. Detalhe: {exc}"
+            ) from exc
+
     with open(LOC_FILE, "w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
@@ -110,7 +132,10 @@ def render_home():
             changed = True
 
     if changed:
-        save_locations(locations)
+        try:
+            save_locations(locations)
+        except RuntimeError as exc:
+            st.warning(str(exc))
 
     kpis = load_kpis()
     is_manager = is_manager_authenticated()
@@ -304,8 +329,12 @@ def render_home():
                 else:
                     data.pop("_needs_geocode", None)
 
-            save_locations(updated)
-            st.success("Localizações salvas.")
+            try:
+                save_locations(updated)
+                st.success("Localizações salvas.")
+            except RuntimeError as exc:
+                st.warning(str(exc))
+                st.success("Localizações salvas localmente.")
             st.cache_data.clear()
             time.sleep(1)
             st.rerun()
