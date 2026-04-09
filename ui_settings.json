@@ -1,0 +1,31 @@
+{
+  "brand": {
+    "app_title": "UBY RECHARGE — Plataforma de Gestão",
+    "app_caption": "Gerencie, analise e compare seus projetos de recarga elétrica."
+  },
+  "navigation": {
+    "section_general": "Geral",
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "projects": "Projetos",
+    "comparison": "Comparacao",
+    "analysis": "Analise",
+    "integrations": "Integracoes",
+    "manager_area": "Area Gestor",
+    "ui_settings": "Configuracoes"
+  },
+  "home_cards": {
+    "home_title": "Home",
+    "home_subtitle": "Visão geral",
+    "dashboard_title": "Dashboard",
+    "dashboard_subtitle": "Indicadores",
+    "projects_title": "Projetos",
+    "projects_subtitle": "Operação",
+    "comparison_title": "Comparação",
+    "comparison_subtitle": "Lado a lado",
+    "manager_title": "Área do Gestor",
+    "manager_subtitle": "Protegida",
+    "integrations_title": "Integrações",
+    "integrations_subtitle": "Drive"
+  }
+}

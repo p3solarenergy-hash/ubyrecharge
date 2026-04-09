@@ -11,6 +11,7 @@ from streamlit_folium import st_folium
 from utils.calculations import calc_monthly
 from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project
 from utils.manager_auth import is_manager_authenticated
+from utils.ui_settings import load_ui_settings
 
 APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LOC_FILE = os.path.join(APP_DIR, "locations.json")
@@ -59,8 +60,12 @@ def load_kpis():
 
 
 def render_home():
+    ui_settings = load_ui_settings()
+    brand = ui_settings["brand"]
+    cards = ui_settings["home_cards"]
+
     st.set_page_config(
-        page_title="UBY RECHARGE — Gestão",
+        page_title=brand["app_title"],
         page_icon="⚡",
         layout="wide",
         initial_sidebar_state="expanded",
@@ -110,17 +115,17 @@ def render_home():
     kpis = load_kpis()
     is_manager = is_manager_authenticated()
 
-    st.title("⚡ UBY RECHARGE — Plataforma de Gestão")
-    st.caption("Gerencie, analise e compare seus projetos de recarga elétrica.")
+    st.title(f"⚡ {brand['app_title']}")
+    st.caption(brand["app_caption"])
     st.markdown("---")
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.info("🏠 **Home**\nVisão geral")
-    c2.info("📊 **Dashboard**\nIndicadores")
-    c3.info("📁 **Projetos**\nOperação")
-    c4.info("🔄 **Comparação**\nLado a lado")
-    c5.info("🔒 **Área do Gestor**\nProtegida")
-    c6.info("🔌 **Integrações**\nDrive")
+    c1.info(f"🏠 **{cards['home_title']}**\n{cards['home_subtitle']}")
+    c2.info(f"📊 **{cards['dashboard_title']}**\n{cards['dashboard_subtitle']}")
+    c3.info(f"📁 **{cards['projects_title']}**\n{cards['projects_subtitle']}")
+    c4.info(f"🔄 **{cards['comparison_title']}**\n{cards['comparison_subtitle']}")
+    c5.info(f"🔒 **{cards['manager_title']}**\n{cards['manager_subtitle']}")
+    c6.info(f"🔌 **{cards['integrations_title']}**\n{cards['integrations_subtitle']}")
     st.markdown("---")
 
     st.markdown("### 📍 Pontos de Recarga")
