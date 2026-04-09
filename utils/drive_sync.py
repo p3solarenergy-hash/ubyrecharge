@@ -29,6 +29,8 @@ from utils.excel_reader import EXCEL_DIR
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+GOOGLE_SHEETS_MIME_TYPE = "application/vnd.google-apps.spreadsheet"
+GOOGLE_DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
 APP_DIR = Path(__file__).resolve().parent.parent
 CFG_FILE = APP_DIR / "drive_config.json"
@@ -240,7 +242,7 @@ def get_credentials() -> Credentials:
 
 
 def list_drive_files(folder_id: str | None = None) -> list[dict]:
-    """List only .xlsx files from the configured Drive folder."""
+    """List .xlsx files and native Google Sheets from the configured folder tree."""
     effective_folder_id = (folder_id or get_folder_id()).strip()
     if not effective_folder_id:
         raise RuntimeError("Google Drive folder ID is not configured.")
@@ -248,28 +250,72 @@ def list_drive_files(folder_id: str | None = None) -> list[dict]:
     creds = get_credentials()
     service = build("drive", "v3", credentials=creds)
 
-    query = (
-        f"'{effective_folder_id}' in parents"
-        f" and mimeType='{XLSX_MIME_TYPE}'"
-        " and trashed=false"
-    )
-    result = (
-        service.files()
-        .list(q=query, fields="files(id, name, modifiedTime, size, mimeType)", orderBy="name")
-        .execute()
-    )
-
-    return [
-        item
-        for item in result.get("files", [])
-        if item.get("mimeType") == XLSX_MIME_TYPE and item.get("name", "").lower().endswith(".xlsx")
-    ]
+    return _list_drive_files_recursive(service, effective_folder_id)
 
 
-def download_file(file_id: str, dest_path: str):
+def _list_drive_files_recursive(service, folder_id: str, current_path: str = "") -> list[dict]:
+    page_token = None
+    files = []
+
+    while True:
+        query = f"'{folder_id}' in parents and trashed=false"
+        response = (
+            service.files()
+            .list(
+                q=query,
+                fields="nextPageToken, files(id, name, mimeType, modifiedTime, size)",
+                orderBy="folder,name",
+                pageToken=page_token,
+            )
+            .execute()
+        )
+
+        for item in response.get("files", []):
+            mime_type = item.get("mimeType")
+            name = item.get("name", "").strip()
+
+            if mime_type == GOOGLE_DRIVE_FOLDER_MIME_TYPE:
+                next_path = os.path.join(current_path, name) if current_path else name
+                files.extend(_list_drive_files_recursive(service, item["id"], next_path))
+                continue
+
+            if mime_type not in {XLSX_MIME_TYPE, GOOGLE_SHEETS_MIME_TYPE}:
+                continue
+
+            local_name = name
+            if mime_type == GOOGLE_SHEETS_MIME_TYPE and not local_name.lower().endswith(".xlsx"):
+                local_name = f"{local_name}.xlsx"
+
+            relative_path = os.path.join(current_path, local_name) if current_path else local_name
+            files.append(
+                {
+                    "id": item["id"],
+                    "name": local_name,
+                    "source_name": name,
+                    "mimeType": mime_type,
+                    "modifiedTime": item.get("modifiedTime", ""),
+                    "size": item.get("size", 0),
+                    "relative_path": relative_path,
+                    "folder_path": current_path,
+                }
+            )
+
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
+
+    return files
+
+
+def download_file(file_id: str, dest_path: str, mime_type: str = XLSX_MIME_TYPE):
     creds = get_credentials()
     service = build("drive", "v3", credentials=creds)
-    request = service.files().get_media(fileId=file_id)
+
+    if mime_type == GOOGLE_SHEETS_MIME_TYPE:
+        request = service.files().export_media(fileId=file_id, mimeType=XLSX_MIME_TYPE)
+    else:
+        request = service.files().get_media(fileId=file_id)
+
     buffer = io.BytesIO()
     downloader = MediaIoBaseDownload(buffer, request)
 
@@ -300,23 +346,30 @@ def sync_all(folder_id: str | None = None, dest_dir: str | None = None) -> tuple
 
     for item in files:
         name = item["name"]
+        relative_path = item["relative_path"]
         if name.startswith("~$") or not name.lower().endswith(".xlsx"):
             continue
 
-        remote_names.add(name)
+        remote_names.add(relative_path)
         try:
-            download_file(item["id"], os.path.join(target_dir, name))
-            downloaded.append(name)
+            dest_path = os.path.join(target_dir, relative_path)
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            download_file(item["id"], dest_path, item.get("mimeType", XLSX_MIME_TYPE))
+            downloaded.append(relative_path)
         except Exception as exc:
-            errors.append(f"{name}: {exc}")
+            errors.append(f"{relative_path}: {exc}")
 
-    for local_name in os.listdir(target_dir):
-        local_path = os.path.join(target_dir, local_name)
-        if not os.path.isfile(local_path):
-            continue
-        if not local_name.lower().endswith(".xlsx"):
-            continue
-        if local_name not in remote_names:
-            os.remove(local_path)
+    for root, _, filenames in os.walk(target_dir, topdown=False):
+        for local_name in filenames:
+            if not local_name.lower().endswith(".xlsx"):
+                continue
+
+            local_path = os.path.join(root, local_name)
+            relative_local_path = os.path.relpath(local_path, target_dir)
+            if relative_local_path not in remote_names:
+                os.remove(local_path)
+
+        if root != target_dir and not os.listdir(root):
+            os.rmdir(root)
 
     return downloaded, errors

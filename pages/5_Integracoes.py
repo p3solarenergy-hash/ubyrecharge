@@ -38,7 +38,7 @@ with tab_drive:
     cloud_ready = folder_ok and creds_ok and token_ok
 
     st.markdown("### ☁️ Google Drive como base de dados")
-    st.caption("O deploy no Streamlit Cloud usa secrets para autenticar e sincronizar apenas arquivos .xlsx.")
+    st.caption("O deploy no Streamlit Cloud usa secrets para autenticar e sincronizar arquivos do Google Drive, incluindo subpastas.")
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("OAuth client", "✅ OK" if creds_ok else "❌ Faltando")
@@ -96,9 +96,11 @@ Se o Google continuar retornando `403 access_denied`, quase sempre falta publica
         st.markdown(
             f"""
 - Pasta local sincronizada: `{EXCEL_DIR}`
-- Apenas arquivos com extensao `.xlsx` entram na sincronizacao
-- Arquivos que nao sao `.xlsx` sao ignorados
-- Planilhas `.xlsx` removidas do Drive tambem sao removidas da pasta local sincronizada
+- O app percorre a pasta principal e tambem as subpastas do Google Drive
+- Arquivos `.xlsx` sao baixados como estao
+- Planilhas nativas do Google Sheets sao exportadas automaticamente para `.xlsx`
+- Arquivos que nao sao planilhas sao ignorados
+- Planilhas removidas do Drive tambem sao removidas da pasta local sincronizada
 """
         )
         if folder_ok:
@@ -146,19 +148,19 @@ Para continuar trabalhando localmente, voce ainda pode:
 
         with col_btn:
             if st.button("🔄 Sincronizar agora", type="primary", use_container_width=True):
-                with st.spinner("Sincronizando arquivos .xlsx do Google Drive..."):
+                with st.spinner("Sincronizando planilhas do Google Drive..."):
                     try:
                         downloaded, errors = sync_all(folder_id=folder_id, dest_dir=EXCEL_DIR)
                         st.cache_data.clear()
                         if downloaded:
-                            st.success(f"{len(downloaded)} arquivo(s) .xlsx sincronizado(s).")
+                            st.success(f"{len(downloaded)} planilha(s) sincronizada(s).")
                             for filename in downloaded:
                                 st.markdown(f"- 📄 `{filename}`")
                         if errors:
                             for error in errors:
                                 st.error(error)
                         if not downloaded and not errors:
-                            st.info("Nenhum arquivo .xlsx encontrado na pasta configurada.")
+                            st.info("Nenhuma planilha compativel encontrada na pasta configurada.")
                     except Exception as exc:
                         st.error(f"Erro ao sincronizar: {exc}")
 
@@ -167,13 +169,15 @@ Para continuar trabalhando localmente, voce ainda pode:
             try:
                 files = list_drive_files(folder_id)
                 if files:
-                    st.markdown(f"**{len(files)} arquivo(s) .xlsx no Drive:**")
+                    st.markdown(f"**{len(files)} planilha(s) encontrada(s) no Drive:**")
                     for item in files:
                         size_kb = int(item.get("size", 0)) // 1024
                         modified = item.get("modifiedTime", "")[:10]
-                        st.markdown(f"- 📄 `{item['name']}` - {size_kb} KB - {modified}")
+                        origin = "Google Sheets" if item.get("mimeType") == "application/vnd.google-apps.spreadsheet" else "XLSX"
+                        relative_path = item.get("relative_path", item["name"])
+                        st.markdown(f"- 📄 `{relative_path}` - {origin} - {size_kb} KB - {modified}")
                 else:
-                    st.info("A pasta do Drive esta vazia ou sem arquivos .xlsx.")
+                    st.info("A pasta do Drive esta vazia ou sem planilhas compativeis.")
             except Exception as exc:
                 st.caption(f"Preview indisponivel: {exc}")
 

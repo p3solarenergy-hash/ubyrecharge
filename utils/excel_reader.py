@@ -26,20 +26,22 @@ def ascii_key(s):
 
 def get_all_projects():
     """
-    Scan the app data directory and return only .xlsx project files.
+    Scan the app data directory recursively and return all .xlsx project files.
     """
     files = []
     try:
-        for entry in os.scandir(EXCEL_DIR):
-            if not entry.is_file():
-                continue
-            filename = entry.name
-            if (
-                filename.endswith(".xlsx")
-                and filename not in SKIP_FILES
-                and not any(filename.startswith(prefix) for prefix in SKIP_PREFIX)
-            ):
-                files.append(filename)
+        for root, dirnames, filenames in os.walk(EXCEL_DIR):
+            dirnames[:] = [dirname for dirname in dirnames if dirname not in SKIP_DIRS]
+
+            for filename in filenames:
+                if (
+                    filename.endswith(".xlsx")
+                    and filename not in SKIP_FILES
+                    and not any(filename.startswith(prefix) for prefix in SKIP_PREFIX)
+                ):
+                    full_path = os.path.join(root, filename)
+                    relative_path = os.path.relpath(full_path, EXCEL_DIR)
+                    files.append(relative_path)
     except OSError:
         pass
     return sorted(files)
