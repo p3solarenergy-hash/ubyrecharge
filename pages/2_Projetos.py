@@ -117,24 +117,53 @@ with tabs[0]:
 
 with tabs[1]:
     st.markdown("### Projeção Anual")
-    projection_inputs = {
-        label: {"value": inputs[label]["value"], "unit": inputs[label].get("unit", "")}
-        for label in inputs
-    }
-    years = st.slider("Horizonte (anos)", 1, 15, 10)
-    projection = pd.DataFrame(calc_annual_projection(projection_inputs, anos=years))
+    projection = project.get("projection")
+    using_sheet_projection = projection is not None and not projection.empty
+
+    if using_sheet_projection:
+        projection = projection.copy()
+        st.caption("Fonte: aba calculada da planilha.")
+    else:
+        projection_inputs = {
+            label: {"value": inputs[label]["value"], "unit": inputs[label].get("unit", "")}
+            for label in inputs
+        }
+        years = st.slider("Horizonte (anos)", 1, 15, 10)
+        projection = pd.DataFrame(calc_annual_projection(projection_inputs, anos=years))
+        st.caption("Fonte: recálculo interno da plataforma.")
 
     fig = go.Figure()
-    fig.add_trace(go.Bar(name="EBITDA", x=projection["Ano"], y=projection["EBITDA"], marker_color="#00c8ff"))
+    x_col = "Ano" if "Ano" in projection.columns else projection.columns[0]
+    receita_col = "Receita" if "Receita" in projection.columns else "Receita Total"
+    ebitda_col = "EBITDA"
+    energia_col = "Custo Energia" if "Custo Energia" in projection.columns else None
+    variavel_col = "Custos Variáveis" if "Custos Variáveis" in projection.columns else "Impostos+Adq+Área"
+    fixos_col = "Custos Fixos" if "Custos Fixos" in projection.columns else None
+    fluxo_col = "Fluxo Acumulado" if "Fluxo Acumulado" in projection.columns else "Fluxo Acum"
+
+    fig.add_trace(go.Bar(name="EBITDA", x=projection[x_col], y=projection[ebitda_col], marker_color="#00c8ff"))
     if is_manager:
-        fig.add_trace(go.Bar(name="Custo Energia", x=projection["Ano"], y=projection["Custo Energia"], marker_color="#ff6b6b"))
-        fig.add_trace(
-            go.Bar(name="Custos Variáveis", x=projection["Ano"], y=projection["Custos Variáveis"], marker_color="#ffa500")
-        )
-        fig.add_trace(go.Bar(name="Custos Fixos", x=projection["Ano"], y=projection["Custos Fixos"], marker_color="#888"))
+        if energia_col:
+            fig.add_trace(go.Bar(name="Custo Energia", x=projection[x_col], y=projection[energia_col], marker_color="#ff6b6b"))
+        if variavel_col in projection.columns:
+            variavel_label = "Custos Variáveis" if variavel_col == "Custos Variáveis" else "Impostos + Adq. + Área"
+            fig.add_trace(go.Bar(name=variavel_label, x=projection[x_col], y=projection[variavel_col], marker_color="#ffa500"))
+        if fixos_col:
+            fig.add_trace(go.Bar(name="Custos Fixos", x=projection[x_col], y=projection[fixos_col], marker_color="#888"))
     fig.add_trace(
-        go.Scatter(name="Receita", x=projection["Ano"], y=projection["Receita"], mode="lines+markers", line=dict(color="#00e676"))
+        go.Scatter(name="Receita", x=projection[x_col], y=projection[receita_col], mode="lines+markers", line=dict(color="#00e676"))
     )
+    if is_manager and fluxo_col in projection.columns:
+        fig.add_trace(
+            go.Scatter(
+                name="Fluxo Acumulado",
+                x=projection[x_col],
+                y=projection[fluxo_col],
+                mode="lines+markers",
+                line=dict(color="#ffd166", dash="dot"),
+                yaxis="y2",
+            )
+        )
     fig.update_layout(
         barmode="stack" if is_manager else "group",
         height=380,
@@ -143,13 +172,22 @@ with tabs[1]:
         font_color="#e0e0e0",
         legend=dict(orientation="h", y=-0.15),
         margin=dict(t=10, b=60),
+        yaxis2=dict(overlaying="y", side="right", showgrid=False, visible=is_manager and fluxo_col in projection.columns),
     )
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(projection, use_container_width=True, hide_index=True)
 
 with tabs[2]:
     st.markdown("### Sensibilidade por Ocupação")
-    sensitivity = pd.DataFrame(calc_sensitivity(inputs))
+    sensitivity = project.get("scenarios")
+    using_sheet_scenarios = sensitivity is not None and not sensitivity.empty
+
+    if using_sheet_scenarios:
+        sensitivity = sensitivity.copy()
+        st.caption("Fonte: aba calculada da planilha.")
+    else:
+        sensitivity = pd.DataFrame(calc_sensitivity(inputs))
+        st.caption("Fonte: recálculo interno da plataforma.")
     if not is_manager:
         visible_columns = [column for column in sensitivity.columns if "Payback" not in column and "Retorno" not in column]
         sensitivity = sensitivity[visible_columns]
