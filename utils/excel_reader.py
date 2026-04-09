@@ -440,6 +440,22 @@ def save_inputs_to_excel(filepath, edited_inputs):
     """Write edited values back to Excel Inputs sheet."""
     try:
         wb = load_workbook(filepath)
+        if "Inputs" in wb.sheetnames:
+            ws = wb["Inputs"]
+            for row in ws.iter_rows():
+                if not row[0].value:
+                    continue
+                label = str(row[0].value).strip()
+                if label in edited_inputs and len(row) > 1:
+                    col1_cell = row[1]
+                    col3_cell = row[3] if len(row) > 3 else None
+                    if col1_cell.value is not None and isinstance(col1_cell.value, (int, float)):
+                        col1_cell.value = edited_inputs[label]
+                    elif col3_cell and col3_cell.value is not None and isinstance(col3_cell.value, (int, float)):
+                        col3_cell.value = edited_inputs[label]
+            wb.save(filepath)
+            return True
+
         if "UBY_SCHEMA" in wb.sheetnames:
             current_project = parse_full_project(filepath)
             schema = apply_display_inputs_to_schema(current_project["schema"], edited_inputs)
@@ -447,22 +463,7 @@ def save_inputs_to_excel(filepath, edited_inputs):
             wb.save(filepath)
             return True
 
-        if "Inputs" not in wb.sheetnames:
-            return False
-        ws = wb["Inputs"]
-        for row in ws.iter_rows():
-            if not row[0].value:
-                continue
-            label = str(row[0].value).strip()
-            if label in edited_inputs and len(row) > 1:
-                col1_cell = row[1]
-                col3_cell = row[3] if len(row) > 3 else None
-                if col1_cell.value is not None and isinstance(col1_cell.value, (int, float)):
-                    col1_cell.value = edited_inputs[label]
-                elif col3_cell and col3_cell.value is not None and isinstance(col3_cell.value, (int, float)):
-                    col3_cell.value = edited_inputs[label]
-        wb.save(filepath)
-        return True
+        return False
     except Exception:
         return False
 

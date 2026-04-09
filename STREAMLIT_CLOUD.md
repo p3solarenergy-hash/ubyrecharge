@@ -18,7 +18,10 @@ project_id = "SEU_PROJECT_ID"
 [google_token]
 refresh_token = "SEU_REFRESH_TOKEN"
 token_uri = "https://oauth2.googleapis.com/token"
-scopes = ["https://www.googleapis.com/auth/drive"]
+scopes = [
+  "https://www.googleapis.com/auth/drive",
+  "https://www.googleapis.com/auth/spreadsheets"
+]
 
 [google_drive]
 folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
@@ -30,7 +33,7 @@ folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
 2. Use um usuario autorizado no modo teste do OAuth.
 3. Sincronize o Google Drive uma vez.
 4. Copie o `refresh_token` gerado em `drive_token.json`.
-5. Use o escopo `https://www.googleapis.com/auth/drive` para permitir leitura e gravação de localizações.
+5. Use os escopos `https://www.googleapis.com/auth/drive` e `https://www.googleapis.com/auth/spreadsheets` para permitir leitura, gravação no Drive e edição de planilhas Google Sheets.
 
 ## Comportamento do app
 

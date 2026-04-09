@@ -29,7 +29,10 @@ from utils.drive_manifest import save_drive_manifest
 from utils.excel_reader import EXCEL_DIR
 from utils.project_schema import apply_display_inputs_to_schema, default_project_schema, schema_to_rows
 
-SCOPES = ["https://www.googleapis.com/auth/drive"]
+SCOPES = [
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/spreadsheets",
+]
 XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 GOOGLE_SHEETS_MIME_TYPE = "application/vnd.google-apps.spreadsheet"
 GOOGLE_DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
@@ -252,7 +255,10 @@ def build_drive_service():
 def has_drive_write_access() -> bool:
     creds = get_credentials()
     scopes = set(creds.scopes or [])
-    return "https://www.googleapis.com/auth/drive" in scopes
+    return (
+        "https://www.googleapis.com/auth/drive" in scopes
+        and "https://www.googleapis.com/auth/spreadsheets" in scopes
+    )
 
 
 def require_drive_write_access():
@@ -260,8 +266,9 @@ def require_drive_write_access():
         return
 
     raise RuntimeError(
-        "A conta Google atual está com acesso somente leitura. Para salvar localizações no Drive, "
-        "gere um novo refresh token com o escopo https://www.googleapis.com/auth/drive e atualize os secrets."
+        "A conta Google atual está sem os escopos de escrita completos. Para salvar localizações e editar "
+        "Google Sheets, gere um novo refresh token com os escopos https://www.googleapis.com/auth/drive "
+        "e https://www.googleapis.com/auth/spreadsheets e atualize os secrets."
     )
 
 
@@ -420,6 +427,45 @@ def update_google_sheet_inputs(spreadsheet_id: str, edited_inputs: dict) -> bool
     metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
     sheet_names = {sheet["properties"]["title"] for sheet in metadata.get("sheets", [])}
 
+    if "Inputs" in sheet_names:
+        response = service.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range="'Inputs'!A:G").execute()
+        values = response.get("values", [])
+        updates = []
+
+        for row_index, row in enumerate(values, start=1):
+            if not row or not row[0]:
+                continue
+
+            label = str(row[0]).strip()
+            if label not in edited_inputs:
+                continue
+
+            target_col = None
+            col1_value = row[1] if len(row) > 1 else None
+            col4_value = row[3] if len(row) > 3 else None
+
+            if _is_numeric_like(col1_value):
+                target_col = "B"
+            elif _is_numeric_like(col4_value):
+                target_col = "D"
+
+            if target_col:
+                updates.append(
+                    {
+                        "range": f"'Inputs'!{target_col}{row_index}",
+                        "values": [[edited_inputs[label]]],
+                    }
+                )
+
+        if not updates:
+            return False
+
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"valueInputOption": "USER_ENTERED", "data": updates},
+        ).execute()
+        return True
+
     if "UBY_SCHEMA" in sheet_names:
         current_schema = _read_schema_from_google_sheet(service, spreadsheet_id)
         schema = apply_display_inputs_to_schema(current_schema, edited_inputs)
@@ -437,43 +483,7 @@ def update_google_sheet_inputs(spreadsheet_id: str, edited_inputs: dict) -> bool
         ).execute()
         return True
 
-    response = service.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range="'Inputs'!A:G").execute()
-    values = response.get("values", [])
-    updates = []
-
-    for row_index, row in enumerate(values, start=1):
-        if not row or not row[0]:
-            continue
-
-        label = str(row[0]).strip()
-        if label not in edited_inputs:
-            continue
-
-        target_col = None
-        col1_value = row[1] if len(row) > 1 else None
-        col4_value = row[3] if len(row) > 3 else None
-
-        if _is_numeric_like(col1_value):
-            target_col = "B"
-        elif _is_numeric_like(col4_value):
-            target_col = "D"
-
-        if target_col:
-            updates.append(
-                {
-                    "range": f"'Inputs'!{target_col}{row_index}",
-                    "values": [[edited_inputs[label]]],
-                }
-            )
-
-    if not updates:
-        return False
-
-    service.spreadsheets().values().batchUpdate(
-        spreadsheetId=spreadsheet_id,
-        body={"valueInputOption": "USER_ENTERED", "data": updates},
-    ).execute()
-    return True
+    return False
 
 
 def _read_schema_from_google_sheet(service, spreadsheet_id: str) -> dict:
