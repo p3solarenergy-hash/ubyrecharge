@@ -199,9 +199,11 @@ def parse_budget(filepath):
         wb = load_workbook(filepath, data_only=True)
         sheet_name = next((sheet for sheet in wb.sheetnames if "Orcamento" in sheet or "Or" in sheet and "amento" in sheet), None)
         if not sheet_name:
-            return None, None
+            return None, None, ""
 
         ws = wb[sheet_name]
+        address = ws["B4"].value if ws["B4"].value is not None else ""
+        address = str(address).strip() if address else ""
         rows = list(ws.iter_rows(values_only=True))
         header_row = None
         capex_total = None
@@ -216,17 +218,17 @@ def parse_budget(filepath):
                         break
 
         if header_row is None:
-            return None, capex_total
+            return None, capex_total, address
 
         headers = [str(cell).strip() if cell else f"col_{idx}" for idx, cell in enumerate(rows[header_row])]
         data = [row for row in rows[header_row + 1 :] if row[0] is not None and str(row[0]).strip().isdigit()]
         if not data:
-            return None, capex_total
+            return None, capex_total, address
 
         df = pd.DataFrame(data, columns=headers[: len(data[0])]).dropna(how="all")
-        return df, capex_total
+        return df, capex_total, address
     except Exception:
-        return None, None
+        return None, None, ""
 
 
 def parse_full_project(filepath):
@@ -234,7 +236,7 @@ def parse_full_project(filepath):
     inputs = parse_inputs(filepath)
     proj_df, proj_sheet = parse_projection(filepath)
     scen_df = parse_scenarios(filepath)
-    budget_df, capex_total = parse_budget(filepath)
+    budget_df, capex_total, address = parse_budget(filepath)
 
     kpis = {}
     for label, info in inputs.items():
@@ -258,6 +260,7 @@ def parse_full_project(filepath):
         "scenarios": scen_df,
         "budget": budget_df,
         "capex_total": capex_total,
+        "address": address,
     }
 
 

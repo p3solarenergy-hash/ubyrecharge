@@ -81,6 +81,16 @@ def load_kpis():
     return result
 
 
+@st.cache_data(ttl=10)
+def load_project_metadata():
+    result = {}
+    for filename in get_all_projects():
+        filepath = os.path.join(EXCEL_DIR, filename)
+        project = parse_full_project(filepath)
+        result[project["name"]] = {"address": project.get("address", "").strip()}
+    return result
+
+
 def render_home():
     ui_settings = load_ui_settings()
     brand = ui_settings["brand"]
@@ -119,6 +129,7 @@ def render_home():
     )
 
     locations = load_locations()
+    project_metadata = load_project_metadata()
     current_names = {os.path.splitext(os.path.basename(filename))[0] for filename in get_all_projects()}
 
     stale = [name for name in locations if name not in current_names]
@@ -129,6 +140,14 @@ def render_home():
     for name in current_names:
         if name not in locations:
             locations[name] = {"endereco_completo": "", "lat": None, "lon": None, "status": "ativo"}
+            changed = True
+
+        budget_address = project_metadata.get(name, {}).get("address", "").strip()
+        if budget_address and locations[name].get("endereco_completo", "").strip() != budget_address:
+            geocoded = geocode(budget_address)
+            locations[name]["endereco_completo"] = budget_address
+            if geocoded:
+                locations[name]["lat"], locations[name]["lon"] = geocoded
             changed = True
 
     if changed:
