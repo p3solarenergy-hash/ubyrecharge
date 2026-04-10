@@ -13,6 +13,7 @@ import io
 import json
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     import streamlit as st
@@ -47,6 +48,33 @@ CREDS_FILE = APP_DIR / "credentials.json"
 DEFAULT_AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
 DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token"
 DEFAULT_CERTS_URI = "https://www.googleapis.com/oauth2/v1/certs"
+PROXY_ENV_KEYS = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy")
+
+
+def _looks_like_broken_local_proxy(value: str) -> bool:
+    if not value:
+        return False
+
+    raw = str(value).strip()
+    if not raw:
+        return False
+
+    candidate = raw if "://" in raw else f"http://{raw}"
+    parsed = urlparse(candidate)
+    host = (parsed.hostname or "").strip().lower()
+    port = parsed.port
+
+    return host in {"127.0.0.1", "localhost"} and port in {0, 9}
+
+
+def _clear_invalid_local_proxy_env():
+    """
+    Ignore broken localhost proxy settings that block Google OAuth/Drive calls.
+    """
+    for key in PROXY_ENV_KEYS:
+        value = os.environ.get(key)
+        if value and _looks_like_broken_local_proxy(value):
+            os.environ.pop(key, None)
 
 
 def _get_secret_section(name: str):
@@ -215,6 +243,7 @@ def _persist_token(creds: Credentials):
 
 def get_credentials() -> Credentials:
     """Return valid Drive credentials for local or cloud execution."""
+    _clear_invalid_local_proxy_env()
     creds = None
     token_info = _load_token_info()
 
@@ -249,6 +278,7 @@ def get_credentials() -> Credentials:
 
 
 def build_drive_service():
+    _clear_invalid_local_proxy_env()
     return build("drive", "v3", credentials=get_credentials())
 
 

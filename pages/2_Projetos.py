@@ -13,8 +13,9 @@ from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project, 
 from utils.manager_auth import is_manager_authenticated
 from utils.project_schema import apply_display_inputs_to_schema, build_project_schema
 
-st.set_page_config(page_title="Projetos | UBY RECHARGE", page_icon="📁", layout="wide")
-st.title("📁 Projetos")
+st.set_page_config(page_title="Implantacao | CAPEX e Viabilidade", page_icon="📁", layout="wide")
+st.title("📁 CAPEX e Viabilidade")
+st.caption("Edite premissas, acompanhe projecoes e valide a viabilidade de cada projeto.")
 
 files = get_all_projects()
 if not files:

@@ -12,7 +12,9 @@ from utils.project_schema import (
     apply_display_inputs_to_schema,
     build_project_schema,
     default_project_schema,
+    finalize_project_schema,
     safe_float,
+    set_schema_value,
     schema_to_display_inputs,
 )
 
@@ -253,6 +255,16 @@ def parse_uby_schema(filepath, project_name="", fallback_address="", fallback_ca
         )
 
         numeric_fields = {
+            "implantation.capex_total",
+            "operations.sessions_monthly",
+            "operations.energy_kwh_monthly",
+            "operations.availability_pct",
+            "finance.revenue_monthly",
+            "finance.ebitda_monthly",
+            "finance.gross_result_monthly",
+            "finance.net_result_monthly",
+            "map.lat",
+            "map.lon",
             "operational.chargers_dc",
             "operational.chargers_ac",
             "operational.power_dc_kw",
@@ -289,6 +301,26 @@ def parse_uby_schema(filepath, project_name="", fallback_address="", fallback_ca
         alias_map = {
             "project_name": "project_name",
             "address": "address",
+            "project.name": "project.name",
+            "project.stage": "project.stage",
+            "implantation.address": "implantation.address",
+            "implantation.city": "implantation.city",
+            "implantation.state": "implantation.state",
+            "implantation.capex_total": "implantation.capex_total",
+            "implantation.timeline_status": "implantation.timeline_status",
+            "management.partner_name": "management.partner_name",
+            "operations.sessions_monthly": "operations.sessions_monthly",
+            "operations.energy_kwh_monthly": "operations.energy_kwh_monthly",
+            "operations.availability_pct": "operations.availability_pct",
+            "finance.revenue_monthly": "finance.revenue_monthly",
+            "finance.ebitda_monthly": "finance.ebitda_monthly",
+            "finance.gross_result_monthly": "finance.gross_result_monthly",
+            "finance.net_result_monthly": "finance.net_result_monthly",
+            "integration.source_type": "integration.source_type",
+            "integration.partner_name": "integration.partner_name",
+            "map.lat": "map.lat",
+            "map.lon": "map.lon",
+            "map.site_status": "map.site_status",
             "operational.chargers_dc": "operational.chargers_dc",
             "operational.chargers_ac": "operational.chargers_ac",
             "operational.power_dc_kw": "operational.power_dc_kw",
@@ -368,6 +400,8 @@ def parse_uby_schema(filepath, project_name="", fallback_address="", fallback_ca
                 continue
 
             target_path = alias_map.get(key_lower, alias_map.get(key))
+            if not target_path and (("." in key) or ("[" in key and "]" in key)):
+                target_path = key
             if not target_path:
                 continue
 
@@ -375,14 +409,7 @@ def parse_uby_schema(filepath, project_name="", fallback_address="", fallback_ca
             if value is None and target_path in numeric_fields:
                 continue
 
-            if "." not in target_path:
-                schema[target_path] = value
-                continue
-
-            root, child = target_path.split(".", 1)
-            if root not in schema or not isinstance(schema[root], dict):
-                continue
-            schema[root][child] = value
+            set_schema_value(schema, target_path, value)
 
         return schema
     except Exception:
@@ -400,6 +427,15 @@ def parse_full_project(filepath):
     schema = parse_uby_schema(filepath, project_name=name, fallback_address=address, fallback_capex=capex_total)
     if schema is None:
         schema = build_project_schema(inputs, project_name=name, address=address, capex_total=capex_total)
+    monthly = calc_monthly(schema)
+    schema = finalize_project_schema(
+        schema,
+        project_name=name,
+        address=address,
+        capex_total=capex_total,
+        monthly=monthly,
+        source_type="planilha",
+    )
     display_inputs = schema_to_display_inputs(schema) if has_uby_schema else (inputs or schema_to_display_inputs(schema))
 
     kpis = {}
@@ -422,7 +458,7 @@ def parse_full_project(filepath):
         "raw_inputs": inputs,
         "schema": schema,
         "schema_source": "UBY_SCHEMA" if has_uby_schema else "legacy",
-        "monthly": calc_monthly(schema),
+        "monthly": monthly,
         "kpis": kpis,
         "projection": proj_df,
         "scenarios": scen_df,
