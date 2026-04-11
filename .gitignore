@@ -1,6 +1,7 @@
 .streamlit/secrets.toml
 credentials.json
 drive_token.json
+geocode_cache.json
 data/*.xlsx
 __pycache__/
 utils/__pycache__/

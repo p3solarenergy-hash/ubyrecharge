@@ -14,6 +14,8 @@ import json
 import os
 from pathlib import Path
 from urllib.parse import urlparse
+import urllib.parse
+import urllib.request
 
 try:
     import streamlit as st
@@ -39,11 +41,14 @@ GOOGLE_SHEETS_MIME_TYPE = "application/vnd.google-apps.spreadsheet"
 GOOGLE_DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 JSON_MIME_TYPE = "application/json"
 LOCATIONS_FILENAME = "locations.json"
+GEOCODE_CACHE_FILENAME = "geocode_cache.json"
+GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
 APP_DIR = Path(__file__).resolve().parent.parent
 CFG_FILE = APP_DIR / "drive_config.json"
 TOKEN_FILE = APP_DIR / "drive_token.json"
 CREDS_FILE = APP_DIR / "credentials.json"
+GEOCODE_CACHE_FILE = APP_DIR / GEOCODE_CACHE_FILENAME
 
 DEFAULT_AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
 DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token"
@@ -106,6 +111,95 @@ def _json_secret_or_env(section: str, env_key: str):
         return json.loads(raw)
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Invalid JSON in environment variable {env_key}.") from exc
+
+
+def get_google_maps_api_key() -> str:
+    return str(_secret_or_env("google_maps", "api_key", "GOOGLE_MAPS_API_KEY", "") or "").strip()
+
+
+def _normalize_address(address: str) -> str:
+    return " ".join(str(address or "").strip().split())
+
+
+def _load_local_json(path: Path) -> dict:
+    if path.exists():
+        with path.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+            if isinstance(data, dict):
+                return data
+    return {}
+
+
+def _save_local_json(path: Path, data: dict):
+    with path.open("w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+
+
+def load_geocode_cache(folder_id: str | None = None) -> dict:
+    folder_id = (folder_id or get_folder_id()).strip()
+    if folder_id:
+        try:
+            drive_data = load_json_file_from_drive(GEOCODE_CACHE_FILENAME, folder_id)
+            if isinstance(drive_data, dict):
+                return drive_data
+        except Exception:
+            pass
+    return _load_local_json(GEOCODE_CACHE_FILE)
+
+
+def save_geocode_cache(data: dict, folder_id: str | None = None):
+    folder_id = (folder_id or get_folder_id()).strip()
+    if folder_id:
+        try:
+            save_json_file_to_drive(GEOCODE_CACHE_FILENAME, data, folder_id)
+        except Exception:
+            pass
+    _save_local_json(GEOCODE_CACHE_FILE, data)
+
+
+def geocode_address_with_google(address: str, folder_id: str | None = None) -> dict | None:
+    normalized_address = _normalize_address(address)
+    if not normalized_address:
+        return None
+
+    cache = load_geocode_cache(folder_id)
+    if normalized_address in cache:
+        return cache[normalized_address]
+
+    api_key = get_google_maps_api_key()
+    if not api_key:
+        return None
+
+    query = urllib.parse.urlencode({"address": normalized_address, "key": api_key, "region": "br"})
+    request = urllib.request.Request(f"{GOOGLE_GEOCODE_URL}?{query}", headers={"User-Agent": "UbyRecharge/1.0"})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    if payload.get("status") != "OK" or not payload.get("results"):
+        return None
+
+    result = payload["results"][0]
+    geometry = result.get("geometry", {}).get("location", {})
+    components = result.get("address_components", [])
+    city = ""
+    state = ""
+    for component in components:
+        types = set(component.get("types", []))
+        if {"administrative_area_level_2", "political"} <= types or "administrative_area_level_2" in types:
+            city = component.get("long_name", city)
+        if "administrative_area_level_1" in types:
+            state = component.get("short_name", state)
+
+    parsed = {
+        "lat": geometry.get("lat"),
+        "lon": geometry.get("lng"),
+        "city": city,
+        "state": state,
+        "formatted_address": result.get("formatted_address", normalized_address),
+    }
+    cache[normalized_address] = parsed
+    save_geocode_cache(cache, folder_id)
+    return parsed
 
 
 def ensure_excel_dir() -> str:
@@ -450,6 +544,106 @@ def save_locations_to_drive(data: dict, folder_id: str | None = None):
     save_json_file_to_drive(LOCATIONS_FILENAME, data, folder_id)
 
 
+def _get_sheet_tab_id(service, spreadsheet_id: str, title: str) -> int | None:
+    metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    for sheet in metadata.get("sheets", []):
+        props = sheet.get("properties", {})
+        if props.get("title") == title:
+            return props.get("sheetId")
+    return None
+
+
+def _read_schema_key_rows(service, spreadsheet_id: str) -> tuple[dict, list[list]]:
+    response = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range="'UBY_SCHEMA'!A:B",
+    ).execute()
+    values = response.get("values", [])
+    key_rows = {}
+    for row_index, row in enumerate(values, start=1):
+        if not row:
+            continue
+        key = str(row[0]).strip() if row[0] else ""
+        if key:
+            key_rows[key] = row_index
+    return key_rows, values
+
+
+def _ensure_schema_key_rows(service, spreadsheet_id: str, required_keys: list[str]) -> dict:
+    key_rows, values = _read_schema_key_rows(service, spreadsheet_id)
+    missing = [key for key in required_keys if key not in key_rows]
+    if not missing:
+        return key_rows
+
+    start_row = len(values) + 1 if values else 1
+    update_rows = [[key, ""] for key in missing]
+    service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'UBY_SCHEMA'!A{start_row}:B{start_row + len(update_rows) - 1}",
+        valueInputOption="USER_ENTERED",
+        body={"values": update_rows},
+    ).execute()
+    key_rows, _ = _read_schema_key_rows(service, spreadsheet_id)
+    return key_rows
+
+
+def ensure_google_sheet_base_schema(spreadsheet_id: str, folder_id: str | None = None):
+    if not get_google_maps_api_key() or not has_drive_write_access():
+        return
+    service = build("sheets", "v4", credentials=get_credentials())
+    if _get_sheet_tab_id(service, spreadsheet_id, "UBY_SCHEMA") is None:
+        return
+
+    required_keys = [
+        "project.status",
+        "implantation.city",
+        "implantation.state",
+        "map.lat",
+        "map.lon",
+    ]
+    key_rows = _ensure_schema_key_rows(service, spreadsheet_id, required_keys)
+    values_response = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range="'UBY_SCHEMA'!A:B",
+        valueRenderOption="UNFORMATTED_VALUE",
+    ).execute()
+    rows = values_response.get("values", [])
+
+    def read_value(key: str):
+        row_index = key_rows.get(key)
+        if not row_index or row_index - 1 >= len(rows):
+            return ""
+        row = rows[row_index - 1]
+        return row[1] if len(row) > 1 else ""
+
+    address = read_value("implantation.address") or read_value("address")
+    normalized_address = _normalize_address(address)
+    if not normalized_address:
+        return
+
+    geocoded = geocode_address_with_google(normalized_address, folder_id)
+    if not geocoded:
+        return
+
+    updates = []
+    for key, value in {
+        "implantation.city": geocoded.get("city", ""),
+        "implantation.state": geocoded.get("state", ""),
+        "map.lat": geocoded.get("lat", ""),
+        "map.lon": geocoded.get("lon", ""),
+    }.items():
+        row_index = key_rows.get(key)
+        current = read_value(key)
+        if row_index and str(current) != str(value):
+            updates.append({"range": f"'UBY_SCHEMA'!B{row_index}", "values": [[value]]})
+
+    if updates:
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"valueInputOption": "USER_ENTERED", "data": updates},
+        ).execute()
+
+
 def update_google_sheet_inputs(spreadsheet_id: str, edited_inputs: dict) -> bool:
     require_drive_write_access()
 
@@ -585,6 +779,8 @@ def sync_all(folder_id: str | None = None, dest_dir: str | None = None) -> tuple
         try:
             dest_path = os.path.join(target_dir, relative_path)
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            if item.get("mimeType") == GOOGLE_SHEETS_MIME_TYPE:
+                ensure_google_sheet_base_schema(item["id"], effective_folder_id)
             download_file(item["id"], dest_path, item.get("mimeType", XLSX_MIME_TYPE))
             downloaded.append(relative_path)
             manifest[relative_path] = {

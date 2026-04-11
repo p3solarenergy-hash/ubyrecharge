@@ -7,7 +7,7 @@ from utils.project_portfolio import filter_projects, load_portfolio_projects
 
 st.set_page_config(page_title="Implantacao | Resumo", page_icon="📍", layout="wide")
 st.title("📍 Resumo de Implantacao")
-st.caption("Visao consolidada dos projetos em estruturacao, obra e comissionamento.")
+st.caption("Visao consolidada dos projetos entre prospeccao, estudo, contrato e obra.")
 
 
 @st.cache_data(ttl=10)
@@ -22,14 +22,14 @@ if not projects:
 
 is_manager = is_manager_authenticated()
 
+count_em_estudo = sum(1 for project in projects if project["site_status"] == "em_estudo")
 count_em_obra = sum(1 for project in projects if project["site_status"] == "em_obra")
-count_comissionamento = sum(1 for project in projects if project["site_status"] == "comissionamento")
 total_capex = sum(project["monthly"].get("capex", 0) for project in projects)
 
 top = st.columns(4)
 top[0].metric("Projetos em implantacao", len(projects))
-top[1].metric("Em obra", count_em_obra)
-top[2].metric("Comissionamento", count_comissionamento)
+top[1].metric("Em estudo", count_em_estudo)
+top[2].metric("Em obra", count_em_obra)
 top[3].metric("CAPEX total", f"R$ {total_capex:,.0f}" if is_manager else show_manager_hint())
 
 rows = []

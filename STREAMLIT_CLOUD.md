@@ -25,6 +25,9 @@ scopes = [
 
 [google_drive]
 folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
+
+[google_maps]
+api_key = "SUA_GOOGLE_MAPS_API_KEY"
 ```
 
 ## Como obter o refresh token
@@ -38,5 +41,6 @@ folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
 ## Comportamento do app
 
 - Os arquivos sincronizados ficam em `data/`
+- A sincronizacao atualiza a `UBY_SCHEMA` com cidade, estado, latitude e longitude quando `google_maps.api_key` estiver configurada
 - Apenas arquivos `.xlsx` sao baixados
 - `.xlsx` removidos do Drive sao removidos da pasta local sincronizada

@@ -1,126 +1,20 @@
-import json
-import os
 import urllib.parse
-import urllib.request
 
 import folium
 import streamlit as st
 from streamlit_folium import st_folium
 
-from utils.drive_sync import get_folder_id, load_locations_from_drive, save_locations_to_drive
-from utils.project_portfolio import CHARGER_STATUS_COLORS, SITE_STATUS_COLORS, filter_projects, load_portfolio_projects
+from utils.project_portfolio import CHARGER_STATUS_COLORS, SITE_STATUS_COLORS, load_portfolio_projects
 from utils.ui_settings import load_ui_settings
-
-APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-LOC_FILE = os.path.join(APP_DIR, "locations.json")
-
-
-def load_locations():
-    folder_id = get_folder_id()
-    if folder_id:
-        try:
-            drive_data = load_locations_from_drive(folder_id)
-            if isinstance(drive_data, dict):
-                return drive_data
-        except Exception:
-            pass
-
-    if os.path.exists(LOC_FILE):
-        with open(LOC_FILE, "r", encoding="utf-8") as file:
-            return json.load(file)
-    return {}
-
-
-def save_locations(data):
-    folder_id = get_folder_id()
-    if folder_id:
-        try:
-            save_locations_to_drive(data, folder_id)
-        except Exception:
-            pass
-
-    with open(LOC_FILE, "w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
-
-
-def geocode(address: str):
-    try:
-        url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
-            {"q": address, "format": "json", "limit": 1, "countrycodes": "br"}
-        )
-        request = urllib.request.Request(url, headers={"User-Agent": "UbyRecharge/1.0"})
-        with urllib.request.urlopen(request, timeout=5) as response:
-            data = json.loads(response.read())
-        if data:
-            return float(data[0]["lat"]), float(data[0]["lon"])
-    except Exception:
-        pass
-    return None
 
 
 def gmaps_link(address: str) -> str:
-    return "https://www.google.com/maps/search/" + urllib.parse.quote(address)
+    return "https://www.google.com/maps/search/" + urllib.parse.quote(address or "")
 
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=60)
 def load_portfolio():
     return load_portfolio_projects()
-
-
-def _sync_locations(projects: list[dict], locations: dict) -> tuple[list[dict], dict, bool]:
-    changed = False
-    synced = []
-    current_names = {project["name"] for project in projects}
-
-    for stale_name in list(locations.keys()):
-        if stale_name not in current_names:
-            del locations[stale_name]
-            changed = True
-
-    for project in projects:
-        entry = locations.get(
-            project["name"],
-            {
-                "endereco_completo": project.get("address", ""),
-                "lat": project.get("lat"),
-                "lon": project.get("lon"),
-                "status": project.get("site_status", "planejado"),
-            },
-        )
-
-        address = project.get("address", "") or entry.get("endereco_completo", "")
-        lat = project.get("lat") if project.get("lat") is not None else entry.get("lat")
-        lon = project.get("lon") if project.get("lon") is not None else entry.get("lon")
-        site_status = project.get("site_status", entry.get("status", "planejado"))
-
-        if address and (lat is None or lon is None):
-            coords = geocode(address)
-            if coords:
-                lat, lon = coords
-                changed = True
-
-        normalized = {
-            "endereco_completo": address,
-            "lat": lat,
-            "lon": lon,
-            "status": site_status,
-        }
-        if locations.get(project["name"]) != normalized:
-            locations[project["name"]] = normalized
-            changed = True
-
-        synced.append(
-            {
-                **project,
-                "address": address,
-                "lat": lat,
-                "lon": lon,
-                "site_status": site_status,
-                "site_color": SITE_STATUS_COLORS.get(site_status, "#00c8ff"),
-            }
-        )
-
-    return synced, locations, changed
 
 
 def _charger_badges(project: dict) -> str:
@@ -143,12 +37,12 @@ def _charger_badges(project: dict) -> str:
 def _render_map(projects: list[dict]):
     valid_projects = [project for project in projects if project.get("lat") is not None and project.get("lon") is not None]
     if not valid_projects:
-        st.info("Nenhum eletroposto com coordenadas configuradas.")
+        st.info("Nenhum eletroposto com coordenadas prontas na UBY_SCHEMA.")
         return
 
     center = [
-        sum(project["lat"] for project in valid_projects) / len(valid_projects),
-        sum(project["lon"] for project in valid_projects) / len(valid_projects),
+        sum(float(project["lat"]) for project in valid_projects) / len(valid_projects),
+        sum(float(project["lon"]) for project in valid_projects) / len(valid_projects),
     ]
 
     map_object = folium.Map(location=center, zoom_start=6, tiles=None)
@@ -170,10 +64,10 @@ def _render_map(projects: list[dict]):
         color = project["site_color"]
         address = project.get("address", "") or "Endereco nao cadastrado"
         popup_html = f"""
-        <div style="font-family:Arial,sans-serif;min-width:280px;color:#222;">
+        <div style="font-family:Arial,sans-serif;min-width:290px;color:#222;">
             <div style="background:{color};padding:10px 14px;border-radius:10px 10px 0 0;color:#fff;">
                 <strong>{project['name']}</strong><br>
-                <span style="font-size:12px;">{project['stage_label']} - {project['site_status_label']}</span>
+                <span style="font-size:12px;">{project['site_status_label']}</span>
             </div>
             <div style="padding:12px 14px;background:#fff;border-radius:0 0 10px 10px;">
                 <div style="font-size:12px;margin-bottom:8px;">📍 {address}</div>
@@ -234,24 +128,31 @@ def render_home():
                 font-size: 11px;
                 margin-right: 6px;
             }
+            .pending-card {
+                background:#151924;
+                border:1px dashed #324056;
+                border-radius:12px;
+                padding:12px 14px;
+                margin-bottom:10px;
+            }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    projects, locations, changed = _sync_locations(load_portfolio(), load_locations())
-    if changed:
-        save_locations(locations)
-
+    projects = load_portfolio()
     total_sites = len(projects)
-    implantation_sites = len(filter_projects(projects, "Implantacao"))
-    management_sites = len(filter_projects(projects, "Gestao"))
+    implantation_sites = len([project for project in projects if project["group"] == "Implantacao"])
+    management_sites = len([project for project in projects if project["group"] == "Gestao"])
     total_chargers = sum(project["charger_count"] for project in projects)
-    active_chargers = sum(project["charger_status_counts"].get("livre", 0) + project["charger_status_counts"].get("ocupado", 0) for project in projects)
-    alert_sites = sum(1 for project in projects if project["site_status"] == "alerta")
+    active_chargers = sum(
+        project["charger_status_counts"].get("livre", 0) + project["charger_status_counts"].get("ocupado", 0)
+        for project in projects
+    )
+    pending_geo = [project for project in projects if project.get("lat") is None or project.get("lon") is None]
 
     st.title(f"⚡ {brand['app_title']}")
-    st.caption(brand["app_caption"])
+    st.caption("Mapa operacional dos eletropostos com base na UBY_SCHEMA e foco no cenário base.")
     st.markdown("---")
 
     top_cards = st.columns(6)
@@ -260,22 +161,18 @@ def render_home():
     top_cards[2].metric(cards["management_title"], management_sites)
     top_cards[3].metric("Carregadores", total_chargers)
     top_cards[4].metric("Ativos agora", active_chargers)
-    top_cards[5].metric("Postos em alerta", alert_sites)
+    top_cards[5].metric("Pendentes de mapa", len(pending_geo))
+
+    statuses = sorted({project["site_status_label"] for project in projects})
+    partners = sorted({project["partner_name"] for project in projects})
+    cities = sorted({project["city"] for project in projects if project["city"]})
 
     st.markdown("---")
-    filter_col1, filter_col2, filter_col3, filter_col4 = st.columns([1.2, 1.2, 1.2, 2])
-    group_filter = filter_col1.multiselect("Fase", ["Implantacao", "Gestao"], default=["Implantacao", "Gestao"])
-    status_filter = filter_col2.multiselect(
-        "Status do posto",
-        sorted({project["site_status_label"] for project in projects}),
-        default=sorted({project["site_status_label"] for project in projects}),
-    )
-    partner_filter = filter_col3.multiselect(
-        "Parceiro",
-        sorted({project["partner_name"] for project in projects}),
-        default=sorted({project["partner_name"] for project in projects}),
-    )
-    search_filter = filter_col4.text_input("Busca por posto, cidade ou estado", placeholder="Ex.: Faxinal, Londrina, obra...")
+    filter_col1, filter_col2, filter_col3, filter_col4 = st.columns([1.1, 1.4, 1.3, 2])
+    group_filter = filter_col1.multiselect("Bloco", ["Implantacao", "Gestao"], default=["Implantacao", "Gestao"])
+    status_filter = filter_col2.multiselect("Status do projeto", statuses, default=statuses)
+    partner_filter = filter_col3.multiselect("Parceiro", partners, default=partners)
+    search_filter = filter_col4.text_input("Busca por posto, cidade, estado ou endereco", placeholder="Ex.: Londrina, contrato, Robert Koch")
 
     filtered = [
         project
@@ -291,10 +188,11 @@ def render_home():
             or search_filter.lower() in project["address"].lower()
         )
     ]
+    filtered_pending = [project for project in filtered if project.get("lat") is None or project.get("lon") is None]
 
     map_col, list_col = st.columns([3, 1.2])
     with map_col:
-        st.markdown("### Mapa operacional dos eletropostos")
+        st.markdown("### Mapa dos eletropostos")
         _render_map(filtered)
 
     with list_col:
@@ -302,6 +200,8 @@ def render_home():
         if not filtered:
             st.info("Nenhum posto encontrado com os filtros atuais.")
         for project in filtered:
+            link = gmaps_link(project["address"]) if project.get("address") else ""
+            link_html = f"<a href='{link}' target='_blank' style='color:#00c8ff;'>Abrir no Google Maps</a>" if link else ""
             st.markdown(
                 f"""
                 <div class="project-card" style="border-left-color:{project['site_color']};">
@@ -309,50 +209,43 @@ def render_home():
                     <div style="font-size:12px;color:#b0b7c3;margin-bottom:8px;">📍 {project['address'] or 'Endereco nao informado'}</div>
                     <div style="margin-bottom:8px;">
                         <span class="status-chip" style="background:{project['site_color']};">{project['site_status_label']}</span>
-                        <span class="status-chip" style="background:#2d3748;">{project['stage_label']}</span>
+                        <span class="status-chip" style="background:#2d3748;">{project['group']}</span>
                     </div>
                     <div style="font-size:12px;color:#d6d9e0;">🤝 {project['partner_name']}</div>
                     <div style="font-size:12px;color:#d6d9e0;">🔌 {project['charger_count']} carregador(es)</div>
                     <div style="font-size:12px;color:#d6d9e0;">💸 Receita: R$ {project['revenue_monthly']:,.0f}</div>
-                    <div style="font-size:12px;color:#00c8ff;">EBITDA: R$ {project['ebitda_monthly']:,.0f}</div>
+                    <div style="font-size:12px;color:#00c8ff;margin-bottom:6px;">EBITDA: R$ {project['ebitda_monthly']:,.0f}</div>
+                    <div style="font-size:12px;">{link_html}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
     st.markdown("---")
-    st.markdown("### Gerenciar localizacoes")
-    st.caption("Ajuste endereco, coordenadas e status agregado do posto quando necessario.")
+    pending_col, region_col = st.columns([1.4, 1])
+    with pending_col:
+        st.markdown("### Pendências de coordenadas")
+        if not filtered_pending:
+            st.success("Todos os postos filtrados já têm latitude e longitude prontas na UBY_SCHEMA.")
+        else:
+            for project in filtered_pending:
+                st.markdown(
+                    f"""
+                    <div class="pending-card">
+                        <div style="font-weight:700;color:#fff;">{project['name']}</div>
+                        <div style="font-size:12px;color:#c6ccd8;margin:6px 0 8px;">{project['address'] or 'Endereco ausente na planilha'}</div>
+                        <div style="font-size:12px;color:#8fb9ff;">Atualize a UBY_SCHEMA ou execute a sincronização com geocoding Google habilitado.</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-    with st.form("form_locations"):
-        updated = {}
-        for project in projects:
-            st.markdown(f"**{project['name']}**")
-            col_a, col_b, col_c, col_d = st.columns([3.2, 1, 1, 1.2])
-            new_address = col_a.text_input(
-                "Endereco completo",
-                value=project.get("address", ""),
-                key=f"addr_{project['name']}",
-            )
-            new_lat = col_b.text_input("Latitude", value="" if project.get("lat") is None else str(project["lat"]), key=f"lat_{project['name']}")
-            new_lon = col_c.text_input("Longitude", value="" if project.get("lon") is None else str(project["lon"]), key=f"lon_{project['name']}")
-            new_status = col_d.selectbox(
-                "Status",
-                options=list(SITE_STATUS_COLORS.keys()),
-                index=list(SITE_STATUS_COLORS.keys()).index(project.get("site_status", "planejado")),
-                key=f"status_{project['name']}",
-            )
-            updated[project["name"]] = {
-                "endereco_completo": new_address.strip(),
-                "lat": float(new_lat) if new_lat not in {"", None} else None,
-                "lon": float(new_lon) if new_lon not in {"", None} else None,
-                "status": new_status,
-            }
-
-        submitted = st.form_submit_button("Salvar localizacoes", type="primary")
-
-    if submitted:
-        save_locations(updated)
-        st.success("Localizacoes atualizadas.")
-        st.cache_data.clear()
-        st.rerun()
+    with region_col:
+        st.markdown("### Cobertura")
+        if cities:
+            for city in cities:
+                count = sum(1 for project in filtered if project["city"] == city)
+                if count:
+                    st.markdown(f"- **{city}**: {count} posto(s)")
+        else:
+            st.info("As cidades serão preenchidas a partir da geocodificação Google.")

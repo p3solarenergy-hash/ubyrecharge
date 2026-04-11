@@ -6,9 +6,25 @@ import unicodedata
 from typing import Any
 
 
-IMPLANTATION_STAGES = {"planejado", "implantacao", "em_obra", "comissionamento"}
-MANAGEMENT_STAGES = {"operacao_assistida", "gestao"}
-SITE_STATUSES = ("planejado", "em_obra", "comissionamento", "ativo", "inativo", "alerta")
+PROJECT_STATUS_LABELS = {
+    "prospeccao": "Prospecção",
+    "em_estudo": "Em Estudo",
+    "estudo_realizado_viavel": "Estudo Realizado (Viável)",
+    "fase_de_contrato": "Fase de Contrato",
+    "em_obra": "Em Obra",
+    "ativo": "Ativo",
+}
+LEGACY_STATUS_ALIASES = {
+    "planejado": "Prospecção",
+    "implantacao": "Em Estudo",
+    "em_obra": "Em Obra",
+    "comissionamento": "Fase de Contrato",
+    "operacao_assistida": "Ativo",
+    "gestao": "Ativo",
+    "inativo": "Fase de Contrato",
+    "alerta": "Fase de Contrato",
+}
+MANAGEMENT_STATUSES = {"ativo"}
 CHARGER_STATUSES = ("livre", "ocupado", "offline", "falha", "planejado", "em_obra", "comissionamento", "ativo")
 
 
@@ -16,6 +32,12 @@ def normalize_text(value: Any) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = text.replace("Âº", "o").replace("Âª", "a")
     return text.encode("ascii", errors="ignore").decode().lower().strip()
+
+
+def _status_key(value: Any) -> str:
+    normalized = normalize_text(value)
+    normalized = normalized.replace("(", " ").replace(")", " ")
+    return re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
 
 
 def safe_float(value: Any, default: float = 0.0) -> float:
@@ -109,29 +131,25 @@ def set_schema_value(schema: dict, path: str, value):
         current[last] = value
 
 
+def canonical_project_status(value: Any, default: str = "Em Estudo") -> str:
+    key = _status_key(value)
+    if key in PROJECT_STATUS_LABELS:
+        return PROJECT_STATUS_LABELS[key]
+    if key in LEGACY_STATUS_ALIASES:
+        return LEGACY_STATUS_ALIASES[key]
+    return default
+
+
 def humanize_stage(stage: str) -> str:
-    labels = {
-        "planejado": "Planejado",
-        "implantacao": "Implantacao",
-        "em_obra": "Em obra",
-        "comissionamento": "Comissionamento",
-        "operacao_assistida": "Operacao assistida",
-        "gestao": "Gestao",
-        "ativo": "Ativo",
-        "inativo": "Inativo",
-        "alerta": "Alerta",
-    }
-    normalized = normalize_text(stage)
-    return labels.get(normalized, stage or "Nao definido")
+    return canonical_project_status(stage, default=stage or "Nao definido")
 
 
 def is_management_stage(stage: str) -> bool:
-    return normalize_text(stage) in MANAGEMENT_STAGES
+    return _status_key(stage) in MANAGEMENT_STATUSES
 
 
 def is_implantation_stage(stage: str) -> bool:
-    normalized = normalize_text(stage)
-    return normalized in IMPLANTATION_STAGES or normalized not in MANAGEMENT_STAGES
+    return not is_management_stage(stage)
 
 
 def default_project_schema(project_name: str = "", address: str = "", capex_total: float | None = None) -> dict:
@@ -140,14 +158,14 @@ def default_project_schema(project_name: str = "", address: str = "", capex_tota
         "address": address,
         "project": {
             "name": project_name,
-            "stage": "implantacao",
+            "status": "Em Estudo",
         },
         "implantation": {
             "address": address,
             "city": "",
             "state": "",
             "capex_total": float(capex_total or 0.0),
-            "timeline_status": "planejado",
+            "timeline_status": "Em Estudo",
         },
         "management": {
             "partner_name": "",
@@ -170,7 +188,7 @@ def default_project_schema(project_name: str = "", address: str = "", capex_tota
         "map": {
             "lat": None,
             "lon": None,
-            "site_status": "planejado",
+            "site_status": "Em Estudo",
         },
         "chargers": [],
         "operational": {
@@ -192,12 +210,8 @@ def default_project_schema(project_name: str = "", address: str = "", capex_tota
             "other_variable_cost_kwh": 0.0,
         },
         "occupancy": {
-            "dc_pessimistic": 0.15,
             "dc_base": 0.3,
-            "dc_optimistic": 0.45,
-            "ac_pessimistic": 0.1,
             "ac_base": 0.1,
-            "ac_optimistic": 0.1,
         },
         "costs": {
             "area_share_pct": 0.0,
@@ -259,7 +273,7 @@ def _build_default_chargers(schema: dict, stage: str, site_status: str, partner_
     ac_power = safe_float(get_schema_value(schema, "operational.power_ac_kw", 0.0), 0.0)
 
     charger_status = site_status
-    if normalize_text(stage) in MANAGEMENT_STAGES and charger_status not in {"livre", "ocupado", "offline", "falha"}:
+    if is_management_stage(stage) and charger_status not in {"livre", "ocupado", "offline", "falha"}:
         charger_status = "ativo"
 
     for index in range(total_dc):
@@ -289,45 +303,25 @@ def _build_default_chargers(schema: dict, stage: str, site_status: str, partner_
     return generated
 
 
-def _derive_stage(schema: dict, monthly: dict | None) -> str:
-    stage = normalize_text(get_schema_value(schema, "project.stage", ""))
-    if stage:
-        return stage
+def _derive_project_status(schema: dict, monthly: dict | None) -> str:
+    explicit = get_schema_value(schema, "project.status", "")
+    if explicit:
+        return canonical_project_status(explicit)
 
-    timeline_status = normalize_text(get_schema_value(schema, "implantation.timeline_status", ""))
-    if timeline_status in IMPLANTATION_STAGES:
-        return "implantacao" if timeline_status == "planejado" else timeline_status
+    legacy_stage = get_schema_value(schema, "project.stage", "")
+    if legacy_stage:
+        return canonical_project_status(legacy_stage)
+
+    timeline_status = get_schema_value(schema, "implantation.timeline_status", "")
+    if timeline_status:
+        return canonical_project_status(timeline_status)
 
     sessions = safe_float(get_schema_value(schema, "operations.sessions_monthly", 0.0), 0.0)
     revenue = safe_float(get_schema_value(schema, "finance.revenue_monthly", 0.0), 0.0)
     if not revenue and monthly:
         revenue = safe_float(monthly.get("receita"), 0.0)
 
-    return "gestao" if sessions > 0 or revenue > 0 else "implantacao"
-
-
-def _derive_site_status(schema: dict, stage: str, monthly: dict | None) -> str:
-    explicit = normalize_text(get_schema_value(schema, "map.site_status", ""))
-    if explicit in SITE_STATUSES:
-        return explicit
-
-    timeline_status = normalize_text(get_schema_value(schema, "implantation.timeline_status", ""))
-    if timeline_status in {"planejado", "em_obra", "comissionamento"}:
-        return timeline_status
-
-    if normalize_text(stage) in IMPLANTATION_STAGES:
-        return "em_obra" if normalize_text(stage) == "implantacao" else normalize_text(stage)
-
-    availability = safe_float(get_schema_value(schema, "operations.availability_pct", 0.0), 0.0)
-    revenue = safe_float(get_schema_value(schema, "finance.revenue_monthly", 0.0), 0.0)
-    if not revenue and monthly:
-        revenue = safe_float(monthly.get("receita"), 0.0)
-
-    if availability and availability < 0.75:
-        return "alerta"
-    if revenue <= 0:
-        return "inativo"
-    return "ativo"
+    return "Ativo" if sessions > 0 or revenue > 0 else "Em Estudo"
 
 
 def _extract_city_state(address: str) -> tuple[str, str]:
@@ -376,8 +370,9 @@ def finalize_project_schema(
     final["address"] = address or final.get("address") or get_schema_value(final, "implantation.address", "")
 
     final["project"]["name"] = final.get("project_name", "")
-    stage = _derive_stage(final, monthly)
-    final["project"]["stage"] = stage
+    status = _derive_project_status(final, monthly)
+    final["project"]["status"] = status
+    final["project"].pop("stage", None)
 
     final["implantation"]["address"] = final.get("address", "")
     if capex_total is not None:
@@ -394,9 +389,10 @@ def finalize_project_schema(
         final["implantation"]["city"] = derived_city
         final["implantation"]["state"] = derived_state
 
-    timeline_status = normalize_text(get_schema_value(final, "implantation.timeline_status", ""))
-    if timeline_status not in IMPLANTATION_STAGES:
-        final["implantation"]["timeline_status"] = "ativo" if is_management_stage(stage) else "planejado"
+    final["implantation"]["timeline_status"] = canonical_project_status(
+        get_schema_value(final, "implantation.timeline_status", status),
+        default=status,
+    )
 
     partner_name = (
         str(get_schema_value(final, "management.partner_name", "") or "").strip()
@@ -416,7 +412,7 @@ def finalize_project_schema(
         0.0,
     )
     final["operations"]["availability_pct"] = safe_float(
-        get_schema_value(final, "operations.availability_pct", 1.0 if is_management_stage(stage) else 0.0),
+        get_schema_value(final, "operations.availability_pct", 1.0 if is_management_stage(status) else 0.0),
         0.0,
     )
 
@@ -436,10 +432,9 @@ def finalize_project_schema(
     final["finance"]["gross_result_monthly"] = gross_result
     final["finance"]["net_result_monthly"] = net_result
 
-    site_status = _derive_site_status(final, stage, monthly)
-    final["map"]["site_status"] = site_status
+    final["map"]["site_status"] = status
 
-    chargers = _build_default_chargers(final, stage, site_status, partner_name)
+    chargers = _build_default_chargers(final, status, normalize_text(status), partner_name)
     final["chargers"] = chargers
     return final
 
@@ -474,12 +469,8 @@ def build_project_schema(raw_inputs: dict, project_name: str = "", address: str 
     )
     schema["occupancy"].update(
         {
-            "dc_pessimistic": _extract_value(raw_inputs, "ocupacao dc", scenario="pessimista"),
             "dc_base": _extract_value(raw_inputs, "ocupacao dc", scenario="conservador", default=0.3),
-            "dc_optimistic": _extract_value(raw_inputs, "ocupacao dc", scenario="otimista"),
-            "ac_pessimistic": _extract_value(raw_inputs, "ocupacao ac", scenario="pessimista"),
             "ac_base": _extract_value(raw_inputs, "ocupacao ac", scenario="conservador", default=0.1),
-            "ac_optimistic": _extract_value(raw_inputs, "ocupacao ac", scenario="otimista"),
         }
     )
     schema["costs"].update(
@@ -616,14 +607,11 @@ def schema_to_rows(schema: dict) -> list[list]:
     rows = [["campo", "valor"]]
     ordered_paths = [
         "project.name",
-        "project.stage",
-        "project_name",
-        "address",
+        "project.status",
         "implantation.address",
         "implantation.city",
         "implantation.state",
         "implantation.capex_total",
-        "implantation.timeline_status",
         "management.partner_name",
         "operations.sessions_monthly",
         "operations.energy_kwh_monthly",
@@ -633,26 +621,39 @@ def schema_to_rows(schema: dict) -> list[list]:
         "finance.gross_result_monthly",
         "finance.net_result_monthly",
         "integration.source_type",
-        "integration.partner_name",
         "map.lat",
         "map.lon",
-        "map.site_status",
+        "operational.chargers_dc",
+        "operational.chargers_ac",
+        "operational.power_dc_kw",
+        "operational.power_ac_kw",
+        "operational.plugs_total",
+        "operational.power_total_kw",
+        "operational.hours_per_day",
+        "operational.days_per_month",
+        "operational.efficiency_factor",
+        "operational.battery_capacity_kwh",
+        "pricing.sale_price_dc",
+        "pricing.sale_price_ac",
+        "pricing.energy_cost_kwh",
+        "pricing.other_variable_cost_kwh",
+        "occupancy.dc_base",
+        "occupancy.ac_base",
+        "costs.area_share_pct",
+        "costs.management_pct",
+        "costs.taxes_pct",
+        "costs.fixed_costs_monthly",
+        "costs.replacement_capex_monthly",
+        "investment.capex_total",
+        "investment.project_horizon_months",
+        "investment.discount_rate_annual",
+        "growth.energy_cost_annual",
+        "growth.sale_price_annual",
+        "growth.fixed_costs_annual",
     ]
 
     for path in ordered_paths:
         rows.append([path, get_schema_value(schema, path, "")])
-
-    for _label, path, _unit in DISPLAY_FIELDS:
-        rows.append([path, get_schema_value(schema, path, "")])
-
-    rows.extend(
-        [
-            ["occupancy.dc_pessimistic", get_schema_value(schema, "occupancy.dc_pessimistic", 0.0)],
-            ["occupancy.dc_optimistic", get_schema_value(schema, "occupancy.dc_optimistic", 0.0)],
-            ["occupancy.ac_pessimistic", get_schema_value(schema, "occupancy.ac_pessimistic", 0.0)],
-            ["occupancy.ac_optimistic", get_schema_value(schema, "occupancy.ac_optimistic", 0.0)],
-        ]
-    )
 
     for index, charger in enumerate(get_schema_value(schema, "chargers", [])):
         rows.extend(

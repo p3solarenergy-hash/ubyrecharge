@@ -69,6 +69,9 @@ scopes = [
 
 [google_drive]
 folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
+
+[google_maps]
+api_key = "SUA_GOOGLE_MAPS_API_KEY"
 ```
 """
         )
@@ -79,6 +82,7 @@ folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
         st.caption(
             "O credentials.json e o drive_token.json continuam funcionando localmente como fallback, mas nao sao mais necessarios no deploy."
         )
+        st.info("Com `google_maps.api_key`, a sincronizacao atualiza `map.lat`, `map.lon`, cidade e estado na UBY_SCHEMA.")
         st.warning(
             "Para salvar localizações e editar os Google Sheets de origem, o token precisa usar os escopos "
             "`https://www.googleapis.com/auth/drive` e `https://www.googleapis.com/auth/spreadsheets`."

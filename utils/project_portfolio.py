@@ -3,25 +3,25 @@ from __future__ import annotations
 import os
 
 from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project
-from utils.project_schema import get_schema_value, humanize_stage, is_management_stage, normalize_text
+from utils.project_schema import canonical_project_status, get_schema_value, humanize_stage, is_management_stage, normalize_text
 
 
 SITE_STATUS_LABELS = {
-    "planejado": "Planejado",
-    "em_obra": "Em obra",
-    "comissionamento": "Comissionamento",
+    "prospeccao": "Prospecção",
+    "em_estudo": "Em Estudo",
+    "estudo_realizado_viavel": "Estudo Realizado (Viável)",
+    "fase_de_contrato": "Fase de Contrato",
+    "em_obra": "Em Obra",
     "ativo": "Ativo",
-    "inativo": "Inativo",
-    "alerta": "Alerta",
 }
 
 SITE_STATUS_COLORS = {
-    "planejado": "#7f8c8d",
-    "em_obra": "#f39c12",
-    "comissionamento": "#9b59b6",
+    "prospeccao": "#64748b",
+    "em_estudo": "#2563eb",
+    "estudo_realizado_viavel": "#0891b2",
+    "fase_de_contrato": "#d97706",
+    "em_obra": "#ea580c",
     "ativo": "#00c853",
-    "inativo": "#95a5a6",
-    "alerta": "#ff5252",
 }
 
 CHARGER_STATUS_COLORS = {
@@ -61,8 +61,14 @@ def _group_for_stage(stage: str) -> str:
 
 def build_project_record(project: dict) -> dict:
     schema = project.get("schema", {})
-    stage = normalize_text(get_schema_value(schema, "project.stage", "implantacao")) or "implantacao"
-    site_status = normalize_text(get_schema_value(schema, "map.site_status", "planejado")) or "planejado"
+    status_label = canonical_project_status(
+        get_schema_value(
+            schema,
+            "project.status",
+            get_schema_value(schema, "map.site_status", get_schema_value(schema, "project.stage", "Em Estudo")),
+        )
+    )
+    status_key = normalize_text(status_label).replace(" ", "_").replace("(", "").replace(")", "")
     chargers = get_schema_value(schema, "chargers", []) or []
     partner_name = (
         str(get_schema_value(schema, "management.partner_name", "") or "").strip()
@@ -80,12 +86,12 @@ def build_project_record(project: dict) -> dict:
 
     return {
         **project,
-        "stage": stage,
-        "stage_label": humanize_stage(stage),
-        "group": _group_for_stage(stage),
-        "site_status": site_status,
-        "site_status_label": SITE_STATUS_LABELS.get(site_status, humanize_stage(site_status)),
-        "site_color": SITE_STATUS_COLORS.get(site_status, "#00c8ff"),
+        "stage": status_label,
+        "stage_label": humanize_stage(status_label),
+        "group": _group_for_stage(status_label),
+        "site_status": status_key,
+        "site_status_label": SITE_STATUS_LABELS.get(status_key, status_label),
+        "site_color": SITE_STATUS_COLORS.get(status_key, "#00c8ff"),
         "partner_name": partner_name,
         "city": city,
         "state": state,

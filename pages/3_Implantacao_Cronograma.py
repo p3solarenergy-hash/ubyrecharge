@@ -5,15 +5,15 @@ from utils.project_portfolio import filter_projects, load_portfolio_projects
 
 st.set_page_config(page_title="Implantacao | Cronograma", page_icon="🗓️", layout="wide")
 st.title("🗓️ Cronograma de Implantacao")
-st.caption("Acompanhamento macro dos projetos entre planejamento, obra e comissionamento.")
+st.caption("Acompanhamento macro dos projetos entre prospeccao, estudo, contrato e obra.")
 
 PROGRESS_BY_STATUS = {
-    "planejado": 0.15,
-    "em_obra": 0.55,
-    "comissionamento": 0.85,
+    "prospeccao": 0.1,
+    "em_estudo": 0.3,
+    "estudo_realizado_viavel": 0.5,
+    "fase_de_contrato": 0.7,
+    "em_obra": 0.9,
     "ativo": 1.0,
-    "inativo": 1.0,
-    "alerta": 0.7,
 }
 
 
