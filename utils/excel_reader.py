@@ -1,4 +1,5 @@
 import os
+import re
 import unicodedata
 import warnings
 
@@ -34,6 +35,10 @@ def ascii_key(s):
     s = unicodedata.normalize("NFKD", str(s))
     s = s.encode("ascii", errors="ignore").decode().lower().strip()
     return s
+
+
+def _sheet_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", ascii_key(value or ""))
 
 
 def get_all_projects():
@@ -207,12 +212,25 @@ def parse_scenarios(filepath):
 def parse_budget(filepath):
     try:
         wb = load_workbook(filepath, data_only=True)
-        sheet_name = next((sheet for sheet in wb.sheetnames if "Orcamento" in sheet or "Or" in sheet and "amento" in sheet), None)
+        sheet_name = next(
+            (
+                sheet
+                for sheet in wb.sheetnames
+                if any(token in _sheet_key(sheet) for token in ["orcamentoprojeto", "orcamento", "budget"])
+            ),
+            None,
+        )
         if not sheet_name:
             return None, None, ""
 
         ws = wb[sheet_name]
-        address = ws["B4"].value if ws["B4"].value is not None else ""
+        address = ""
+        for cell_ref in ("B4", "B5", "C4", "C5"):
+            cell_value = ws[cell_ref].value if ws[cell_ref].value is not None else ""
+            cell_value = str(cell_value).strip() if cell_value else ""
+            if cell_value:
+                address = cell_value
+                break
         address = str(address).strip() if address else ""
         rows = list(ws.iter_rows(values_only=True))
         header_row = None

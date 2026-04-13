@@ -110,10 +110,10 @@ def _render_geo_fix_panel(project: dict):
     source = project.get("source") or {}
     spreadsheet_id = source.get("id", "")
     address_value = st.text_input(
-        "Endereço Google Maps",
+        "Endereço ou link do Google Maps",
         value=project.get("address", "") or "",
         key=f"geo-address-{project['relative_path']}",
-        placeholder="Cole aqui o endereço do Google Maps",
+        placeholder="Cole aqui o endereço ou o link do Google Maps",
     )
 
     if st.button("Buscar localização e salvar", key=f"geo-save-{project['relative_path']}", use_container_width=True):

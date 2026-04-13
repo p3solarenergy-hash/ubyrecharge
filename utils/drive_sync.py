@@ -13,6 +13,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 from urllib.parse import urlparse
 import urllib.parse
 import urllib.request
@@ -121,6 +122,33 @@ def _normalize_address(address: str) -> str:
     return " ".join(str(address or "").strip().split())
 
 
+def _extract_google_maps_coordinates(raw_value: str) -> dict | None:
+    text = str(raw_value or "").strip()
+    if not text:
+        return None
+
+    patterns = [
+        r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)",
+        r"[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)",
+        r"[?&]ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if not match:
+            continue
+        lat = float(match.group(1))
+        lon = float(match.group(2))
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            return {
+                "lat": lat,
+                "lon": lon,
+                "city": "",
+                "state": "",
+                "formatted_address": text,
+            }
+    return None
+
+
 def _load_local_json(path: Path) -> dict:
     if path.exists():
         with path.open("r", encoding="utf-8") as file:
@@ -161,6 +189,10 @@ def geocode_address_with_google(address: str, folder_id: str | None = None) -> d
     normalized_address = _normalize_address(address)
     if not normalized_address:
         return None
+
+    direct_coords = _extract_google_maps_coordinates(normalized_address)
+    if direct_coords:
+        return direct_coords
 
     cache = load_geocode_cache(folder_id)
     if normalized_address in cache:
@@ -711,7 +743,9 @@ def update_google_sheet_geodata(spreadsheet_id: str, address: str, folder_id: st
     normalized_address = _normalize_address(address)
     if not normalized_address:
         raise RuntimeError("Informe um endereço válido para buscar a localização.")
-    if not get_google_maps_api_key():
+
+    direct_coords = _extract_google_maps_coordinates(normalized_address)
+    if not direct_coords and not get_google_maps_api_key():
         raise RuntimeError("A chave `google_maps.api_key` não está configurada nos secrets do app.")
 
     geocoded = geocode_address_with_google(normalized_address, folder_id)
