@@ -691,6 +691,44 @@ def _get_sheet_tab_id(service, spreadsheet_id: str, title: str) -> int | None:
     return None
 
 
+def _get_spreadsheet_title(service, spreadsheet_id: str) -> str:
+    metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    return str(metadata.get("properties", {}).get("title", "") or "").strip()
+
+
+def _ensure_uby_schema_sheet(service, spreadsheet_id: str, project_name: str = "", address: str = "") -> dict:
+    tab_id = _get_sheet_tab_id(service, spreadsheet_id, "UBY_SCHEMA")
+    if tab_id is None:
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"requests": [{"addSheet": {"properties": {"title": "UBY_SCHEMA"}}}]},
+        ).execute()
+
+        base_schema = default_project_schema(project_name=project_name, address=address)
+        rows = schema_to_rows(base_schema)
+        service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range=f"'UBY_SCHEMA'!A1:B{len(rows)}",
+            valueInputOption="USER_ENTERED",
+            body={"values": rows},
+        ).execute()
+
+    return _ensure_schema_key_rows(
+        service,
+        spreadsheet_id,
+        [
+            "project.name",
+            "project.status",
+            "address",
+            "implantation.address",
+            "implantation.city",
+            "implantation.state",
+            "map.lat",
+            "map.lon",
+        ],
+    )
+
+
 def _read_schema_key_rows(service, spreadsheet_id: str) -> tuple[dict, list[list]]:
     response = service.spreadsheets().values().get(
         spreadsheetId=spreadsheet_id,
@@ -793,18 +831,13 @@ def update_google_sheet_geodata(spreadsheet_id: str, address: str, folder_id: st
         raise RuntimeError("Não foi possível encontrar esse endereço automaticamente.")
 
     service = build("sheets", "v4", credentials=get_credentials())
-    if _get_sheet_tab_id(service, spreadsheet_id, "UBY_SCHEMA") is None:
-        raise RuntimeError("A planilha de origem não possui a aba UBY_SCHEMA.")
-
-    required_keys = [
-        "address",
-        "implantation.address",
-        "implantation.city",
-        "implantation.state",
-        "map.lat",
-        "map.lon",
-    ]
-    key_rows = _ensure_schema_key_rows(service, spreadsheet_id, required_keys)
+    project_name = _get_spreadsheet_title(service, spreadsheet_id)
+    key_rows = _ensure_uby_schema_sheet(
+        service,
+        spreadsheet_id,
+        project_name=project_name,
+        address=geocoded.get("formatted_address", normalized_address),
+    )
 
     updates = []
     values_by_key = {
