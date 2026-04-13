@@ -42,13 +42,16 @@ def render_manager_login(section_name: str = "Área do Gestor") -> bool:
     if is_manager_authenticated():
         return True
 
-    st.warning(f"🔒 {section_name} protegida por senha.")
-
     if not manager_password_configured():
+        st.warning(f"🔓 {section_name} está temporariamente aberta porque nenhuma senha do gestor foi configurada.")
         st.info(
-            "Configure `manager.password` no Streamlit secrets ou a variável `UBY_MANAGER_PASSWORD` para ativar a área protegida."
+            "Quando quisermos proteger de novo, basta configurar `manager.password` no Streamlit secrets "
+            "ou a variável `UBY_MANAGER_PASSWORD`."
         )
-        return False
+        st.session_state[SESSION_KEY] = True
+        return True
+
+    st.warning(f"🔒 {section_name} protegida por senha.")
 
     with st.form(f"manager_login_{section_name}"):
         password = st.text_input("Senha do gestor", type="password")
