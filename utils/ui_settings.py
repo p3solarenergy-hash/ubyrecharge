@@ -26,6 +26,7 @@ DEFAULT_UI_SETTINGS = {
         "management_comparison": "Comparacao Operacional",
         "management_partners": "Parceiros",
         "integrations": "Integracoes",
+        "crm_implantation": "CRM Implantacao",
         "manager_area": "Area Gestor",
         "ui_settings": "Configuracoes",
     },

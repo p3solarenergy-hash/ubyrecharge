@@ -26,6 +26,7 @@ navigation = st.navigation(
         ],
         nav["section_admin"]: [
             st.Page("pages/5_Integracoes.py", title=nav["integrations"], icon="🔌"),
+            st.Page("pages/10_CRM_Implantacao.py", title=nav["crm_implantation"], icon="📂"),
             st.Page("pages/6_Area_Gestor.py", title=nav["manager_area"], icon="🔒"),
             st.Page("pages/7_Configuracoes.py", title=nav["ui_settings"], icon="⚙️"),
         ],

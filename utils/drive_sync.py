@@ -545,6 +545,59 @@ def save_json_file_to_drive(file_name: str, data: dict, folder_id: str | None = 
         ).execute()
 
 
+def ensure_drive_folder(folder_name: str, parent_folder_id: str | None = None) -> dict:
+    require_drive_write_access()
+
+    effective_parent = (parent_folder_id or get_folder_id()).strip()
+    if not effective_parent:
+        raise RuntimeError("Google Drive folder ID is not configured.")
+
+    service = build_drive_service()
+    safe_name = folder_name.replace("'", "\\'")
+    query = (
+        f"name='{safe_name}' and '{effective_parent}' in parents and "
+        f"mimeType='{GOOGLE_DRIVE_FOLDER_MIME_TYPE}' and trashed=false"
+    )
+    response = service.files().list(q=query, fields="files(id, name, webViewLink)", pageSize=10).execute()
+    files = response.get("files", [])
+    if files:
+        return files[0]
+
+    return (
+        service.files()
+        .create(
+            body={"name": folder_name, "parents": [effective_parent], "mimeType": GOOGLE_DRIVE_FOLDER_MIME_TYPE},
+            fields="id, name, webViewLink",
+        )
+        .execute()
+    )
+
+
+def upload_file_bytes_to_drive(
+    file_name: str,
+    content: bytes,
+    mime_type: str,
+    parent_folder_id: str | None = None,
+) -> dict:
+    require_drive_write_access()
+
+    effective_parent = (parent_folder_id or get_folder_id()).strip()
+    if not effective_parent:
+        raise RuntimeError("Google Drive folder ID is not configured.")
+
+    service = build_drive_service()
+    media = MediaIoBaseUpload(io.BytesIO(content), mimetype=mime_type or "application/octet-stream", resumable=False)
+    return (
+        service.files()
+        .create(
+            body={"name": file_name, "parents": [effective_parent]},
+            media_body=media,
+            fields="id, name, webViewLink, mimeType, createdTime",
+        )
+        .execute()
+    )
+
+
 def load_locations_from_drive(folder_id: str | None = None) -> dict | None:
     return load_json_file_from_drive(LOCATIONS_FILENAME, folder_id)
 

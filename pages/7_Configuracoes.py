@@ -41,8 +41,9 @@ with st.form("ui_settings_form"):
     management_comparison = nav_col1.text_input("Comparacao Operacional", value=nav["management_comparison"])
     management_partners = nav_col2.text_input("Parceiros", value=nav["management_partners"])
     integrations = nav_col1.text_input("Integracoes", value=nav["integrations"])
-    manager_area = nav_col2.text_input("Area do Gestor", value=nav["manager_area"])
-    ui_settings_label = nav_col1.text_input("Configuracoes", value=nav["ui_settings"])
+    crm_implantation = nav_col2.text_input("CRM Implantacao", value=nav["crm_implantation"])
+    manager_area = nav_col1.text_input("Area do Gestor", value=nav["manager_area"])
+    ui_settings_label = nav_col2.text_input("Configuracoes", value=nav["ui_settings"])
 
     st.markdown("### Cards da Home")
     cards = settings["home_cards"]
@@ -83,6 +84,7 @@ if submitted:
                 "management_comparison": management_comparison.strip() or nav["management_comparison"],
                 "management_partners": management_partners.strip() or nav["management_partners"],
                 "integrations": integrations.strip() or nav["integrations"],
+                "crm_implantation": crm_implantation.strip() or nav["crm_implantation"],
                 "manager_area": manager_area.strip() or nav["manager_area"],
                 "ui_settings": ui_settings_label.strip() or nav["ui_settings"],
             },
