@@ -44,6 +44,7 @@ JSON_MIME_TYPE = "application/json"
 LOCATIONS_FILENAME = "locations.json"
 GEOCODE_CACHE_FILENAME = "geocode_cache.json"
 GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+NOMINATIM_GEOCODE_URL = "https://nominatim.openstreetmap.org/search"
 
 APP_DIR = Path(__file__).resolve().parent.parent
 CFG_FILE = APP_DIR / "drive_config.json"
@@ -149,6 +150,46 @@ def _extract_google_maps_coordinates(raw_value: str) -> dict | None:
     return None
 
 
+def _geocode_address_with_nominatim(normalized_address: str) -> dict | None:
+    query = urllib.parse.urlencode(
+        {
+            "q": normalized_address,
+            "format": "jsonv2",
+            "limit": 1,
+            "addressdetails": 1,
+            "countrycodes": "br",
+        }
+    )
+    request = urllib.request.Request(
+        f"{NOMINATIM_GEOCODE_URL}?{query}",
+        headers={"User-Agent": "UbyRecharge/1.0 (contact: app)"},
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    if not payload:
+        return None
+
+    result = payload[0]
+    address = result.get("address", {}) or {}
+    city = (
+        address.get("city")
+        or address.get("town")
+        or address.get("municipality")
+        or address.get("village")
+        or ""
+    )
+    state = address.get("state_code") or address.get("state") or ""
+
+    return {
+        "lat": float(result.get("lat")),
+        "lon": float(result.get("lon")),
+        "city": city,
+        "state": state,
+        "formatted_address": result.get("display_name", normalized_address),
+    }
+
+
 def _load_local_json(path: Path) -> dict:
     if path.exists():
         with path.open("r", encoding="utf-8") as file:
@@ -199,36 +240,39 @@ def geocode_address_with_google(address: str, folder_id: str | None = None) -> d
         return cache[normalized_address]
 
     api_key = get_google_maps_api_key()
-    if not api_key:
+    parsed = None
+    if api_key:
+        query = urllib.parse.urlencode({"address": normalized_address, "key": api_key, "region": "br"})
+        request = urllib.request.Request(f"{GOOGLE_GEOCODE_URL}?{query}", headers={"User-Agent": "UbyRecharge/1.0"})
+        with urllib.request.urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+
+        if payload.get("status") == "OK" and payload.get("results"):
+            result = payload["results"][0]
+            geometry = result.get("geometry", {}).get("location", {})
+            components = result.get("address_components", [])
+            city = ""
+            state = ""
+            for component in components:
+                types = set(component.get("types", []))
+                if {"administrative_area_level_2", "political"} <= types or "administrative_area_level_2" in types:
+                    city = component.get("long_name", city)
+                if "administrative_area_level_1" in types:
+                    state = component.get("short_name", state)
+
+            parsed = {
+                "lat": geometry.get("lat"),
+                "lon": geometry.get("lng"),
+                "city": city,
+                "state": state,
+                "formatted_address": result.get("formatted_address", normalized_address),
+            }
+
+    if not parsed:
+        parsed = _geocode_address_with_nominatim(normalized_address)
+    if not parsed:
         return None
 
-    query = urllib.parse.urlencode({"address": normalized_address, "key": api_key, "region": "br"})
-    request = urllib.request.Request(f"{GOOGLE_GEOCODE_URL}?{query}", headers={"User-Agent": "UbyRecharge/1.0"})
-    with urllib.request.urlopen(request, timeout=10) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-
-    if payload.get("status") != "OK" or not payload.get("results"):
-        return None
-
-    result = payload["results"][0]
-    geometry = result.get("geometry", {}).get("location", {})
-    components = result.get("address_components", [])
-    city = ""
-    state = ""
-    for component in components:
-        types = set(component.get("types", []))
-        if {"administrative_area_level_2", "political"} <= types or "administrative_area_level_2" in types:
-            city = component.get("long_name", city)
-        if "administrative_area_level_1" in types:
-            state = component.get("short_name", state)
-
-    parsed = {
-        "lat": geometry.get("lat"),
-        "lon": geometry.get("lng"),
-        "city": city,
-        "state": state,
-        "formatted_address": result.get("formatted_address", normalized_address),
-    }
     cache[normalized_address] = parsed
     save_geocode_cache(cache, folder_id)
     return parsed
@@ -744,13 +788,9 @@ def update_google_sheet_geodata(spreadsheet_id: str, address: str, folder_id: st
     if not normalized_address:
         raise RuntimeError("Informe um endereço válido para buscar a localização.")
 
-    direct_coords = _extract_google_maps_coordinates(normalized_address)
-    if not direct_coords and not get_google_maps_api_key():
-        raise RuntimeError("A chave `google_maps.api_key` não está configurada nos secrets do app.")
-
     geocoded = geocode_address_with_google(normalized_address, folder_id)
     if not geocoded:
-        raise RuntimeError("Não foi possível encontrar esse endereço no Google Maps.")
+        raise RuntimeError("Não foi possível encontrar esse endereço automaticamente.")
 
     service = build("sheets", "v4", credentials=get_credentials())
     if _get_sheet_tab_id(service, spreadsheet_id, "UBY_SCHEMA") is None:
