@@ -202,6 +202,15 @@ def geocode_address_with_google(address: str, folder_id: str | None = None) -> d
     return parsed
 
 
+def _schema_batch_update(service, spreadsheet_id: str, updates: list[dict], raw: bool = False):
+    if not updates:
+        return
+    service.spreadsheets().values().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={"valueInputOption": "RAW" if raw else "USER_ENTERED", "data": updates},
+    ).execute()
+
+
 def ensure_excel_dir() -> str:
     os.makedirs(EXCEL_DIR, exist_ok=True)
     return EXCEL_DIR
@@ -627,6 +636,8 @@ def ensure_google_sheet_base_schema(spreadsheet_id: str, folder_id: str | None =
 
     updates = []
     for key, value in {
+        "address": geocoded.get("formatted_address", normalized_address),
+        "implantation.address": geocoded.get("formatted_address", normalized_address),
         "implantation.city": geocoded.get("city", ""),
         "implantation.state": geocoded.get("state", ""),
         "map.lat": geocoded.get("lat", ""),
@@ -638,10 +649,52 @@ def ensure_google_sheet_base_schema(spreadsheet_id: str, folder_id: str | None =
             updates.append({"range": f"'UBY_SCHEMA'!B{row_index}", "values": [[value]]})
 
     if updates:
-        service.spreadsheets().values().batchUpdate(
-            spreadsheetId=spreadsheet_id,
-            body={"valueInputOption": "USER_ENTERED", "data": updates},
-        ).execute()
+        _schema_batch_update(service, spreadsheet_id, updates, raw=True)
+
+
+def update_google_sheet_geodata(spreadsheet_id: str, address: str, folder_id: str | None = None) -> dict | None:
+    require_drive_write_access()
+
+    normalized_address = _normalize_address(address)
+    if not normalized_address:
+        raise RuntimeError("Informe um endereço válido para buscar a localização.")
+    if not get_google_maps_api_key():
+        raise RuntimeError("A chave `google_maps.api_key` não está configurada nos secrets do app.")
+
+    geocoded = geocode_address_with_google(normalized_address, folder_id)
+    if not geocoded:
+        raise RuntimeError("Não foi possível encontrar esse endereço no Google Maps.")
+
+    service = build("sheets", "v4", credentials=get_credentials())
+    if _get_sheet_tab_id(service, spreadsheet_id, "UBY_SCHEMA") is None:
+        raise RuntimeError("A planilha de origem não possui a aba UBY_SCHEMA.")
+
+    required_keys = [
+        "address",
+        "implantation.address",
+        "implantation.city",
+        "implantation.state",
+        "map.lat",
+        "map.lon",
+    ]
+    key_rows = _ensure_schema_key_rows(service, spreadsheet_id, required_keys)
+
+    updates = []
+    values_by_key = {
+        "address": geocoded.get("formatted_address", normalized_address),
+        "implantation.address": geocoded.get("formatted_address", normalized_address),
+        "implantation.city": geocoded.get("city", ""),
+        "implantation.state": geocoded.get("state", ""),
+        "map.lat": geocoded.get("lat", ""),
+        "map.lon": geocoded.get("lon", ""),
+    }
+    for key, value in values_by_key.items():
+        row_index = key_rows.get(key)
+        if row_index:
+            updates.append({"range": f"'UBY_SCHEMA'!B{row_index}", "values": [[value]]})
+
+    _schema_batch_update(service, spreadsheet_id, updates, raw=True)
+    return geocoded
 
 
 def update_google_sheet_inputs(spreadsheet_id: str, edited_inputs: dict) -> bool:

@@ -36,6 +36,38 @@ CHARGER_STATUS_COLORS = {
 }
 
 
+def _coerce_coordinate(value, minimum: float, maximum: float):
+    if value is None or value == "":
+        return None
+
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        return numeric if minimum <= numeric <= maximum else None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    if text.count(".") > 1 and "," not in text:
+        return None
+
+    normalized = text.replace(" ", "")
+    if "," in normalized and "." in normalized:
+        if normalized.rfind(",") > normalized.rfind("."):
+            normalized = normalized.replace(".", "").replace(",", ".")
+        else:
+            normalized = normalized.replace(",", "")
+    elif "," in normalized:
+        normalized = normalized.replace(",", ".")
+
+    try:
+        numeric = float(normalized)
+    except ValueError:
+        return None
+
+    return numeric if minimum <= numeric <= maximum else None
+
+
 def load_portfolio_projects() -> list[dict]:
     projects = []
     for filename in get_all_projects():
@@ -78,8 +110,8 @@ def build_project_record(project: dict) -> dict:
     city = str(get_schema_value(schema, "implantation.city", "") or "").strip()
     state = str(get_schema_value(schema, "implantation.state", "") or "").strip()
     address = str(get_schema_value(schema, "implantation.address", project.get("address", "")) or "").strip()
-    lat = get_schema_value(schema, "map.lat", None)
-    lon = get_schema_value(schema, "map.lon", None)
+    lat = _coerce_coordinate(get_schema_value(schema, "map.lat", None), -90.0, 90.0)
+    lon = _coerce_coordinate(get_schema_value(schema, "map.lon", None), -180.0, 180.0)
     monthly = project.get("monthly", {})
     finance = schema.get("finance", {})
     operations = schema.get("operations", {})

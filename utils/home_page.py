@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import urllib.parse
 
 import folium
 import streamlit as st
 from streamlit_folium import st_folium
 
-from utils.project_portfolio import CHARGER_STATUS_COLORS, SITE_STATUS_COLORS, load_portfolio_projects
+from utils.drive_sync import get_folder_id, get_google_maps_api_key, sync_all, update_google_sheet_geodata
+from utils.excel_reader import EXCEL_DIR
+from utils.project_portfolio import CHARGER_STATUS_COLORS, load_portfolio_projects
 from utils.ui_settings import load_ui_settings
 
 
@@ -34,10 +38,16 @@ def _charger_badges(project: dict) -> str:
     return "".join(items) if items else "<span style='font-size:11px;color:#999;'>Sem telemetria por carregador</span>"
 
 
+def _refresh_portfolio_data():
+    load_portfolio.clear()
+    st.cache_data.clear()
+    st.rerun()
+
+
 def _render_map(projects: list[dict]):
     valid_projects = [project for project in projects if project.get("lat") is not None and project.get("lon") is not None]
     if not valid_projects:
-        st.info("Nenhum eletroposto com coordenadas prontas na UBY_SCHEMA.")
+        st.info("Nenhum eletroposto com coordenadas válidas na UBY_SCHEMA.")
         return
 
     center = [
@@ -62,7 +72,7 @@ def _render_map(projects: list[dict]):
 
     for project in valid_projects:
         color = project["site_color"]
-        address = project.get("address", "") or "Endereco nao cadastrado"
+        address = project.get("address", "") or "Endereço não cadastrado"
         popup_html = f"""
         <div style="font-family:Arial,sans-serif;min-width:290px;color:#222;">
             <div style="background:{color};padding:10px 14px;border-radius:10px 10px 0 0;color:#fff;">
@@ -94,6 +104,33 @@ def _render_map(projects: list[dict]):
         ).add_to(map_object)
 
     st_folium(map_object, width=None, height=560, returned_objects=[])
+
+
+def _render_geo_fix_panel(project: dict):
+    source = project.get("source") or {}
+    spreadsheet_id = source.get("id", "")
+    address_value = st.text_input(
+        "Endereço Google Maps",
+        value=project.get("address", "") or "",
+        key=f"geo-address-{project['relative_path']}",
+        placeholder="Cole aqui o endereço do Google Maps",
+    )
+
+    if st.button("Buscar localização e salvar", key=f"geo-save-{project['relative_path']}", use_container_width=True):
+        if not spreadsheet_id:
+            st.error("Esse posto não está vinculado a uma planilha de origem no Drive.")
+            return
+
+        try:
+            geocoded = update_google_sheet_geodata(spreadsheet_id, address_value, get_folder_id())
+            sync_all(folder_id=get_folder_id(), dest_dir=EXCEL_DIR)
+            st.success(
+                f"Localização atualizada para {geocoded.get('formatted_address', address_value)} "
+                f"({geocoded.get('lat')}, {geocoded.get('lon')})"
+            )
+            _refresh_portfolio_data()
+        except Exception as exc:
+            st.error(f"Não foi possível atualizar a localização: {exc}")
 
 
 def render_home():
@@ -128,13 +165,6 @@ def render_home():
                 font-size: 11px;
                 margin-right: 6px;
             }
-            .pending-card {
-                background:#151924;
-                border:1px dashed #324056;
-                border-radius:12px;
-                padding:12px 14px;
-                margin-bottom:10px;
-            }
         </style>
         """,
         unsafe_allow_html=True,
@@ -152,7 +182,7 @@ def render_home():
     pending_geo = [project for project in projects if project.get("lat") is None or project.get("lon") is None]
 
     st.title(f"⚡ {brand['app_title']}")
-    st.caption("Mapa operacional dos eletropostos com base na UBY_SCHEMA e foco no cenário base.")
+    st.caption("Mapa operacional dos eletropostos com foco no cenário base e localização corrigida pela UBY_SCHEMA.")
     st.markdown("---")
 
     top_cards = st.columns(6)
@@ -172,7 +202,10 @@ def render_home():
     group_filter = filter_col1.multiselect("Bloco", ["Implantacao", "Gestao"], default=["Implantacao", "Gestao"])
     status_filter = filter_col2.multiselect("Status do projeto", statuses, default=statuses)
     partner_filter = filter_col3.multiselect("Parceiro", partners, default=partners)
-    search_filter = filter_col4.text_input("Busca por posto, cidade, estado ou endereco", placeholder="Ex.: Londrina, contrato, Robert Koch")
+    search_filter = filter_col4.text_input(
+        "Busca por posto, cidade, estado ou endereço",
+        placeholder="Ex.: Londrina, contrato, Robert Koch",
+    )
 
     filtered = [
         project
@@ -206,7 +239,7 @@ def render_home():
                 f"""
                 <div class="project-card" style="border-left-color:{project['site_color']};">
                     <div style="font-weight:700;color:#fff;margin-bottom:6px;">{project['name']}</div>
-                    <div style="font-size:12px;color:#b0b7c3;margin-bottom:8px;">📍 {project['address'] or 'Endereco nao informado'}</div>
+                    <div style="font-size:12px;color:#b0b7c3;margin-bottom:8px;">📍 {project['address'] or 'Endereço não informado'}</div>
                     <div style="margin-bottom:8px;">
                         <span class="status-chip" style="background:{project['site_color']};">{project['site_status_label']}</span>
                         <span class="status-chip" style="background:#2d3748;">{project['group']}</span>
@@ -226,19 +259,16 @@ def render_home():
     with pending_col:
         st.markdown("### Pendências de coordenadas")
         if not filtered_pending:
-            st.success("Todos os postos filtrados já têm latitude e longitude prontas na UBY_SCHEMA.")
+            st.success("Todos os postos filtrados já têm latitude e longitude válidas na UBY_SCHEMA.")
         else:
+            st.caption("Você pode colar o endereço do Google Maps aqui e o app salva a localização certa na planilha.")
+            if not get_google_maps_api_key():
+                st.warning("Configure `google_maps.api_key` nos secrets para habilitar a busca automática da localização.")
             for project in filtered_pending:
-                st.markdown(
-                    f"""
-                    <div class="pending-card">
-                        <div style="font-weight:700;color:#fff;">{project['name']}</div>
-                        <div style="font-size:12px;color:#c6ccd8;margin:6px 0 8px;">{project['address'] or 'Endereco ausente na planilha'}</div>
-                        <div style="font-size:12px;color:#8fb9ff;">Atualize a UBY_SCHEMA ou execute a sincronização com geocoding Google habilitado.</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                with st.container(border=True):
+                    st.markdown(f"**{project['name']}**")
+                    st.caption(project["address"] or "Endereço ausente na planilha")
+                    _render_geo_fix_panel(project)
 
     with region_col:
         st.markdown("### Cobertura")
@@ -248,4 +278,4 @@ def render_home():
                 if count:
                     st.markdown(f"- **{city}**: {count} posto(s)")
         else:
-            st.info("As cidades serão preenchidas a partir da geocodificação Google.")
+            st.info("As cidades serão preenchidas automaticamente pela geocodificação Google.")
