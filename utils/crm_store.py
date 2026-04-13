@@ -162,3 +162,16 @@ def upload_crm_document(item: dict, uploaded_file) -> dict:
         "created_at": file_meta.get("createdTime", datetime.now().isoformat(timespec="seconds")),
         "folder_id": title_folder["id"],
     }
+
+
+def upload_crm_documents(item: dict, uploaded_files: list) -> tuple[list[dict], list[str]]:
+    uploaded_documents = []
+    errors = []
+
+    for uploaded_file in uploaded_files:
+        try:
+            uploaded_documents.append(upload_crm_document(item, uploaded_file))
+        except Exception as exc:
+            errors.append(f"{uploaded_file.name}: {exc}")
+
+    return uploaded_documents, errors

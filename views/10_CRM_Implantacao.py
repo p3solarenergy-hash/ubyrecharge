@@ -12,7 +12,7 @@ from utils.crm_store import (
     delete_crm_item,
     get_crm_item,
     list_crm_items,
-    upload_crm_document,
+    upload_crm_documents,
     upsert_crm_item,
 )
 from utils.manager_auth import logout_manager, render_manager_login
@@ -183,22 +183,26 @@ with right_col:
 
         st.markdown("---")
         st.markdown("#### Documentos")
-        uploaded_file = st.file_uploader(
-            "Anexar documento",
+        uploaded_files = st.file_uploader(
+            "Anexar documentos",
             key=f"file-{selected_id}",
-            accept_multiple_files=False,
-            help="Ao anexar aqui, o arquivo sobe para o Google Drive e fica vinculado ao registro.",
+            accept_multiple_files=True,
+            help="Você pode selecionar vários arquivos de uma vez. Todos sobem para o Google Drive e ficam vinculados ao registro.",
         )
-        if uploaded_file is not None:
-            if st.button("Enviar anexo para o Drive", key=f"upload-{selected_id}", use_container_width=True):
+        if uploaded_files:
+            st.caption(f"{len(uploaded_files)} arquivo(s) selecionado(s).")
+            if st.button("Enviar anexos para o Drive", key=f"upload-{selected_id}", use_container_width=True):
                 try:
-                    document = upload_crm_document(selected, uploaded_file)
-                    updated_docs = (selected.get("documents") or []) + [document]
+                    documents_uploaded, errors = upload_crm_documents(selected, uploaded_files)
+                    updated_docs = (selected.get("documents") or []) + documents_uploaded
                     upsert_crm_item({**selected, "documents": updated_docs})
-                    st.success(f"Documento enviado: {document['name']}")
+                    if documents_uploaded:
+                        st.success(f"{len(documents_uploaded)} arquivo(s) enviado(s) com sucesso.")
+                    for error in errors:
+                        st.error(f"Não foi possível enviar o documento: {error}")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Não foi possível enviar o documento: {exc}")
+                    st.error(f"Não foi possível enviar os documentos: {exc}")
 
         documents = selected.get("documents") or []
         if not documents:
