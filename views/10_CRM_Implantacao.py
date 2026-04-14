@@ -15,7 +15,7 @@ from utils.crm_store import (
     upload_crm_documents,
     upsert_crm_item,
 )
-from utils.excel_reader import get_all_projects
+from utils.excel_reader import get_all_projects_cached
 from utils.manager_auth import logout_manager, render_manager_login
 
 NEW_FORM_DEFAULTS = {
@@ -52,7 +52,7 @@ def _empty_item() -> dict:
 
 def _project_options() -> list[str]:
     project_names = []
-    for relative_path in get_all_projects():
+    for relative_path in get_all_projects_cached():
         name = os.path.splitext(os.path.basename(relative_path))[0].strip()
         if name:
             project_names.append(name)

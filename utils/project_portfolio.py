@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from utils.excel_reader import EXCEL_DIR, get_all_projects, parse_full_project
+from utils.excel_reader import EXCEL_DIR, get_all_projects_cached, parse_full_project
 from utils.project_schema import canonical_project_status, get_schema_value, humanize_stage, is_management_stage, normalize_text
 
 
@@ -70,7 +70,7 @@ def _coerce_coordinate(value, minimum: float, maximum: float):
 
 def load_portfolio_projects() -> list[dict]:
     projects = []
-    for filename in get_all_projects():
+    for filename in get_all_projects_cached():
         filepath = os.path.join(EXCEL_DIR, filename)
         project = parse_full_project(filepath)
         if project.get("inputs"):

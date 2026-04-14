@@ -5,6 +5,7 @@ import warnings
 
 import openpyxl
 import pandas as pd
+import streamlit as st
 from openpyxl import load_workbook
 
 from utils.calculations import calc_monthly
@@ -62,6 +63,11 @@ def get_all_projects():
     except OSError:
         pass
     return sorted(files)
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_all_projects_cached():
+    return get_all_projects()
 
 
 def parse_inputs(filepath):
@@ -423,7 +429,8 @@ def parse_uby_schema(filepath, project_name="", fallback_address="", fallback_ca
         return None
 
 
-def parse_full_project(filepath):
+@st.cache_data(ttl=30, show_spinner=False)
+def _parse_full_project_cached(filepath, modified_at):
     name = os.path.splitext(os.path.basename(filepath))[0]
     wb = load_workbook(filepath, data_only=True)
     has_uby_schema = "UBY_SCHEMA" in wb.sheetnames
@@ -475,6 +482,11 @@ def parse_full_project(filepath):
     }
 
 
+def parse_full_project(filepath):
+    modified_at = os.path.getmtime(filepath) if os.path.exists(filepath) else 0
+    return _parse_full_project_cached(filepath, modified_at)
+
+
 def get_project_source(filepath):
     relative_path = os.path.relpath(filepath, EXCEL_DIR)
     manifest = load_drive_manifest()
@@ -499,6 +511,8 @@ def save_inputs_to_excel(filepath, edited_inputs):
                     elif col3_cell and col3_cell.value is not None and isinstance(col3_cell.value, (int, float)):
                         col3_cell.value = edited_inputs[label]
             wb.save(filepath)
+            _parse_full_project_cached.clear()
+            get_all_projects_cached.clear()
             return True
 
         if "UBY_SCHEMA" in wb.sheetnames:
@@ -506,6 +520,8 @@ def save_inputs_to_excel(filepath, edited_inputs):
             schema = apply_display_inputs_to_schema(current_project["schema"], edited_inputs)
             _write_schema_sheet(wb, schema)
             wb.save(filepath)
+            _parse_full_project_cached.clear()
+            get_all_projects_cached.clear()
             return True
 
         return False
