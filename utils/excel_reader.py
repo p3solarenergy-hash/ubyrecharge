@@ -42,6 +42,52 @@ def _sheet_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", ascii_key(value or ""))
 
 
+def _looks_like_address(value) -> bool:
+    if value is None:
+        return False
+
+    text = str(value).strip()
+    if not text:
+        return False
+
+    lowered = ascii_key(text)
+    blocked_terms = {
+        "impostos",
+        "desenvolvimento",
+        "gestao",
+        "desconto",
+        "ajuste",
+        "capex",
+        "orcamento",
+        "projeto",
+    }
+    if any(term in lowered for term in blocked_terms):
+        return False
+
+    address_markers = [
+        ",",
+        " - ",
+        " rua ",
+        " avenida ",
+        " av ",
+        " rod ",
+        " rodovia ",
+        " estr ",
+        " estrada ",
+        " alameda ",
+        " travessa ",
+        " pr",
+        " sp",
+        " sc",
+        " rs",
+        " mg",
+        " go",
+    ]
+    has_marker = any(marker in lowered for marker in address_markers)
+    has_number = bool(re.search(r"\d", text))
+    return has_marker and has_number
+
+
 def get_all_projects():
     """
     Scan the app data directory recursively and return all .xlsx project files.
@@ -231,10 +277,10 @@ def parse_budget(filepath):
 
         ws = wb[sheet_name]
         address = ""
-        for cell_ref in ("B4", "B5", "C4", "C5"):
+        for cell_ref in ("B4", "B5", "C4", "C5", "B3", "B6", "C3", "C6"):
             cell_value = ws[cell_ref].value if ws[cell_ref].value is not None else ""
             cell_value = str(cell_value).strip() if cell_value else ""
-            if cell_value:
+            if _looks_like_address(cell_value):
                 address = cell_value
                 break
         address = str(address).strip() if address else ""
