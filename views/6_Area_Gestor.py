@@ -25,7 +25,7 @@ def _project_financials(project: dict) -> dict:
     costs = schema.get("costs", {}) or {}
     monthly = project.get("monthly", {}) or {}
 
-    capex = _money(schema.get("investment", {}).get("capex_total") or schema.get("implantation", {}).get("capex_total"))
+    capex = _money(schema.get("implantation", {}).get("capex_total") or schema.get("investment", {}).get("capex_total"))
     revenue = _money(finance.get("revenue_monthly"))
     ebitda = _money(finance.get("ebitda_monthly"))
     gross_result = _money(finance.get("gross_result_monthly"))
