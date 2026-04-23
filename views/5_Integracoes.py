@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from pathlib import Path
 
 import streamlit as st
 
@@ -21,6 +22,10 @@ from utils.drive_sync import (
     sync_all,
 )
 from utils.excel_reader import EXCEL_DIR
+
+APP_DIR = Path(__file__).resolve().parent.parent
+SECRETS_TEMPLATE_PATH = APP_DIR / "STREAMLIT_SECRETS_TEMPLATE.toml"
+SECRETS_TEMPLATE = SECRETS_TEMPLATE_PATH.read_text(encoding="utf-8")
 
 st.set_page_config(page_title="Integracoes | UBY RECHARGE", page_icon="🔌", layout="wide")
 st.title("🔌 Integracoes")
@@ -49,31 +54,14 @@ with tab_drive:
     st.markdown("---")
 
     with st.expander("1. Secrets para Streamlit Cloud", expanded=not cloud_ready):
-        st.markdown(
-            """
-Cole estes dados em **Streamlit Cloud -> App settings -> Secrets**.
-
-```toml
-[google_oauth]
-client_id = "SEU_CLIENT_ID"
-client_secret = "SEU_CLIENT_SECRET"
-project_id = "SEU_PROJECT_ID"
-
-[google_token]
-refresh_token = "SEU_REFRESH_TOKEN"
-token_uri = "https://oauth2.googleapis.com/token"
-scopes = [
-  "https://www.googleapis.com/auth/drive",
-  "https://www.googleapis.com/auth/spreadsheets"
-]
-
-[google_drive]
-folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
-
-[google_maps]
-api_key = "SUA_GOOGLE_MAPS_API_KEY"
-```
-"""
+        st.markdown("Cole estes dados em **Streamlit Cloud -> App settings -> Secrets**.")
+        st.code(SECRETS_TEMPLATE, language="toml")
+        st.download_button(
+            "Baixar template de secrets",
+            data=SECRETS_TEMPLATE,
+            file_name="STREAMLIT_SECRETS_TEMPLATE.toml",
+            mime="text/plain",
+            use_container_width=True,
         )
 
         st.info(
@@ -82,6 +70,7 @@ api_key = "SUA_GOOGLE_MAPS_API_KEY"
         st.caption(
             "O credentials.json e o drive_token.json continuam funcionando localmente como fallback, mas nao sao mais necessarios no deploy."
         )
+        st.caption("Template salvo em `STREAMLIT_SECRETS_TEMPLATE.toml` na raiz do projeto.")
         st.info("Com `google_maps.api_key`, a sincronizacao atualiza `map.lat`, `map.lon`, cidade e estado na UBY_SCHEMA.")
         st.warning(
             "Para salvar localizações e editar os Google Sheets de origem, o token precisa usar os escopos "

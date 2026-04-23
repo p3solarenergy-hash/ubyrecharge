@@ -31,8 +31,6 @@ echo  Para encerrar: feche esta janela ou pressione Ctrl+C
 echo  ------------------------------------------
 echo.
 
-:: Inicia o Streamlit
-cd /d "%~dp0uby_recharge"
-"C:\Users\eduar\AppData\Local\Python\pythoncore-3.14-64\Scripts\streamlit.exe" run app.py
-
-pause
+:: Inicia o Streamlit em uma janela PowerShell propria
+cd /d "%~dp0"
+start "UBY RECHARGE" powershell -NoExit -ExecutionPolicy Bypass -Command "Set-Location '%~dp0'; & 'C:\Users\Eduardo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m streamlit run app.py"

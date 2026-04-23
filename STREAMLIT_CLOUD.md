@@ -26,9 +26,14 @@ scopes = [
 [google_drive]
 folder_id = "ID_DA_PASTA_NO_GOOGLE_DRIVE"
 
+[manager]
+password = "DEFINA_SUA_SENHA_DO_GESTOR"
+
 [google_maps]
-api_key = "SUA_GOOGLE_MAPS_API_KEY"
+api_key = "SUA_GOOGLE_MAPS_API_KEY_OPCIONAL"
 ```
+
+Template pronto no projeto: `STREAMLIT_SECRETS_TEMPLATE.toml`
 
 ## Como obter o refresh token
 
