@@ -6,31 +6,13 @@ echo   UBY RECHARGE  --  Servidor Local
 echo  ==========================================
 echo.
 
-:: Mata instancia anterior se existir
-taskkill /IM streamlit.exe /F >nul 2>&1
-
-:: Aguarda a porta liberar
-timeout /t 2 /nobreak >nul
-
-:: Descobre IP local
-for /f "tokens=4 delims= " %%i in ('route print 0.0.0.0 ^| findstr "0.0.0.0.*0.0.0.0"') do (
-    set IP=%%i
-    goto :found
-)
-:found
-
 echo  Acesse no navegador:
 echo.
 echo    Neste computador:   http://localhost:8501
-echo    Rede local (outros): http://%IP%:8501
 echo.
-echo  Compartilhe o link da rede com sua equipe.
-echo  (Todos precisam estar no mesmo Wi-Fi ou rede.)
-echo.
-echo  Para encerrar: feche esta janela ou pressione Ctrl+C
+echo  Para encerrar: feche a janela do servidor ou pressione Ctrl+C
 echo  ------------------------------------------
 echo.
 
-:: Inicia o Streamlit em uma janela PowerShell propria
 cd /d "%~dp0"
-start "UBY RECHARGE" powershell -NoExit -ExecutionPolicy Bypass -Command "Set-Location '%~dp0'; & 'C:\Users\Eduardo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m streamlit run app.py"
+start "UBY RECHARGE" powershell -NoExit -ExecutionPolicy Bypass -File "%~dp0start_streamlit.ps1"

@@ -3,7 +3,12 @@ credentials.json
 drive_token.json
 STREAMLIT_SECRETS_READY.toml
 geocode_cache.json
+crm_pipeline.json
+drive_manifest.json
+*.xlsx
 data/*.xlsx
+.logs/
+.tmp/
 __pycache__/
 utils/__pycache__/
 pages/__pycache__/
