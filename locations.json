@@ -1,1 +1,38 @@
-{}
+{
+  "Cópia de 60KW EV - VERSÃO COMPLETA v5": {
+    "endereco_completo": "",
+    "lat": null,
+    "lon": null,
+    "status": "planejado"
+  },
+  "POSTO ALPHA V5": {
+    "endereco_completo": "",
+    "lat": null,
+    "lon": null,
+    "status": "planejado"
+  },
+  "POSTO ARAGUAIA MALASSISE": {
+    "endereco_completo": "",
+    "lat": null,
+    "lon": null,
+    "status": "planejado"
+  },
+  "POSTO DUIM": {
+    "endereco_completo": "",
+    "lat": null,
+    "lon": null,
+    "status": "planejado"
+  },
+  "POSTO R.K. MALASSISE V5": {
+    "endereco_completo": "POSTO R.K. MALASSISE",
+    "lat": null,
+    "lon": null,
+    "status": "planejado"
+  },
+  "POSTO R.K. MALASSISE": {
+    "endereco_completo": "",
+    "lat": null,
+    "lon": null,
+    "status": "planejado"
+  }
+}

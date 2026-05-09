@@ -1,38 +1,32 @@
 {
   "brand": {
-    "app_title": "UBY RECHARGE - Plataforma de Gestao",
-    "app_caption": "Gerencie implantacao, operacao e faturamento dos seus eletropostos."
+    "app_title": "P3 Energy — Gestão",
+    "app_caption": "Controle de obras, carregadores e resultados."
   },
   "navigation": {
     "section_home": "Home",
-    "section_implantation": "Implantacao",
-    "section_management": "Gestao",
-    "section_admin": "Administracao",
+    "section_implantation": "Implantação",
+    "section_management": "Gestão",
+    "section_admin": "Administração",
     "home": "Home",
-    "implantation_summary": "Resumo do Projeto",
-    "implantation_viability": "CAPEX e Viabilidade",
-    "implantation_timeline": "Cronograma",
-    "implantation_comparison": "Comparacao de Implantacao",
-    "management_executive": "Visao Executiva",
-    "management_operations": "Operacao",
-    "management_billing": "Faturamento",
-    "management_comparison": "Comparacao Operacional",
-    "management_partners": "Parceiros",
-    "integrations": "Integracoes",
-    "crm_implantation": "CRM Implantacao",
-    "manager_area": "Area Gestor",
-    "ui_settings": "Configuracoes"
+    "implantation_summary":    "Resumo da Obra",
+    "implantation_control":    "Controle de Obra",
+    "implantation_expenses":   "Gastos da Obra",
+    "implantation_comparison": "Comparativo",
+    "implantation_analyzer":   "Analisador",
+    "management_billing":      "Faturamento",
+    "management_occupancy":    "Taxa de Ocupação",
+    "management_metrics":      "Métricas e Insights",
+    "management_prospection":  "Prospecção",
+    "integrations":            "Integrações",
+    "ui_settings":             "Configurações"
   },
   "home_cards": {
-    "home_title": "Mapa",
-    "home_subtitle": "Monitoramento",
-    "implantation_title": "Implantacao",
-    "implantation_subtitle": "Projetos e viabilidade",
-    "management_title": "Gestao",
-    "management_subtitle": "Operacao e faturamento",
-    "manager_title": "Area do Gestor",
-    "manager_subtitle": "Protegida",
-    "integrations_title": "Integracoes",
-    "integrations_subtitle": "Drive e parceiros"
+    "implantation_title":    "Implantação",
+    "implantation_subtitle": "Obras e analisador",
+    "management_title":      "Gestão",
+    "management_subtitle":   "Faturamento e métricas",
+    "integrations_title":    "Integrações",
+    "integrations_subtitle": "Conexões externas"
   }
 }

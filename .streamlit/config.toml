@@ -8,8 +8,9 @@ runOnSave = false
 gatherUsageStats = false
 
 [theme]
-base = "dark"
-primaryColor = "#00c8ff"
-backgroundColor = "#0f1117"
-secondaryBackgroundColor = "#1e2130"
-textColor = "#e0e0e0"
+base             = "dark"
+primaryColor     = "#3FB66B"
+backgroundColor  = "#0E1813"
+secondaryBackgroundColor = "#16221E"
+textColor        = "#E8EFEB"
+font             = "sans serif"
