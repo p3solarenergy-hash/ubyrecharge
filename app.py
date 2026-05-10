@@ -1,5 +1,12 @@
 import streamlit as st
 
+st.set_page_config(
+    page_title="P3 Energy — Gestão",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
 from utils.home_page import render_home
 from utils.ui_settings import load_ui_settings
 
