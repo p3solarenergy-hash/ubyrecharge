@@ -11,6 +11,7 @@ Dashboard principal inspirado na plataforma MOVE:
 import datetime
 import streamlit as st
 from utils.p3_styles import inject, section_title
+from utils.calendar_sync import get_upcoming_events
 
 
 # ─── CONFIGURAÇÃO DE DADOS REAIS ────────────────────────────────────────────
@@ -258,26 +259,67 @@ def render_home():
 
     st.markdown("---")
 
-    # ── Google Calendar ───────────────────────────────────────────────────────
-    section_title("📅 Agenda")
+    # ── Agenda Google Calendar ────────────────────────────────────────────────
+    section_title("📅 Agenda — P3 Energy")
 
-    if GOOGLE_CALENDAR_SRC:
-        st.markdown(
-            f"""<iframe src="{GOOGLE_CALENDAR_SRC}&bgcolor=%230E1813&color=%233FB66B&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&mode=AGENDA"
-            style="border:none;border-radius:12px;background:#16221E"
-            width="100%" height="400" frameborder="0" scrolling="no"></iframe>""",
-            unsafe_allow_html=True,
-        )
+    eventos = get_upcoming_events(n=8)
+
+    if eventos:
+        col_ag1, col_ag2 = st.columns(2)
+        for idx, ev in enumerate(eventos):
+            col = col_ag1 if idx % 2 == 0 else col_ag2
+            with col:
+                # Formata data/hora
+                inicio = ev["start"]
+                if ev["all_day"]:
+                    data_str = inicio.strftime("%d/%m/%Y") if hasattr(inicio, "strftime") else str(inicio)
+                    hora_str = "Dia todo"
+                else:
+                    data_str = inicio.strftime("%d/%m/%Y")
+                    hora_str = inicio.strftime("%H:%M")
+
+                # Dia da semana
+                DIAS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"]
+                dia_semana = DIAS[inicio.weekday()] if hasattr(inicio, "weekday") else ""
+
+                # Cor por dia da semana
+                cor_dia = "#3FB66B" if dia_semana in ["Seg","Ter","Qua","Qui","Sex"] else "#FFD66B"
+
+                local_html = (
+                    f"<div style='font-size:11px;color:#8FA39A;margin-top:4px'>📍 {ev['location'][:50]}{'...' if len(ev['location'])>50 else ''}</div>"
+                    if ev["location"] else ""
+                )
+
+                link_html = (
+                    f"<a href='{ev['link']}' target='_blank' style='font-size:10px;color:#3FB66B;text-decoration:none'>Abrir no Google Calendar →</a>"
+                    if ev["link"] else ""
+                )
+
+                with st.container(border=True):
+                    st.markdown(
+                        f"<div style='display:flex;gap:12px;align-items:flex-start'>"
+                        f"  <div style='background:#2A3530;border-radius:8px;padding:6px 10px;text-align:center;min-width:48px;flex-shrink:0'>"
+                        f"    <div style='font-size:10px;color:{cor_dia};font-weight:700;text-transform:uppercase'>{dia_semana}</div>"
+                        f"    <div style='font-size:18px;font-weight:800;color:#E8EFEB;line-height:1.2'>{data_str[0:2]}</div>"
+                        f"    <div style='font-size:10px;color:#8FA39A'>{data_str[3:5]}/{data_str[6:]}</div>"
+                        f"  </div>"
+                        f"  <div style='flex:1;min-width:0'>"
+                        f"    <div style='font-size:13px;font-weight:700;color:#E8EFEB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>{ev['summary']}</div>"
+                        f"    <div style='font-size:11px;color:{cor_dia};margin-top:2px'>🕐 {hora_str}</div>"
+                        f"    {local_html}"
+                        f"    <div style='margin-top:6px'>{link_html}</div>"
+                        f"  </div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
     else:
         col_cal, col_inst = st.columns([2, 1])
         with col_cal:
             st.warning(
-                "**Google Calendar não configurado ainda.**\n\n"
-                "Para exibir sua agenda aqui:\n"
-                "1. Abra o Google Calendar → ⚙️ Configurações\n"
-                "2. Clique na sua agenda → **Integrar agenda**\n"
-                "3. Copie o link do campo **\"Endereço para incorporar\"**\n"
-                "4. Cole em `GOOGLE_CALENDAR_SRC` no arquivo `utils/home_page.py`",
+                "**Google Calendar não conectado ainda.**\n\n"
+                "Para ativar a agenda no app, o token OAuth precisa incluir o escopo de Calendar. "
+                "Vá em **Integrações → Google Drive** e regenere o token incluindo:\n"
+                "`https://www.googleapis.com/auth/calendar.readonly`",
                 icon="📅",
             )
         with col_inst:
