@@ -19,6 +19,7 @@ navigation = st.navigation(
             st.Page("views/Analisador.py",                 title=nav["implantation_analyzer"],   icon="⚡"),
         ],
         nav["section_management"]: [
+            st.Page("views/Agenda.py",               title=nav["agenda"],                  icon="📅"),
             st.Page("views/7_Gestao_Faturamento.py", title=nav["management_billing"],      icon="💸"),
             st.Page("views/Taxa_Ocupacao.py",        title=nav["management_occupancy"],    icon="🔌"),
             st.Page("views/Metricas.py",             title=nav["management_metrics"],      icon="📈"),
