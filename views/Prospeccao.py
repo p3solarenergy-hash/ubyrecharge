@@ -11,56 +11,7 @@ inject()
 
 # ─── DADOS (substituir por Supabase futuramente) ──────────────────────────────
 if "prospecoes" not in st.session_state:
-    st.session_state["prospecoes"] = [
-        {
-            "nome": "Posto Shell — Ipanema",
-            "cidade": "Rio de Janeiro - RJ",
-            "contato": "Carlos Menezes",
-            "telefone": "(21) 99999-0001",
-            "fluxo_veiculos": "Alto",
-            "padrao_atual": 150,
-            "ev_kw": 60,
-            "status": "Proposta enviada",
-            "data_contato": "25/04/2026",
-            "obs": "Cliente interessado, aguardando resposta sobre financiamento.",
-        },
-        {
-            "nome": "Shopping Via Parque",
-            "cidade": "Barra da Tijuca - RJ",
-            "contato": "Gerência de Facilities",
-            "telefone": "(21) 3333-4444",
-            "fluxo_veiculos": "Muito alto",
-            "padrao_atual": 200,
-            "ev_kw": 60,
-            "status": "Em prospecção",
-            "data_contato": "05/05/2026",
-            "obs": "Reunião agendada para 15/05.",
-        },
-        {
-            "nome": "Posto Petrobras — Tijuca",
-            "cidade": "Rio de Janeiro - RJ",
-            "contato": "Roberto Lima",
-            "telefone": "(21) 98888-7777",
-            "fluxo_veiculos": "Médio",
-            "padrao_atual": 100,
-            "ev_kw": 60,
-            "status": "Estudo elétrico",
-            "data_contato": "01/05/2026",
-            "obs": "Padrão precisa de upgrade para 150A antes da instalação.",
-        },
-        {
-            "nome": "Condomínio Jardim Oceânico",
-            "cidade": "Barra da Tijuca - RJ",
-            "contato": "Síndico",
-            "telefone": "(21) 97777-6666",
-            "fluxo_veiculos": "Baixo",
-            "padrao_atual": 150,
-            "ev_kw": 22,
-            "status": "Em prospecção",
-            "data_contato": "08/05/2026",
-            "obs": "Projeto residencial — carregadores modo 2 ou 3.",
-        },
-    ]
+    st.session_state["prospecoes"] = []  # ← adicione os sites reais pelo formulário abaixo
 
 PIPELINE_STATUS = [
     "Em prospecção",

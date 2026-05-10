@@ -11,8 +11,9 @@ from utils.p3_styles import inject, page_header, section_title
 
 inject()
 
-# ─── DADOS INICIAIS (substituir por Supabase futuramente) ──────────────────
-OBRAS = ["Rio Beach EV — Rio de Janeiro", "Posto Malassise R.K. — Maringá"]
+# ─── DADOS (substituir por Supabase futuramente) ─────────────────────────────
+# Adicione aqui os nomes reais das suas obras
+OBRAS = []  # ex: ["Rio Beach EV — Rio de Janeiro", "Posto Malassise R.K. — Maringá"]
 
 CATEGORIAS = [
     "Material elétrico",
@@ -25,24 +26,19 @@ CATEGORIAS = [
     "Outros",
 ]
 
-# Dados de exemplo — serão substituídos por dados reais do Supabase
-GASTOS_EXEMPLO = [
-    {"obra": "Rio Beach EV — Rio de Janeiro", "data": "10/03/2026", "categoria": "Projeto / engenharia",   "descricao": "Elaboração do projeto executivo",        "fornecedor": "P3 Energy",        "valor": 3500.00},
-    {"obra": "Rio Beach EV — Rio de Janeiro", "data": "15/04/2026", "categoria": "Material elétrico",      "descricao": "Cabo 35mm² 50m + disjuntores",           "fornecedor": "Elétrica Central", "valor": 2180.00},
-    {"obra": "Rio Beach EV — Rio de Janeiro", "data": "20/04/2026", "categoria": "Taxas e licenças",       "descricao": "Taxa protocolo ENEL",                    "fornecedor": "ENEL RJ",          "valor": 420.00},
-    {"obra": "Posto Malassise R.K. — Maringá", "data": "02/05/2026","categoria": "Projeto / engenharia",   "descricao": "Análise de carga — analisador DMI P1000R","fornecedor": "ISSO Telecom",     "valor": 1200.00},
-    {"obra": "Posto Malassise R.K. — Maringá", "data": "02/05/2026","categoria": "Projeto / engenharia",   "descricao": "Elaboração dos relatórios técnicos",     "fornecedor": "P3 Energy",        "valor": 800.00},
-]
-
-# Armazena novos gastos na sessão (até Supabase estar integrado)
+# Armazena gastos na sessão (até Supabase estar integrado)
 if "gastos" not in st.session_state:
-    st.session_state["gastos"] = GASTOS_EXEMPLO.copy()
+    st.session_state["gastos"] = []
 
 # ─── PÁGINA ───────────────────────────────────────────────────────────────────
 page_header(
     "💰 Gastos da Obra",
     "Registre despesas por projeto. Exporte para planilha a qualquer momento.",
 )
+
+if not OBRAS:
+    st.info("Nenhuma obra cadastrada. Adicione os nomes das obras na lista OBRAS no código.", icon="📋")
+    st.stop()
 
 obra_sel = st.selectbox("Selecione a obra", OBRAS, label_visibility="collapsed")
 
@@ -56,7 +52,7 @@ df = pd.DataFrame(gastos_obra) if gastos_obra else pd.DataFrame(
 total_gasto = df["valor"].sum() if not df.empty else 0
 n_lancamentos = len(df)
 
-ORCAMENTO = 25000.0  # placeholder — conectar ao Supabase / CAPEX depois
+ORCAMENTO = 0.0  # ← coloque o orçamento real da obra aqui (ou conecte ao Supabase)
 saldo = ORCAMENTO - total_gasto
 pct = total_gasto / ORCAMENTO if ORCAMENTO else 0
 

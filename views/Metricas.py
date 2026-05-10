@@ -8,26 +8,26 @@ from utils.p3_styles import inject, page_header, section_title
 
 inject()
 
-# ─── DADOS PLACEHOLDER (substituir por Supabase futuramente) ─────────────────
-MESES = ["Nov/25","Dez/25","Jan/26","Fev/26","Mar/26","Abr/26","Mai/26"]
+# ─── DADOS REAIS (preencher / conectar ao Supabase) ──────────────────────────
+# Adicione os meses e valores reais aqui
+MESES    = []  # ex: ["Jan/26", "Fev/26", "Mar/26"]
+RECEITA  = []  # R$ faturado por mês
+EBITDA   = []  # EBITDA por mês
+SESSOES  = []  # sessões de carga por mês
+OCUPACAO = []  # % ocupação média por mês
 
-RECEITA  = [0,    0,    1200, 2100, 3200, 5800, 6480]
-EBITDA   = [0,    0,    540,  945,  1440, 2610, 2916]
-SESSOES  = [0,    0,    38,   67,   102,  185,  207]
-OCUPACAO = [0,    0,    12,   21,   32,   54,   57]
-
-# KPIs atuais (último mês)
+# KPIs do mês atual — preencha com os valores reais
 kpi = {
-    "receita_mes":   6480.00,
-    "ebitda_mes":    2916.00,
-    "margem":        45.0,
-    "sessoes_mes":   207,
-    "kwh_mes":       6210,
-    "ticket_medio":  31.30,
-    "carregadores":  2,
-    "obras_ativas":  1,
-    "obras_estudo":  1,
-    "prospecoes":    3,
+    "receita_mes":   0.0,   # ← R$ faturado no mês
+    "ebitda_mes":    0.0,   # ← EBITDA do mês
+    "margem":        0.0,   # ← margem EBITDA %
+    "sessoes_mes":   0,     # ← sessões de carga no mês
+    "kwh_mes":       0,     # ← kWh entregues no mês
+    "ticket_medio":  0.0,   # ← R$ médio por sessão
+    "carregadores":  0,     # ← carregadores ativos
+    "obras_ativas":  0,     # ← obras em andamento
+    "obras_estudo":  0,     # ← projetos em estudo
+    "prospecoes":    0,     # ← sites em prospecção
 }
 
 # ─── PÁGINA ───────────────────────────────────────────────────────────────────
@@ -55,70 +55,39 @@ st.markdown("---")
 # ── Gráfico evolução ─────────────────────────────────────────────────────────
 section_title("Evolução Mensal")
 
-fig = go.Figure()
-fig.add_trace(go.Bar(
-    x=MESES, y=RECEITA, name="Receita (R$)",
-    marker_color="#3FB66B", marker_line_width=0, opacity=0.9,
-))
-fig.add_trace(go.Bar(
-    x=MESES, y=EBITDA, name="EBITDA (R$)",
-    marker_color="#5BC882", marker_line_width=0, opacity=0.9,
-))
-fig.add_trace(go.Scatter(
-    x=MESES, y=OCUPACAO, name="Ocupação (%)",
-    yaxis="y2", mode="lines+markers",
-    line=dict(color="#FFD66B", width=2),
-    marker=dict(size=6),
-))
-fig.update_layout(
-    barmode="group", height=360,
-    paper_bgcolor="#16221E", plot_bgcolor="#16221E", font_color="#E8EFEB",
-    legend=dict(orientation="h", yanchor="bottom", y=1.02),
-    yaxis=dict(title="R$", gridcolor="#2A3530"),
-    yaxis2=dict(title="Ocupação (%)", overlaying="y", side="right", range=[0,100], gridcolor="rgba(0,0,0,0)"),
-    margin=dict(t=10, b=10),
-)
-st.plotly_chart(fig, use_container_width=True)
+if MESES:
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=MESES, y=RECEITA, name="Receita (R$)",
+        marker_color="#3FB66B", marker_line_width=0, opacity=0.9,
+    ))
+    fig.add_trace(go.Bar(
+        x=MESES, y=EBITDA, name="EBITDA (R$)",
+        marker_color="#5BC882", marker_line_width=0, opacity=0.9,
+    ))
+    fig.add_trace(go.Scatter(
+        x=MESES, y=OCUPACAO, name="Ocupação (%)",
+        yaxis="y2", mode="lines+markers",
+        line=dict(color="#FFD66B", width=2),
+        marker=dict(size=6),
+    ))
+    fig.update_layout(
+        barmode="group", height=360,
+        paper_bgcolor="#16221E", plot_bgcolor="#16221E", font_color="#E8EFEB",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        yaxis=dict(title="R$", gridcolor="#2A3530"),
+        yaxis2=dict(title="Ocupação (%)", overlaying="y", side="right", range=[0,100], gridcolor="rgba(0,0,0,0)"),
+        margin=dict(t=10, b=10),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("Sem dados históricos ainda. Preencha as listas MESES, RECEITA, EBITDA e OCUPACAO no código.", icon="📊")
 
 st.markdown("---")
 
-# ── Insights automáticos ─────────────────────────────────────────────────────
+# ── Insights (gerados automaticamente quando houver dados) ────────────────────
 section_title("💡 Insights P3 Energy")
-
-col_i1, col_i2 = st.columns(2)
-
-with col_i1:
-    with st.container(border=True):
-        st.markdown("🟢 **Crescimento consistente**")
-        st.markdown(
-            "A receita cresceu **+12%** no último mês e acumula **+440%** desde janeiro. "
-            "O ritmo atual sugere break-even operacional em **agosto/2026** com os 2 carregadores ativos.",
-            unsafe_allow_html=False,
-        )
-
-    with st.container(border=True):
-        st.markdown("🟡 **Margem pressionada**")
-        st.markdown(
-            "A margem EBITDA caiu 1pp. Revise os custos de energia — "
-            "se a tarifa pico/fora-pico não estiver otimizada, "
-            "pode custar R$ 300–500/mês extras neste perfil de uso.",
-        )
-
-with col_i2:
-    with st.container(border=True):
-        st.markdown("🔵 **Ticket médio abaixo do mercado**")
-        st.markdown(
-            f"Seu ticket médio de **R$ {kpi['ticket_medio']:.2f}** por sessão está abaixo da média nacional (R$ 38–45). "
-            "Considere revisar a precificação por kWh para os próximos contratos.",
-        )
-
-    with st.container(border=True):
-        st.markdown("🟢 **Potencial de escala**")
-        st.markdown(
-            f"Com **{kpi['prospecoes']} sites em prospecção** e 1 em obra, "
-            "o pipeline pode dobrar a receita nos próximos 6 meses. "
-            "Priorize os sites com maior fluxo de veículos e padrão elétrico adequado.",
-        )
+st.info("Os insights aparecerão aqui automaticamente conforme os dados reais forem preenchidos.", icon="💡")
 
 st.markdown("---")
 
