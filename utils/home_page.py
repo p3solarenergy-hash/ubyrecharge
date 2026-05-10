@@ -83,7 +83,7 @@ def render_home():
     pct_ocup     = round(ocupado / total * 100) if total else 0
     n_atividades = len(ATIVIDADES_RECENTES)
 
-    k1, k2, k3, k4 = st.columns(4)
+    k1, k2, k3 = st.columns(3)
 
     # Card Carregadores
     with k1:
@@ -141,17 +141,6 @@ def render_home():
                 f"    <div style='font-size:11px;color:#8FA39A;margin-top:4px'>Agora</div>"
                 f"  </div>"
                 "</div>",
-                unsafe_allow_html=True,
-            )
-
-    # Card Sustentabilidade
-    with k4:
-        with st.container(border=True):
-            st.markdown(
-                "<div style='font-size:10px;color:#8FA39A;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px'>🌱 SUSTENTABILIDADE</div>"
-                f"<div style='font-size:32px;font-weight:800;color:#3FB66B;line-height:1'>{META_CO2_KG_MES:,.0f} kg</div>"
-                f"<div style='font-size:12px;color:#8FA39A;margin-top:4px'>CO₂ evitados no período</div>"
-                f"<div style='font-size:11px;color:#8FA39A;margin-top:2px'>🌳 {META_ARVORES_MES} árvores equivalentes</div>",
                 unsafe_allow_html=True,
             )
 
