@@ -20,7 +20,7 @@ inject()
 # URL base do GitHub Pages onde os HTMLs dos relatórios estão publicados.
 # Exemplo: "https://p3solarenergy.github.io/p3-energy-relatorios"
 # Deixe vazio ("") para desabilitar os links enquanto o Pages não estiver no ar.
-RELATORIOS_BASE_URL = "https://p3solarenergy.github.io/p3-energy-relatorios"
+RELATORIOS_BASE_URL = "https://p3solarenergy-hash.github.io/p3-energy-relatorios"
 
 # ─── CADASTRO DE RELATÓRIOS ──────────────────────────────────────────────────
 # Adicione uma entrada aqui sempre que gerar relatórios novos.
@@ -102,8 +102,6 @@ def report_url(filename: str) -> str:
 
 
 # ─── PÁGINA ──────────────────────────────────────────────────────────────────
-
-st.set_page_config(page_title="Analisador | P3 Energy", page_icon="⚡", layout="wide")
 
 page_header(
     "⚡ Analisador de Carga",
