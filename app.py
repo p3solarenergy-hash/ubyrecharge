@@ -25,8 +25,9 @@ navigation = st.navigation(
             st.Page("views/Prospeccao.py",           title=nav["management_prospection"],  icon="🔍"),
         ],
         nav["section_admin"]: [
-            st.Page("views/5_Integracoes.py",  title=nav["integrations"], icon="🔌"),
-            st.Page("views/7_Configuracoes.py", title=nav["ui_settings"],  icon="⚙️"),
+            st.Page("views/5_Integracoes.py",      title=nav["integrations"],     icon="🔌"),
+            st.Page("views/Instagram_Agent.py",    title=nav["instagram_agent"],  icon="📱"),
+            st.Page("views/7_Configuracoes.py",    title=nav["ui_settings"],      icon="⚙️"),
         ],
     }
 )

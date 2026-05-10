@@ -53,9 +53,10 @@ with st.form("ui_settings_form"):
     management_comparison = nc1.text_input("Comparação Operacional",   value=nav.get("management_comparison",""))
     management_partners   = nc2.text_input("Parceiros",                value=nav.get("management_partners",""))
     integrations          = nc1.text_input("Integrações",              value=nav["integrations"])
-    crm_implantation      = nc2.text_input("CRM Implantação",          value=nav.get("crm_implantation",""))
-    manager_area          = nc1.text_input("Área do Gestor",           value=nav.get("manager_area",""))
-    ui_settings_label     = nc2.text_input("Configurações",            value=nav["ui_settings"])
+    instagram_agent       = nc2.text_input("Agente Instagram",         value=nav.get("instagram_agent","Agente Instagram"))
+    crm_implantation      = nc1.text_input("CRM Implantação",          value=nav.get("crm_implantation",""))
+    manager_area          = nc2.text_input("Área do Gestor",           value=nav.get("manager_area",""))
+    ui_settings_label     = nc1.text_input("Configurações",            value=nav["ui_settings"])
 
     st.markdown("")
 
@@ -100,6 +101,7 @@ if submitted:
             "management_comparison":   management_comparison.strip()   or nav.get("management_comparison",""),
             "management_partners":     management_partners.strip()     or nav.get("management_partners",""),
             "integrations":            integrations.strip()            or nav["integrations"],
+            "instagram_agent":         instagram_agent.strip()         or nav.get("instagram_agent","Agente Instagram"),
             "crm_implantation":        crm_implantation.strip()        or nav.get("crm_implantation",""),
             "manager_area":            manager_area.strip()            or nav.get("manager_area",""),
             "ui_settings":             ui_settings_label.strip()       or nav["ui_settings"],
