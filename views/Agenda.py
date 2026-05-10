@@ -1,9 +1,9 @@
 """
 Agenda P3 Energy
 ================
-Topo replicado do artifact (hero + 4 KPIs + weather strip),
-com tempo ao vivo via Open-Meteo.  Abaixo: Google Calendar embed
-+ análise de mercado EV & Solar.
+Estrutura do artifact (hero + 4 KPIs + weather strip) com o design
+P3 Energy: verde #3FB66B, fundo #16221E, bordas #2A3530.
+Clima ao vivo via Open-Meteo. Abaixo: Google Calendar + mercado EV/Solar.
 """
 
 import streamlit as st
@@ -13,20 +13,17 @@ from utils.p3_styles import inject, section_title
 
 inject()
 
-# ── TOPO: réplica exata do artifact ──────────────────────────────────────────
+# ── TOPO: estrutura do artifact nas cores P3 Energy ───────────────────────────
 components.html("""
-<!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-<meta charset="UTF-8"/>
+<head><meta charset="UTF-8"/>
 <style>
-  :root { color-scheme: light; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                  "Helvetica Neue", Arial, sans-serif;
     background: transparent;
-    color: #e6ebf5;
+    color: #e2ebe5;
     line-height: 1.5;
     font-size: 14px;
   }
@@ -39,45 +36,44 @@ components.html("""
   .brand { display: flex; align-items: center; gap: 12px; }
   .logo {
     width: 44px; height: 44px; border-radius: 12px;
-    background: linear-gradient(135deg, #f5b400 0%, #3b82f6 100%);
+    background: linear-gradient(135deg, #3FB66B 0%, #1a4a2e 100%);
     display: flex; align-items: center; justify-content: center;
-    color: #0b0f17; font-weight: 800; font-size: 18px;
-    box-shadow: 0 6px 18px rgba(59,130,246,.35); flex-shrink: 0;
+    color: #fff; font-weight: 800; font-size: 16px;
+    box-shadow: 0 4px 14px rgba(63,182,107,.35); flex-shrink: 0;
   }
-  h1 { font-size: 22px; color: #f5f7fb; font-weight: 700; }
-  .subtitle { font-size: 13px; color: #8a93a8; margin-top: 2px; }
-  .updated { font-size: 12px; color: #8a93a8; }
+  .brand-title { font-size: 20px; font-weight: 700; color: #f0f7f2; }
+  .brand-sub   { font-size: 12px; color: #6A8F7A; margin-top: 2px; }
+  .updated     { font-size: 12px; color: #6A8F7A; }
 
   /* ── hero ── */
   .hero {
-    background: linear-gradient(135deg, #182239 0%, #1a1530 100%);
-    border: 1px solid #2a3a5e;
-    border-radius: 16px;
+    background: linear-gradient(135deg, #0F1F16 0%, #111D14 100%);
+    border: 1px solid #2A3530;
+    border-radius: 14px;
     padding: 18px 20px;
     margin-bottom: 12px;
     display: grid;
     grid-template-columns: 1.4fr 1fr;
     gap: 18px;
   }
-  @media (max-width: 700px) { .hero { grid-template-columns: 1fr; } }
+  @media (max-width: 680px) { .hero { grid-template-columns: 1fr; } }
 
-  .hero-next .label {
+  .label-green {
     font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
-    color: #93c5fd; font-weight: 700; margin-bottom: 6px;
+    color: #3FB66B; font-weight: 700; margin-bottom: 6px;
   }
-  .hero-next .title {
-    font-size: 22px; font-weight: 700; color: #f5f7fb; margin-bottom: 8px;
-  }
-  .hero-next .meta { color: #b9c2d6; font-size: 13px; }
-
-  .hero-summary .label {
+  .label-amber {
     font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
-    color: #fbbf24; font-weight: 700; margin-bottom: 8px;
+    color: #F5A623; font-weight: 700; margin-bottom: 8px;
   }
+  .hero-title {
+    font-size: 20px; font-weight: 700; color: #f0f7f2; margin-bottom: 6px;
+  }
+  .hero-meta { color: #8AAF96; font-size: 13px; }
   .summary-line {
-    font-size: 13.5px; color: #d4dbeb; margin-bottom: 6px; line-height: 1.5;
+    font-size: 13px; color: #b8d0c0; margin-bottom: 7px; line-height: 1.5;
   }
-  .summary-line strong { color: #f5f7fb; }
+  .summary-line strong { color: #f0f7f2; }
 
   /* ── KPI strip ── */
   .kpis {
@@ -86,45 +82,46 @@ components.html("""
     gap: 10px;
     margin-bottom: 12px;
   }
-  @media (max-width: 600px) { .kpis { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .kpis { grid-template-columns: 1fr 1fr; } }
 
   .kpi {
-    background: #121a2a;
-    border: 1px solid #1f2a40;
+    background: #0F1F16;
+    border: 1px solid #2A3530;
     border-radius: 12px;
     padding: 12px 14px;
-    display: flex; flex-direction: column; gap: 2px;
+    display: flex; flex-direction: column; gap: 3px;
   }
-  .kpi-label { font-size: 11px; color: #8a93a8; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
-  .kpi-value { font-size: 22px; font-weight: 800; color: #f5f7fb; }
-  .kpi-sub   { font-size: 11px; color: #8a93a8; }
+  .kpi-label { font-size: 11px; color: #6A8F7A; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+  .kpi-value { font-size: 22px; font-weight: 800; }
+  .kpi-sub   { font-size: 11px; color: #6A8F7A; }
 
-  .kpi.gmail   .kpi-value { color: #60a5fa; }
-  .kpi.events  .kpi-value { color: #4ade80; }
-  .kpi.next    .kpi-value { color: #f472b6; font-size: 15px; line-height: 1.3; }
-  .kpi.weather .kpi-value { color: #fbbf24; }
+  .kpi.inbox   .kpi-value { color: #3FB66B; }
+  .kpi.eventos .kpi-value { color: #3FB66B; }
+  .kpi.proximo .kpi-value { color: #F5A623; font-size: 15px; line-height: 1.3; }
+  .kpi.weather .kpi-value { color: #F5A623; }
 
-  /* ── weather strip ── */
+  /* ── weather card ── */
   .weather-card {
-    background: #121a2a;
-    border: 1px solid #1f2a40;
+    background: #0F1F16;
+    border: 1px solid #2A3530;
     border-radius: 14px;
     padding: 14px 18px;
   }
-  .weather-card h3 {
-    font-size: 14px; font-weight: 700; color: #f5f7fb;
+  .weather-card-title {
+    font-size: 13px; font-weight: 700; color: #f0f7f2;
     display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
   }
   .weather-strip {
     display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
-    background: linear-gradient(135deg, rgba(245,180,0,.10) 0%, rgba(59,130,246,.10) 100%);
-    border: 1px solid #1f2a40; border-radius: 10px;
+    background: linear-gradient(135deg, rgba(63,182,107,.08) 0%, rgba(245,166,35,.08) 100%);
+    border: 1px solid #2A3530;
+    border-radius: 10px;
     padding: 10px 14px;
   }
-  .w-item { display: flex; gap: 6px; align-items: baseline; }
-  .w-num   { font-weight: 800; font-size: 16px; color: #f5f7fb; }
-  .w-label { font-size: 11px; color: #8a93a8; }
-  .weather-note { font-size: 12px; color: #8a93a8; margin-top: 8px; }
+  .w-item  { display: flex; gap: 5px; align-items: baseline; }
+  .w-num   { font-weight: 800; font-size: 15px; color: #f0f7f2; }
+  .w-label { font-size: 11px; color: #6A8F7A; }
+  .weather-note { font-size: 11px; color: #6A8F7A; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -134,46 +131,42 @@ components.html("""
   <div class="brand">
     <div class="logo">P3</div>
     <div>
-      <h1>Painel P3 Energy</h1>
-      <div class="subtitle">Agenda · Mercado EV &amp; Solar · Londrina/PR</div>
+      <div class="brand-title">Painel P3 Energy</div>
+      <div class="brand-sub">Agenda · Mercado EV &amp; Solar · Londrina/PR</div>
     </div>
   </div>
-  <div>
-    <span class="updated" id="updated">—</span>
-  </div>
+  <span class="updated" id="updated">—</span>
 </header>
 
 <!-- Hero -->
 <section class="hero">
-  <div class="hero-next">
-    <div class="label">Próximo compromisso</div>
-    <div class="title">Sem compromissos à frente</div>
-    <div class="meta">Aproveite o tempo livre.</div>
+  <div>
+    <div class="label-green">📅 Próximo compromisso</div>
+    <div class="hero-title">Sem compromissos à frente</div>
+    <div class="hero-meta">Aproveite o tempo livre.</div>
   </div>
-  <div class="hero-summary">
-    <div class="label">Resumo executivo do dia</div>
-    <div>
-      <div class="summary-line">📅 <strong>Sem compromissos hoje.</strong> Boa janela para prospecção e follow-up.</div>
-      <div class="summary-line">⚡ <strong>EV em alta:</strong> +88% no 1T26, BYD Dolphin Mini lidera com 50%+ das vendas.</div>
-      <div class="summary-line">☀️ <strong>Atenção solar:</strong> custos +30% e Fio B em 60% — revisar precificação de propostas em aberto.</div>
-      <div class="summary-line" id="weather-summary-line"></div>
-    </div>
+  <div>
+    <div class="label-amber">⚡ Resumo executivo do dia</div>
+    <div class="summary-line">📅 <strong>Sem compromissos hoje.</strong> Boa janela para prospecção e follow-up.</div>
+    <div class="summary-line">⚡ <strong>EV em alta:</strong> +88% no 1T26, BYD Dolphin Mini lidera com 50%+ das vendas.</div>
+    <div class="summary-line">☀️ <strong>Atenção solar:</strong> custos +30% e Fio B em 60% — revisar precificação de propostas em aberto.</div>
+    <div id="weather-summary"></div>
   </div>
 </section>
 
 <!-- KPIs -->
 <div class="kpis">
-  <div class="kpi gmail">
+  <div class="kpi inbox">
     <div class="kpi-label">📬 Inbox não lido</div>
     <div class="kpi-value">0</div>
     <div class="kpi-sub">inbox zerado 🎉</div>
   </div>
-  <div class="kpi events">
+  <div class="kpi eventos">
     <div class="kpi-label">📅 Eventos hoje</div>
     <div class="kpi-value">0</div>
     <div class="kpi-sub">na agenda</div>
   </div>
-  <div class="kpi next">
+  <div class="kpi proximo">
     <div class="kpi-label">⏰ Próximo evento</div>
     <div class="kpi-value">—</div>
     <div class="kpi-sub">sem próximos eventos</div>
@@ -187,17 +180,15 @@ components.html("""
 
 <!-- Tempo & Irradiância -->
 <div class="weather-card">
-  <h3>🌤 Tempo &amp; irradiância — Londrina/Cambé</h3>
-  <div class="weather-strip" id="weather-strip">
+  <div class="weather-card-title">🌤 Tempo &amp; irradiância — Londrina/Cambé</div>
+  <div class="weather-strip">
     <div class="w-item"><span class="w-num" id="w-temp">…</span><span class="w-label">°C máx</span></div>
     <div class="w-item"><span class="w-num" id="w-hum">…</span><span class="w-label">% umidade</span></div>
     <div class="w-item"><span class="w-num" id="w-cond">…</span></div>
-    <div class="w-item" id="w-prec-wrap" style="display:none">
-      <span class="w-num" id="w-prec">…</span><span class="w-label">mm hoje</span>
-    </div>
+    <div class="w-item" id="w-prec-wrap" style="display:none"><span class="w-num" id="w-prec">…</span><span class="w-label">mm hoje</span></div>
     <div class="w-item"><span class="w-num" id="w-rad">…</span></div>
   </div>
-  <div class="weather-note" id="weather-note">Fonte: Open-Meteo · SIMEPAR — ao vivo</div>
+  <div class="weather-note">Fonte: Open-Meteo · ao vivo</div>
 </div>
 
 <script>
@@ -212,34 +203,21 @@ const WMO = {
 
 async function fetchWeather() {
   try {
-    const url = [
-      "https://api.open-meteo.com/v1/forecast",
-      "?latitude=-23.31&longitude=-51.16",
-      "&current=temperature_2m,relative_humidity_2m,weather_code,precipitation,apparent_temperature",
-      "&daily=temperature_2m_max,precipitation_sum,shortwave_radiation_sum",
-      "&timezone=America%2FSao_Paulo&forecast_days=1"
-    ].join("");
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=-23.31&longitude=-51.16&current=temperature_2m,relative_humidity_2m,weather_code,precipitation&daily=temperature_2m_max,precipitation_sum,shortwave_radiation_sum&timezone=America%2FSao_Paulo&forecast_days=1";
     const data = await fetch(url).then(r => r.json());
-    const cur = data.current;
-    const daily = data.daily || {};
-
-    const temp  = Math.round(cur.temperature_2m);
-    const hum   = cur.relative_humidity_2m;
-    const code  = cur.weather_code;
-    const cond  = WMO[code] || "—";
-    const prec  = (daily.precipitation_sum || [0])[0] || 0;
-    const maxT  = Math.round((daily.temperature_2m_max || [temp])[0]);
-    const rad   = (daily.shortwave_radiation_sum || [])[0];
-    const radTxt = rad != null
-      ? (rad < 10 ? "irradiância reduzida" : rad < 18 ? "irradiância moderada" : "boa irradiância")
-      : "";
+    const cur = data.current, daily = data.daily || {};
+    const temp = Math.round(cur.temperature_2m);
+    const hum  = cur.relative_humidity_2m;
+    const code = cur.weather_code;
+    const cond = WMO[code] || "—";
+    const prec = (daily.precipitation_sum || [0])[0] || 0;
+    const maxT = Math.round((daily.temperature_2m_max || [temp])[0]);
+    const rad  = (daily.shortwave_radiation_sum || [])[0];
+    const radTxt = rad != null ? (rad < 10 ? "⬇ irradiância reduzida" : rad < 18 ? "irradiância moderada" : "boa irradiância") : "";
     const isRainy = [51,53,55,61,63,65,80,81,82,95,96,99].includes(code);
 
-    // KPI
     document.getElementById("kpi-temp").textContent = temp + "°C";
     document.getElementById("kpi-cond").textContent = cond.toLowerCase();
-
-    // Strip
     document.getElementById("w-temp").textContent = maxT + "°C";
     document.getElementById("w-hum").textContent  = hum + "%";
     document.getElementById("w-cond").textContent  = cond;
@@ -247,38 +225,32 @@ async function fetchWeather() {
       document.getElementById("w-prec").textContent = prec.toFixed(1) + " mm";
       document.getElementById("w-prec-wrap").style.display = "flex";
     }
-    if (radTxt) document.getElementById("w-rad").textContent = "⬇ " + radTxt;
+    if (radTxt) document.getElementById("w-rad").textContent = radTxt;
 
-    // Summary line
     const emoji = isRainy ? "🌧" : code <= 1 ? "☀️" : "🌤";
-    const genNote = isRainy ? " — geração reduzida hoje" : rad != null && rad < 10 ? " — geração abaixo da média" : "";
-    document.getElementById("weather-summary-line").innerHTML =
-      `<div class="summary-line">${emoji} <strong>Tempo:</strong> ${cond.toLowerCase()} em Londrina${genNote}.</div>`;
-
+    const note  = isRainy ? " — geração reduzida hoje" : (rad != null && rad < 10 ? " — geração abaixo da média" : "");
+    document.getElementById("weather-summary").innerHTML =
+      `<div class="summary-line">${emoji} <strong>Tempo:</strong> ${cond.toLowerCase()} em Londrina${note}.</div>`;
   } catch(e) {
     ["kpi-temp","w-temp","w-hum","w-cond","w-rad"].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = "—";
+      const el = document.getElementById(id); if (el) el.textContent = "—";
     });
     document.getElementById("kpi-cond").textContent = "indisponível";
   }
 }
 
 function tick() {
-  const now = new Date().toLocaleTimeString("pt-BR",{
-    hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"America/Sao_Paulo"
-  });
+  const t = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"America/Sao_Paulo"});
   const el = document.getElementById("updated");
-  if (el) el.textContent = "Atualizado " + now;
+  if (el) el.textContent = "Atualizado " + t;
 }
 
 fetchWeather();
 tick();
 setInterval(tick, 1000);
 </script>
-</body>
-</html>
-""", height=500, scrolling=False)
+</body></html>
+""", height=490, scrolling=False)
 
 # ── CALENDÁRIO GOOGLE ─────────────────────────────────────────────────────────
 
@@ -295,7 +267,6 @@ CALENDAR_URL = (
     f"&mode=WEEK"
 )
 
-import streamlit.components.v1 as _comp  # noqa — já importado acima
 components.html(
     f"""
     <div style="border-radius:12px;overflow:hidden;border:1px solid #2A3530;">
@@ -327,9 +298,7 @@ ev_col, sol_col = st.columns(2, gap="large")
 with ev_col:
     st.markdown(
         "<p style='font-size:13px;font-weight:700;color:#3FB66B;margin-bottom:12px;'>"
-        "⚡ Veículos Elétricos</p>",
-        unsafe_allow_html=True,
-    )
+        "⚡ Veículos Elétricos</p>", unsafe_allow_html=True)
     ev1, ev2 = st.columns(2)
     ev1.metric("Crescimento 1T26 vs 1T25", "+88%", "+88%")
     ev2.metric("Emplacamentos 1T26", "95 mil unidades")
@@ -354,9 +323,7 @@ Preço agressivo e bom pacote de equipamentos consolidam o modelo como referênc
 with sol_col:
     st.markdown(
         "<p style='font-size:13px;font-weight:700;color:#F5A623;margin-bottom:12px;'>"
-        "☀️ Energia Solar Fotovoltaica</p>",
-        unsafe_allow_html=True,
-    )
+        "☀️ Energia Solar Fotovoltaica</p>", unsafe_allow_html=True)
     s1, s2 = st.columns(2)
     s1.metric("Adições em 2026", "10,6 GW", "-7% vs 2025", delta_color="inverse")
     s2.metric("Fio B 2026", "60%", "+45pp desde 2023", delta_color="inverse")
