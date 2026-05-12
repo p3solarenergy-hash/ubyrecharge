@@ -3,3 +3,4 @@ pandas
 plotly
 gspread>=6.0
 google-auth>=2.0
+google-api-python-client>=2.0

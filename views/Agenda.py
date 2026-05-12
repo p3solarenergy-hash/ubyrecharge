@@ -3,50 +3,131 @@ Agenda P3 Energy
 ================
 Estrutura do artifact (hero + 4 KPIs + weather strip) com o design
 P3 Energy: verde #3FB66B, fundo #16221E, bordas #2A3530.
-Clima ao vivo via Open-Meteo. Abaixo: Google Calendar + mercado EV/Solar.
+Dados ao vivo: Google Calendar + Gmail (via OAuth) + Clima (Open-Meteo).
 """
 
+import datetime
 import streamlit as st
 import streamlit.components.v1 as components
 
 from utils.p3_styles import inject, section_title
+from utils.calendar_sync import get_upcoming_events, get_unread_count
 
 inject()
 
+# ── Busca dados reais (Python) ────────────────────────────────────────────────
+@st.cache_data(ttl=120, show_spinner=False)
+def _load_events():
+    return get_upcoming_events(10)
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _load_inbox():
+    return get_unread_count()
+
+_events     = _load_events()
+_inbox      = _load_inbox()
+_today      = datetime.date.today()
+
+# Eventos hoje
+def _as_date(v):
+    return v.date() if isinstance(v, datetime.datetime) else v
+
+eventos_hoje = sum(1 for e in _events if _as_date(e["start"]) == _today)
+
+# Próximo evento (KPI card)
+if _events:
+    _prox = _events[0]
+    if _prox["all_day"]:
+        prox_value = _prox["summary"][:22] + ("…" if len(_prox["summary"]) > 22 else "")
+        prox_sub   = "dia todo"
+    else:
+        _hora = _prox["start"].strftime("%H:%M") if isinstance(_prox["start"], datetime.datetime) else "—"
+        prox_value = _prox["summary"][:22] + ("…" if len(_prox["summary"]) > 22 else "")
+        prox_sub   = _hora
+else:
+    prox_value = "—"
+    prox_sub   = "sem próximos eventos"
+
+# Hero — próximo compromisso
+if _events:
+    _e0 = _events[0]
+    hero_title = _e0["summary"]
+    _date0 = _as_date(_e0["start"])
+    if _date0 == _today:
+        _prefix = "Hoje"
+    elif _date0 == _today + datetime.timedelta(days=1):
+        _prefix = "Amanhã"
+    else:
+        _prefix = _date0.strftime("%-d/%b").replace("jan","jan").replace("feb","fev").replace("mar","mar").replace("apr","abr").replace("may","mai").replace("jun","jun").replace("jul","jul").replace("aug","ago").replace("sep","set").replace("oct","out").replace("nov","nov").replace("dec","dez")
+
+    if _e0["all_day"]:
+        hero_meta = f"{_prefix} · Dia todo"
+    else:
+        _h = _e0["start"].strftime("%H:%M") if isinstance(_e0["start"], datetime.datetime) else "—"
+        hero_meta = f"{_prefix} · {_h}"
+    _local = f" · {_e0['location']}" if _e0.get("location") else ""
+    hero_meta += _local
+else:
+    hero_title = "Sem compromissos à frente"
+    hero_meta  = "Aproveite o tempo livre."
+
+# Resumo de agenda no hero (lado direito)
+if _events:
+    _ev_today = [e for e in _events if _as_date(e["start"]) == _today]
+    if _ev_today:
+        _ev_txt = f"📅 <strong>{len(_ev_today)} evento{'s' if len(_ev_today) > 1 else ''} hoje:</strong> " + \
+                  ", ".join(e["summary"] for e in _ev_today[:3]) + "."
+    else:
+        _ev_txt = "📅 <strong>Sem compromissos hoje.</strong> Boa janela para prospecção e follow-up."
+else:
+    _ev_txt = "📅 <strong>Sem compromissos hoje.</strong> Boa janela para prospecção e follow-up."
+
+# Inbox sub-label
+inbox_sub = "inbox zerado 🎉" if _inbox == 0 else f"não lido{'s' if _inbox != 1 else ''}"
+
+# Escape para HTML (evita quebrar f-string com aspas)
+def _esc(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+hero_title_h = _esc(hero_title)
+hero_meta_h  = _esc(hero_meta)
+prox_value_h = _esc(prox_value)
+prox_sub_h   = _esc(prox_sub)
+
 # ── TOPO: estrutura do artifact nas cores P3 Energy ───────────────────────────
-components.html("""
+components.html(f"""
 <html lang="pt-BR">
 <head><meta charset="UTF-8"/>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                  "Helvetica Neue", Arial, sans-serif;
     background: transparent;
     color: #e2ebe5;
     line-height: 1.5;
     font-size: 14px;
-  }
+  }}
 
   /* ── header ── */
-  header {
+  header {{
     display: flex; align-items: center; justify-content: space-between;
     flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
-  }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .logo {
+  }}
+  .brand {{ display: flex; align-items: center; gap: 12px; }}
+  .logo {{
     width: 44px; height: 44px; border-radius: 12px;
     background: linear-gradient(135deg, #3FB66B 0%, #1a4a2e 100%);
     display: flex; align-items: center; justify-content: center;
     color: #fff; font-weight: 800; font-size: 16px;
     box-shadow: 0 4px 14px rgba(63,182,107,.35); flex-shrink: 0;
-  }
-  .brand-title { font-size: 20px; font-weight: 700; color: #f0f7f2; }
-  .brand-sub   { font-size: 12px; color: #6A8F7A; margin-top: 2px; }
-  .updated     { font-size: 12px; color: #6A8F7A; }
+  }}
+  .brand-title {{ font-size: 20px; font-weight: 700; color: #f0f7f2; }}
+  .brand-sub   {{ font-size: 12px; color: #6A8F7A; margin-top: 2px; }}
+  .updated     {{ font-size: 12px; color: #6A8F7A; }}
 
   /* ── hero ── */
-  .hero {
+  .hero {{
     background: linear-gradient(135deg, #0F1F16 0%, #111D14 100%);
     border: 1px solid #2A3530;
     border-radius: 14px;
@@ -55,73 +136,73 @@ components.html("""
     display: grid;
     grid-template-columns: 1.4fr 1fr;
     gap: 18px;
-  }
-  @media (max-width: 680px) { .hero { grid-template-columns: 1fr; } }
+  }}
+  @media (max-width: 680px) {{ .hero {{ grid-template-columns: 1fr; }} }}
 
-  .label-green {
+  .label-green {{
     font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
     color: #3FB66B; font-weight: 700; margin-bottom: 6px;
-  }
-  .label-amber {
+  }}
+  .label-amber {{
     font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
     color: #F5A623; font-weight: 700; margin-bottom: 8px;
-  }
-  .hero-title {
+  }}
+  .hero-title {{
     font-size: 20px; font-weight: 700; color: #f0f7f2; margin-bottom: 6px;
-  }
-  .hero-meta { color: #8AAF96; font-size: 13px; }
-  .summary-line {
+  }}
+  .hero-meta {{ color: #8AAF96; font-size: 13px; }}
+  .summary-line {{
     font-size: 13px; color: #b8d0c0; margin-bottom: 7px; line-height: 1.5;
-  }
-  .summary-line strong { color: #f0f7f2; }
+  }}
+  .summary-line strong {{ color: #f0f7f2; }}
 
   /* ── KPI strip ── */
-  .kpis {
+  .kpis {{
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
     margin-bottom: 12px;
-  }
-  @media (max-width: 560px) { .kpis { grid-template-columns: 1fr 1fr; } }
+  }}
+  @media (max-width: 560px) {{ .kpis {{ grid-template-columns: 1fr 1fr; }} }}
 
-  .kpi {
+  .kpi {{
     background: #0F1F16;
     border: 1px solid #2A3530;
     border-radius: 12px;
     padding: 12px 14px;
     display: flex; flex-direction: column; gap: 3px;
-  }
-  .kpi-label { font-size: 11px; color: #6A8F7A; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
-  .kpi-value { font-size: 22px; font-weight: 800; }
-  .kpi-sub   { font-size: 11px; color: #6A8F7A; }
+  }}
+  .kpi-label {{ font-size: 11px; color: #6A8F7A; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }}
+  .kpi-value {{ font-size: 22px; font-weight: 800; }}
+  .kpi-sub   {{ font-size: 11px; color: #6A8F7A; }}
 
-  .kpi.inbox   .kpi-value { color: #3FB66B; }
-  .kpi.eventos .kpi-value { color: #3FB66B; }
-  .kpi.proximo .kpi-value { color: #F5A623; font-size: 15px; line-height: 1.3; }
-  .kpi.weather .kpi-value { color: #F5A623; }
+  .kpi.inbox   .kpi-value {{ color: #3FB66B; }}
+  .kpi.eventos .kpi-value {{ color: #3FB66B; }}
+  .kpi.proximo .kpi-value {{ color: #F5A623; font-size: 15px; line-height: 1.3; }}
+  .kpi.weather .kpi-value {{ color: #F5A623; }}
 
   /* ── weather card ── */
-  .weather-card {
+  .weather-card {{
     background: #0F1F16;
     border: 1px solid #2A3530;
     border-radius: 14px;
     padding: 14px 18px;
-  }
-  .weather-card-title {
+  }}
+  .weather-card-title {{
     font-size: 13px; font-weight: 700; color: #f0f7f2;
     display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
-  }
-  .weather-strip {
+  }}
+  .weather-strip {{
     display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
     background: linear-gradient(135deg, rgba(63,182,107,.08) 0%, rgba(245,166,35,.08) 100%);
     border: 1px solid #2A3530;
     border-radius: 10px;
     padding: 10px 14px;
-  }
-  .w-item  { display: flex; gap: 5px; align-items: baseline; }
-  .w-num   { font-weight: 800; font-size: 15px; color: #f0f7f2; }
-  .w-label { font-size: 11px; color: #6A8F7A; }
-  .weather-note { font-size: 11px; color: #6A8F7A; margin-top: 8px; }
+  }}
+  .w-item  {{ display: flex; gap: 5px; align-items: baseline; }}
+  .w-num   {{ font-weight: 800; font-size: 15px; color: #f0f7f2; }}
+  .w-label {{ font-size: 11px; color: #6A8F7A; }}
+  .weather-note {{ font-size: 11px; color: #6A8F7A; margin-top: 8px; }}
 </style>
 </head>
 <body>
@@ -142,12 +223,12 @@ components.html("""
 <section class="hero">
   <div>
     <div class="label-green">📅 Próximo compromisso</div>
-    <div class="hero-title">Sem compromissos à frente</div>
-    <div class="hero-meta">Aproveite o tempo livre.</div>
+    <div class="hero-title">{hero_title_h}</div>
+    <div class="hero-meta">{hero_meta_h}</div>
   </div>
   <div>
     <div class="label-amber">⚡ Resumo executivo do dia</div>
-    <div class="summary-line">📅 <strong>Sem compromissos hoje.</strong> Boa janela para prospecção e follow-up.</div>
+    <div class="summary-line">{_ev_txt}</div>
     <div class="summary-line">⚡ <strong>EV em alta:</strong> +88% no 1T26, BYD Dolphin Mini lidera com 50%+ das vendas.</div>
     <div class="summary-line">☀️ <strong>Atenção solar:</strong> custos +30% e Fio B em 60% — revisar precificação de propostas em aberto.</div>
     <div id="weather-summary"></div>
@@ -158,18 +239,18 @@ components.html("""
 <div class="kpis">
   <div class="kpi inbox">
     <div class="kpi-label">📬 Inbox não lido</div>
-    <div class="kpi-value">0</div>
-    <div class="kpi-sub">inbox zerado 🎉</div>
+    <div class="kpi-value">{_inbox}</div>
+    <div class="kpi-sub">{inbox_sub}</div>
   </div>
   <div class="kpi eventos">
     <div class="kpi-label">📅 Eventos hoje</div>
-    <div class="kpi-value">0</div>
+    <div class="kpi-value">{eventos_hoje}</div>
     <div class="kpi-sub">na agenda</div>
   </div>
   <div class="kpi proximo">
     <div class="kpi-label">⏰ Próximo evento</div>
-    <div class="kpi-value">—</div>
-    <div class="kpi-sub">sem próximos eventos</div>
+    <div class="kpi-value">{prox_value_h}</div>
+    <div class="kpi-sub">{prox_sub_h}</div>
   </div>
   <div class="kpi weather">
     <div class="kpi-label">🌤 Londrina</div>
@@ -192,20 +273,20 @@ components.html("""
 </div>
 
 <script>
-const WMO = {
+const WMO = {{
   0:"Céu limpo",1:"Predo. limpo",2:"Parcialmente nublado",3:"Nublado",
   45:"Névoa",48:"Névoa c/ geada",51:"Garoa leve",53:"Garoa moderada",55:"Garoa intensa",
   61:"Chuva leve",63:"Chuva moderada",65:"Chuva forte",
   71:"Neve leve",73:"Neve moderada",75:"Neve forte",
   80:"Pancadas leves",81:"Pancadas moderadas",82:"Pancadas fortes",
   95:"Tempestade",96:"Tempestade c/ granizo",99:"Tempestade forte"
-};
+}};
 
-async function fetchWeather() {
-  try {
+async function fetchWeather() {{
+  try {{
     const url = "https://api.open-meteo.com/v1/forecast?latitude=-23.31&longitude=-51.16&current=temperature_2m,relative_humidity_2m,weather_code,precipitation&daily=temperature_2m_max,precipitation_sum,shortwave_radiation_sum&timezone=America%2FSao_Paulo&forecast_days=1";
     const data = await fetch(url).then(r => r.json());
-    const cur = data.current, daily = data.daily || {};
+    const cur = data.current, daily = data.daily || {{}};
     const temp = Math.round(cur.temperature_2m);
     const hum  = cur.relative_humidity_2m;
     const code = cur.weather_code;
@@ -221,29 +302,29 @@ async function fetchWeather() {
     document.getElementById("w-temp").textContent = maxT + "°C";
     document.getElementById("w-hum").textContent  = hum + "%";
     document.getElementById("w-cond").textContent  = cond;
-    if (prec > 0) {
+    if (prec > 0) {{
       document.getElementById("w-prec").textContent = prec.toFixed(1) + " mm";
       document.getElementById("w-prec-wrap").style.display = "flex";
-    }
+    }}
     if (radTxt) document.getElementById("w-rad").textContent = radTxt;
 
     const emoji = isRainy ? "🌧" : code <= 1 ? "☀️" : "🌤";
     const note  = isRainy ? " — geração reduzida hoje" : (rad != null && rad < 10 ? " — geração abaixo da média" : "");
     document.getElementById("weather-summary").innerHTML =
-      `<div class="summary-line">${emoji} <strong>Tempo:</strong> ${cond.toLowerCase()} em Londrina${note}.</div>`;
-  } catch(e) {
-    ["kpi-temp","w-temp","w-hum","w-cond","w-rad"].forEach(id => {
+      `<div class="summary-line">${{emoji}} <strong>Tempo:</strong> ${{cond.toLowerCase()}} em Londrina${{note}}.</div>`;
+  }} catch(e) {{
+    ["kpi-temp","w-temp","w-hum","w-cond","w-rad"].forEach(id => {{
       const el = document.getElementById(id); if (el) el.textContent = "—";
-    });
+    }});
     document.getElementById("kpi-cond").textContent = "indisponível";
-  }
-}
+  }}
+}}
 
-function tick() {
-  const t = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"America/Sao_Paulo"});
+function tick() {{
+  const t = new Date().toLocaleTimeString("pt-BR",{{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"America/Sao_Paulo"}});
   const el = document.getElementById("updated");
   if (el) el.textContent = "Atualizado " + t;
-}
+}}
 
 fetchWeather();
 tick();

@@ -149,6 +149,33 @@ def get_upcoming_events(n: int = 8) -> list[dict]:
         return []
 
 
+def get_unread_count() -> int:
+    """
+    Retorna o número estimado de e-mails não lidos no inbox.
+    Requer escopo gmail.readonly no token OAuth.
+    Retorna 0 silenciosamente se o escopo não estiver disponível.
+    """
+    try:
+        from googleapiclient.discovery import build
+    except ImportError:
+        return 0
+
+    creds = _build_credentials()
+    if not creds:
+        return 0
+
+    try:
+        service = build("gmail", "v1", credentials=creds, cache_discovery=False)
+        result = service.users().messages().list(
+            userId="me",
+            labelIds=["INBOX", "UNREAD"],
+            maxResults=1,
+        ).execute()
+        return int(result.get("resultSizeEstimate", 0))
+    except Exception:
+        return 0
+
+
 def calendar_connected() -> bool:
     """Retorna True se conseguiu conectar ao Google Calendar."""
     creds = _build_credentials()
