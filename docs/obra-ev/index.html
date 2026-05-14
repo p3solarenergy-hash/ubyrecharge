@@ -98,6 +98,9 @@
   <div class="toolbar">
     <h2>Obras</h2>
     <div class="search"><input id="searchInput" placeholder="Nome, cliente, cidade ou status..."></div>
+    <button class="ghost-btn" id="exportBackup">Backup</button>
+    <button class="ghost-btn" id="importBackup">Restaurar</button>
+    <input id="backupFile" type="file" accept="application/json,.json" style="display:none">
     <button class="new-btn" id="openNewObra">+ Nova Obra</button>
   </div>
 
@@ -135,6 +138,7 @@
   <footer><strong>P3 Energy</strong> - Engenharia em Energia Solar e Mobilidade Eletrica<br>Prototipo visual para anexar na plataforma UBY Recharge</footer>
 </div>
 
+<script src="backup_guard.js"></script>
 <script src="drive_config.js"></script>
 <script>
 const KEY="p3_obras_theme";
@@ -224,6 +228,9 @@ document.getElementById("searchInput").addEventListener("input",e=>{
 document.getElementById("openNewObra").addEventListener("click",()=>document.getElementById("newObraPanel").classList.add("open"));
 document.getElementById("cancelNewObra").addEventListener("click",()=>document.getElementById("newObraPanel").classList.remove("open"));
 document.getElementById("saveNewObra").addEventListener("click",createObra);
+document.getElementById("exportBackup").addEventListener("click",()=>window.UBY_BACKUP.export());
+document.getElementById("importBackup").addEventListener("click",()=>document.getElementById("backupFile").click());
+document.getElementById("backupFile").addEventListener("change",e=>window.UBY_BACKUP.importFile(e.target.files[0]));
 renderPhases();renderCards(filteredObras());renderProspects();updateStats();
 </script>
 </body>
