@@ -14,7 +14,7 @@
   .brand{display:flex;align-items:center;gap:16px;margin-bottom:20px;position:relative;z-index:1}.logo{width:54px;height:54px;border-radius:12px;background:#0F3D2E;border:1px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:26px;font-weight:900}.brand-name{font-size:14px;letter-spacing:3px;text-transform:uppercase;opacity:.86}.brand-tag{font-size:11px;opacity:.7;letter-spacing:1px}
   h1{font-size:32px;line-height:1.15;margin-bottom:8px;position:relative;z-index:1}.subtitle{color:#D8E5DE;max-width:780px;position:relative;z-index:1}
   .top-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px;position:relative;z-index:1}.top-actions a,.btn{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#fff;text-decoration:none;border-radius:9px;padding:10px 14px;font-size:12px;font-weight:900}.top-actions a.primary{background:var(--accent);border-color:var(--accent)}
-  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px}.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:17px;box-shadow:var(--shadow)}.label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:800}.value{font-size:28px;color:var(--primary);font-weight:900;margin-top:6px;line-height:1.1}.sub{font-size:11px;color:var(--muted);margin-top:5px}
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:24px}.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:17px;box-shadow:var(--shadow)}.label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:800}.value{font-size:28px;color:var(--primary);font-weight:900;margin-top:6px;line-height:1.1}.sub{font-size:11px;color:var(--muted);margin-top:5px}
   .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:18px}.modules{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.module{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:var(--shadow);text-decoration:none;color:inherit;display:grid;gap:12px;min-height:188px;position:relative;overflow:hidden}.module::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#0F3D2E,var(--accent))}.module:hover{transform:translateY(-2px);transition:.18s}.module h2{color:var(--primary);font-size:18px}.module p{color:var(--muted);font-size:12px}.module-foot{display:flex;justify-content:space-between;align-items:center;margin-top:auto}.badge{display:inline-block;border-radius:7px;padding:4px 8px;font-size:10px;font-weight:900;text-transform:uppercase;background:#0E2A1B;color:#7FE2A0}.badge.warn{background:#2E2310;color:#F2D77F}.badge.info{background:#0D2030;color:#7FCCFF}.open{color:var(--accent);font-size:12px;font-weight:900}
   .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:var(--shadow);margin-bottom:18px}.panel h2{font-size:16px;color:var(--primary);padding-bottom:10px;margin-bottom:14px;border-bottom:1px solid var(--border)}.insights{display:grid;gap:10px}.insight{background:#121d18;border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:10px;padding:12px}.insight.warn{border-left-color:var(--warn)}.insight.danger{border-left-color:var(--danger)}.insight strong{display:block;font-size:13px;margin-bottom:3px}.insight span{font-size:12px;color:var(--muted)}
   .files-panel{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);margin-top:18px;overflow:hidden}.files-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--border)}.files-title{display:flex;align-items:center;gap:12px}.file-icon{width:34px;height:34px;border-radius:8px;background:#10241a;display:grid;place-items:center;font-size:18px}.file-count{background:#0E2A1B;color:#7FE2A0;border-radius:999px;padding:4px 10px;font-weight:900;font-size:12px}.files-grid{display:grid;grid-template-columns:1fr 1fr}.file-row{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);min-height:66px}.file-row:nth-child(odd){border-right:1px solid var(--border)}.file-row strong{display:block;font-size:13px;color:var(--text)}.file-row span{font-size:11px;color:var(--muted)}.file-row b{color:#7FE2A0}.file-row a{color:#7FA7FF;text-decoration:none;font-size:12px;font-weight:900}
@@ -40,7 +40,8 @@
     <div class="stat"><div class="label">Obras no painel</div><div class="value" id="kWorks">0</div><div class="sub">Projetos acompanhados</div></div>
     <div class="stat"><div class="label">Tarefas abertas</div><div class="value" id="kTasks">0</div><div class="sub">Pendentes e em andamento</div></div>
     <div class="stat"><div class="label">Atrasos</div><div class="value" id="kLate">0</div><div class="sub">Tarefas vencidas</div></div>
-    <div class="stat"><div class="label">Potencia EV</div><div class="value" id="kKw">0</div><div class="sub">kW planejados</div></div>
+    <div class="stat"><div class="label">Potencia instalada</div><div class="value" id="kInstalledKw">0</div><div class="sub">kW em obras concluidas</div></div>
+    <div class="stat"><div class="label">Potencia em obras</div><div class="value" id="kWorkKw">0</div><div class="sub">kW ainda em implantacao</div></div>
     <div class="stat"><div class="label">Modulos</div><div class="value">4</div><div class="sub">Base operacional</div></div>
   </div>
 
@@ -129,11 +130,13 @@ function render(){
   const t=tasks();
   const open=t.filter(x=>x.status!=="Concluida");
   const late=open.filter(x=>daysTo(x.due)<0);
-  const kw=w.reduce((a,o)=>a+(parseInt(o.kw,10)||0),0);
+  const installedKw=w.filter(o=>/conclu/i.test(o.status||"")).reduce((a,o)=>a+(parseInt(o.kw,10)||0),0);
+  const workKw=w.filter(o=>!/conclu/i.test(o.status||"")).reduce((a,o)=>a+(parseInt(o.kw,10)||0),0);
   document.getElementById("kWorks").textContent=w.length;
   document.getElementById("kTasks").textContent=open.length;
   document.getElementById("kLate").textContent=late.length;
-  document.getElementById("kKw").textContent=kw;
+  document.getElementById("kInstalledKw").textContent=installedKw;
+  document.getElementById("kWorkKw").textContent=workKw;
   document.getElementById("worksBadge").textContent=w.length+" obras";
   document.getElementById("tasksBadge").textContent=open.length+" abertas";
   const worst=[...w].sort((a,b)=>(a.pct||0)-(b.pct||0))[0];
