@@ -99,7 +99,7 @@ const phases=[
   ["Documentacao",68],["Concessionaria",43],["Projeto",71],["Orcamentos",36],["Materiais",61],["Obra civil",52],["Obra eletrica",37],["Adicionais",48],["Comissionamento",28],["Operacao assistida",13]
 ];
 const baseObras=[
-  {id:"rio",nome:"Rio Beach EV",cliente:"Rio Beach",local:"Rio de Janeiro - RJ",status:"Em obra",kind:"warn",pct:61,kw:120,carregadores:"2 x 60 kW",crit:3,flags:["Orcamento eletrica a aprovar","Materiais parciais","Civil liberada"],link:"gestao_obra_ev_detalhe.html"},
+  {id:"rio",nome:"Rio Beach EV",cliente:"Rio Beach",local:"Rua Luiz Lerco 159",status:"Concluida",kind:"ok",pct:100,kw:7,carregadores:"1 x 7 kW",crit:0,flags:["Obra completa"],link:"gestao_obra_ev_detalhe.html"},
   {id:"malassise",nome:"Posto Malassise R.K.",cliente:"Malassise Robert Koch",local:"Maringa - PR",status:"Projeto",kind:"warn",pct:42,kw:60,carregadores:"1 x 60 kW",crit:4,flags:["Aumento de carga","Trafo a validar","Orcamento civil"],link:"gestao_obra_ev_detalhe.html?obra=malassise"},
   {id:"shopping",nome:"Shopping Center EV",cliente:"Cliente modelo",local:"Sao Paulo - SP",status:"Aguardando",kind:"danger",pct:18,kw:90,carregadores:"3 x 30 kW",crit:2,flags:["Docs pendentes","Sem vistoria","Orcamentos pendentes"],link:"gestao_obra_ev_detalhe.html?obra=shopping"}
 ];
@@ -108,7 +108,8 @@ let obras=loadObras();
 function detailKey(id){return "uby-obra-detalhe-"+(id||"rio")}
 function detailStats(detail){const tasks=(detail.phases||[]).flatMap(p=>(p.tasks||[]).map(t=>({...t,phase:p.name})));const total=tasks.length||1;const released=tasks.filter(t=>t.status==="done"||t.status==="na").length;const pct=Math.round(released/total*100);const critical=tasks.filter(t=>["Concessionaria","Orcamentos e contratacoes","Materiais e equipamentos","Obra eletrica"].includes(t.phase)&&["pending","doing"].includes(t.status));return{pct,crit:critical.length,flags:critical.slice(0,3).map(t=>t.title)}}
 function mergeDetailData(obra){try{const detail=JSON.parse(localStorage.getItem(detailKey(obra.id)));if(!detail||!detail.project)return obra;const qtd=parseInt(detail.project.qtdCarregadores,10)||parseInt((detail.project.equip||"1 x 60").split("x")[0],10)||1;const pot=parseInt(detail.project.potenciaCarregador,10)||parseInt((detail.project.equip||"1 x 60").split("x")[1],10)||60;const ds=detailStats(detail);return{...obra,nome:detail.project.obraNome||obra.nome,local:detail.project.local||obra.local,status:detail.project.statusExec||obra.status,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,pct:ds.pct,crit:ds.crit,flags:ds.flags.length?ds.flags:(ds.pct===100?["Obra completa"]:obra.flags)}}catch{return obra}}
-function loadObras(){try{return (JSON.parse(localStorage.getItem(obrasKey))||baseObras).map(mergeDetailData)}catch{return baseObras.map(mergeDetailData)}}
+function normalizeDefaults(saved){if(!saved||!saved.length)return baseObras;const byId=new Map(saved.map(o=>[o.id,o]));baseObras.forEach(base=>{if(!byId.has(base.id))saved.push(base)});return saved.map(o=>o.id==="rio"&&o.pct<100?{...o,...baseObras.find(b=>b.id==="rio")}:o)}
+function loadObras(){try{return normalizeDefaults(JSON.parse(localStorage.getItem(obrasKey))).map(mergeDetailData)}catch{return baseObras.map(mergeDetailData)}}
 function saveObras(){localStorage.setItem(obrasKey,JSON.stringify(obras))}
 function sortObras(list){return [...list].sort((a,b)=>(a.pct??0)-(b.pct??0)||a.nome.localeCompare(b.nome))}
 function deleteObra(nome){if(!confirm(`Excluir a obra "${nome}" deste prototipo?`))return;obras=obras.filter(o=>o.nome!==nome);saveObras();renderCards(filteredObras());updateStats()}
