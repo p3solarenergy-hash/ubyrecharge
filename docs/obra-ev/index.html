@@ -29,6 +29,7 @@
   .report-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:12px 0;border-top:1px solid var(--p3-border);border-bottom:1px solid var(--p3-border)}.ml{font-size:9px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}.mv{font-size:14px;font-weight:700;color:var(--p3-primary);margin-top:2px}.mu{font-size:10px;color:var(--p3-muted);font-weight:500}
   .report-flags{display:flex;gap:6px;flex-wrap:wrap}.flag{font-size:10px;padding:3px 8px;border-radius:6px;background:#1F2A26;color:var(--p3-muted);font-weight:600}.flag.crit{background:#2E1714;color:#FF8B7C}.flag.warn{background:#2E2310;color:#F2D77F}.flag.ok{background:#0E2A1B;color:#7FE2A0}
   .report-foot{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--p3-muted);margin-top:auto}.open{color:var(--p3-accent);font-weight:700}.delete-btn{border:1px solid var(--p3-danger);background:#2E1714;color:#FF8B7C;border-radius:7px;padding:6px 9px;font-size:10px;font-weight:800;cursor:pointer;text-transform:uppercase;letter-spacing:.4px}.delete-btn:hover{filter:brightness(1.12)}
+  .analyzer-section{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:20px;margin:0 0 28px;box-shadow:var(--p3-shadow)}.analyzer-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.analyzer-head h2{font-size:16px;color:var(--p3-primary)}.analyzer-links{display:flex;gap:8px;flex-wrap:wrap}.analyzer-links a{border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:8px;padding:8px 11px;font-size:11px;font-weight:800;text-decoration:none}.analyzer-links a.main{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
   .prospect-section{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:24px;margin:10px 0 32px;box-shadow:var(--p3-shadow)}.prospect-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}.prospect-head h2{font-size:16px;color:var(--p3-primary)}.prospect-actions{display:flex;gap:8px;flex-wrap:wrap}.prospect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}.prospect-card{background:#1A2622;border:1px solid var(--p3-border);border-radius:12px;padding:15px;display:grid;gap:11px}.prospect-top{display:flex;justify-content:space-between;gap:10px}.prospect-title{font-size:15px;font-weight:800;color:var(--p3-primary)}.prospect-sub{font-size:11px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.6px;margin-top:2px}.prospect-status{font-size:9px;padding:4px 8px;border-radius:8px;background:#2E2310;color:#F2D77F;font-weight:800;text-transform:uppercase;height:max-content}.prospect-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;border-top:1px solid var(--p3-border);border-bottom:1px solid var(--p3-border);padding:10px 0}.prospect-note{font-size:12px;color:var(--p3-muted);min-height:32px}.mini-link{display:inline-block;border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:7px;padding:7px 10px;font-size:11px;font-weight:800;text-decoration:none}.mini-link.primary{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
   .theme-toggle{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;border:1px solid var(--p3-border);background:var(--p3-card);color:var(--p3-text);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;z-index:1000;box-shadow:var(--p3-shadow)}
   footer{text-align:center;padding:24px 0;color:var(--p3-muted);font-size:11px;margin-top:30px;border-top:1px solid var(--p3-border)}footer strong{color:var(--p3-primary)}
@@ -66,6 +67,25 @@
     <div class="macro-grid">
       <div class="macro-list" id="macroInsights"></div>
       <div class="pipeline-bars" id="pipelineChart"></div>
+    </div>
+  </div>
+
+  <div class="analyzer-section">
+    <div class="analyzer-head">
+      <div>
+        <h2>Atalhos dos analisadores</h2>
+        <div class="sub">Central única para abrir os HTMLs técnicos sem poluir cada projeto.</div>
+      </div>
+    </div>
+    <div class="analyzer-links">
+      <a class="main" href="analisadores/dashboard.html" target="_blank" rel="noopener">Dashboard geral</a>
+      <a href="analisadores/index.html" target="_blank" rel="noopener">Index</a>
+      <a href="analisadores/Relatorio_Analise_Carga_Araguaia.html" target="_blank" rel="noopener">Carga Araguaia</a>
+      <a href="analisadores/Relatorio_Analise_Carga_Malassise_RK.html" target="_blank" rel="noopener">Carga Malassise</a>
+      <a href="analisadores/Relatorio_Carregador_Araguaia.html" target="_blank" rel="noopener">Carregador Araguaia</a>
+      <a href="analisadores/Relatorio_Carregador_Malassise_RK.html" target="_blank" rel="noopener">Carregador Malassise</a>
+      <a href="analisadores/Relatorio_Eletrico_Araguaia.html" target="_blank" rel="noopener">Eletrico Araguaia</a>
+      <a href="analisadores/Relatorio_Eletrico_Malassise_RK.html" target="_blank" rel="noopener">Eletrico Malassise</a>
     </div>
   </div>
 
