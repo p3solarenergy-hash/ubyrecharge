@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P3 Energy - Gestao de Tarefas</title>
+<style>
+  :root{--primary:#3FB66B;--accent:#5BC882;--bg:#0E1813;--card:#16221E;--card2:#1A2622;--text:#E8EFEB;--muted:#8FA39A;--border:#2A3530;--danger:#E55545;--warn:#F2A93D;--info:#6CB7FF;--shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--text);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.5;min-height:100vh}
+  .page{max-width:1540px;margin:0 auto;padding:32px 36px 80px}
+  .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);border-radius:16px;padding:30px 34px;margin-bottom:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .header::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;background:radial-gradient(circle,rgba(46,168,92,.35),transparent 70%);border-radius:50%}
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:18px;position:relative;z-index:1}.logo{width:50px;height:50px;border-radius:11px;background:#0F3D2E;border:1px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-weight:900;font-size:24px}
+  .brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.85}.brand-tag{font-size:11px;opacity:.7;letter-spacing:1px}.header h1{font-size:30px;line-height:1.15;margin-bottom:8px;position:relative;z-index:1}.subtitle{font-size:14px;color:#D7E5DE;max-width:780px;position:relative;z-index:1}.nav{position:absolute;right:28px;top:24px;display:flex;gap:8px;z-index:2}.nav a{color:#fff;text-decoration:none;background:rgba(255,255,255,.08);border-radius:18px;padding:7px 13px;font-size:12px;font-weight:700}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px}.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:17px;box-shadow:var(--shadow)}.label{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:800}.value{font-size:28px;color:var(--primary);font-weight:800;line-height:1.1;margin-top:6px}.sub{font-size:11px;color:var(--muted);margin-top:5px}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow)}.toolbar h2{flex:1;color:var(--primary);font-size:18px}.toolbar input,.toolbar select{height:40px;border:1px solid var(--border);background:#121d18;color:var(--text);border-radius:8px;padding:0 10px;font-weight:700}.toolbar input{min-width:280px}.btn{height:40px;border:1px solid var(--border);background:#121d18;color:var(--text);border-radius:8px;padding:0 13px;font-size:12px;font-weight:900;cursor:pointer}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.danger{border-color:var(--danger);background:#2E1714;color:#FF8B7C}.btn:hover{filter:brightness(1.1)}
+  .new-panel{display:none;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin:-6px 0 22px;box-shadow:var(--shadow)}.new-panel.open{display:block}.new-panel h3{color:var(--primary);font-size:16px;margin-bottom:14px}.form-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr .8fr .9fr;gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.7px;font-weight:800;margin-bottom:5px}.field input,.field select,.field textarea{width:100%;border:1px solid var(--border);background:#121d18;color:var(--text);border-radius:8px;padding:0 10px;font-weight:700}.field input,.field select{height:40px}.field textarea{height:80px;padding:10px;resize:vertical}.field.wide{grid-column:1/-1}.actions{display:flex;gap:8px}
+  .main-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:18px}.panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;box-shadow:var(--shadow);margin-bottom:18px}.panel h2{color:var(--primary);font-size:16px;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:14px}
+  .kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.col{background:#111b17;border:1px solid var(--border);border-radius:12px;padding:10px;min-height:360px}.col-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;color:var(--primary);font-weight:900}.count{font-size:11px;color:var(--muted)}
+  .task{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;display:grid;gap:9px}.task.overdue{border-left:4px solid var(--danger)}.task.today{border-left:4px solid var(--warn)}.task strong{font-size:13px}.task small{color:var(--muted);font-size:11px}.task-meta{display:flex;gap:6px;flex-wrap:wrap}.tag{font-size:10px;font-weight:900;border-radius:7px;padding:3px 7px;text-transform:uppercase}.tag.high{background:#2E1714;color:#FF8B7C}.tag.medium{background:#2E2310;color:#F2D77F}.tag.low{background:#0E2A1B;color:#7FE2A0}.tag.info{background:#0D2030;color:#7FCCFF}.task select{width:100%;height:34px;border:1px solid var(--border);background:#121d18;color:var(--text);border-radius:7px;font-weight:800}
+  .table{width:100%;border-collapse:collapse;font-size:13px}th{background:#1F2A26;color:var(--primary);font-size:10px;text-transform:uppercase;letter-spacing:.7px;text-align:left;padding:9px;border-bottom:2px solid var(--border)}td{padding:9px;border-bottom:1px solid var(--border);vertical-align:top}.due-danger{color:#FF8B7C;font-weight:900}.due-warn{color:#F2D77F;font-weight:900}.due-ok{color:#7FE2A0;font-weight:900}
+  .insights{display:grid;gap:10px}.insight{background:#121d18;border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:10px;padding:12px}.insight.warn{border-left-color:var(--warn)}.insight.danger{border-left-color:var(--danger)}.insight strong{display:block;font-size:13px;margin-bottom:3px}.insight span{font-size:12px;color:var(--muted)}
+  footer{text-align:center;padding:24px 0;color:var(--muted);font-size:11px;margin-top:24px;border-top:1px solid var(--border)}footer strong{color:var(--primary)}
+  @media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}.main-grid,.kanban{grid-template-columns:1fr}.form-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:640px){.page{padding:18px 14px 60px}.stats,.form-grid{grid-template-columns:1fr}.nav{position:static;margin-bottom:14px}.toolbar input{min-width:100%}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="nav"><a href="../obra-ev/">Obras EV</a></div>
+    <div class="brand"><div class="logo">P3</div><div><div class="brand-name">P3 Energy</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div></div>
+    <h1>Gestao de Tarefas</h1>
+    <div class="subtitle">Central visual para acompanhar demandas operacionais, prazos, responsaveis e pendencias por obra ou area.</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="label">Tarefas abertas</div><div class="value" id="kOpen">0</div><div class="sub">Pendentes + em andamento</div></div>
+    <div class="stat"><div class="label">Atrasadas</div><div class="value" id="kLate">0</div><div class="sub">Prazo vencido</div></div>
+    <div class="stat"><div class="label">Vencem hoje</div><div class="value" id="kToday">0</div><div class="sub">Acao imediata</div></div>
+    <div class="stat"><div class="label">Concluidas</div><div class="value" id="kDone">0</div><div class="sub">Historico da semana</div></div>
+    <div class="stat"><div class="label">Carga alta</div><div class="value" id="kHigh">0</div><div class="sub">Prioridade alta</div></div>
+  </div>
+
+  <div class="toolbar">
+    <h2>Tarefas</h2>
+    <input id="search" placeholder="Buscar tarefa, obra, responsavel...">
+    <select id="filterStatus"><option value="">Todos status</option><option>Pendente</option><option>Em andamento</option><option>Aguardando terceiro</option><option>Concluida</option></select>
+    <select id="filterPriority"><option value="">Todas prioridades</option><option>Alta</option><option>Media</option><option>Baixa</option></select>
+    <button class="btn" id="backupBtn">Backup</button>
+    <button class="btn" id="restoreBtn">Restaurar</button>
+    <input id="restoreFile" type="file" accept="application/json,.json" style="display:none">
+    <button class="btn primary" id="newBtn">+ Nova tarefa</button>
+  </div>
+
+  <div class="new-panel" id="newPanel">
+    <h3>Nova tarefa</h3>
+    <div class="form-grid">
+      <div class="field"><label>Tarefa</label><input id="taskTitle" placeholder="Ex: Cobrar protocolo da concessionaria"></div>
+      <div class="field"><label>Obra / area</label><select id="taskProject"></select></div>
+      <div class="field"><label>Responsavel</label><input id="taskOwner" placeholder="Nome ou equipe"></div>
+      <div class="field"><label>Prazo</label><input id="taskDue" type="date"></div>
+      <div class="field"><label>Prioridade</label><select id="taskPriority"><option>Alta</option><option>Media</option><option>Baixa</option></select></div>
+      <div class="field"><label>Status</label><select id="taskStatus"><option>Pendente</option><option>Em andamento</option><option>Aguardando terceiro</option><option>Concluida</option></select></div>
+      <div class="field wide"><label>Observacao</label><textarea id="taskNote" placeholder="Contexto, proxima acao, protocolo ou dependencia"></textarea></div>
+      <div class="actions"><button class="btn primary" id="saveTask">Salvar</button><button class="btn" id="cancelTask">Cancelar</button></div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <h2>Quadro operacional</h2>
+      <div class="kanban" id="kanban"></div>
+    </div>
+    <div>
+      <div class="panel">
+        <h2>Insights de gestao</h2>
+        <div class="insights" id="insights"></div>
+      </div>
+      <div class="panel">
+        <h2>Lista de controle</h2>
+        <table class="table"><thead><tr><th>Tarefa</th><th>Obra</th><th>Responsavel</th><th>Prazo</th><th></th></tr></thead><tbody id="tableRows"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <footer><strong>P3 Energy</strong> - Modulo visual de gestao de tarefas</footer>
+</div>
+
+<script>
+const tasksKey="uby-tarefas-v1";
+const backupKey="uby-tarefas-backups-v1";
+const statuses=["Pendente","Em andamento","Aguardando terceiro","Concluida"];
+const seed=[
+  {id:"t1",title:"Validar protocolo de aumento de carga",project:"Posto Malassise R.K.",owner:"UBY Recharge",due:addDays(2),priority:"Alta",status:"Em andamento",note:"Conferir retorno da concessionaria e refletir no checklist da obra."},
+  {id:"t2",title:"Enviar orcamento civil revisado",project:"Posto Araguaia",owner:"Equipe civil",due:addDays(4),priority:"Media",status:"Pendente",note:"Separar base, recomposicao e protecao mecanica."},
+  {id:"t3",title:"Arquivar fotos finais da Rio Beach",project:"Rio Beach EV",owner:"Campo",due:addDays(0),priority:"Baixa",status:"Pendente",note:"Subir fotos no documento da obra."},
+  {id:"t4",title:"Definir padrao de documentos para cada obra",project:"Administrativo",owner:"UBY Recharge",due:addDays(7),priority:"Media",status:"Aguardando terceiro",note:"Base para Drive e historico."}
+];
+let tasks=loadTasks();
+function addDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+function loadTasks(){try{return JSON.parse(localStorage.getItem(tasksKey))||seed}catch{return seed}}
+function saveTasks(){localStorage.setItem(tasksKey,JSON.stringify(tasks))}
+function managedBackup(reason){const payload={createdAt:new Date().toISOString(),reason,data:{[tasksKey]:localStorage.getItem(tasksKey)||JSON.stringify(tasks)}};const backups=JSON.parse(localStorage.getItem(backupKey)||"[]");backups.unshift(payload);localStorage.setItem(backupKey,JSON.stringify(backups.slice(0,20)));return payload}
+function exportBackup(){const backup=managedBackup("manual");const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="backup-tarefas-"+backup.createdAt.slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}
+function importBackup(file){if(!file)return;const reader=new FileReader();reader.onload=()=>{try{managedBackup("antes de restaurar");const imported=JSON.parse(String(reader.result||"{}"));const data=imported.data||imported;if(data[tasksKey])localStorage.setItem(tasksKey,data[tasksKey]);tasks=loadTasks();render();alert("Backup restaurado.")}catch(err){alert("Nao foi possivel restaurar: "+err.message)}};reader.readAsText(file)}
+function projects(){const base=["Administrativo","Comercial","Operacao","Compras","Concessionaria"];try{const obras=JSON.parse(localStorage.getItem("uby-obras-dashboard-v1"))||[];obras.forEach(o=>base.push(o.nome))}catch{}return [...new Set(base)]}
+function daysTo(due){if(!due)return 999;const today=new Date();today.setHours(0,0,0,0);const d=new Date(due+"T00:00:00");return Math.round((d-today)/86400000)}
+function dueClass(t){const d=daysTo(t.due);if(t.status==="Concluida")return"due-ok";if(d<0)return"due-danger";if(d<=1)return"due-warn";return"due-ok"}
+function dueText(t){const d=daysTo(t.due);if(!t.due)return"Sem prazo";if(d<0)return`${Math.abs(d)} dia(s) atrasada`;if(d===0)return"Hoje";if(d===1)return"Amanha";return`${d} dias`}
+function priorityClass(p){return p==="Alta"?"high":p==="Media"?"medium":"low"}
+function filtered(){const q=document.getElementById("search").value.toLowerCase();const fs=document.getElementById("filterStatus").value;const fp=document.getElementById("filterPriority").value;return tasks.filter(t=>(!fs||t.status===fs)&&(!fp||t.priority===fp)&&[t.title,t.project,t.owner,t.note].join(" ").toLowerCase().includes(q))}
+function setStatus(id,status){const t=tasks.find(x=>x.id===id);if(!t)return;t.status=status;saveTasks();render()}
+function removeTask(id){if(!confirm("Excluir esta tarefa?"))return;tasks=tasks.filter(t=>t.id!==id);saveTasks();render()}
+function createTask(){const title=document.getElementById("taskTitle").value.trim();if(!title){alert("Informe a tarefa.");return}tasks.unshift({id:"task-"+Date.now(),title,project:document.getElementById("taskProject").value,owner:document.getElementById("taskOwner").value||"Sem responsavel",due:document.getElementById("taskDue").value,priority:document.getElementById("taskPriority").value,status:document.getElementById("taskStatus").value,note:document.getElementById("taskNote").value});saveTasks();document.getElementById("newPanel").classList.remove("open");["taskTitle","taskOwner","taskDue","taskNote"].forEach(id=>document.getElementById(id).value="");render()}
+function renderProjects(){document.getElementById("taskProject").innerHTML=projects().map(p=>`<option>${p}</option>`).join("")}
+function renderStats(list){const open=tasks.filter(t=>t.status!=="Concluida");document.getElementById("kOpen").textContent=open.length;document.getElementById("kLate").textContent=tasks.filter(t=>t.status!=="Concluida"&&daysTo(t.due)<0).length;document.getElementById("kToday").textContent=tasks.filter(t=>t.status!=="Concluida"&&daysTo(t.due)===0).length;document.getElementById("kDone").textContent=tasks.filter(t=>t.status==="Concluida").length;document.getElementById("kHigh").textContent=open.filter(t=>t.priority==="Alta").length}
+function renderInsights(list){const late=tasks.filter(t=>t.status!=="Concluida"&&daysTo(t.due)<0);const high=tasks.filter(t=>t.status!=="Concluida"&&t.priority==="Alta");const waiting=tasks.filter(t=>t.status==="Aguardando terceiro");const byOwner={};tasks.filter(t=>t.status!=="Concluida").forEach(t=>byOwner[t.owner]=(byOwner[t.owner]||0)+1);const owner=Object.entries(byOwner).sort((a,b)=>b[1]-a[1])[0];const insights=[];if(late.length)insights.push(["Atraso exige corte diario",`${late.length} tarefa(s) vencidas. Primeira: ${late[0].title}.`,"danger"]);else insights.push(["Sem atraso critico","Nao ha tarefa vencida na base atual.","ok"]);if(high.length)insights.push(["Prioridade alta aberta",`${high.length} tarefa(s) de prioridade alta ainda abertas. Validar se travam obra ou compra.`,"warn"]);if(waiting.length)insights.push(["Dependencia externa",`${waiting.length} tarefa(s) aguardando terceiro. Registrar cobranca, prazo e responsavel externo.`,"warn"]);if(owner)insights.push(["Carga por responsavel",`${owner[0]} concentra ${owner[1]} tarefa(s) abertas. Pode precisar redistribuicao.`,"ok"]);document.getElementById("insights").innerHTML=insights.map(i=>`<div class="insight ${i[2]}"><strong>${i[0]}</strong><span>${i[1]}</span></div>`).join("")}
+function taskCard(t){const urgent=daysTo(t.due)<0&&t.status!=="Concluida"?"overdue":daysTo(t.due)===0&&t.status!=="Concluida"?"today":"";return`<div class="task ${urgent}"><strong>${t.title}</strong><small>${t.project} - ${t.owner}</small><div class="task-meta"><span class="tag ${priorityClass(t.priority)}">${t.priority}</span><span class="tag info">${dueText(t)}</span></div><select onchange="setStatus('${t.id}',this.value)">${statuses.map(s=>`<option ${s===t.status?"selected":""}>${s}</option>`).join("")}</select><small>${t.note||""}</small><button class="btn danger" onclick="removeTask('${t.id}')">Excluir</button></div>`}
+function renderKanban(list){document.getElementById("kanban").innerHTML=statuses.map(s=>{const items=list.filter(t=>t.status===s).sort((a,b)=>daysTo(a.due)-daysTo(b.due));return`<div class="col"><div class="col-head"><span>${s}</span><span class="count">${items.length}</span></div>${items.map(taskCard).join("")||'<small class="sub">Sem tarefas</small>'}</div>`}).join("")}
+function renderTable(list){const rows=[...list].sort((a,b)=>daysTo(a.due)-daysTo(b.due));document.getElementById("tableRows").innerHTML=rows.map(t=>`<tr><td><strong>${t.title}</strong><br><span class="tag ${priorityClass(t.priority)}">${t.priority}</span></td><td>${t.project}</td><td>${t.owner}</td><td class="${dueClass(t)}">${dueText(t)}</td><td><button class="btn danger" onclick="removeTask('${t.id}')">Excluir</button></td></tr>`).join("")}
+function render(){renderProjects();const list=filtered();renderStats(list);renderInsights(list);renderKanban(list);renderTable(list)}
+document.getElementById("newBtn").addEventListener("click",()=>document.getElementById("newPanel").classList.add("open"));
+document.getElementById("cancelTask").addEventListener("click",()=>document.getElementById("newPanel").classList.remove("open"));
+document.getElementById("saveTask").addEventListener("click",createTask);
+document.getElementById("backupBtn").addEventListener("click",exportBackup);
+document.getElementById("restoreBtn").addEventListener("click",()=>document.getElementById("restoreFile").click());
+document.getElementById("restoreFile").addEventListener("change",e=>importBackup(e.target.files[0]));
+["search","filterStatus","filterPriority"].forEach(id=>document.getElementById(id).addEventListener("input",render));
+managedBackup("antes de carregar pagina");
+render();
+</script>
+</body>
+</html>
