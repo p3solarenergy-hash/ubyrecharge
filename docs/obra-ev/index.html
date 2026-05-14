@@ -30,6 +30,7 @@
   .report-flags{display:flex;gap:6px;flex-wrap:wrap}.flag{font-size:10px;padding:3px 8px;border-radius:6px;background:#1F2A26;color:var(--p3-muted);font-weight:600}.flag.crit{background:#2E1714;color:#FF8B7C}.flag.warn{background:#2E2310;color:#F2D77F}.flag.ok{background:#0E2A1B;color:#7FE2A0}
   .report-foot{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--p3-muted);margin-top:auto}.open{color:var(--p3-accent);font-weight:700}.delete-btn{border:1px solid var(--p3-danger);background:#2E1714;color:#FF8B7C;border-radius:7px;padding:6px 9px;font-size:10px;font-weight:800;cursor:pointer;text-transform:uppercase;letter-spacing:.4px}.delete-btn:hover{filter:brightness(1.12)}
   .analyzer-section{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:20px;margin:0 0 28px;box-shadow:var(--p3-shadow)}.analyzer-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.analyzer-head h2{font-size:16px;color:var(--p3-primary)}.analyzer-links{display:flex;gap:8px;flex-wrap:wrap}.analyzer-links a{border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:8px;padding:8px 11px;font-size:11px;font-weight:800;text-decoration:none}.analyzer-links a.main{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
+  .compare-section + .analyzer-section{display:none}
   .prospect-section{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:22px;margin:10px 0 32px;box-shadow:var(--p3-shadow)}.prospect-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}.prospect-head h2{font-size:16px;color:var(--p3-primary)}.prospect-actions{display:flex;gap:8px;flex-wrap:wrap}.prospect-list{display:grid;gap:8px}.prospect-row{display:grid;grid-template-columns:82px minmax(220px,1.3fr) 120px 150px minmax(190px,1fr) 80px 190px;gap:10px;align-items:center;background:#1A2622;border:1px solid var(--p3-border);border-radius:10px;padding:11px 12px}.prospect-row.head{background:#1F2A26;color:var(--p3-primary);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.7px}.prospect-main{min-width:0}.prospect-title{font-size:13px;font-weight:800;color:var(--p3-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prospect-sub{font-size:10px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prospect-status{font-size:10px;color:#F2D77F;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prospect-note{font-size:11px;color:var(--p3-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-link{display:inline-block;border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:7px;padding:7px 10px;font-size:11px;font-weight:800;text-decoration:none}.mini-link.primary{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
   .theme-toggle{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;border:1px solid var(--p3-border);background:var(--p3-card);color:var(--p3-text);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;z-index:1000;box-shadow:var(--p3-shadow)}
   footer{text-align:center;padding:24px 0;color:var(--p3-muted);font-size:11px;margin-top:30px;border-top:1px solid var(--p3-border)}footer strong{color:var(--p3-primary)}
@@ -48,6 +49,18 @@
     </div>
     <h1>Dashboard de Obras de Carregadores EV</h1>
     <div class="subtitle">Central para acompanhar implantacoes por obra, com progresso por fase, pendencias criticas, materiais, terceiros e entrega final.</div>
+  </div>
+
+  <div class="analyzer-section">
+    <div class="analyzer-head">
+      <div>
+        <h2>Atalhos dos analisadores</h2>
+        <div class="sub">Central unica para abrir os HTMLs tecnicos.</div>
+      </div>
+    </div>
+    <div class="analyzer-links">
+      <a class="main" href="analisadores/dashboard.html" target="_blank" rel="noopener">Dashboard geral dos analisadores</a>
+    </div>
   </div>
 
   <div class="stats">
@@ -122,6 +135,7 @@
   <footer><strong>P3 Energy</strong> - Engenharia em Energia Solar e Mobilidade Eletrica<br>Prototipo visual para anexar na plataforma UBY Recharge</footer>
 </div>
 
+<script src="drive_config.js"></script>
 <script>
 const KEY="p3_obras_theme";
 const root=document.documentElement;
@@ -135,8 +149,7 @@ const phases=[
 ];
 const baseObras=[
   {id:"rio",nome:"Rio Beach EV",cliente:"Rio Beach",local:"Rua Luiz Lerco 159",status:"Concluida",kind:"ok",pct:100,kw:7,carregadores:"1 x 7 kW",crit:0,flags:["Obra completa"],link:"gestao_obra_ev_detalhe.html"},
-  {id:"malassise",nome:"Posto Malassise R.K.",cliente:"Malassise Robert Koch",local:"Maringa - PR",status:"Projeto",kind:"warn",pct:42,kw:60,carregadores:"1 x 60 kW",crit:4,flags:["Aumento de carga","Trafo a validar","Orcamento civil"],link:"gestao_obra_ev_detalhe.html?obra=malassise"},
-  {id:"shopping",nome:"Shopping Center EV",cliente:"Cliente modelo",local:"Sao Paulo - SP",status:"Aguardando",kind:"danger",pct:18,kw:90,carregadores:"3 x 30 kW",crit:2,flags:["Docs pendentes","Sem vistoria","Orcamentos pendentes"],link:"gestao_obra_ev_detalhe.html?obra=shopping"}
+  {id:"malassise",nome:"Posto Malassise R.K.",cliente:"Malassise Robert Koch",local:"Maringa - PR",status:"Projeto",kind:"warn",pct:42,kw:60,carregadores:"1 x 60 kW",crit:4,flags:["Aumento de carga","Trafo a validar","Orcamento civil"],link:"gestao_obra_ev_detalhe.html?obra=malassise"}
 ];
 const prospectSheetUrl="https://docs.google.com/spreadsheets/d/1IiUqtF8xobzwmMkRqJiNXcT1CFW6tskEybT6GWgvvPs/edit?gid=2137351283";
 const prospects=[
@@ -157,10 +170,12 @@ const deletedKey="uby-obras-dashboard-deleted-v1";
 let obras=loadObras();
 function detailKey(id){return "uby-obra-detalhe-"+(id||"rio")}
 function detailStats(detail){const tasks=(detail.phases||[]).flatMap(p=>(p.tasks||[]).map(t=>({...t,phase:p.name})));const total=tasks.length||1;const released=tasks.filter(t=>t.status==="done"||t.status==="na").length;const pct=Math.round(released/total*100);const critical=tasks.filter(t=>["Concessionaria","Orcamentos e contratacoes","Materiais e equipamentos","Obra eletrica"].includes(t.phase)&&["pending","doing"].includes(t.status));return{pct,crit:critical.length,flags:critical.slice(0,3).map(t=>t.title)}}
+function obraFromDetail(id,detail){const p=detail.project||{};const qtd=parseInt(p.qtdCarregadores,10)||parseInt((p.equip||"1 x 60").split("x")[0],10)||1;const pot=parseInt(p.potenciaCarregador,10)||parseInt((p.equip||"1 x 60").split("x")[1],10)||60;const ds=detailStats(detail);return{id,nome:p.obraNome||id,cliente:p.cliente||"Cliente",local:p.local||"Local a definir",status:p.statusExec||"Projeto",kind:ds.pct>=100?"ok":ds.crit?"danger":"warn",pct:ds.pct,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,crit:ds.crit,flags:ds.flags.length?ds.flags:(ds.pct===100?["Obra completa"]:["Obra criada"]),link:id==="rio"?"gestao_obra_ev_detalhe.html":`gestao_obra_ev_detalhe.html?obra=${id}`}}
 function mergeDetailData(obra){try{const detail=JSON.parse(localStorage.getItem(detailKey(obra.id)));if(!detail||!detail.project)return obra;const qtd=parseInt(detail.project.qtdCarregadores,10)||parseInt((detail.project.equip||"1 x 60").split("x")[0],10)||1;const pot=parseInt(detail.project.potenciaCarregador,10)||parseInt((detail.project.equip||"1 x 60").split("x")[1],10)||60;const ds=detailStats(detail);return{...obra,nome:detail.project.obraNome||obra.nome,local:detail.project.local||obra.local,status:detail.project.statusExec||obra.status,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,pct:ds.pct,crit:ds.crit,flags:ds.flags.length?ds.flags:(ds.pct===100?["Obra completa"]:obra.flags)}}catch{return obra}}
 function deletedIds(){try{return JSON.parse(localStorage.getItem(deletedKey))||[]}catch{return[]}}
-function normalizeDefaults(saved){const deleted=new Set(deletedIds());const activeBase=baseObras.filter(o=>!deleted.has(o.id));if(!saved||!saved.length)return activeBase;const byId=new Map(saved.filter(o=>!deleted.has(o.id)).map(o=>[o.id,o]));activeBase.forEach(base=>{if(!byId.has(base.id))byId.set(base.id,base)});return [...byId.values()].map(o=>o.id==="rio"&&o.pct<100?{...o,...baseObras.find(b=>b.id==="rio")}:o)}
-function loadObras(){try{return normalizeDefaults(JSON.parse(localStorage.getItem(obrasKey))).map(mergeDetailData)}catch{return baseObras.map(mergeDetailData)}}
+function detailObras(){const deleted=new Set([...deletedIds(),"shopping","prospect-19"]);const items=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||!key.startsWith("uby-obra-detalhe-"))continue;const id=key.replace("uby-obra-detalhe-","");if(deleted.has(id))continue;try{const detail=JSON.parse(localStorage.getItem(key));if(detail&&detail.project&&!/shopping aurora/i.test(detail.project.obraNome||""))items.push(obraFromDetail(id,detail))}catch{}}return items}
+function normalizeDefaults(saved){const deleted=new Set([...deletedIds(),"shopping","prospect-19"]);const activeBase=baseObras.filter(o=>!deleted.has(o.id));const byId=new Map((saved||[]).filter(o=>!deleted.has(o.id)&&!/shopping aurora/i.test(o.nome||"")).map(o=>[o.id,o]));activeBase.forEach(base=>{if(!byId.has(base.id))byId.set(base.id,base)});detailObras().forEach(obra=>byId.set(obra.id,{...(byId.get(obra.id)||{}),...obra}));return [...byId.values()].map(o=>o.id==="rio"&&o.pct<100?{...o,...baseObras.find(b=>b.id==="rio")}:o)}
+function loadObras(){try{return normalizeDefaults(JSON.parse(localStorage.getItem(obrasKey))).map(mergeDetailData)}catch{return normalizeDefaults([]).map(mergeDetailData)}}
 function saveObras(){localStorage.setItem(obrasKey,JSON.stringify(obras))}
 function sortObras(list){return [...list].sort((a,b)=>(a.pct??0)-(b.pct??0)||a.nome.localeCompare(b.nome))}
 function deleteObra(nome){if(!confirm(`Excluir a obra "${nome}" deste prototipo?`))return;const alvo=obras.find(o=>o.nome===nome);if(alvo){const deleted=[...new Set([...deletedIds(),alvo.id])];localStorage.setItem(deletedKey,JSON.stringify(deleted));localStorage.removeItem(detailKey(alvo.id))}obras=obras.filter(o=>o.nome!==nome);saveObras();renderCards(filteredObras());updateStats()}
