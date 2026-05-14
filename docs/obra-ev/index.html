@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P3 Energy - Dashboard de Obras EV</title>
+<style>
+  :root{--p3-primary:#3FB66B;--p3-primary-deep:#0F3D2E;--p3-accent:#5BC882;--p3-accent-2:#FFD66B;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#2A3530;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#3FB66B;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.55;min-height:100vh}
+  .page{max-width:1540px;margin:0 auto;padding:32px 36px 80px}
+  .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);color:#fff;border-radius:16px;padding:36px;margin-bottom:28px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
+  .header::after{content:"";position:absolute;right:-80px;top:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(46,168,92,.35),transparent 70%);border-radius:50%}
+  .brand{display:flex;align-items:center;gap:16px;margin-bottom:20px;position:relative;z-index:1}
+  .logo-mark{width:54px;height:54px;border-radius:12px;background:#0F3D2E;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--p3-accent);font-size:26px;border:1px solid var(--p3-accent);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .brand-name{font-size:14px;letter-spacing:3px;text-transform:uppercase;opacity:.85}.brand-tag{font-size:11px;opacity:.65;letter-spacing:1px}
+  .header h1{font-size:32px;font-weight:700;margin-bottom:8px;position:relative;z-index:1}.subtitle{opacity:.85;font-size:15px;max-width:720px;position:relative;z-index:1}
+  .bookmark-hint{position:absolute;top:24px;right:28px;background:rgba(255,255,255,.08);padding:8px 14px;border-radius:20px;font-size:11px;backdrop-filter:blur(6px);z-index:2}.bookmark-hint b{color:#FFE082}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}.stat{background:var(--p3-card);padding:18px;border-radius:12px;border:1px solid var(--p3-border);box-shadow:var(--p3-shadow)}
+  .stat .label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--p3-muted);font-weight:600}.stat .value{font-size:28px;font-weight:700;color:var(--p3-primary);margin-top:6px;line-height:1}.unit{font-size:13px;color:var(--p3-muted);font-weight:500;margin-left:4px}.sub{font-size:11px;color:var(--p3-muted);margin-top:6px}
+  .toolbar{display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap}.toolbar h2{flex:1;font-size:18px;font-weight:700;color:var(--p3-primary);display:flex;align-items:center;gap:10px}.toolbar h2::before{content:"";width:4px;height:22px;background:var(--p3-accent);border-radius:3px}
+  .search{flex:0 0 310px;position:relative}.search input{width:100%;padding:9px 12px 9px 34px;border-radius:8px;border:1px solid var(--p3-border);font-size:13px;background:#1A2622;color:var(--p3-text)}.search::before{content:"Buscar";position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:10px;opacity:.55}.search input{padding-left:58px}.search input:focus{outline:none;border-color:var(--p3-accent);box-shadow:0 0 0 3px rgba(46,168,92,.15)}
+  .new-btn{background:var(--p3-accent);color:#fff;padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}.new-btn:hover{background:#258A4D}
+  .new-panel{display:none;background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:20px;margin:-6px 0 24px;box-shadow:var(--p3-shadow)}.new-panel.open{display:block}.new-panel h3{color:var(--p3-primary);font-size:16px;margin-bottom:14px}.new-grid{display:grid;grid-template-columns:1.3fr 1fr 1.3fr .7fr .8fr .9fr;gap:12px;align-items:end}.field label{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;margin-bottom:5px}.field input,.field select{width:100%;height:40px;border:1px solid var(--p3-border);border-radius:8px;background:#1A2622;color:var(--p3-text);padding:0 10px;font-weight:600}.form-actions{display:flex;gap:8px}.ghost-btn{border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:8px;padding:9px 12px;font-size:12px;font-weight:800;cursor:pointer}
+  .compare-section{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:24px;margin-bottom:28px;box-shadow:var(--p3-shadow)}.compare-section h2{font-size:16px;font-weight:700;color:var(--p3-primary);margin-bottom:14px;display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}.compare-section h2::before{content:"";width:4px;height:18px;background:var(--p3-accent);border-radius:3px}
+  .phase-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.phase-mini{background:#1A2622;border:1px solid var(--p3-border);border-radius:12px;padding:14px}.phase-mini strong{display:flex;justify-content:space-between;color:var(--p3-text);gap:10px}.phase-mini small{display:block;color:var(--p3-muted);margin-top:4px}.progress{height:8px;background:#26332e;border-radius:999px;overflow:hidden;margin-top:10px}.bar{height:100%;background:var(--p3-primary);border-radius:999px}
+  .reports{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px;margin-bottom:32px}.report-card{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:22px;box-shadow:var(--p3-shadow);text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:14px;transition:all .2s;position:relative;overflow:hidden}.report-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(15,61,46,.16)}.report-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#0F3D2E,var(--p3-accent))}
+  .report-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.report-title{font-size:16px;font-weight:700;color:var(--p3-primary);line-height:1.3}.report-sub{font-size:11px;color:var(--p3-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.7px}.report-status{font-size:9px;padding:3px 9px;border-radius:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0}.status-ok{background:#0E2A1B;color:#7FE2A0}.status-warn{background:#2E2310;color:#F2D77F}.status-danger{background:#2E1714;color:#FF8B7C}
+  .report-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:12px 0;border-top:1px solid var(--p3-border);border-bottom:1px solid var(--p3-border)}.ml{font-size:9px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}.mv{font-size:14px;font-weight:700;color:var(--p3-primary);margin-top:2px}.mu{font-size:10px;color:var(--p3-muted);font-weight:500}
+  .report-flags{display:flex;gap:6px;flex-wrap:wrap}.flag{font-size:10px;padding:3px 8px;border-radius:6px;background:#1F2A26;color:var(--p3-muted);font-weight:600}.flag.crit{background:#2E1714;color:#FF8B7C}.flag.warn{background:#2E2310;color:#F2D77F}.flag.ok{background:#0E2A1B;color:#7FE2A0}
+  .report-foot{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--p3-muted);margin-top:auto}.open{color:var(--p3-accent);font-weight:700}.delete-btn{border:1px solid var(--p3-danger);background:#2E1714;color:#FF8B7C;border-radius:7px;padding:6px 9px;font-size:10px;font-weight:800;cursor:pointer;text-transform:uppercase;letter-spacing:.4px}.delete-btn:hover{filter:brightness(1.12)}
+  .theme-toggle{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;border:1px solid var(--p3-border);background:var(--p3-card);color:var(--p3-text);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;z-index:1000;box-shadow:var(--p3-shadow)}
+  footer{text-align:center;padding:24px 0;color:var(--p3-muted);font-size:11px;margin-top:30px;border-top:1px solid var(--p3-border)}footer strong{color:var(--p3-primary)}
+  [data-theme="light"]{--p3-primary:#0F3D2E;--p3-primary-deep:#0F3D2E;--p3-accent:#2EA85C;--p3-accent-2:#FFB300;--p3-bg:#F5F7F6;--p3-card:#FFFFFF;--p3-text:#1F2A24;--p3-muted:#5C6B62;--p3-border:#E2E8E4;--p3-danger:#C0392B;--p3-warn:#E08E0B;--p3-ok:#1F8A4C;--p3-shadow:0 1px 3px rgba(15,61,46,.06),0 4px 12px rgba(15,61,46,.05)}[data-theme="light"] .header{background:linear-gradient(135deg,#0F3D2E 0%,#155340 100%)}[data-theme="light"] .logo-mark{background:#2EA85C;color:#fff;border:none}[data-theme="light"] .phase-mini,[data-theme="light"] .search input{background:#fff}
+  @media(max-width:880px){.stats,.phase-grid{grid-template-columns:repeat(2,1fr)}.reports{grid-template-columns:1fr}.bookmark-hint{display:none}}@media(max-width:620px){.page{padding:18px 14px 60px}.stats,.phase-grid{grid-template-columns:1fr}.search{flex:1 1 100%}.header{padding:26px 22px}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Alternar tema">Sol</button>
+<div class="page">
+  <div class="header">
+    <span class="bookmark-hint"><b>Modelo</b> gestao de obra EV</span>
+    <div class="brand">
+      <div class="logo-mark">P3</div>
+      <div><div class="brand-name">P3 Energy</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div>
+    </div>
+    <h1>Dashboard de Obras de Carregadores EV</h1>
+    <div class="subtitle">Central para acompanhar implantacoes por obra, com progresso por fase, pendencias criticas, materiais, terceiros e entrega final.</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="label">Obras ativas</div><div class="value" id="statObras">3</div><div class="sub">Projetos em implantacao</div></div>
+    <div class="stat"><div class="label">Progresso medio</div><div class="value" id="statProgresso">54<span class="unit">%</span></div><div class="sub">OK + N/A sobre o total</div></div>
+    <div class="stat"><div class="label">Pendencias criticas</div><div class="value" id="statCriticas">9</div><div class="sub">Concessionaria, materiais e eletrica</div></div>
+    <div class="stat"><div class="label">Potencia planejada</div><div class="value" id="statKw">270<span class="unit">kW</span></div><div class="sub">Soma das obras cadastradas</div></div>
+  </div>
+
+  <div class="compare-section">
+    <h2>Avanco geral por fase</h2>
+    <div class="phase-grid" id="phaseGrid"></div>
+  </div>
+
+  <div class="toolbar">
+    <h2>Obras</h2>
+    <div class="search"><input id="searchInput" placeholder="Nome, cliente, cidade ou status..."></div>
+    <button class="new-btn" id="openNewObra">+ Nova Obra</button>
+  </div>
+
+  <div class="new-panel" id="newObraPanel">
+    <h3>Criar nova obra</h3>
+    <div class="new-grid">
+      <div class="field"><label>Nome da obra</label><input id="newNome" placeholder="Ex: Condominio Alpha EV"></div>
+      <div class="field"><label>Cliente</label><input id="newCliente" placeholder="Cliente"></div>
+      <div class="field"><label>Endereco / local</label><input id="newLocal" placeholder="Cidade - UF"></div>
+      <div class="field"><label>Carregadores</label><input id="newQtd" type="number" min="1" step="1" value="1"></div>
+      <div class="field"><label>kW por carregador</label><input id="newKw" type="number" min="1" step="1" value="60"></div>
+      <div class="field"><label>Status</label><select id="newStatus"><option>Projeto</option><option>Em obra</option><option>Aguardando cliente</option><option>Concluida</option></select></div>
+      <div class="form-actions">
+        <button class="new-btn" id="saveNewObra">Criar</button>
+        <button class="ghost-btn" id="cancelNewObra">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="reports" id="reportsGrid"></div>
+
+  <footer><strong>P3 Energy</strong> - Engenharia em Energia Solar e Mobilidade Eletrica<br>Prototipo visual para anexar na plataforma UBY Recharge</footer>
+</div>
+
+<script>
+const KEY="p3_obras_theme";
+const root=document.documentElement;
+const themeBtn=document.getElementById("themeToggle");
+function applyTheme(t){root.setAttribute("data-theme",t);themeBtn.textContent=t==="light"?"Lua":"Sol"}
+applyTheme(localStorage.getItem(KEY)||"dark");
+themeBtn.onclick=()=>{const nxt=(root.getAttribute("data-theme")==="light")?"dark":"light";localStorage.setItem(KEY,nxt);applyTheme(nxt)};
+
+const phases=[
+  ["Documentacao",68],["Concessionaria",43],["Projeto",71],["Orcamentos",36],["Materiais",61],["Obra civil",52],["Obra eletrica",37],["Adicionais",48],["Comissionamento",28],["Operacao assistida",13]
+];
+const baseObras=[
+  {id:"rio",nome:"Rio Beach EV",cliente:"Rio Beach",local:"Rio de Janeiro - RJ",status:"Em obra",kind:"warn",pct:61,kw:120,carregadores:"2 x 60 kW",crit:3,flags:["Orcamento eletrica a aprovar","Materiais parciais","Civil liberada"],link:"gestao_obra_ev_detalhe.html"},
+  {id:"malassise",nome:"Posto Malassise R.K.",cliente:"Malassise Robert Koch",local:"Maringa - PR",status:"Projeto",kind:"warn",pct:42,kw:60,carregadores:"1 x 60 kW",crit:4,flags:["Aumento de carga","Trafo a validar","Orcamento civil"],link:"gestao_obra_ev_detalhe.html?obra=malassise"},
+  {id:"shopping",nome:"Shopping Center EV",cliente:"Cliente modelo",local:"Sao Paulo - SP",status:"Aguardando",kind:"danger",pct:18,kw:90,carregadores:"3 x 30 kW",crit:2,flags:["Docs pendentes","Sem vistoria","Orcamentos pendentes"],link:"gestao_obra_ev_detalhe.html?obra=shopping"}
+];
+const obrasKey="uby-obras-dashboard-v1";
+let obras=loadObras();
+function detailKey(id){return "uby-obra-detalhe-"+(id||"rio")}
+function detailStats(detail){const tasks=(detail.phases||[]).flatMap(p=>(p.tasks||[]).map(t=>({...t,phase:p.name})));const total=tasks.length||1;const released=tasks.filter(t=>t.status==="done"||t.status==="na").length;const pct=Math.round(released/total*100);const critical=tasks.filter(t=>["Concessionaria","Orcamentos e contratacoes","Materiais e equipamentos","Obra eletrica"].includes(t.phase)&&["pending","doing"].includes(t.status));return{pct,crit:critical.length,flags:critical.slice(0,3).map(t=>t.title)}}
+function mergeDetailData(obra){try{const detail=JSON.parse(localStorage.getItem(detailKey(obra.id)));if(!detail||!detail.project)return obra;const qtd=parseInt(detail.project.qtdCarregadores,10)||parseInt((detail.project.equip||"1 x 60").split("x")[0],10)||1;const pot=parseInt(detail.project.potenciaCarregador,10)||parseInt((detail.project.equip||"1 x 60").split("x")[1],10)||60;const ds=detailStats(detail);return{...obra,nome:detail.project.obraNome||obra.nome,local:detail.project.local||obra.local,status:detail.project.statusExec||obra.status,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,pct:ds.pct,crit:ds.crit,flags:ds.flags.length?ds.flags:(ds.pct===100?["Obra completa"]:obra.flags)}}catch{return obra}}
+function loadObras(){try{return (JSON.parse(localStorage.getItem(obrasKey))||baseObras).map(mergeDetailData)}catch{return baseObras.map(mergeDetailData)}}
+function saveObras(){localStorage.setItem(obrasKey,JSON.stringify(obras))}
+function sortObras(list){return [...list].sort((a,b)=>(a.pct??0)-(b.pct??0)||a.nome.localeCompare(b.nome))}
+function deleteObra(nome){if(!confirm(`Excluir a obra "${nome}" deste prototipo?`))return;obras=obras.filter(o=>o.nome!==nome);saveObras();renderCards(filteredObras());updateStats()}
+function filteredObras(){const q=document.getElementById("searchInput").value.toLowerCase();return sortObras(obras.filter(o=>[o.nome,o.cliente,o.local,o.status,...o.flags].join(" ").toLowerCase().includes(q)))}
+function updateStats(){document.getElementById("statObras").textContent=obras.length;const avg=obras.length?Math.round(obras.reduce((a,o)=>a+o.pct,0)/obras.length):0;document.getElementById("statProgresso").innerHTML=avg+'<span class="unit">%</span>';document.getElementById("statCriticas").textContent=obras.reduce((a,o)=>a+o.crit,0);document.getElementById("statKw").innerHTML=obras.reduce((a,o)=>a+o.kw,0)+'<span class="unit">kW</span>'}
+function createSlug(text){return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,48)||("obra-"+Date.now())}
+function createDetailSeed(obra,qtd,pot){const today=new Date().toISOString().slice(0,10);return{project:{obraNome:obra.nome,cliente:obra.cliente,local:obra.local,qtdCarregadores:qtd,potenciaCarregador:pot,entrega:today,statusExec:obra.status},phases:[["Documentacao e liberacoes","UBY / cliente",["Contrato ou proposta aprovada","Dados cadastrais do cliente e local","Autorizacao do proprietario ou condominio","ART / TRT definida","Fotos e levantamento tecnico inicial","Documentos exigidos pela concessionaria","Termo de aceite para inicio da implantacao"]],["Concessionaria","UBY / responsavel tecnico",["Pedido segundo padrao","Pedido de aumento de carga","Consulta de carga disponivel","Definicao se precisa aumento de carga","Protocolo aberto na concessionaria","Projeto enviado para analise","Aprovacao da concessionaria","Ligacao ou energizacao liberada"]],["Projeto e engenharia","Equipe terceirizada",["Projeto eletrico executivo entregue","Diagrama unifilar entregue","Lista tecnica de materiais validada","Dimensionamento de cabos, protecoes e quadro","Definicao de transformador quando necessario","Compatibilizacao com obra civil","Projeto aprovado para execucao"]],["Orcamentos e contratacoes","UBY / compras",["Orcamento de pintura recebido","Orcamento de obra civil recebido","Orcamento de obra eletrica recebido","Orcamento de projeto ou engenharia recebido","Orcamento de cobertura recebido, quando necessario","Orcamento de comunicacao visual e sinalizacao recebido","Pedido ou contrato da equipe terceirizada liberado"]],["Materiais e equipamentos","Compras / UBY",["Carregador EV comprado","Smart charging comprado","Transformador comprado quando necessario","Quadro e protecoes comprados","Cabos, eletrodutos e eletrocalhas comprados","Pedestal, base ou suporte comprado","Materiais recebidos e conferidos em obra"]],["Obra civil","Equipe terceirizada",["Local demarcado e liberado","Base do carregador ou pedestal executada","Base do transformador ou quadro executada","Infraestrutura de dutos ou passagem pronta","Recomposicao de piso e acabamento","Protecao mecanica instalada quando necessario","Area limpa e liberada para eletrica"]],["Obra eletrica","Equipe terceirizada",["Quadro eletrico montado","Cabos e infraestrutura eletrica instalados","Protecoes instaladas: disjuntor, DPS e DR","Aterramento validado","Transformador instalado quando necessario","Testes eletricos realizados","Energizacao tecnica liberada"]],["Adicionais","UBY / terceiros",["Cobertura definida ou descartada","Sinalizacao de vaga definida","Totem ou comunicacao visual definida","Protecao contra impacto definida","Internet, Wi-Fi, cabo ou 4G definido","Iluminacao adicional definida","Camera ou controle de acesso definido"]],["Instalacao e comissionamento","UBY / tecnico",["Carregador fixado e ligado","Configuracao de potencia realizada","Smart charging configurado","Equipamento cadastrado na plataforma","Teste com veiculo realizado","Teste de cobranca ou liberacao realizado","Termo de entrega assinado"]],["Operacao assistida","UBY",["Monitoramento inicial realizado","Pendencias de entrega registradas","Pendencias corrigidas","Cliente orientado sobre uso","Plano de suporte e manutencao definido"]]].map(([name,owner,tasks])=>({name,owner,tasks:tasks.map((title,i)=>({id:name+"-"+i,title,status:"pending",note:"",protocol:"",requestDate:"",forecastDate:""}))}))}}
+function createObra(){const nome=document.getElementById("newNome").value.trim();if(!nome){alert("Informe o nome da obra.");return}const cliente=document.getElementById("newCliente").value.trim()||"Cliente";const local=document.getElementById("newLocal").value.trim()||"Local a definir";const qtd=parseInt(document.getElementById("newQtd").value,10)||1;const pot=parseInt(document.getElementById("newKw").value,10)||60;let id=createSlug(nome);while(obras.some(o=>o.id===id))id=id+"-"+Math.floor(Math.random()*900+100);const obra={id,nome,cliente,local,status:document.getElementById("newStatus").value,kind:"warn",pct:0,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,crit:0,flags:["Nova obra"],link:`gestao_obra_ev_detalhe.html?obra=${id}`};obras.unshift(obra);saveObras();localStorage.setItem(detailKey(id),JSON.stringify(createDetailSeed(obra,qtd,pot)));document.getElementById("newObraPanel").classList.remove("open");["newNome","newCliente","newLocal"].forEach(id=>document.getElementById(id).value="");renderCards(filteredObras());updateStats()}
+function statusClass(kind){return kind==="danger"?"status-danger":kind==="warn"?"status-warn":"status-ok"}
+function flagClass(text){return /pendente|aumento|trafo|concessionaria/i.test(text)?"crit":/projeto|materiais|orcamento/i.test(text)?"warn":"ok"}
+function renderPhases(){
+  document.getElementById("phaseGrid").innerHTML=phases.map(([name,pct])=>`
+    <div class="phase-mini">
+      <strong><span>${name}</span><span>${pct}%</span></strong>
+      <small>${pct>=70?"Bem encaminhada":pct>=40?"Em andamento":"Precisa atencao"}</small>
+      <div class="progress"><div class="bar" style="width:${pct}%;background:${pct>=70?"var(--p3-ok)":pct>=40?"var(--p3-warn)":"var(--p3-danger)"}"></div></div>
+    </div>`).join("");
+}
+function renderCards(list){
+  document.getElementById("reportsGrid").innerHTML=list.map(o=>`
+    <a class="report-card" href="${o.link}">
+      <div class="report-head">
+        <div><div class="report-title">${o.nome}</div><div class="report-sub">${o.cliente} - ${o.local}</div></div>
+        <div class="report-status ${statusClass(o.kind)}">${o.status}</div>
+      </div>
+      <div class="report-meta">
+        <div class="item"><div class="ml">Avanco</div><div class="mv">${o.pct}%</div><div class="mu">OK + N/A</div></div>
+        <div class="item"><div class="ml">Potencia</div><div class="mv">${o.kw} kW</div><div class="mu">${o.carregadores}</div></div>
+        <div class="item"><div class="ml">Criticas</div><div class="mv">${o.crit}</div><div class="mu">pendencias</div></div>
+      </div>
+      <div class="progress"><div class="bar" style="width:${o.pct}%;background:${o.pct>=70?"var(--p3-ok)":o.pct>=40?"var(--p3-warn)":"var(--p3-danger)"}"></div></div>
+      <div class="report-flags">${o.flags.map(f=>`<span class="flag ${flagClass(f)}">${f}</span>`).join("")}</div>
+      <div class="report-foot"><span>Ultima atualizacao: hoje</span><button class="delete-btn" onclick="event.preventDefault();event.stopPropagation();deleteObra('${o.nome.replace(/'/g,"\\'")}')">Excluir</button><span class="open">Abrir obra -></span></div>
+    </a>`).join("");
+}
+document.getElementById("searchInput").addEventListener("input",e=>{
+  renderCards(filteredObras());
+});
+document.getElementById("openNewObra").addEventListener("click",()=>document.getElementById("newObraPanel").classList.add("open"));
+document.getElementById("cancelNewObra").addEventListener("click",()=>document.getElementById("newObraPanel").classList.remove("open"));
+document.getElementById("saveNewObra").addEventListener("click",createObra);
+renderPhases();renderCards(filteredObras());updateStats();
+</script>
+</body>
+</html>

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>P3 Energy — Análise Elétrica | Posto Malassise R.K.</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{--p3-primary:#3FB66B;--p3-primary-deep:#0F3D2E;--p3-accent:#5BC882;--p3-accent-2:#FFD66B;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#2A3530;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#3FB66B;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--p3-bg);color:var(--p3-text);font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .page{max-width:1180px;margin:0 auto;padding:32px 28px 80px}
+  .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);color:#fff;border-radius:14px;padding:28px 32px;margin-bottom:24px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
+  .header::after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;background:radial-gradient(circle,rgba(46,168,92,.35),transparent 70%);border-radius:50%}
+  .header .brand{display:flex;align-items:center;gap:14px;margin-bottom:18px;position:relative;z-index:1}
+  .logo-mark{width:46px;height:46px;border-radius:10px;background:#0F3D2E;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--p3-accent);font-size:22px;border:1px solid var(--p3-accent);letter-spacing:.5px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+  .brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.85}
+  .brand-tag{font-size:11px;opacity:.7;letter-spacing:1px}
+  .header h1{font-size:26px;font-weight:700;margin-bottom:6px;position:relative;z-index:1}
+  .header .subtitle{opacity:.85;font-size:14px;position:relative;z-index:1}
+  .header-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:22px;position:relative;z-index:1}
+  .header-meta div{font-size:12px}
+  .header-meta .label{opacity:.65;text-transform:uppercase;letter-spacing:1px;font-size:10px;margin-bottom:3px}
+  .header-meta .value{font-weight:600;font-size:13px}
+  .nav-back{position:absolute;top:18px;right:24px;background:rgba(255,255,255,.08);color:#fff;padding:6px 14px;border-radius:18px;font-size:12px;text-decoration:none;backdrop-filter:blur(8px);z-index:2}
+  .nav-back:hover{background:rgba(255,255,255,.14)}
+  .alert{border-left:4px solid var(--p3-warn);background:#2E2310;color:#F2D77F;padding:14px 18px;border-radius:8px;margin-bottom:22px;display:flex;gap:12px;align-items:flex-start}
+  .alert.danger{border-left-color:var(--p3-danger);background:#2E1714;color:#FF8B7C}
+  .alert.ok{border-left-color:var(--p3-ok);background:#0E2A1B;color:#7FE2A0}
+  .alert .ico{font-size:18px;line-height:1.2}
+  .alert strong{display:block;margin-bottom:2px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+  .kpi{background:var(--p3-card);padding:18px;border-radius:12px;box-shadow:var(--p3-shadow);border:1px solid var(--p3-border);position:relative;overflow:hidden}
+  .kpi .kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--p3-muted);font-weight:600}
+  .kpi .kpi-value{font-size:26px;font-weight:700;color:var(--p3-primary);margin-top:6px;line-height:1.1}
+  .kpi .kpi-unit{font-size:13px;color:var(--p3-muted);font-weight:500;margin-left:4px}
+  .kpi .kpi-sub{font-size:11px;color:var(--p3-muted);margin-top:6px}
+  .kpi .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;margin-top:8px;text-transform:uppercase;letter-spacing:.5px}
+  .badge.ok{background:#0E2A1B;color:#7FE2A0}
+  .badge.warn{background:#2E2310;color:#F2D77F}
+  .badge.danger{background:#2E1714;color:#FF8B7C}
+  .part-divider{display:flex;align-items:center;gap:16px;margin:36px 0 18px;padding-top:18px;border-top:2px solid var(--p3-border)}
+  .part-divider .num{background:var(--p3-primary);color:#fff;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0}
+  .part-divider .info{flex:1}
+  .part-divider .info h2{color:var(--p3-primary);font-size:20px;font-weight:700;margin-bottom:2px}
+  .part-divider .info p{font-size:12px;color:var(--p3-muted)}
+  section{background:var(--p3-card);border-radius:12px;padding:24px;margin-bottom:20px;border:1px solid var(--p3-border);box-shadow:var(--p3-shadow)}
+  section h2{font-size:16px;font-weight:700;color:var(--p3-primary);margin-bottom:14px;display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}
+  section h2 .num{width:26px;height:26px;border-radius:6px;background:var(--p3-accent);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  .chart-wrapper{position:relative;height:260px}
+  .chart-wrapper.tall{height:340px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#1F2A26;color:var(--p3-primary);font-weight:600;text-align:left;padding:9px 10px;border-bottom:2px solid var(--p3-border);font-size:11px;text-transform:uppercase;letter-spacing:.7px}
+  td{padding:8px 10px;border-bottom:1px solid var(--p3-border)}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;text-align:right}
+  td.label{font-weight:500}
+  .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .tag.ok{background:#0E2A1B;color:#7FE2A0}
+  .tag.warn{background:#2E2310;color:#F2D77F}
+  .tag.danger{background:#2E1714;color:#FF8B7C}
+  .scenarios td.label{max-width:280px}
+  .scenarios .verdict{font-weight:700;text-align:center}
+  .controls{background:#1F2A26;border:1px solid var(--p3-border);border-radius:10px;padding:18px 20px;margin-bottom:18px;display:grid;grid-template-columns:1.1fr 1.1fr 1.3fr 1.6fr;gap:18px;align-items:stretch}
+  .ctrl{display:flex;flex-direction:column;gap:6px}
+  .ctrl label.k{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--p3-muted);font-weight:700}
+  .ctrl select{width:100%;height:42px;padding:0 12px;border-radius:8px;border:1px solid var(--p3-border);background:#1A2622;font-size:14px;font-weight:600;color:var(--p3-text);font-family:inherit;cursor:pointer}
+  .ctrl select:focus{outline:none;border-color:var(--p3-accent);box-shadow:0 0 0 3px rgba(46,168,92,.15)}
+  .ctrl input[type=range]{width:100%;accent-color:var(--p3-accent);height:42px}
+  .ctrl .range-row{display:flex;align-items:center;gap:10px;height:42px}
+  .ctrl .range-row span{font-weight:700;color:var(--p3-primary);min-width:42px;text-align:right}
+  .toggle{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;height:42px}
+  .toggle input{opacity:0;width:0;height:0;position:absolute}
+  .toggle .track{width:46px;height:24px;background:#3A4842;border-radius:12px;position:relative;transition:.2s;flex-shrink:0}
+  .toggle .track::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .toggle input:checked + .track{background:var(--p3-accent)}
+  .toggle input:checked + .track::after{transform:translateX(22px)}
+  .toggle .lbl{font-size:13px;font-weight:600;color:var(--p3-text)}
+  .ctrl-hint{font-size:11px;color:var(--p3-muted);margin-top:auto;padding-top:6px;line-height:1.4}
+  .scenario-row.active{background:#2A2614 !important;outline:2px solid var(--p3-warn);outline-offset:-2px}
+  .op-summary{background:linear-gradient(135deg,#1A2622,#1F2D27);border:1px solid var(--p3-border);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:13px;color:var(--p3-primary);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .op-summary .pill{background:var(--p3-accent);color:#fff;padding:4px 12px;border-radius:8px;font-weight:700;font-size:11px;letter-spacing:.5px}
+  .op-summary .pill.muted{background:var(--p3-primary)}
+  .op-summary .pill.warn{background:var(--p3-warn)}
+  .capacity-bar{display:flex;width:100%;height:54px;border-radius:8px;overflow:hidden;margin-bottom:8px;border:1px solid var(--p3-border);background:#16221E}
+  .cap-segment{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;padding:4px;text-align:center;line-height:1.2;transition:width .3s ease}
+  .cap-segment.posto{background:linear-gradient(135deg,#C0392B,#E55039)}
+  .cap-segment.ev{background:linear-gradient(135deg,#1F8A4C,var(--p3-accent))}
+  .cap-segment.reserve{background:#4A5852}
+  .cap-segment .v{font-size:13px;font-weight:700}
+  .cap-legend{display:flex;gap:18px;font-size:11px;color:var(--p3-muted);margin-bottom:18px;flex-wrap:wrap}
+  .cap-legend .leg{display:flex;align-items:center;gap:6px}
+  .cap-legend .sw{width:12px;height:12px;border-radius:3px}
+  .cap-legend .sw.posto{background:#C0392B}
+  .cap-legend .sw.ev{background:var(--p3-accent)}
+  .cap-legend .sw.reserve{background:#4A5852}
+  .op-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .op-card{background:#1A2622;border:1px solid var(--p3-border);border-radius:10px;padding:14px;border-top:3px solid var(--p3-accent);transition:transform .2s}
+  .op-card:hover{transform:translateY(-2px)}
+  .op-card.crit{border-top-color:var(--p3-danger)}
+  .op-card.warn{border-top-color:var(--p3-warn)}
+  .op-card .op-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--p3-muted);font-weight:700}
+  .op-card .op-context{font-size:11px;color:var(--p3-muted);margin-top:2px}
+  .op-card .op-value{font-size:24px;font-weight:700;color:var(--p3-primary);margin:8px 0 6px;line-height:1}
+  .op-card .op-unit{font-size:13px;color:var(--p3-muted);font-weight:500;margin-left:3px}
+  .op-card .op-bar{height:6px;background:#1F2A26;border-radius:3px;overflow:hidden;margin-bottom:6px}
+  .op-card .op-bar .fill{height:100%;background:var(--p3-accent);border-radius:3px;transition:width .3s}
+  .op-card.crit .op-bar .fill{background:var(--p3-danger)}
+  .op-card.warn .op-bar .fill{background:var(--p3-warn)}
+  .op-card .op-hint{font-size:11px;color:var(--p3-muted)}
+  h3.sub{margin-top:24px;margin-bottom:12px;font-size:13px;color:var(--p3-primary);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .band-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:8px}
+  .band-card{padding:14px 10px;border-radius:10px;background:#1A2622;border:1px solid var(--p3-border);text-align:center;border-bottom:4px solid #ccc}
+  .band-card.b0{border-bottom-color:#4A5852}
+  .band-card.b1{border-bottom-color:#F2A93D}
+  .band-card.b2{border-bottom-color:#FFD66B}
+  .band-card.b3{border-bottom-color:#5BC882}
+  .band-card.b4{border-bottom-color:var(--p3-accent)}
+  .band-card .pct{font-size:11px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+  .band-card .kw{font-size:11px;color:var(--p3-muted);margin-top:2px}
+  .band-card .hours{font-size:24px;font-weight:700;color:var(--p3-primary);margin:8px 0 4px;line-height:1}
+  .band-card .hours small{font-size:11px;color:var(--p3-muted);font-weight:500}
+  .band-card .pct-day{font-size:11px;color:var(--p3-muted);margin-top:2px}
+  .band-bar{display:flex;width:100%;height:12px;border-radius:6px;overflow:hidden;border:1px solid var(--p3-border);margin-top:14px}
+  .band-bar .seg{display:block;height:100%;transition:width .3s}
+  .rec-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .rec{border:1px solid var(--p3-border);border-radius:10px;padding:16px;border-left:4px solid var(--p3-accent);background:#1A2622}
+  .rec.danger{border-left-color:var(--p3-danger);background:#2A1816}
+  .rec.warn{border-left-color:var(--p3-warn);background:#2A2614}
+  .rec h3{font-size:13px;color:var(--p3-primary);margin-bottom:8px;display:flex;align-items:center;gap:8px;font-weight:700}
+  .rec h3 .pri{font-size:9px;background:var(--p3-accent);color:#fff;padding:2px 7px;border-radius:8px;letter-spacing:.5px}
+  .rec.danger h3 .pri{background:var(--p3-danger)}
+  .rec.warn h3 .pri{background:var(--p3-warn)}
+  .rec ul{padding-left:18px;color:var(--p3-text)}
+  .rec li{margin-bottom:5px;font-size:12.5px;line-height:1.5}
+  .ind-row{display:flex;align-items:center;gap:14px;padding:8px 0;border-bottom:1px solid var(--p3-border)}
+  .ind-row:last-child{border-bottom:none}
+  .ind-label{flex:1;font-size:13px}
+  .ind-bar{flex:1.6;height:8px;background:#1F2A26;border-radius:4px;overflow:hidden;position:relative}
+  .ind-bar .fill{height:100%;background:var(--p3-accent);border-radius:4px}
+  .ind-bar .fill.warn{background:var(--p3-warn)}
+  .ind-bar .fill.danger{background:var(--p3-danger)}
+  .ind-value{width:100px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+  footer{text-align:center;padding:24px 0;color:var(--p3-muted);font-size:11px;margin-top:30px;border-top:1px solid var(--p3-border)}
+  footer strong{color:var(--p3-primary)}
+  @media print{body{background:#fff}.page{padding:0;max-width:100%}section,.kpi,.header{box-shadow:none;break-inside:avoid}.header{border-radius:0}section{page-break-inside:avoid}}
+  @media (max-width:880px){.kpis{grid-template-columns:repeat(2,1fr)}.header-meta{grid-template-columns:repeat(2,1fr)}.section-grid,.rec-grid{grid-template-columns:1fr}.op-grid,.band-grid{grid-template-columns:repeat(2,1fr)}}
+
+  /* === THEME TOGGLE === */
+  .theme-toggle{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;border:1px solid var(--p3-border);background:var(--p3-card);color:var(--p3-text);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;z-index:1000;box-shadow:var(--p3-shadow);transition:all .2s;font-family:inherit}
+  .theme-toggle:hover{transform:scale(1.08);border-color:var(--p3-accent)}
+  .theme-toggle:active{transform:scale(0.95)}
+
+  /* === LIGHT THEME OVERRIDES === */
+  [data-theme="light"]{--p3-primary:#0F3D2E;--p3-primary-deep:#0F3D2E;--p3-accent:#2EA85C;--p3-accent-2:#FFB300;--p3-bg:#F5F7F6;--p3-card:#FFFFFF;--p3-text:#1F2A24;--p3-muted:#5C6B62;--p3-border:#E2E8E4;--p3-danger:#C0392B;--p3-warn:#E08E0B;--p3-ok:#1F8A4C;--p3-shadow:0 1px 3px rgba(15,61,46,.06),0 4px 12px rgba(15,61,46,.05)}
+  [data-theme="light"] .header{background:linear-gradient(135deg,#0F3D2E 0%,#155340 100%)}
+  [data-theme="light"] .logo-mark{background:#2EA85C !important;color:#fff !important;border:none !important}
+  [data-theme="light"] .header .bookmark-hint,[data-theme="light"] .nav-back{background:rgba(255,255,255,.15) !important}
+  [data-theme="light"] .nav-back:hover{background:rgba(255,255,255,.25) !important}
+  [data-theme="light"] .alert{background:#FFF8E6;color:#6B4F0A}
+  [data-theme="light"] .alert.danger{background:#FCEDEC;color:#7A1F16}
+  [data-theme="light"] .alert.ok{background:#EDF7F0;color:#0F4824}
+  [data-theme="light"] th{background:#F1F5F2 !important;color:#0F3D2E !important}
+  [data-theme="light"] .badge.ok,[data-theme="light"] .tag.ok,[data-theme="light"] .status-ok,[data-theme="light"] .flag.ok{background:#E2F4E9 !important;color:#1F8A4C !important}
+  [data-theme="light"] .badge.warn,[data-theme="light"] .tag.warn,[data-theme="light"] .status-warn,[data-theme="light"] .flag.warn{background:#FFF1D6 !important;color:#E08E0B !important}
+  [data-theme="light"] .badge.danger,[data-theme="light"] .tag.danger,[data-theme="light"] .status-danger,[data-theme="light"] .flag.danger{background:#FBE3E0 !important;color:#C0392B !important}
+  [data-theme="light"] .flag{background:#F1F5F2 !important;color:#5C6B62 !important}
+  [data-theme="light"] .controls{background:#F1F5F2 !important}
+  [data-theme="light"] .ctrl select,[data-theme="light"] .toolbar input{background:#fff !important;color:#0F3D2E !important}
+  [data-theme="light"] .toggle .track{background:#CDD4D0 !important}
+  [data-theme="light"] .ind-bar,[data-theme="light"] .op-card .op-bar{background:#EAEEEC !important}
+  [data-theme="light"] .scenario-row.active,[data-theme="light"] .rec.warn{background:#FFFAEE !important}
+  [data-theme="light"] .rec{background:#FAFCFA !important}
+  [data-theme="light"] .rec.danger{background:#FDF6F5 !important}
+  [data-theme="light"] .op-summary{background:linear-gradient(135deg,#F1F5F2,#E9F1EC) !important}
+  [data-theme="light"] .op-card,[data-theme="light"] .band-card{background:#FAFCFA !important}
+  [data-theme="light"] .capacity-bar{background:#fff !important}
+  [data-theme="light"] .cap-segment.reserve{background:#7B8A82 !important}
+  [data-theme="light"] .band-card.b0{border-bottom-color:#7B8A82 !important}
+  [data-theme="light"] .band-card.b1{border-bottom-color:#FFB300 !important}
+  [data-theme="light"] .band-card.b2{border-bottom-color:#FFC940 !important}
+  [data-theme="light"] .band-card.b3{border-bottom-color:#7DCB97 !important}
+  [data-theme="light"] tr[style*="background:#1F2A26"]{background:#F1F5F2 !important;color:#1F2A24 !important}
+  [data-theme="light"] .vbtn.completo{background:#0F3D2E !important;color:#fff !important;border-color:transparent !important}
+  [data-theme="light"] .vbtn.completo:hover{background:#155340 !important}
+  [data-theme="light"] .vbtn.eletrico{background:#FFF1D6 !important;color:#7A4F0A !important;border-color:#F0C97D !important}
+  [data-theme="light"] .vbtn.eletrico:hover{background:#FFE6B0 !important}
+  [data-theme="light"] .vbtn.carregador{background:#E2F4E9 !important;color:#0F4824 !important;border-color:#A5D9B8 !important}
+  [data-theme="light"] .vbtn.carregador:hover{background:#CCE9D6 !important}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Alternar tema (claro/escuro)" aria-label="Toggle theme">☀️</button>
+<div class="page">
+
+  <div class="header">
+    <a href="dashboard.html" class="nav-back">← Dashboard</a>
+    <div class="brand">
+      <div class="logo-mark">P3</div>
+      <div>
+        <div class="brand-name">P3 Energy</div>
+        <div class="brand-tag">Engenharia em Energia Solar &amp; Mobilidade Elétrica</div>
+      </div>
+    </div>
+    <h1>Análise Elétrica da Rede Interna</h1>
+    <div class="subtitle">Posto Malassise Robert Koch — Diagnóstico da instalação elétrica</div>
+    <div class="header-meta">
+      <div><div class="label">Cliente</div><div class="value">Malassise Robert Koch</div></div>
+      <div><div class="label">Equipamento</div><div class="value">DMI P1000R Black Box</div></div>
+      <div><div class="label">Período</div><div class="value">01/02/2026 a 02/05/2026</div></div>
+      <div><div class="label">Emissão</div><div class="value">02/05/2026 — P3 Energy</div></div>
+    </div>
+  </div>
+
+  <div class="alert">
+    <div class="ico">&#9888;</div>
+    <div>
+      <strong>Atenção quanto à qualidade da base de dados</strong>
+      Foram encontrados registros em apenas <b>5 dos 91 dias</b> analisados (≈ 5,5%). A janela útil concentra-se entre 22 e 25/03/2026. Recomenda-se reinstalar o analisador por 7 a 15 dias completos para captar variação semanal antes do fechamento do projeto.
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-label">Pico Potência Ativa</div>
+      <div class="kpi-value">28,06<span class="kpi-unit">kW</span></div>
+      <div class="kpi-sub">25/03/2026 12:55</div>
+      <span class="badge ok">Dentro do esperado</span>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Pico Aparente (Vetorial)</div>
+      <div class="kpi-value">28,78<span class="kpi-unit">kVA</span></div>
+      <div class="kpi-sub">Média 11,80 kVA</div>
+      <span class="badge ok" id="kpiUtil">38% padrão 200 A</span>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Fator de Potência médio</div>
+      <div class="kpi-value">0,79</div>
+      <div class="kpi-sub">cos(φ) 0,50 indutivo</div>
+      <span class="badge danger">Abaixo de 0,92 NBR</span>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Demanda Diária</div>
+      <div class="kpi-value">22,99<span class="kpi-unit">kW</span></div>
+      <div class="kpi-sub">Consumo 438,78 kWh em 5 dias</div>
+      <span class="badge warn">Janela parcial</span>
+    </div>
+  </div>
+
+  
+
+  <section>
+    <h2><span class="num">1</span>Correntes por fase e neutro</h2>
+    <div class="section-grid">
+      <div>
+        <table>
+          <thead><tr><th>Origem</th><th class="num">Máx (A)</th><th class="num">Mín (A)</th><th class="num">Média (A)</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="label">Fase A</td><td class="num">92,81</td><td class="num">0,00</td><td class="num">37,54</td><td><span class="tag warn">Alta</span></td></tr>
+            <tr><td class="label">Fase B</td><td class="num">90,04</td><td class="num">0,00</td><td class="num">35,48</td><td><span class="tag warn">Alta</span></td></tr>
+            <tr><td class="label">Fase C</td><td class="num">64,90</td><td class="num">0,00</td><td class="num">22,65</td><td><span class="tag ok">OK</span></td></tr>
+            <tr><td class="label">Neutro Medido</td><td class="num">110,90</td><td class="num">0,00</td><td class="num">38,88</td><td><span class="tag danger">Crítico</span></td></tr>
+            <tr><td class="label">Neutro Calculado</td><td class="num">73,86</td><td class="num">0,00</td><td class="num">31,09</td><td><span class="tag warn">Atenção</span></td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12px;color:var(--p3-muted);margin-top:10px;line-height:1.5">O neutro <b>medido</b> superou as fases. Isso aponta presença de 3ª harmônica (LEDs, fontes chaveadas, bombas dos abastecedores). O condutor de neutro do novo padrão deve ser dimensionado igual ao das fases.</p>
+      </div>
+      <div class="chart-wrapper"><canvas id="chartCorrente"></canvas></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>Potências (Ativa, Reativa e Aparente)</h2>
+    <div class="section-grid">
+      <div class="chart-wrapper"><canvas id="chartPotencia"></canvas></div>
+      <div>
+        <table>
+          <thead><tr><th>Grandeza</th><th class="num">Máxima</th><th class="num">Média</th><th>Unid.</th></tr></thead>
+          <tbody>
+            <tr><td class="label">P. Ativa Total</td><td class="num">28.064,42</td><td class="num">10.193,40</td><td>W</td></tr>
+            <tr><td class="label">P. Aparente — Soma Vetorial</td><td class="num">28.782,87</td><td class="num">11.804,28</td><td>VA</td></tr>
+            <tr><td class="label">P. Aparente — Soma Aritmética</td><td class="num">29.371,68</td><td class="num">12.159,16</td><td>VA</td></tr>
+            <tr><td class="label">P. Reativa — Soma Aritmética</td><td class="num">14.020,74</td><td class="num">6.405,97</td><td>VAr</td></tr>
+            <tr><td class="label">P. Reativa — Soma Vetorial</td><td class="num">12.578,67</td><td class="num">5.672,80</td><td>VAr</td></tr>
+            <tr><td class="label">P. Ativa Harmônica Total</td><td class="num">238,15</td><td class="num">1,96</td><td>W</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>Tensões e Frequência</h2>
+    <div class="section-grid">
+      <div>
+        <table>
+          <thead><tr><th>Origem</th><th class="num">Máx (V)</th><th class="num">Média (V)</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="label">Fase A (FN)</td><td class="num">215,17</td><td class="num">125,34</td><td><span class="tag ok">OK</span></td></tr>
+            <tr><td class="label">Fase B (FN)</td><td class="num">218,90</td><td class="num">122,88</td><td><span class="tag ok">OK</span></td></tr>
+            <tr><td class="label">Fase C (FN)</td><td class="num">220,74</td><td class="num">123,94</td><td><span class="tag ok">OK</span></td></tr>
+            <tr><td class="label">A-B (FF)</td><td class="num">373,36</td><td class="num">214,75</td><td><span class="tag ok">OK</span></td></tr>
+            <tr><td class="label">B-C (FF)</td><td class="num">380,26</td><td class="num">214,47</td><td><span class="tag ok">OK</span></td></tr>
+            <tr><td class="label">C-A (FF)</td><td class="num">378,34</td><td class="num">215,98</td><td><span class="tag ok">OK</span></td></tr>
+            <tr><td class="label">Frequência (Hz)</td><td class="num">60,13</td><td class="num">58,65</td><td><span class="tag ok">OK</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="chart-wrapper"><canvas id="chartTensao"></canvas></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span>Fator de Potência e cos(φ)</h2>
+    <div class="section-grid">
+      <div class="chart-wrapper"><canvas id="chartFP"></canvas></div>
+      <div>
+        <table>
+          <thead><tr><th>Origem</th><th class="num">FP médio</th><th class="num">cos(φ) médio</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="label">Fase A</td><td class="num">0,88</td><td class="num">0,42 In</td><td><span class="tag warn">Limítrofe</span></td></tr>
+            <tr><td class="label">Fase B</td><td class="num">0,65</td><td class="num">0,65 In</td><td><span class="tag danger">Crítico</span></td></tr>
+            <tr><td class="label">Fase C</td><td class="num">0,86</td><td class="num">0,72 In</td><td><span class="tag warn">Limítrofe</span></td></tr>
+            <tr><td class="label">Soma Aritmética</td><td class="num">0,79</td><td class="num">0,50 In</td><td><span class="tag danger">Abaixo NBR</span></td></tr>
+            <tr><td class="label">Soma Vetorial</td><td class="num">0,82</td><td class="num">—</td><td><span class="tag danger">Abaixo NBR</span></td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12px;color:var(--p3-muted);margin-top:10px">FP médio sistêmico de <b>0,79</b> — VIOLA o mínimo NBR de 0,92. Cliente sujeito a cobrança de excedente reativo. Indicado banco de capacitores automático de 15–20 kVAr antes do EV.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">5</span>Desequilíbrios e Qualidade</h2>
+    <div class="ind-row"><div class="ind-label">Desequilíbrio de Tensão (fasorial)</div><div class="ind-bar"><div class="fill" style="width:14%"></div></div><div class="ind-value">1,41% <span class="tag ok">OK</span></div></div>
+    <div class="ind-row"><div class="ind-label">Desequilíbrio de Tensão (amplitude)</div><div class="ind-bar"><div class="fill" style="width:24%"></div></div><div class="ind-value">2,37% <span class="tag warn">Atenção</span></div></div>
+    <div class="ind-row"><div class="ind-label">Desequilíbrio de Corrente (amplitude)</div><div class="ind-bar"><div class="fill danger" style="width:80%"></div></div><div class="ind-value">30,82% <span class="tag danger">Crítico</span></div></div>
+    <div class="ind-row"><div class="ind-label">Variação de Frequência (Δ Hz)</div><div class="ind-bar"><div class="fill" style="width:10%"></div></div><div class="ind-value">±1,5 Hz <span class="tag ok">OK</span></div></div>
+    <p style="font-size:12px;color:var(--p3-muted);margin-top:14px">Diferença de pico entre Fase A (92,8 A) e Fase C (64,9 A) sinaliza distribuição irregular de cargas monofásicas. Reequilibrar antes da instalação do novo padrão e do carregador EV.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">6</span>Consumo de Energia</h2>
+    <div class="section-grid">
+      <div>
+        <table>
+          <thead><tr><th>Fase</th><th class="num">Consumo (kWh)</th><th class="num">% do Total</th></tr></thead>
+          <tbody>
+            <tr><td class="label">Fase A</td><td class="num">190,69</td><td class="num">43,5%</td></tr>
+            <tr><td class="label">Fase B</td><td class="num">132,69</td><td class="num">30,2%</td></tr>
+            <tr><td class="label">Fase C</td><td class="num">115,40</td><td class="num">26,3%</td></tr>
+            <tr style="background:#1F2A26;font-weight:700"><td class="label">Total (5 dias)</td><td class="num">438,78</td><td class="num">100,0%</td></tr>
+          </tbody>
+        </table>
+        <table style="margin-top:14px">
+          <thead><tr><th>Projeção (88 kWh/dia)</th><th class="num">Energia</th></tr></thead>
+          <tbody>
+            <tr><td>Mensal</td><td class="num">≈ 2.633 kWh</td></tr>
+            <tr><td>Anual</td><td class="num">≈ 32.031 kWh</td></tr>
+            <tr><td>Mensal com EV (4 h/dia @ 60 kW)</td><td class="num">≈ 9.833 kWh</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="chart-wrapper"><canvas id="chartConsumo"></canvas></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">7</span>Recomendações de Adequação da Rede Interna</h2>
+    <div class="rec-grid">
+      <div class="rec danger">
+        <h3><span class="pri">Prioridade 1</span>Correção de Fator de Potência</h3>
+        <ul>
+          <li>FP atual de 0,79 viola NBR (mínimo 0,92).</li>
+          <li>Instalar banco automático de capacitores 15–20 kVAr (5 estágios).</li>
+          <li>Executar ANTES da implantação do EV.</li>
+        </ul>
+      </div>
+      <div class="rec warn">
+        <h3><span class="pri">Prioridade 2</span>Reequilíbrio de Fases</h3>
+        <ul>
+          <li>Desequilíbrio de corrente de 30,8% — muito alto.</li>
+          <li>Redistribuir cargas monofásicas (iluminação, refrigeração, tomadas).</li>
+          <li>Meta: ≤ 10% após adequação.</li>
+        </ul>
+      </div>
+      <div class="rec warn">
+        <h3><span class="pri">Prioridade 2</span>Harmônicas e Neutro</h3>
+        <ul>
+          <li>Neutro com 110,9 A (maior que as fases) = 3ª harmônica.</li>
+          <li>Dimensionar neutro do novo padrão igual às fases.</li>
+          <li>Monitorar THDi após instalação do EV.</li>
+        </ul>
+      </div>
+      <div class="rec">
+        <h3><span class="pri">Prioridade 3</span>Nova Campanha de Medição</h3>
+        <ul>
+          <li>Reinstalar analisador por 7 a 15 dias completos.</li>
+          <li>Configurar integralização de 10–15 minutos.</li>
+          <li>Validar TCs e relação de transformação.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <strong>P3 Energy</strong> — Engenharia em Energia Solar e Mobilidade Elétrica<br>
+    Relatório gerado em 02/05/2026 com base em medição DMI P1000R Black Box (S/N 216A52ACD961) — Datalog ISSO Telecom<br>
+    Análise Elétrica da Rede Interna • Documento de diagnóstico para o proprietário
+  </footer>
+</div>
+
+<script>
+
+// === THEME TOGGLE ===
+(function(){
+  const KEY = 'p3_theme';
+  const root = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  const apply = (t) => {
+    root.setAttribute('data-theme', t);
+    if(btn) btn.textContent = t === 'light' ? '🌙' : '☀️';
+    if(btn) btn.title = 'Mudar para tema ' + (t === 'light' ? 'escuro' : 'claro');
+  };
+  let saved = 'dark';
+  try { saved = localStorage.getItem(KEY) || 'dark'; } catch(e){}
+  apply(saved);
+  if(btn) btn.addEventListener('click', () => {
+    const cur = root.getAttribute('data-theme') || 'dark';
+    const nxt = cur === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(KEY, nxt); } catch(e){}
+    apply(nxt);
+  });
+})();
+
+const P3 = { primary:'#0F3D2E', accent:'#2EA85C', accent2:'#FFB300', danger:'#C0392B', warn:'#E08E0B', muted:'#5C6B62' };
+Chart.defaults.font.family = "'Inter','Segoe UI',Arial,sans-serif";
+Chart.defaults.color = '#1F2A24';
+Chart.defaults.borderColor = '#E2E8E4';
+
+new Chart(document.getElementById('chartCorrente'), {
+  type:'bar',
+  data:{labels:['Fase A','Fase B','Fase C','Neutro Med.','Neutro Calc.'],datasets:[
+    {label:'Máxima (A)', data:[92.81,90.04,64.9,110.9,73.86], backgroundColor:P3.danger, borderRadius:4},
+    {label:'Média (A)', data:[37.54,35.48,22.65,38.88,31.09], backgroundColor:P3.accent, borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Correntes — Máxima vs Média'}},scales:{y:{title:{display:true,text:'Ampères (A)'}}}}
+});
+new Chart(document.getElementById('chartPotencia'), {
+  type:'bar',
+  data:{labels:['Fase A','Fase B','Fase C','Total/Soma'],datasets:[
+    {label:'P. Ativa Máx (kW)', data:[10.31,11.33,9.18,28.06], backgroundColor:P3.primary, borderRadius:4},
+    {label:'P. Reativa Máx (kVAr)', data:[5.16,6.19,3.20,14.02], backgroundColor:P3.warn, borderRadius:4},
+    {label:'P. Aparente Máx (kVA)', data:[11.52,11.33,9.18,28.78], backgroundColor:P3.accent, borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Potências por fase (Máx)'}},scales:{y:{title:{display:true,text:'kW / kVAr / kVA'}}}}
+});
+new Chart(document.getElementById('chartTensao'), {
+  type:'bar',
+  data:{labels:['A-N','B-N','C-N','A-B','B-C','C-A'],datasets:[
+    {label:'Tensão Máxima (V)', data:[215.17,218.90,220.74,373.36,380.26,378.34], backgroundColor:P3.accent, borderRadius:4},
+    {label:'Tensão Média (V)', data:[125.34,122.88,123.94,214.75,214.47,215.98], backgroundColor:P3.primary, borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Tensões Fase-Neutro e Fase-Fase'}}}
+});
+new Chart(document.getElementById('chartFP'), {
+  type:'bar',
+  data:{labels:['Fase A','Fase B','Fase C','Soma Arit.','Soma Vet.'],datasets:[
+    {label:'FP Real médio', data:[0.88,0.65,0.86,0.79,0.82], backgroundColor:[P3.warn,P3.danger,P3.warn,P3.danger,P3.danger], borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'Fator de Potência médio (mín. NBR = 0,92)'}},scales:{y:{min:0,max:1,title:{display:true,text:'FP'}}}}
+});
+new Chart(document.getElementById('chartConsumo'), {
+  type:'doughnut',
+  data:{labels:['Fase A — 190,69 kWh','Fase B — 132,69 kWh','Fase C — 115,40 kWh'],datasets:[{data:[190.69,132.69,115.40], backgroundColor:[P3.primary, P3.accent, P3.warn], borderColor:'#fff', borderWidth:3}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom'},title:{display:true,text:'Distribuição do Consumo por Fase (5 dias)'}}}
+});
+
+
+</script>
+</body>
+</html>
