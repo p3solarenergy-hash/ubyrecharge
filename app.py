@@ -31,6 +31,7 @@ navigation = st.navigation(
             st.Page("views/Taxa_Ocupacao.py",        title=nav["management_occupancy"],    icon="🔌"),
             st.Page("views/Metricas.py",             title=nav["management_metrics"],      icon="📈"),
             st.Page("views/Prospeccao.py",           title=nav["management_prospection"],  icon="🔍"),
+            st.Page("views/Move_Operacao.py",        title="movE Operacao",                icon="🚗"),
         ],
         nav["section_admin"]: [
             st.Page("views/5_Integracoes.py",      title=nav["integrations"],     icon="🔌"),
