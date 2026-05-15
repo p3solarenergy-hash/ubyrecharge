@@ -81,7 +81,7 @@
         <div class="quick">
           <a href="obra-ev/gestao_obra_ev_detalhe.html">Rio Beach EV<span>Obra dedicada</span></a>
           <a href="obra-ev/gestao_obra_ev_detalhe.html?obra=malassise">Malassise R.K.<span>Obra dedicada</span></a>
-          <a href="obra-ev/gestao_obra_ev_detalhe.html?obra=prospect-29">Araguaia<span>Criar/abrir par</span></a>
+          <a href="obra-ev/gestao_obra_ev_detalhe.html?obra=prospect-29">Araguaia<span>Obra dedicada</span></a>
           <a href="obra-ev/analisadores/dashboard.html">Dashboard tecnico<span>Analisadores</span></a>
         </div>
       </div>
@@ -102,7 +102,8 @@
 <script>
 const baseWorks=[
   {id:"rio",nome:"Rio Beach EV",status:"Concluida",pct:100,kw:7,crit:0},
-  {id:"malassise",nome:"Posto Malassise R.K.",status:"Projeto",pct:42,kw:60,crit:4}
+  {id:"malassise",nome:"Posto Malassise R.K.",status:"Projeto",pct:42,kw:60,crit:4},
+  {id:"prospect-29",nome:"Posto Araguaia",status:"Projeto",pct:0,kw:60,crit:0}
 ];
 const baseTasks=[
   {status:"Em andamento",priority:"Alta",due:addDays(2)},
@@ -122,7 +123,7 @@ const recentFiles=[
 function addDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
 function daysTo(due){if(!due)return 999;const today=new Date();today.setHours(0,0,0,0);const d=new Date(due+"T00:00:00");return Math.round((d-today)/86400000)}
 function readJson(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}}
-function works(){const saved=readJson("uby-obras-dashboard-v1",baseWorks);return saved.filter(o=>!/shopping/i.test(o.nome||""))}
+function works(){const saved=readJson("uby-obras-dashboard-v1",[]);const byId=new Map(baseWorks.map(o=>[o.id,o]));saved.forEach(o=>{if(o&&o.id)byId.set(o.id,{...(byId.get(o.id)||{}),...o})});return [...byId.values()].filter(o=>!/shopping/i.test(o.nome||""))}
 function tasks(){return readJson("uby-tarefas-v1",baseTasks)}
 function statusStage(status){if(/conclu/i.test(status))return"Concluida";if(/obra/i.test(status))return"Em obra";if(/aguard/i.test(status))return"Aguardando";return"Projeto"}
 function render(){
