@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P3 Energy - Portal Engenharia EV</title>
+<style>
+  :root{--p3-primary:#3FB66B;--p3-accent:#5BC882;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#2A3530;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#3FB66B;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.5;min-height:100vh}
+  .page{max-width:1540px;margin:0 auto;padding:32px 36px 80px}
+  .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);border-radius:16px;padding:30px 34px;margin-bottom:24px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:18px}.logo{width:48px;height:48px;border-radius:10px;border:1px solid var(--p3-accent);display:grid;place-items:center;color:var(--p3-accent);font-size:22px;font-weight:900;background:#0F3D2E}.brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.86}.brand-tag{font-size:11px;color:#c7d7cf;letter-spacing:1px}.header h1{font-size:28px;margin-bottom:6px}.header p{color:#c8d8d0;max-width:760px}.nav{position:absolute;right:24px;top:24px;display:flex;gap:8px;flex-wrap:wrap}.nav a,.ghost-btn{border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:8px;padding:9px 12px;font-size:12px;font-weight:800;text-decoration:none;cursor:pointer}.nav a.main,.primary-btn{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px}.stat{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:12px;padding:17px;box-shadow:var(--p3-shadow)}.label{font-size:10px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:1px;font-weight:800}.value{font-size:26px;color:var(--p3-primary);font-weight:900;margin-top:5px}.sub{font-size:11px;color:var(--p3-muted);margin-top:5px}
+  .grid{display:grid;grid-template-columns:1fr 1.15fr;gap:18px}.panel{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:20px;box-shadow:var(--p3-shadow);margin-bottom:18px}.panel h2{font-size:16px;color:var(--p3-primary);margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}.toolbar input,.toolbar select{height:40px;border:1px solid var(--p3-border);border-radius:8px;background:#121d18;color:var(--p3-text);padding:0 11px;font-weight:700}.toolbar input{flex:1;min-width:240px}
+  .work-list{display:grid;gap:10px}.work-card{border:1px solid var(--p3-border);background:#1A2622;border-radius:12px;padding:14px;cursor:pointer}.work-card.active{border-color:var(--p3-accent);box-shadow:inset 0 3px 0 var(--p3-accent)}.work-head{display:flex;justify-content:space-between;gap:10px}.work-title{font-size:15px;color:var(--p3-primary);font-weight:900}.work-sub{font-size:11px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}.badge{display:inline-block;border-radius:8px;padding:3px 8px;font-size:10px;font-weight:900;text-transform:uppercase}.ok{background:#0E2A1B;color:#7FE2A0}.warn{background:#2E2310;color:#F2D77F}.danger{background:#2E1714;color:#FF8B7C}.info{background:#0D2030;color:#7FCCFF}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;border-top:1px solid var(--p3-border);margin-top:11px;padding-top:11px}.meta strong{display:block;color:var(--p3-primary);font-size:15px}
+  .task-grid{display:grid;gap:12px}.task-block{background:#1A2622;border:1px solid var(--p3-border);border-radius:12px;padding:14px}.task-top{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px}.task-top strong{font-size:14px}.task-fields{display:grid;grid-template-columns:160px 1fr 1fr;gap:8px}.task-fields label{display:block;color:var(--p3-muted);font-size:9px;text-transform:uppercase;letter-spacing:.7px;font-weight:800;margin-bottom:4px}.task-fields input,.task-fields select,.task-fields textarea{width:100%;border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:8px;padding:9px;font-weight:700}.task-fields textarea{min-height:38px;resize:vertical}.wide{grid-column:1/-1}.mini-table{width:100%;border-collapse:collapse;font-size:13px}th{background:#1F2A26;color:var(--p3-primary);font-size:10px;text-transform:uppercase;letter-spacing:.7px;text-align:left;padding:9px;border-bottom:2px solid var(--p3-border)}td{padding:9px;border-bottom:1px solid var(--p3-border);vertical-align:top}.insights{display:grid;gap:10px}.insight{background:#121d18;border-left:3px solid var(--p3-accent);border-radius:8px;padding:10px}.insight.warn{border-left-color:var(--p3-warn)}.insight.danger{border-left-color:var(--p3-danger)}.insight strong{display:block;margin-bottom:3px}.insight span{color:var(--p3-muted);font-size:12px}.empty{color:var(--p3-muted);padding:18px;border:1px dashed var(--p3-border);border-radius:10px;text-align:center}
+  @media(max-width:980px){.stats{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.nav{position:static;margin-bottom:16px}.task-fields{grid-template-columns:1fr}.meta{grid-template-columns:repeat(2,1fr)}}@media(max-width:620px){.page{padding:18px 14px 60px}.stats{grid-template-columns:1fr}.header{padding:24px 20px}.toolbar input{min-width:100%}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="nav">
+      <a href="index.html">Dashboard obras</a>
+      <a class="main" href="analisadores/dashboard.html" target="_blank" rel="noopener">Analisadores</a>
+    </div>
+    <div class="brand"><div class="logo">P3</div><div><div class="brand-name">P3 Energy</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div></div>
+    <h1>Portal Engenharia EV</h1>
+    <p>Fila tecnica para controlar obras, prazos, estudos, orcamentos e principalmente pedidos de segundo padrao ou aumento de carga.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="label">Obras na engenharia</div><div class="value" id="statWorks">0</div><div class="sub">Visao tecnica</div></div>
+    <div class="stat"><div class="label">Concessionaria aberta</div><div class="value" id="statUtility">0</div><div class="sub">Pedidos/consultas pendentes</div></div>
+    <div class="stat"><div class="label">Protocolos faltando</div><div class="value" id="statProtocols">0</div><div class="sub">Itens sem numero</div></div>
+    <div class="stat"><div class="label">Prazos vencidos</div><div class="value" id="statOverdue">0</div><div class="sub">Datas previstas atrasadas</div></div>
+    <div class="stat"><div class="label">Sem analisador</div><div class="value" id="statAnalysis">0</div><div class="sub">Obras sem estudo vinculado</div></div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <h2>Fila de obras do engenheiro</h2>
+        <div class="toolbar">
+          <input id="search" placeholder="Buscar obra, local ou status">
+          <select id="stageFilter"><option value="">Todas</option><option>Projeto</option><option>Aguardando cliente</option><option>Em obra</option><option>Concluida</option></select>
+        </div>
+        <div class="work-list" id="workList"></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <h2 id="selectedTitle">Controle tecnico</h2>
+        <div id="selectedBody" class="empty">Selecione uma obra para atualizar pedidos, protocolos e prazos.</div>
+      </div>
+      <div class="panel">
+        <h2>Insights do engenheiro</h2>
+        <div class="insights" id="insights"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="backup_guard.js"></script>
+<script>
+const dashboardKey="uby-obras-dashboard-v1";
+const deletedKey="uby-obras-dashboard-deleted-v1";
+const statusDef={pending:"Pendente",doing:"Em andamento",done:"Concluido",na:"Nao se aplica"};
+const concessionTitles=["Pedido segundo padrao","Pedido de aumento de carga","Consulta de carga disponivel","Protocolo aberto na concessionaria","Projeto enviado para analise","Aprovacao da concessionaria","Ligacao ou energizacao liberada"];
+let selectedId="";
+
+function deletedIds(){try{return JSON.parse(localStorage.getItem(deletedKey))||[]}catch{return[]}}
+function detailKey(id){return "uby-obra-detalhe-"+(id||"rio")}
+function parseDetail(id){try{return JSON.parse(localStorage.getItem(detailKey(id)))}catch{return null}}
+function saveDetail(id,detail){localStorage.setItem(detailKey(id),JSON.stringify(detail));persistDashboardCard(id,detail)}
+function stats(tasks){const total=tasks.length||1;const done=tasks.filter(t=>t.status==="done"||t.status==="na").length;return{pct:Math.round(done/total*100),pending:tasks.filter(t=>t.status==="pending").length,doing:tasks.filter(t=>t.status==="doing").length}}
+function allTasks(detail){return(detail?.phases||[]).flatMap(p=>(p.tasks||[]).map(t=>({...t,phase:p.name})))}
+function utilityTasks(detail){return allTasks(detail).filter(t=>t.phase==="Concessionaria"&&concessionTitles.includes(t.title))}
+function needsProtocol(t){return /pedido|consulta|protocolo|projeto enviado|aprovacao|ligacao/i.test(t.title)}
+function formatDate(value){if(!value)return"-";const parts=value.split("-");return parts.length===3?`${parts[2]}/${parts[1]}/${parts[0]}`:value}
+function isOverdue(t){return t.forecastDate&&t.status!=="done"&&t.status!=="na"&&new Date(t.forecastDate+"T23:59:59")<new Date()}
+function loadDashboard(){try{return JSON.parse(localStorage.getItem(dashboardKey))||[]}catch{return[]}}
+function saveDashboard(items){localStorage.setItem(dashboardKey,JSON.stringify(items))}
+function baseCards(){return[{id:"rio",nome:"Rio Beach EV",cliente:"Rio Beach",local:"Rua Luiz Lerco 159",status:"Concluida",pct:100,kw:7,carregadores:"1 x 7 kW",crit:0,flags:["Obra completa"],link:"gestao_obra_ev_detalhe.html"},{id:"malassise",nome:"Posto Malassise R.K.",cliente:"Malassise Robert Koch",local:"Maringa - PR",status:"Projeto",pct:42,kw:60,carregadores:"1 x 60 kW",crit:4,flags:["Aumento de carga","Trafo a validar","Orcamento civil"],link:"gestao_obra_ev_detalhe.html?obra=malassise"}]}
+function cardsFromDetails(){const deleted=new Set([...deletedIds(),"shopping","prospect-19"]);const cards=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||!key.startsWith("uby-obra-detalhe-"))continue;const id=key.replace("uby-obra-detalhe-","");if(deleted.has(id))continue;const detail=parseDetail(id);if(!detail?.project||/shopping aurora/i.test(detail.project.obraNome||""))continue;cards.push(cardFromDetail(id,detail))}return cards}
+function cardFromDetail(id,detail){const p=detail.project||{};const qtd=parseInt(p.qtdCarregadores,10)||1;const kw=parseInt(p.potenciaCarregador,10)||60;const tasks=allTasks(detail);const s=stats(tasks);const critical=tasks.filter(t=>["Concessionaria","Orcamentos e contratacoes","Projeto e engenharia","Obra eletrica"].includes(t.phase)&&["pending","doing"].includes(t.status));return{id,nome:p.obraNome||id,cliente:p.cliente||p.obraNome||"Cliente",local:p.local||"Local",status:p.statusExec||"Projeto",pct:s.pct,kw:qtd*kw,carregadores:`${qtd} x ${kw} kW`,crit:critical.length,flags:critical.slice(0,3).map(t=>t.title),link:id==="rio"?"gestao_obra_ev_detalhe.html":`gestao_obra_ev_detalhe.html?obra=${id}`}}
+function works(){const deleted=new Set([...deletedIds(),"shopping","prospect-19"]);const byId=new Map();baseCards().forEach(c=>{if(!deleted.has(c.id))byId.set(c.id,c)});loadDashboard().forEach(c=>{if(c?.id&&!deleted.has(c.id)&&!/shopping aurora/i.test(c.nome||""))byId.set(c.id,c)});cardsFromDetails().forEach(c=>byId.set(c.id,c));return[...byId.values()].sort((a,b)=>(a.pct??0)-(b.pct??0)||a.nome.localeCompare(b.nome))}
+function ensureDetail(card){let detail=parseDetail(card.id);if(detail?.project)return detail;const today=new Date().toISOString().slice(0,10);detail={project:{obraNome:card.nome,cliente:card.cliente,local:card.local,qtdCarregadores:parseInt((card.carregadores||"1 x 60").split("x")[0],10)||1,potenciaCarregador:parseInt((card.carregadores||"1 x 60").split("x")[1],10)||card.kw||60,entrega:today,statusExec:card.status},phases:[{name:"Concessionaria",owner:"Engenharia / UBY",tasks:concessionTitles.map((title,i)=>({id:"Concessionaria-"+i,title,status:"pending",note:"",protocol:"",requestDate:"",forecastDate:""}))},{name:"Projeto e engenharia",owner:"Engenharia",tasks:["Projeto eletrico executivo entregue","Diagrama unifilar entregue","Lista tecnica de materiais validada","Dimensionamento de cabos, protecoes e quadro"].map((title,i)=>({id:"Projeto e engenharia-"+i,title,status:"pending",note:"",protocol:"",requestDate:"",forecastDate:""}))},{name:"Orcamentos e contratacoes",owner:"UBY / compras",tasks:["Orcamento de projeto ou engenharia recebido","Orcamento de obra eletrica recebido","Orcamento de obra civil recebido"].map((title,i)=>({id:"Orcamentos e contratacoes-"+i,title,status:"pending",note:"",protocol:"",requestDate:"",forecastDate:""}))}]};saveDetail(card.id,detail);return detail}
+function persistDashboardCard(id,detail){const card=cardFromDetail(id,detail);const items=loadDashboard();const idx=items.findIndex(o=>o.id===id);if(idx>=0)items[idx]={...items[idx],...card};else items.unshift(card);saveDashboard(items)}
+function setTask(id,taskTitle,field,value){const card=works().find(w=>w.id===id);if(!card)return;const detail=ensureDetail(card);const task=utilityTasks(detail).find(t=>t.title===taskTitle);const phase=detail.phases.find(p=>p.name==="Concessionaria");const original=phase.tasks.find(t=>t.title===taskTitle);if(original){original[field]=value}saveDetail(id,detail);render()}
+function updateStats(){const list=works();const details=list.map(w=>parseDetail(w.id)).filter(Boolean);const utility=details.flatMap(utilityTasks).filter(t=>t.status==="pending"||t.status==="doing");document.getElementById("statWorks").textContent=list.length;document.getElementById("statUtility").textContent=utility.length;document.getElementById("statProtocols").textContent=utility.filter(t=>needsProtocol(t)&&!t.protocol).length;document.getElementById("statOverdue").textContent=utility.filter(isOverdue).length;document.getElementById("statAnalysis").textContent=list.filter(w=>{const d=parseDetail(w.id);return !d?.project?.analysis||d.project.analysis.url==="#"}).length}
+function renderList(){const q=document.getElementById("search").value.toLowerCase();const stage=document.getElementById("stageFilter").value;const list=works().filter(w=>(!stage||w.status===stage)&&[w.nome,w.cliente,w.local,w.status].join(" ").toLowerCase().includes(q));document.getElementById("workList").innerHTML=list.map(w=>{const d=parseDetail(w.id);const pending=d?utilityTasks(d).filter(t=>t.status==="pending"||t.status==="doing"):[];return`<div class="work-card ${w.id===selectedId?"active":""}" onclick="selectWork('${w.id}')"><div class="work-head"><div><div class="work-title">${w.nome}</div><div class="work-sub">${w.cliente} - ${w.local}</div></div><span class="badge ${w.pct>=100?"ok":pending.length?"danger":"warn"}">${w.status}</span></div><div class="meta"><div><span class="label">Avanco</span><strong>${w.pct||0}%</strong></div><div><span class="label">kW</span><strong>${w.kw||0}</strong></div><div><span class="label">Concess.</span><strong>${pending.length}</strong></div><div><span class="label">Prazo</span><strong>${d?.project?.entrega?formatDate(d.project.entrega):"-"}</strong></div></div></div>`}).join("")||'<div class="empty">Nenhuma obra encontrada.</div>'}
+function taskBlock(id,t){const risk=isOverdue(t)?"danger":t.status==="done"||t.status==="na"?"ok":t.status==="doing"?"warn":"danger";return`<div class="task-block"><div class="task-top"><strong>${t.title}</strong><span class="badge ${risk}">${statusDef[t.status]||"Pendente"}</span></div><div class="task-fields"><div><label>Status</label><select onchange="setTask('${id}','${t.title}','status',this.value)">${Object.entries(statusDef).map(([k,v])=>`<option value="${k}" ${t.status===k?"selected":""}>${v}</option>`).join("")}</select></div><div><label>Data do pedido</label><input type="date" value="${t.requestDate||""}" onchange="setTask('${id}','${t.title}','requestDate',this.value)"></div><div><label>Data prevista</label><input type="date" value="${t.forecastDate||""}" onchange="setTask('${id}','${t.title}','forecastDate',this.value)"></div><div class="wide"><label>Protocolo</label><input value="${t.protocol||""}" placeholder="Numero do protocolo da concessionaria" onchange="setTask('${id}','${t.title}','protocol',this.value)"></div><div class="wide"><label>Observacao tecnica</label><textarea onchange="setTask('${id}','${t.title}','note',this.value)">${t.note||""}</textarea></div></div></div>`}
+function renderSelected(){const card=works().find(w=>w.id===selectedId);if(!card){document.getElementById("selectedTitle").textContent="Controle tecnico";document.getElementById("selectedBody").className="empty";document.getElementById("selectedBody").innerHTML="Selecione uma obra para atualizar pedidos, protocolos e prazos.";document.getElementById("insights").innerHTML="";return}const detail=ensureDetail(card);const utility=utilityTasks(detail);document.getElementById("selectedTitle").textContent=card.nome;document.getElementById("selectedBody").className="";document.getElementById("selectedBody").innerHTML=`<div class="task-grid">${utility.map(t=>taskBlock(card.id,t)).join("")}</div><div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><a class="ghost-btn" href="${card.link}">Abrir obra completa</a><button class="ghost-btn" onclick="window.UBY_BACKUP.export()">Backup</button></div>`;renderInsights(card,detail)}
+function renderInsights(card,detail){const utility=utilityTasks(detail);const pending=utility.filter(t=>t.status==="pending"||t.status==="doing");const overdue=utility.filter(isOverdue);const noProtocol=pending.filter(t=>needsProtocol(t)&&!t.protocol);const insights=[];if(overdue.length)insights.push(["Prazo vencido",`${overdue[0].title} esta atrasado desde ${formatDate(overdue[0].forecastDate)}.`, "danger"]);if(noProtocol.length)insights.push(["Protocolo faltando",`${noProtocol.length} item(ns) de concessionaria sem protocolo. Prioridade: ${noProtocol[0].title}.`, "danger"]);if(!detail.project?.analysis||detail.project.analysis.url==="#")insights.push(["Estudo ausente","Sem analisador vinculado, o pedido de aumento de carga fica mais fraco tecnicamente.","warn"]);if((card.kw||0)>=50)insights.push(["Aumento de carga / DLM",`${card.kw} kW exige validar segundo padrao, demanda, DLM e eventual trafo antes da execucao eletrica.`, "warn"]);if(!pending.length)insights.push(["Concessionaria controlada","Nao ha pedido ou consulta pendente na concessionaria para esta obra.", "ok"]);document.getElementById("insights").innerHTML=insights.map(i=>`<div class="insight ${i[2]}"><strong>${i[0]}</strong><span>${i[1]}</span></div>`).join("")}
+function selectWork(id){selectedId=id;render()}
+function render(){updateStats();renderList();renderSelected()}
+document.getElementById("search").addEventListener("input",renderList);
+document.getElementById("stageFilter").addEventListener("change",renderList);
+selectedId="";
+render();
+</script>
+</body>
+</html>
