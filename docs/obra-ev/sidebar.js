@@ -1,12 +1,17 @@
 (function () {
   const inAnalyzers = location.pathname.includes("/analisadores/");
+  const inPrototypes = location.pathname.includes("/outputs/prototipos/");
   const base = inAnalyzers ? "../" : "./";
-  const home = inAnalyzers ? "../../" : "../";
+  const home = inAnalyzers ? "../../" : inPrototypes ? "../../docs/" : "../";
+  const dashboardHref = inPrototypes ? "gestao_obra_ev.html" : base + "index.html";
+  const detailHref = inPrototypes ? "gestao_obra_ev_detalhe.html" : base + "gestao_obra_ev_detalhe.html";
+  const engineeringHref = inPrototypes ? "../../docs/obra-ev/engenharia.html" : base + "engenharia.html";
+  const analyzersHref = inPrototypes ? "../../docs/obra-ev/analisadores/dashboard.html" : base + "analisadores/dashboard.html";
   const current = location.pathname.split("/").pop() || "index.html";
   const isDetail = current === "gestao_obra_ev_detalhe.html";
   const isEngineering = current === "engenharia.html";
   const isAnalyzer = inAnalyzers;
-  const isDashboard = current === "index.html" && !inAnalyzers;
+  const isDashboard = (current === "index.html" && !inAnalyzers) || current === "gestao_obra_ev.html";
   const collapsed = localStorage.getItem("uby-sidebar-collapsed") === "1";
 
   const links = [
@@ -14,18 +19,18 @@
       title: "Base",
       items: [
         ["Pagina inicial", home, "P", false],
-        ["Dashboard obras", base + "index.html", "O", isDashboard],
-        ["Portal engenharia", base + "engenharia.html", "E", isEngineering]
+        ["Dashboard obras", dashboardHref, "O", isDashboard],
+        ["Portal engenharia", engineeringHref, "E", isEngineering]
       ]
     },
     {
       title: "Gestao de obra",
       items: [
-        ["Controle de obra", base + "gestao_obra_ev_detalhe.html", "C", isDetail],
-        ["Concessionaria", base + "engenharia.html", "K", isEngineering],
-        ["Orcamentos", base + "index.html#obras", "R", false],
-        ["Documentos", base + "gestao_obra_ev_detalhe.html#documentos", "D", false],
-        ["Analisadores", base + "analisadores/dashboard.html", "A", isAnalyzer]
+        ["Controle de obra", detailHref, "C", isDetail],
+        ["Concessionaria", engineeringHref, "K", isEngineering],
+        ["Orcamentos", dashboardHref + "#obras", "R", false],
+        ["Documentos", detailHref + "#documentos", "D", false],
+        ["Analisadores", analyzersHref, "A", isAnalyzer]
       ]
     },
     {
