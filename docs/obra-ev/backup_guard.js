@@ -1,7 +1,8 @@
 (function () {
   const BACKUP_KEY = "uby-obras-backups-v1";
   const SESSION_KEY = "uby-obras-backup-session-v1";
-  const PREFIXES = ["uby-obra-detalhe-", "uby-obras-dashboard", "p3_obras_theme"];
+  const DAILY_KEY = "uby-obras-backup-daily-v1";
+  const PREFIXES = ["uby-obra-detalhe-", "uby-obras-dashboard", "uby-tarefas", "p3_obras_theme", "uby-sidebar"];
 
   function isManagedKey(key) {
     return PREFIXES.some(prefix => key.startsWith(prefix));
@@ -35,9 +36,16 @@
   }
 
   function autoBackup() {
-    if (sessionStorage.getItem(SESSION_KEY)) return;
-    saveBackup("antes de carregar pagina");
-    sessionStorage.setItem(SESSION_KEY, "1");
+    const today = new Date().toISOString().slice(0, 10);
+    const lastDaily = localStorage.getItem(DAILY_KEY);
+    if (lastDaily !== today) {
+      saveBackup("backup diario automatico");
+      localStorage.setItem(DAILY_KEY, today);
+    }
+    if (!sessionStorage.getItem(SESSION_KEY)) {
+      saveBackup("antes de carregar pagina");
+      sessionStorage.setItem(SESSION_KEY, "1");
+    }
   }
 
   function exportBackup() {

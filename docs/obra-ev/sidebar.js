@@ -1,25 +1,31 @@
 (function () {
   const inAnalyzers = location.pathname.includes("/analisadores/");
   const inPrototypes = location.pathname.includes("/outputs/prototipos/");
-  const base = inAnalyzers ? "../" : "./";
-  const home = inAnalyzers ? "../../" : inPrototypes ? "../../docs/" : "../";
+  const inTasks = location.pathname.includes("/tarefas/");
+  const inObras = location.pathname.includes("/obra-ev/") || inPrototypes;
+  const inRoot = !inAnalyzers && !inTasks && !inObras;
+  const base = inAnalyzers ? "../" : inTasks ? "../obra-ev/" : inRoot ? "obra-ev/" : "./";
+  const home = inAnalyzers ? "../../" : inPrototypes ? "../../docs/" : inTasks ? "../" : inRoot ? "./" : "../";
   const dashboardHref = inPrototypes ? "gestao_obra_ev.html" : base + "index.html";
   const detailHref = inPrototypes ? "gestao_obra_ev_detalhe.html" : base + "gestao_obra_ev_detalhe.html";
   const engineeringHref = inPrototypes ? "../../docs/obra-ev/engenharia.html" : base + "engenharia.html";
   const analyzersHref = inPrototypes ? "../../docs/obra-ev/analisadores/dashboard.html" : base + "analisadores/dashboard.html";
+  const tasksHref = inAnalyzers ? "../../tarefas/" : inTasks ? "./" : inRoot ? "tarefas/" : "../tarefas/";
   const current = location.pathname.split("/").pop() || "index.html";
   const isDetail = current === "gestao_obra_ev_detalhe.html";
   const isEngineering = current === "engenharia.html";
   const isAnalyzer = inAnalyzers;
-  const isDashboard = (current === "index.html" && !inAnalyzers) || current === "gestao_obra_ev.html";
+  const isDashboard = (current === "index.html" && inObras && !inAnalyzers) || current === "gestao_obra_ev.html";
+  const isTasks = inTasks;
+  const isHome = inRoot;
   const collapsed = localStorage.getItem("uby-sidebar-collapsed") === "1";
 
   const links = [
     {
       title: "Base",
       items: [
-        ["Pagina inicial", home, "P", false],
-        ["Dashboard obras", dashboardHref, "O", isDashboard],
+        ["Pagina inicial", home, "P", isHome],
+        ["Dashboard obras", dashboardHref, "O", isDashboard && !isHome],
         ["Portal engenharia", engineeringHref, "E", isEngineering]
       ]
     },
@@ -36,7 +42,7 @@
     {
       title: "Administracao",
       items: [
-        ["Tarefas", home + "tarefas/", "T", false],
+        ["Tarefas", tasksHref, "T", isTasks],
         ["Backup e restauracao", base + "index.html#backup", "B", false]
       ]
     }
