@@ -2,7 +2,7 @@
   const BACKUP_KEY = "uby-obras-backups-v1";
   const SESSION_KEY = "uby-obras-backup-session-v1";
   const DAILY_KEY = "uby-obras-backup-daily-v1";
-  const PREFIXES = ["uby-obra-detalhe-", "uby-obras-dashboard", "uby-tarefas", "p3_obras_theme", "uby-sidebar"];
+  const PREFIXES = ["uby-obra-detalhe-", "uby-obras-dashboard", "uby-tarefas", "uby-auth-", "uby-engineering-", "uby-material-", "p3_obras_theme", "uby-sidebar"];
 
   function isManagedKey(key) {
     return PREFIXES.some(prefix => key.startsWith(prefix));

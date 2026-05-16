@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P3 Energy - Acesso UBY Recharge</title>
+<link rel="stylesheet" href="sidebar.css">
+<style>
+  :root{--p3-primary:#3FB66B;--p3-accent:#5BC882;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#9DB5AA;--p3-border:#2A3530;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;min-height:100vh}
+  .page{max-width:1120px;margin:0 auto;padding:32px 36px 80px}
+  .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);border-radius:16px;padding:30px 34px;margin-bottom:24px;box-shadow:var(--p3-shadow)}
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:20px}.logo{width:52px;height:52px;border-radius:11px;border:1px solid var(--p3-accent);display:grid;place-items:center;color:var(--p3-accent);font-size:24px;font-weight:900;background:#0F3D2E}.brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.88}.brand-tag{font-size:11px;color:#c7d7cf;letter-spacing:1px}
+  h1{font-size:30px;margin-bottom:8px}.header p{max-width:760px;color:#c8d8d0;line-height:1.55}
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}.card{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:22px;box-shadow:var(--p3-shadow)}.card h2{color:var(--p3-primary);font-size:19px;margin-bottom:10px}.card p{color:var(--p3-muted);line-height:1.55;margin-bottom:16px}.list{display:grid;gap:8px;margin-bottom:18px}.item{border-top:1px solid var(--p3-border);padding-top:8px;color:#d9e6df;font-size:13px}.btn{height:42px;border:1px solid var(--p3-accent);background:var(--p3-accent);color:#fff;border-radius:8px;padding:0 16px;font-weight:900;cursor:pointer}.ghost{background:#121d18;border-color:var(--p3-border)}
+  .notice{margin-top:18px;background:#121d18;border-left:3px solid var(--p3-accent);border-radius:10px;padding:13px;color:var(--p3-muted);font-size:13px}
+  @media(max-width:760px){.page{padding:20px 14px 60px}.cards{grid-template-columns:1fr}.header{padding:24px 20px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="brand"><div class="logo">P3</div><div><div class="brand-name">P3 Energy</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div></div>
+    <h1>Acesso UBY Recharge</h1>
+    <p>Entrada por perfil para separar sua operacao interna da visao do engenheiro. Nesta fase o controle e visual; a seguranca real entra quando conectarmos o backend/login da plataforma.</p>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h2>Admin interno</h2>
+      <p>Acesso completo para obras, tarefas, prospeccao, analisadores, documentos, backups e administracao.</p>
+      <div class="list">
+        <div class="item">Painel geral e todos os modulos</div>
+        <div class="item">Criacao e exclusao de obras</div>
+        <div class="item">Backup, restauracao e integrações</div>
+      </div>
+      <button class="btn" onclick="UBY_AUTH.set('admin','index.html')">Entrar como admin</button>
+    </div>
+    <div class="card">
+      <h2>Engenheiro</h2>
+      <p>Acesso focado em controle tecnico de obras, prazos, pedidos na concessionaria, estudos, orcamentos e documentos.</p>
+      <div class="list">
+        <div class="item">Portal engenharia e controle tecnico</div>
+        <div class="item">Pedidos de segundo padrao e aumento de carga</div>
+        <div class="item">Planejador, calculadora e analisadores</div>
+      </div>
+      <button class="btn" onclick="UBY_AUTH.set('engineer','engenharia.html')">Entrar como engenheiro</button>
+    </div>
+  </div>
+  <div class="notice">Quando o sistema virar plataforma com backend, este mesmo desenho de perfil sera usado para bloquear rotas e dados no servidor. No HTML estatico ele organiza a experiencia, mas nao substitui login real.</div>
+</div>
+<script src="auth.js"></script>
+<script src="backup_guard.js"></script>
+</body>
+</html>

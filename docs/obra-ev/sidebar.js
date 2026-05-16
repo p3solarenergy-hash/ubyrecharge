@@ -11,45 +11,70 @@
   const engineeringHref = inPrototypes ? "../../docs/obra-ev/engenharia.html" : base + "engenharia.html";
   const analyzersHref = inPrototypes ? "../../docs/obra-ev/analisadores/dashboard.html" : base + "analisadores/dashboard.html";
   const tasksHref = inAnalyzers ? "../../tarefas/" : inTasks ? "./" : inRoot ? "tarefas/" : "../tarefas/";
+  const loginHref = inAnalyzers ? "../login.html" : inPrototypes ? "../../docs/obra-ev/login.html" : inTasks ? "../obra-ev/login.html" : inRoot ? "obra-ev/login.html" : "login.html";
   const current = location.pathname.split("/").pop() || "index.html";
   const isDetail = current === "gestao_obra_ev_detalhe.html";
   const isEngineering = current === "engenharia.html";
+  const isLogin = current === "login.html";
   const isAnalyzer = inAnalyzers;
   const isDashboard = (current === "index.html" && inObras && !inAnalyzers) || current === "gestao_obra_ev.html";
   const isTasks = inTasks;
   const isHome = inRoot;
   const collapsed = localStorage.getItem("uby-sidebar-collapsed") === "1";
+  const profile = readProfile();
+  const isAdmin = profile.role === "admin";
+
+  function readProfile() {
+    try {
+      return JSON.parse(localStorage.getItem("uby-auth-profile-v1") || "null") || { label: "Eduardo / Admin", role: "admin", modules: [] };
+    } catch (err) {
+      return { label: "Eduardo / Admin", role: "admin", modules: [] };
+    }
+  }
+
+  function allowed(module) {
+    return isAdmin || module === "login" || (profile.modules || []).includes(module);
+  }
+
+  const currentModule = isLogin ? "login" : isTasks ? "tasks" : isAnalyzer ? "analyzers" : isEngineering ? "engineering" : isDetail ? "detail" : isDashboard ? "dashboard" : isHome ? "home" : "home";
+  if (!allowed(currentModule)) {
+    location.href = engineeringHref;
+    return;
+  }
 
   const links = [
     {
       title: "Base",
       items: [
-        ["Pagina inicial", home, "P", isHome],
-        ["Dashboard obras", dashboardHref, "O", isDashboard && !isHome],
-        ["Portal engenharia", engineeringHref, "E", isEngineering]
+        ["Pagina inicial", home, "P", isHome, "home"],
+        ["Dashboard obras", dashboardHref, "O", isDashboard && !isHome, "dashboard"],
+        ["Portal engenharia", engineeringHref, "E", isEngineering, "engineering"]
       ]
     },
     {
       title: "Gestao de obra",
       items: [
-        ["Controle de obra", detailHref, "C", isDetail],
-        ["Concessionaria", engineeringHref, "K", isEngineering],
-        ["Orcamentos", dashboardHref + "#obras", "R", false],
-        ["Documentos", detailHref + "#documentos", "D", false],
-        ["Analisadores", analyzersHref, "A", isAnalyzer]
+        ["Controle de obra", detailHref, "C", isDetail, "detail"],
+        ["Concessionaria", engineeringHref, "K", isEngineering, "utility"],
+        ["Orcamentos", dashboardHref + "#obras", "R", false, "budgets"],
+        ["Documentos", detailHref + "#documentos", "D", false, "documents"],
+        ["Analisadores", analyzersHref, "A", isAnalyzer, "analyzers"]
       ]
     },
     {
       title: "Administracao",
       items: [
-        ["Tarefas", tasksHref, "T", isTasks],
-        ["Backup e restauracao", base + "index.html#backup", "B", false]
+        ["Tarefas", tasksHref, "T", isTasks, "tasks"],
+        ["Backup e restauracao", base + "index.html#backup", "B", false, "backup"],
+        ["Perfil e acesso", loginHref, "L", isLogin, "login"]
       ]
     }
   ];
 
   function navSection(section) {
-    return `<div class="uby-section"><div class="uby-section-title">${section.title}</div>${section.items.map(([label, href, mark, active]) => `<a class="uby-link ${active ? "active" : ""}" href="${href}"><span class="uby-link-mark">${mark}</span><span class="uby-link-text">${label}</span></a>`).join("")}</div>`;
+    const items = section.items.filter(([, , , , module]) => allowed(module));
+    if (!items.length) return "";
+    return `<div class="uby-section"><div class="uby-section-title">${section.title}</div>${items.map(([label, href, mark, active]) => `<a class="uby-link ${active ? "active" : ""}" href="${href}"><span class="uby-link-mark">${mark}</span><span class="uby-link-text">${label}</span></a>`).join("")}</div>`;
   }
 
   const shell = document.createElement("div");
@@ -69,6 +94,7 @@
       <strong>P3 Energy - Central</strong>
       <span>|</span>
       <span class="uby-recharge">UBY Recharge</span>
+      <a class="uby-profile-pill" href="${loginHref}">${profile.label || "Admin"}</a>
     </div>
   `;
   document.body.prepend(shell);
