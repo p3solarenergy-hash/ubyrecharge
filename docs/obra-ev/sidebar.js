@@ -7,7 +7,6 @@
   const base = inAnalyzers ? "../" : inTasks ? "../obra-ev/" : inRoot ? "obra-ev/" : "./";
   const home = inAnalyzers ? "../../" : inPrototypes ? "../../docs/" : inTasks ? "../" : inRoot ? "./" : "../";
   const dashboardHref = inPrototypes ? "gestao_obra_ev.html" : base + "index.html";
-  const detailHref = inPrototypes ? "gestao_obra_ev_detalhe.html" : base + "gestao_obra_ev_detalhe.html";
   const engineeringHref = inPrototypes ? "../../docs/obra-ev/engenharia.html" : base + "engenharia.html";
   const analyzersHref = inPrototypes ? "../../docs/obra-ev/analisadores/dashboard.html" : base + "analisadores/dashboard.html";
   const tasksHref = inAnalyzers ? "../../tarefas/" : inTasks ? "./" : inRoot ? "tarefas/" : "../tarefas/";
@@ -54,10 +53,9 @@
     {
       title: "Gestao de obra",
       items: [
-        ["Controle de obra", detailHref, "C", isDetail, "detail"],
+        ["Controle de obras", dashboardHref, "C", isDashboard && !isHome, "dashboard"],
         ["Concessionaria", engineeringHref, "K", isEngineering, "utility"],
         ["Orcamentos", dashboardHref + "#obras", "R", false, "budgets"],
-        ["Documentos", detailHref + "#documentos", "D", false, "documents"],
         ["Analisadores", analyzersHref, "A", isAnalyzer, "analyzers"]
       ]
     },

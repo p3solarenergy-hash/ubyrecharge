@@ -11,7 +11,7 @@
       id: "engineer",
       label: "Engenheiro",
       role: "engineering",
-      modules: ["home", "detail", "engineering", "utility", "budgets", "documents", "analyzers", "backup", "login"]
+      modules: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "analyzers", "backup", "login"]
     }
   };
 
