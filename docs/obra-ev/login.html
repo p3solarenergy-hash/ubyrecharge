@@ -14,8 +14,9 @@
   .brand{display:flex;align-items:center;gap:14px;margin-bottom:20px}.logo{width:52px;height:52px;border-radius:11px;border:1px solid var(--p3-accent);display:grid;place-items:center;color:var(--p3-accent);font-size:24px;font-weight:900;background:#0F3D2E}.brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.88}.brand-tag{font-size:11px;color:#c7d7cf;letter-spacing:1px}
   h1{font-size:30px;margin-bottom:8px}.header p{max-width:760px;color:#c8d8d0;line-height:1.55}
   .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}.card{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:22px;box-shadow:var(--p3-shadow)}.card h2{color:var(--p3-primary);font-size:19px;margin-bottom:10px}.card p{color:var(--p3-muted);line-height:1.55;margin-bottom:16px}.list{display:grid;gap:8px;margin-bottom:18px}.item{border-top:1px solid var(--p3-border);padding-top:8px;color:#d9e6df;font-size:13px}.btn{height:42px;border:1px solid var(--p3-accent);background:var(--p3-accent);color:#fff;border-radius:8px;padding:0 16px;font-weight:900;cursor:pointer}.ghost{background:#121d18;border-color:var(--p3-border)}
+  .cloud-login{background:var(--p3-card);border:1px solid var(--p3-border);border-left:4px solid var(--p3-accent);border-radius:14px;padding:22px;margin-bottom:18px;box-shadow:var(--p3-shadow)}.login-grid{display:grid;grid-template-columns:1fr 1fr auto auto;gap:10px;align-items:end}.field label{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:900;margin-bottom:5px}.field input{width:100%;height:42px;border:1px solid var(--p3-border);border-radius:8px;background:#121d18;color:var(--p3-text);padding:0 11px;font-weight:800}.status{color:var(--p3-muted);font-size:12px;margin-top:10px}
   .notice{margin-top:18px;background:#121d18;border-left:3px solid var(--p3-accent);border-radius:10px;padding:13px;color:var(--p3-muted);font-size:13px}
-  @media(max-width:760px){.page{padding:20px 14px 60px}.cards{grid-template-columns:1fr}.header{padding:24px 20px}}
+  @media(max-width:760px){.page{padding:20px 14px 60px}.cards,.login-grid{grid-template-columns:1fr}.header{padding:24px 20px}}
 </style>
 </head>
 <body>
@@ -24,6 +25,17 @@
     <div class="brand"><div class="logo">P3</div><div><div class="brand-name">P3 Energy</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div></div>
     <h1>Acesso UBY Recharge</h1>
     <p>Entrada por perfil para separar sua operacao interna da visao do engenheiro. Nesta fase o controle e visual; a seguranca real entra quando conectarmos o backend/login da plataforma.</p>
+  </div>
+  <div class="cloud-login">
+    <h2>Login real Supabase</h2>
+    <p>Use o e-mail e senha criados no Supabase Auth. Esse login libera migracao e depois sera usado para perfil admin/engenharia.</p>
+    <div class="login-grid">
+      <div class="field"><label>E-mail</label><input id="supabaseEmail" type="email" placeholder="seu@email.com"></div>
+      <div class="field"><label>Senha</label><input id="supabasePassword" type="password" placeholder="Senha"></div>
+      <button class="btn" onclick="loginSupabase()">Entrar</button>
+      <button class="btn ghost" onclick="logoutSupabase()">Sair</button>
+    </div>
+    <div class="status" id="supabaseLoginStatus">Supabase ainda nao verificado.</div>
   </div>
   <div class="cards">
     <div class="card">
@@ -51,5 +63,29 @@
 </div>
 <script src="auth.js"></script>
 <script src="backup_guard.js"></script>
+<script src="supabase_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_bridge.js"></script>
+<script>
+async function refreshSupabaseLogin(){
+  const el=document.getElementById("supabaseLoginStatus");
+  if(!window.UBY_SUPABASE?.configured()){el.textContent="Supabase ainda nao configurado. Preencha supabase_config.js com URL e anonKey.";return}
+  const user=await window.UBY_SUPABASE.currentUser();
+  el.textContent=user?`Conectado como ${user.email}.`:"Supabase configurado. Informe e-mail e senha para entrar.";
+}
+async function loginSupabase(){
+  const el=document.getElementById("supabaseLoginStatus");
+  try{
+    el.textContent="Entrando...";
+    await window.UBY_SUPABASE.signIn(document.getElementById("supabaseEmail").value,document.getElementById("supabasePassword").value);
+    await refreshSupabaseLogin();
+  }catch(err){el.textContent="Erro no login: "+err.message}
+}
+async function logoutSupabase(){
+  const el=document.getElementById("supabaseLoginStatus");
+  try{await window.UBY_SUPABASE.signOut();await refreshSupabaseLogin()}catch(err){el.textContent="Erro ao sair: "+err.message}
+}
+refreshSupabaseLogin();
+</script>
 </body>
 </html>
