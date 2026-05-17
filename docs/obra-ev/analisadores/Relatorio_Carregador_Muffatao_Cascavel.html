@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>P3 Energy — Análise de Carga | Posto Duim Av. Maringá</title>
+<title>P3 Energy — Análise de Carga | Muffat?o Cascavel Av. Maringá</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   :root{--p3-primary:#3FB66B;--p3-primary-deep:#0F3D2E;--p3-accent:#5BC882;--p3-accent-2:#FFD66B;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#2A3530;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#3FB66B;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
@@ -197,45 +197,43 @@
       </div>
     </div>
     <h1>Relatório de Análise de Carga</h1>
-    <div class="subtitle">Posto Duim Av. Maringá — Implantação Carregador EV 60 kW</div>
+    <div class="subtitle">Muffat?o Cascavel Av. Maringá — Implantação Carregador EV 60 kW</div>
     <div class="header-meta">
-      <div><div class="label">Cliente</div><div class="value">Posto Duim Av. Maringá</div></div>
+      <div><div class="label">Cliente</div><div class="value">Muffat?o Cascavel Av. Maringá</div></div>
       <div><div class="label">Equipamento</div><div class="value">EnergiaV2 Bidirecional · ISSO Digital</div></div>
-      <div><div class="label">Período</div><div class="value">28/02/2026 a 04/03/2026</div></div>
-      <div><div class="label">Emissão</div><div class="value">14/05/2026 — P3 Energy</div></div>
+      <div><div class="label">Período</div><div class="value">15/05/2026 19:45 a 16/05/2026 19:44</div></div>
+      <div><div class="label">Emissão</div><div class="value">16/05/2026 — P3 Energy</div></div>
     </div>
   </div>
 
   <div class="alert">
     <div class="ico">&#9888;</div>
     <div>
-      <strong>Dados parciais — resumo agregado do analisador</strong>
-      O PDF exportado pelo ISSO Digital contém apenas os <b>resumos de kWh por fase e correntes</b> (máx/mín/média). Tensão, fator de potência, THD e curva horária detalhada <b>não estão disponíveis neste relatório</b>. Para análise completa de qualidade de energia, extrair o datalog completo do analisador. FP estimado em 0,83 com base na demanda de pico (39 kW) e correntes medidas.
-    </div>
-  </div>
+      <strong>Medio completa de 24 horas  relatrio preliminar</strong>
+      O PDF do Datalog/ISSO Telecom contm resumos eltricos completos do dia: correntes, potncias, FP, tenso, frequncia, desequilbrio e energia. A nica limitao  que a janela cobre <b>1 dia</b>; por isso a parte operacional do carregador abaixo  simulao de pr-dimensionamento, no curva real medida hora a hora.
 
   <div class="kpis">
     <div class="kpi">
-      <div class="kpi-label">Pico de Demanda</div>
-      <div class="kpi-value">39<span class="kpi-unit">kW</span></div>
-      <div class="kpi-sub">Informado pelo cliente</div>
-      <span class="badge warn">Dentro da capacidade</span>
+      <div class="kpi-label">Pico Potncia Ativa</div>
+      <div class="kpi-value">22,61<span class="kpi-unit">kW</span></div>
+      <div class="kpi-sub">16/05/2026 07:44</div>
+      <span class="badge warn">Pico moderado</span>
     </div>
     <div class="kpi">
       <div class="kpi-label">Corrente Máx (Fase A)</div>
-      <div class="kpi-value">75,51<span class="kpi-unit">A</span></div>
-      <div class="kpi-sub">37,8% do limite de 200 A</div>
+      <div class="kpi-value">28,79<span class="kpi-unit">kVA</span></div>
+      <div class="kpi-sub">Mdia 2,02 kVA</div>
       <span class="badge ok" id="kpiUtil">36% padrão 200 A</span>
     </div>
     <div class="kpi">
-      <div class="kpi-label">FP Estimado</div>
-      <div class="kpi-value">0,83</div>
-      <div class="kpi-sub">Sistema 220/380 V (COPEL)</div>
-      <span class="badge warn">Abaixo de 0,92 NBR</span>
+      <div class="kpi-label">FP Vetorial Mdio</div>
+      <div class="kpi-value">0,93</div>
+      <div class="kpi-sub">Sistema 127/220 V (COPEL)</div>
+      <span class="badge warn">Acima de 0,92</span>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Energia Medida</div>
-      <div class="kpi-value">1.264<span class="kpi-unit">kWh</span></div>
+      <div class="kpi-label">Consumo Medido</div>
+      <div class="kpi-value">45,95<span class="kpi-unit">kWh</span></div>
       <div class="kpi-sub">5 dias · Média 253 kWh/dia</div>
       <span class="badge ok">Amostra razoável</span>
     </div>
@@ -257,15 +255,15 @@
         <table>
           <thead><tr><th>Fase</th><th class="num">Máx (A)</th><th class="num">Mín (A)</th><th class="num">Média (A)</th><th>Status</th></tr></thead>
           <tbody>
-            <tr><td class="label">Fase A (R)</td><td class="num">75,51</td><td class="num">20,10</td><td class="num">43,09</td><td><span class="tag warn">Moderada</span></td></tr>
-            <tr><td class="label">Fase B (S)</td><td class="num">63,39</td><td class="num">8,50</td><td class="num">28,66</td><td><span class="tag danger">Desequilíbrio</span></td></tr>
-            <tr><td class="label">Fase C (T)</td><td class="num">74,54</td><td class="num">16,19</td><td class="num">39,69</td><td><span class="tag warn">Moderada</span></td></tr>
-            <tr style="background:#1F2A26;font-weight:700"><td class="label">Média geral</td><td class="num">71,15</td><td class="num">14,93</td><td class="num">37,15</td><td>—</td></tr>
+            <tr><td class="label">Fase A (R)</td><td class="num">71,15</td><td class="num">1,10</td><td class="num">6,79</td><td><span class="tag ok">Baixa mdia</span></td></tr>
+            <tr><td class="label">Fase B (S)</td><td class="num">66,72</td><td class="num">0,00</td><td class="num">6,08</td><td><span class="tag ok">Baixa mdia</span></td></tr>
+            <tr><td class="label">Fase C (T)</td><td class="num">65,92</td><td class="num">1,21</td><td class="num">3,64</td><td><span class="tag warn">Menor carga</span></td></tr>
+            <tr><td class="label">Neutro medido</td><td class="num">4,94</td><td class="num">0,00</td><td class="num">0,88</td><td><span class="tag ok">Baixo</span></td></tr>
+            <tr style="background:#1F2A26;font-weight:700"><td class="label">Neutro calculado</td><td class="num">25,34</td><td class="num">0,66</td><td class="num">6,00</td><td></td></tr>
           </tbody>
         </table>
         <p style="font-size:12px;color:var(--p3-muted);margin-top:10px;line-height:1.5">
-          Correntes dentro da capacidade do padrão 200 A atual. <b>Fase B apresenta corrente média 33% inferior à Fase A</b> — desequilíbrio significativo que precisa ser corrigido antes da instalação do carregador EV.
-        </p>
+          Correntes mximas dentro de referncia de 150 A/200 A. A mdia do dia  baixa, mas a Fase C ficou abaixo das demais e o desequilbrio de corrente por amplitude chegou a <b>100%</b> em momentos de baixa carga. Reavaliar com 7 dias de medio antes do fechamento do projeto.</p>
       </div>
       <div class="chart-wrapper"><canvas id="chartCorrente"></canvas></div>
     </div>
@@ -281,12 +279,11 @@
             <tr><td class="label">Demanda de Pico</td><td class="num">39 kW</td><td class="num">47,0 kVA</td><td><span class="tag warn">Informado cliente</span></td></tr>
             <tr><td class="label">Demanda Média</td><td class="num">15 kW</td><td class="num">18,1 kVA</td><td><span class="tag ok">Informado cliente</span></td></tr>
             <tr><td class="label">Demanda Mínima</td><td class="num">6 kW</td><td class="num">7,2 kVA</td><td><span class="tag ok">Informado cliente</span></td></tr>
-            <tr><td class="label">Capacidade padrão 200 A</td><td class="num">—</td><td class="num">131,6 kVA</td><td><span class="tag ok">√3 × 380 V × 200 A</span></td></tr>
+            <tr><td class="label">Capacidade padrão 200 A</td><td class="num">—</td><td class="num">131,6 kVA</td><td><span class="tag ok">√3 × 220 V × 200 A</span></td></tr>
           </tbody>
         </table>
         <p style="font-size:11px;color:var(--p3-muted);margin-top:8px;line-height:1.4">
-          kVA estimado com FP 0,83 (medições de pico). Sistema COPEL 220/380 V. Demanda em kW fornecida pelo cliente.
-        </p>
+          Pico aparente vetorial medido diretamente pelo analisador. A amostra cobre 24 horas; repetir a medio por 7 dias para captar variao semanal e fim de semana.</p>
       </div>
       <div class="chart-wrapper"><canvas id="chartDemanda"></canvas></div>
     </div>
@@ -298,7 +295,7 @@
       <div class="nd-icon">📊</div>
       <b>Tensão não exportada neste relatório do ISSO Digital</b><br>
       O resumo de gráfico exportado contém apenas kWh e correntes. Para obter dados de tensão, exportar o relatório de "Tensão por fase" no painel ISSO Digital.<br>
-      <span style="margin-top:8px;display:block;color:var(--p3-primary)">Tensão nominal esperada: 220 V (fase-neutro) · 380 V (linha) — COPEL padrão comercial</span>
+      <span style="margin-top:8px;display:block;color:var(--p3-primary)">Tensão nominal esperada: 220 V (fase-neutro) · 220 V (linha) — COPEL padrão comercial</span>
     </div>
   </section>
 
@@ -368,18 +365,18 @@
         <table>
           <thead><tr><th>Fase</th><th class="num">Total (kWh)</th><th class="num">Máx/h (kWh)</th><th class="num">Média/h (kWh)</th><th class="num">% do Total</th></tr></thead>
           <tbody>
-            <tr><td class="label">Fase A (R)</td><td class="num">504,94</td><td class="num">9,44</td><td class="num">5,32</td><td class="num">39,9%</td></tr>
-            <tr><td class="label">Fase B (S)</td><td class="num">330,93</td><td class="num">7,86</td><td class="num">3,48</td><td class="num" style="color:var(--p3-danger);font-weight:700">26,2% ⚠</td></tr>
-            <tr><td class="label">Fase C (T)</td><td class="num">428,60</td><td class="num">9,10</td><td class="num">4,51</td><td class="num">33,9%</td></tr>
-            <tr style="background:#1F2A26;font-weight:700"><td class="label">Total (5 dias)</td><td class="num">1.264,47</td><td class="num">—</td><td class="num">13,31</td><td class="num">100,0%</td></tr>
+            <tr><td class="label">Fase A (R)</td><td class="num">19,98</td><td class="num"></td><td class="num"></td><td class="num">43,5%</td></tr>
+            <tr><td class="label">Fase B (S)</td><td class="num">15,73</td><td class="num"></td><td class="num"></td><td class="num">34,2%</td></tr>
+            <tr><td class="label">Fase C (T)</td><td class="num">10,24</td><td class="num"></td><td class="num"></td><td class="num">22,3%</td></tr>
+            <tr style="background:#1F2A26;font-weight:700"><td class="label">Total (1 dia)</td><td class="num">45,95</td><td class="num"></td><td class="num"></td><td class="num">100,0%</td></tr>
           </tbody>
         </table>
         <table style="margin-top:14px">
           <thead><tr><th>Projeção (~253 kWh/dia)</th><th class="num">Energia</th></tr></thead>
           <tbody>
-            <tr><td>Mensal estimado (posto atual)</td><td class="num">≈ 7.590 kWh</td></tr>
-            <tr><td>Anual estimado (posto atual)</td><td class="num">≈ 92.345 kWh</td></tr>
-            <tr><td>Mensal com EV (4 h/dia @ 60 kW)</td><td class="num">≈ 14.790 kWh</td></tr>
+            <tr><td>Mensal estimado (posto atual)</td><td class="num"> 1.379 kWh</td></tr>
+            <tr><td>Anual estimado (posto atual)</td><td class="num"> 16.542 kWh</td></tr>
+            <tr><td>Mensal com EV (4 h/dia @ 60 kW)</td><td class="num"> 8.579 kWh</td></tr>
           </tbody>
         </table>
       </div>
@@ -421,7 +418,7 @@
         <ul>
           <li>Com 200 A e EV 60 kW: utilização de 82% da capacidade no pico.</li>
           <li>Margem de 18% — abaixo do recomendado 25%.</li>
-          <li>Upgrade para 250 A eleva margem para ~37%. Ver Seção 8.</li>
+          <li>Upgrade para 250 A eleva a folga operacional. Ver Seção 8.</li>
         </ul>
       </div>
     </div>
@@ -432,7 +429,7 @@
     <div class="num">2</div>
     <div class="info">
       <h2>Análise do Carregador EV — Dimensionamento e Operação</h2>
-      <p>Como o carregador EV vai operar com o padrão escolhido e o Smart Charger (DLM) — Sistema 220/380 V COPEL</p>
+      <p>Como o carregador EV vai operar com o padrão escolhido e o Smart Charger (DLM) — Sistema 127/220 V COPEL</p>
     </div>
   </div>
 
@@ -442,9 +439,8 @@
     <div class="alert info" style="margin-bottom:18px">
       <div class="ico">ℹ</div>
       <div>
-        <strong>Sistema 220/380 V — Capacidades maiores que os outros sites</strong>
-        Este posto opera em 220/380 V (vs 127/220 V dos outros sites da P3). O padrão 200 A aqui tem capacidade de <b>131,6 kVA</b> — significativamente maior que o 200 A em 127/220 V (76,2 kVA). O EV de 60 kW é tecnicamente viável com 200 A + DLM, mas a margem é de apenas 18%.
-      </div>
+        <strong>Sistema 127/220 V — Capacidades maiores que os outros sites</strong>
+        Este posto opera em rede 127/220 V trifsica. Para EV de 60 kW, a referncia conservadora  padro 250 A ou 200 A com DLM e confirmao em medio semanal.</div>
     </div>
 
     <div class="controls">
@@ -463,12 +459,12 @@
         <label class="k" for="padrao">Padrão de Entrada</label>
         <select id="padrao">
           <option value="150">150 A</option>
-          <option value="200" selected>200 A (atual)</option>
-          <option value="250">250 A (recomendado)</option>
+          <option value="200">200 A</option>
+          <option value="250" selected>250 A (recomendado)</option>
           <option value="300">300 A</option>
           <option value="400">400 A</option>
         </select>
-        <div class="ctrl-hint">Sistema 220/380 V COPEL</div>
+        <div class="ctrl-hint">Sistema 127/220 V COPEL</div>
       </div>
       <div class="ctrl">
         <label class="k">Smart Charger (DLM)</label>
@@ -527,9 +523,9 @@
       <div class="rec warn">
         <h3><span class="pri">Prioridade 1</span>Upgrade para 250 A — Recomendado P3</h3>
         <ul>
-          <li>Com 200 A e EV 60 kW: margem de apenas 18% no pico.</li>
+          <li>Com 200 A e EV 60 kW: a operao exige DLM para preservar folga no pico medido.</li>
           <li>P3 Energy recomenda mínimo 25% de margem de segurança.</li>
-          <li>250 A eleva margem para ~37% — operação confortável e segura.</li>
+          <li>250 A eleva a folga operacional — operação confortável e segura.</li>
           <li>Permite futura adição de segundo carregador ou aumento de demanda.</li>
         </ul>
       </div>
@@ -538,7 +534,7 @@
         <ul>
           <li>200 A + DLM é viável mas sem folga de projeto.</li>
           <li>DLM limita EV ao headroom disponível em tempo real.</li>
-          <li>Com pico de 39 kW, EV recebe até 60 kW plenos na maioria do tempo.</li>
+          <li>Com pico de 22,61 kW, EV recebe até 60 kW plenos na maioria do tempo.</li>
           <li>Risco: picos acima de 39 kW reduzem potência do EV abaixo de 60 kW.</li>
         </ul>
       </div>
@@ -554,7 +550,7 @@
         <h3><span class="pri">Prioridade 2</span>Proteções e Cabeamento</h3>
         <ul>
           <li>Disjuntor dedicado Tipo B com proteção diferencial 30 mA.</li>
-          <li>Cabeamento dimensionado para corrente nominal do EV (≈ 92 A por fase em 380 V).</li>
+          <li>Cabeamento dimensionado para corrente nominal do EV (≈ 92 A por fase em 220 V).</li>
           <li>EV deve ficar até 15 m do QGBT para evitar queda de tensão.</li>
           <li>Verificar aterramento: esquema TN-S ou TT recomendado.</li>
         </ul>
@@ -564,8 +560,8 @@
 
   <footer>
     <strong>P3 Energy</strong> — Engenharia em Energia Solar e Mobilidade Elétrica<br>
-    Relatório gerado em 14/05/2026 com base em medição EnergiaV2 Bidirecional (ID: 260ACA431627 · 280226-1115) — ISSO Digital<br>
-    Período: 28/02/2026 a 04/03/2026 · Concessionária: COPEL · Sistema: 220/380 V trifásico<br>
+    Relatório gerado em 16/05/2026 com base em medição EnergiaV2 Bidirecional (ID: 260ACA431627 · 280226-1115) — ISSO Digital<br>
+    Período: 15/05/2026 19:45 a 16/05/2026 19:44 · Concessionária: COPEL · Sistema: 127/220 V trifásico<br>
     Documento técnico de uso interno • Não substitui memorial de cálculo formal
   </footer>
 </div>
@@ -602,34 +598,8 @@ Chart.defaults.borderColor = '#E2E8E4';
 // 1. Correntes por fase (Máx vs Média)
 new Chart(document.getElementById('chartCorrente'), {
   type:'bar',
-  data:{labels:['Fase A','Fase B','Fase C'],datasets:[
-    {label:'Corrente Máxima (A)', data:[75.51,63.39,74.54], backgroundColor:P3.danger, borderRadius:4},
-    {label:'Corrente Média (A)',  data:[43.09,28.66,39.69], backgroundColor:P3.accent, borderRadius:4},
-    {label:'Corrente Mínima (A)',data:[20.10, 8.50,16.19], backgroundColor:P3.muted,  borderRadius:4}]},
-  options:{responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{position:'bottom'},title:{display:true,text:'Correntes por Fase — Máx / Média / Mín (A)'}},
-    scales:{y:{title:{display:true,text:'Ampères (A)'},beginAtZero:true,max:220},
-            y2:{display:true,position:'right',title:{display:true,text:'Limite: 200 A'},
-              ticks:{display:false},grid:{display:false}}}}
-});
-
-// 2. Demanda (Pico / Média / Mínima) — horizontal bar
-new Chart(document.getElementById('chartDemanda'), {
-  type:'bar',
-  data:{labels:['Demanda de Pico','Demanda Média','Demanda Mínima'],
-    datasets:[{
-      label:'Demanda (kW)', data:[39,15,6],
-      backgroundColor:[P3.danger, P3.accent, P3.muted], borderRadius:4}]},
-  options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
-    plugins:{legend:{display:false},title:{display:true,text:'Demanda Medida no Período (kW)'}},
-    scales:{x:{title:{display:true,text:'kW'},beginAtZero:true,max:50}}}
-});
-
-// 6. Consumo por fase — doughnut
-new Chart(document.getElementById('chartConsumo'), {
-  type:'doughnut',
-  data:{labels:['Fase A — 504,94 kWh (39,9%)','Fase B — 330,93 kWh (26,2%)','Fase C — 428,60 kWh (33,9%)'],
-    datasets:[{data:[504.94,330.93,428.60],
+  data:{labels:['Fase A  19,98 kWh (43,5%)','Fase B  15,73 kWh (34,2%)','Fase C  10,24 kWh (22,3%)'],
+    datasets:[{data:[19.98,15.73,10.24],
       backgroundColor:[P3.primary, P3.danger, P3.accent], borderColor:'#fff', borderWidth:3}]},
   options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
     plugins:{legend:{position:'bottom'},title:{display:true,text:'Energia por Fase — 5 dias (kWh)'}}}
@@ -637,7 +607,7 @@ new Chart(document.getElementById('chartConsumo'), {
 
 
 // ===== SIMULADOR INTERATIVO =====
-const STORAGE_KEY = 'p3_AvMaringa_completo';
+const STORAGE_KEY = 'p3_Muffatao_Cascavel_completo';
 function saveConfig(){
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify({
     evPower: document.getElementById('evPower').value,
@@ -655,16 +625,16 @@ function loadConfig(){
   } catch(e){}
 }
 
-// CFG para 220/380 V (V_linha = 380 V)
+// CFG para 127/220 V (V_linha = 220 V)
 const CFG = {
-  V: 380,                // tensão de linha (380 V)
-  P_posto: 39,           // pico de demanda kW
-  S_posto: 47.0,         // pico de demanda kVA (39/0.83)
-  P_med: 15,             // demanda média kW
-  FP_atual: 0.83,        // FP estimado da instalação
-  FP_meta: 0.92,         // FP mínimo NBR
-  FP_ev: 0.99,           // FP típico do carregador DC
-  RESERVA: 0.05,         // 5% reserva técnica
+  V: 220,                // tens?o de linha (220 V)
+  P_posto: 22.61,        // pico de pot?ncia ativa medido (kW)
+  S_posto: 28.79,        // pico aparente vetorial medido (kVA)
+  P_med: 1.92,           // pot?ncia ativa m?dia medida (kW)
+  FP_atual: 0.93,        // FP vetorial m?dio
+  FP_meta: 0.92,         // FP m?nimo NBR
+  FP_ev: 0.99,           // FP t?pico do carregador DC
+  RESERVA: 0.05,         // 5% reserva t?cnica
   SQRT3: Math.sqrt(3)
 };
 
@@ -785,7 +755,7 @@ function atualizarPainelOperacional(P_ev, padrao, dlm){
     <span class="pill">Padrão ${padrao} A — ${fmt(cap_kVA)} kVA</span>
     <span class="pill">EV ${P_ev} kW</span>
     <span class="pill ${dlm ? '' : 'warn'}">DLM ${dlm ? 'Ativo' : 'INATIVO'}</span>
-    <span class="pill muted">Sistema 220/380 V</span>
+    <span class="pill muted">Sistema 127/220 V</span>
     <span style="margin-left:auto;font-size:11px;color:var(--p3-muted)">Reserva técnica: 5% (${fmt(reserva_kVA)} kVA)</span>
   `;
 
@@ -856,7 +826,7 @@ function atualizarPainelOperacional(P_ev, padrao, dlm){
       responsive:true, maintainAspectRatio:false,
       plugins:{
         legend:{position:'bottom'},
-        title:{display:true, text:`Curva diária estimada — Padrão ${padrao} A · EV ${P_ev} kW ${dlm ? '(DLM ativo)' : ''} · 220/380 V`}
+        title:{display:true, text:`Curva diária estimada — Padrão ${padrao} A · EV ${P_ev} kW ${dlm ? '(DLM ativo)' : ''} · 127/220 V`}
       },
       scales:{
         y:{title:{display:true,text:'Potência (kW)'},beginAtZero:true},
