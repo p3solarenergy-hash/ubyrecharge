@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>P3 Energy — Análise de Carga | Muffat?o Cascavel Av. Maringá</title>
+<title>P3 Energy &mdash; An&aacute;lise de Carga | Muffat&atilde;o Cascavel</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   :root{--p3-primary:#3FB66B;--p3-primary-deep:#0F3D2E;--p3-accent:#5BC882;--p3-accent-2:#FFD66B;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#2A3530;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#3FB66B;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
@@ -23,6 +23,10 @@
   .header-meta .value{font-weight:600;font-size:13px}
   .nav-back{position:absolute;top:18px;right:24px;background:rgba(255,255,255,.08);color:#fff;padding:6px 14px;border-radius:18px;font-size:12px;text-decoration:none;backdrop-filter:blur(8px);z-index:2}
   .nav-back:hover{background:rgba(255,255,255,.14)}
+  .top-nav{position:absolute;top:18px;right:24px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;z-index:2}
+  .top-nav a{background:rgba(255,255,255,.08);color:#fff;padding:6px 12px;border-radius:18px;font-size:12px;text-decoration:none;backdrop-filter:blur(8px);font-weight:600;white-space:nowrap}
+  .top-nav a:hover,.top-nav a.active{background:rgba(255,255,255,.18)}
+  @media (max-width:720px){.top-nav{position:relative;top:auto;right:auto;margin-bottom:16px;justify-content:flex-start}.top-nav a{background:rgba(255,255,255,.14)}}
   .alert{border-left:4px solid var(--p3-warn);background:#2E2310;color:#F2D77F;padding:14px 18px;border-radius:8px;margin-bottom:22px;display:flex;gap:12px;align-items:flex-start}
   .alert.danger{border-left-color:var(--p3-danger);background:#2E1714;color:#FF8B7C}
   .alert.ok{border-left-color:var(--p3-ok);background:#0E2A1B;color:#7FE2A0}
@@ -184,37 +188,47 @@
 </style>
 </head>
 <body>
-<button id="themeToggle" class="theme-toggle" title="Alternar tema (claro/escuro)" aria-label="Toggle theme">☀</button>
+<button id="themeToggle" class="theme-toggle" title="Alternar tema (claro/escuro)" aria-label="Toggle theme">&#9728;</button>
 <div class="page">
 
   <div class="header">
-    <a href="../../" class="nav-back">Pagina inicial</a>
+    <div class="top-nav">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="Relatorio_Analise_Carga_Muffatao_Cascavel.html">Completo</a>
+      <a href="Relatorio_Eletrico_Muffatao_Cascavel.html">El&eacute;trico</a>
+      <a href="Relatorio_Carregador_Muffatao_Cascavel.html">Carregador</a>
+      <a href="../../">P&aacute;gina inicial</a>
+    </div>
     <div class="brand">
       <div class="logo-mark">P3</div>
       <div>
         <div class="brand-name">P3 Energy</div>
-        <div class="brand-tag">Engenharia em Energia Solar &amp; Mobilidade Elétrica</div>
+        <div class="brand-tag">Engenharia em Energia Solar &amp; Mobilidade El&eacute;trica</div>
       </div>
     </div>
-    <h1>Relatório de Análise de Carga</h1>
-    <div class="subtitle">Muffat?o Cascavel Av. Maringá — Implantação Carregador EV 60 kW</div>
+    <h1>Relat&oacute;rio de An&aacute;lise de Carga</h1>
+    <div class="subtitle">Muffat&atilde;o Cascavel &mdash; Implanta&ccedil;&atilde;o Carregador EV 60 kW</div>
     <div class="header-meta">
-      <div><div class="label">Cliente</div><div class="value">Muffat?o Cascavel Av. Maringá</div></div>
-      <div><div class="label">Equipamento</div><div class="value">EnergiaV2 Bidirecional · ISSO Digital</div></div>
-      <div><div class="label">Período</div><div class="value">15/05/2026 19:45 a 16/05/2026 19:44</div></div>
-      <div><div class="label">Emissão</div><div class="value">16/05/2026 — P3 Energy</div></div>
+      <div><div class="label">Cliente</div><div class="value">Muffat&atilde;o Cascavel</div></div>
+      <div><div class="label">Equipamento</div><div class="value">DMI P1000R Black Box &middot; Datalog ISSO Telecom</div></div>
+      <div><div class="label">Per&iacute;odo</div><div class="value">15/05/2026 19:45 a 16/05/2026 19:44</div></div>
+      <div><div class="label">Emiss&atilde;o</div><div class="value">16/05/2026 &mdash; P3 Energy</div></div>
     </div>
   </div>
 
   <div class="alert">
     <div class="ico">&#9888;</div>
     <div>
-      <strong>Medio completa de 24 horas  relatrio preliminar</strong>
-      O PDF do Datalog/ISSO Telecom contm resumos eltricos completos do dia: correntes, potncias, FP, tenso, frequncia, desequilbrio e energia. A nica limitao  que a janela cobre <b>1 dia</b>; por isso a parte operacional do carregador abaixo  simulao de pr-dimensionamento, no curva real medida hora a hora.
+      <strong>Medi&ccedil;&atilde;o completa de 24 horas &mdash; relat&oacute;rio preliminar</strong>
+      <div>O PDF do Datalog/ISSO Telecom cont&eacute;m resumos el&eacute;tricos completos do dia: correntes, pot&ecirc;ncias, FP, tens&atilde;o, frequ&ecirc;ncia, desequil&iacute;brio e energia. A janela cobre <b>1 dia</b>; por isso a parte operacional do carregador abaixo &eacute; simula&ccedil;&atilde;o de pr&eacute;-dimensionamento, n&atilde;o curva real medida hora a hora.</div>
+    </div>
+  </div>
+
+
 
   <div class="kpis">
     <div class="kpi">
-      <div class="kpi-label">Pico Potncia Ativa</div>
+      <div class="kpi-label">Pico Pot&ecirc;ncia Ativa</div>
       <div class="kpi-value">22,61<span class="kpi-unit">kW</span></div>
       <div class="kpi-sub">16/05/2026 07:44</div>
       <span class="badge warn">Pico moderado</span>
@@ -222,11 +236,11 @@
     <div class="kpi">
       <div class="kpi-label">Corrente Máx (Fase A)</div>
       <div class="kpi-value">28,79<span class="kpi-unit">kVA</span></div>
-      <div class="kpi-sub">Mdia 2,02 kVA</div>
+      <div class="kpi-sub">M&eacute;dia 2,02 kVA</div>
       <span class="badge ok" id="kpiUtil">36% padrão 200 A</span>
     </div>
     <div class="kpi">
-      <div class="kpi-label">FP Vetorial Mdio</div>
+      <div class="kpi-label">FP Vetorial M&eacute;dio</div>
       <div class="kpi-value">0,93</div>
       <div class="kpi-sub">Sistema 127/220 V (COPEL)</div>
       <span class="badge warn">Acima de 0,92</span>
@@ -255,8 +269,8 @@
         <table>
           <thead><tr><th>Fase</th><th class="num">Máx (A)</th><th class="num">Mín (A)</th><th class="num">Média (A)</th><th>Status</th></tr></thead>
           <tbody>
-            <tr><td class="label">Fase A (R)</td><td class="num">71,15</td><td class="num">1,10</td><td class="num">6,79</td><td><span class="tag ok">Baixa mdia</span></td></tr>
-            <tr><td class="label">Fase B (S)</td><td class="num">66,72</td><td class="num">0,00</td><td class="num">6,08</td><td><span class="tag ok">Baixa mdia</span></td></tr>
+            <tr><td class="label">Fase A (R)</td><td class="num">71,15</td><td class="num">1,10</td><td class="num">6,79</td><td><span class="tag ok">Baixa m&eacute;dia</span></td></tr>
+            <tr><td class="label">Fase B (S)</td><td class="num">66,72</td><td class="num">0,00</td><td class="num">6,08</td><td><span class="tag ok">Baixa m&eacute;dia</span></td></tr>
             <tr><td class="label">Fase C (T)</td><td class="num">65,92</td><td class="num">1,21</td><td class="num">3,64</td><td><span class="tag warn">Menor carga</span></td></tr>
             <tr><td class="label">Neutro medido</td><td class="num">4,94</td><td class="num">0,00</td><td class="num">0,88</td><td><span class="tag ok">Baixo</span></td></tr>
             <tr style="background:#1F2A26;font-weight:700"><td class="label">Neutro calculado</td><td class="num">25,34</td><td class="num">0,66</td><td class="num">6,00</td><td></td></tr>
@@ -523,7 +537,7 @@
       <div class="rec warn">
         <h3><span class="pri">Prioridade 1</span>Upgrade para 250 A — Recomendado P3</h3>
         <ul>
-          <li>Com 200 A e EV 60 kW: a operao exige DLM para preservar folga no pico medido.</li>
+          <li>Com 200 A e EV 60 kW: a opera&ccedil;&atilde;o exige DLM para preservar folga no pico medido.</li>
           <li>P3 Energy recomenda mínimo 25% de margem de segurança.</li>
           <li>250 A eleva a folga operacional — operação confortável e segura.</li>
           <li>Permite futura adição de segundo carregador ou aumento de demanda.</li>
@@ -560,7 +574,7 @@
 
   <footer>
     <strong>P3 Energy</strong> — Engenharia em Energia Solar e Mobilidade Elétrica<br>
-    Relatório gerado em 16/05/2026 com base em medição EnergiaV2 Bidirecional (ID: 260ACA431627 · 280226-1115) — ISSO Digital<br>
+    Relat&oacute;rio gerado em 16/05/2026 com base em medi&ccedil;&atilde;o DMI P1000R Black Box (S/N 216A52ACD961) &mdash; Datalog ISSO Telecom<br>
     Período: 15/05/2026 19:45 a 16/05/2026 19:44 · Concessionária: COPEL · Sistema: 127/220 V trifásico<br>
     Documento técnico de uso interno • Não substitui memorial de cálculo formal
   </footer>
