@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>P3 Energy - Dashboard de Obras EV</title>
+<title>UBY Recharge - Dashboard de Obras EV</title>
+<link rel="icon" type="image/svg+xml" href="assets/brand/04_simbolo_badge.svg">
 <link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="brand.css">
 <style>
   :root{--p3-primary:#3FB66B;--p3-primary-deep:#0F3D2E;--p3-accent:#5BC882;--p3-accent-2:#FFD66B;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#2A3530;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#3FB66B;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -13,7 +15,8 @@
   .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);color:#fff;border-radius:16px;padding:36px;margin-bottom:28px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
   .header::after{content:"";position:absolute;right:-80px;top:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(46,168,92,.35),transparent 70%);border-radius:50%}
   .brand{display:flex;align-items:center;gap:16px;margin-bottom:20px;position:relative;z-index:1}
-  .logo-mark{width:54px;height:54px;border-radius:12px;background:#0F3D2E;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--p3-accent);font-size:26px;border:1px solid var(--p3-accent);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .logo-mark{width:64px;height:64px;border-radius:14px;background:#071527;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .logo-mark img{width:100%;height:100%;object-fit:cover}
   .brand-name{font-size:14px;letter-spacing:3px;text-transform:uppercase;opacity:.85}.brand-tag{font-size:11px;opacity:.65;letter-spacing:1px}
   .header h1{font-size:32px;font-weight:700;margin-bottom:8px;position:relative;z-index:1}.subtitle{opacity:.85;font-size:15px;max-width:720px;position:relative;z-index:1}
   .bookmark-hint{position:absolute;top:24px;right:28px;background:rgba(255,255,255,.08);padding:8px 14px;border-radius:20px;font-size:11px;backdrop-filter:blur(6px);z-index:2}.bookmark-hint b{color:#FFE082}
@@ -160,8 +163,8 @@
   <div class="header">
     <span class="bookmark-hint"><b>Modelo</b> gestao de obra EV</span>
     <div class="brand">
-      <div class="logo-mark">P3</div>
-      <div><div class="brand-name">P3 Energy</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div>
+      <div class="logo-mark"><img src="assets/brand/04_simbolo_badge.svg" alt=""></div>
+      <div><div class="brand-name">UBY Recharge</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div>
     </div>
     <h1>Dashboard de Obras de Carregadores EV</h1>
     <div class="subtitle">Central para acompanhar implantacoes por obra, com progresso por fase, pendencias criticas, materiais, terceiros e entrega final.</div>
@@ -177,13 +180,14 @@
     <div class="analyzer-links">
       <a href="../">Pagina inicial</a>
       <a class="main" href="analisadores/dashboard.html" target="_blank" rel="noopener">Dashboard geral dos analisadores</a>
+      <a href="mercado.html">Mercado EV</a>
       <a href="engenharia.html">Portal engenharia</a>
       <a href="../tarefas/">Gestao de tarefas</a>
     </div>
   </div>
 
   <div class="stats">
-    <div class="stat"><div class="label">Obras ativas</div><div class="value" id="statObras">3</div><div class="sub">Projetos em implantacao</div></div>
+    <div class="stat"><div class="label">Obras ativas</div><div class="value" id="statObras">4</div><div class="sub">Projetos em implantacao</div></div>
     <div class="stat"><div class="label">Progresso medio</div><div class="value" id="statProgresso">54<span class="unit">%</span></div><div class="sub">OK + N/A sobre o total</div></div>
     <div class="stat"><div class="label">Pendencias criticas</div><div class="value" id="statCriticas">9</div><div class="sub">Concessionaria, materiais e eletrica</div></div>
     <div class="stat"><div class="label">Potencia planejada</div><div class="value" id="statKw">270<span class="unit">kW</span></div><div class="sub">Soma das obras cadastradas</div></div>
@@ -192,12 +196,13 @@
   <div class="cloud-panel">
     <div>
       <h2>Base em nuvem Supabase</h2>
-      <p>Use primeiro para conferir conexao e migrar uma copia da base local. A base local continua preservada ate validarmos tudo.</p>
+      <p>O app sincroniza a base oficial direto pela tela. A base local continua preservada e o banco nao sobrescreve obras ja existentes.</p>
       <div class="cloud-status" id="cloudStatus">Supabase ainda nao verificado.</div>
     </div>
     <div class="cloud-actions">
       <a class="ghost-btn" href="login.html">Login Supabase</a>
       <button class="ghost-btn" id="checkCloud">Ver status</button>
+      <button class="new-btn" id="syncCoreWorks">Sincronizar 4 obras</button>
       <button class="new-btn" id="migrateCloud">Migrar base local</button>
       <button class="ghost-btn" id="seedProspects">Migrar prospeccao</button>
     </div>
@@ -242,6 +247,7 @@
     </div>
     <div class="analyzer-links">
       <a class="main" href="analisadores/dashboard.html" target="_blank" rel="noopener">Dashboard geral</a>
+      <a href="mercado.html">Mercado EV</a>
     </div>
   </div>
 
@@ -377,10 +383,11 @@ document.getElementById("exportBackup").addEventListener("click",()=>window.UBY_
 document.getElementById("importBackup").addEventListener("click",()=>document.getElementById("backupFile").click());
 document.getElementById("backupFile").addEventListener("change",e=>window.UBY_BACKUP.importFile(e.target.files[0]));
 document.getElementById("checkCloud").addEventListener("click",async()=>{const el=document.getElementById("cloudStatus");try{if(!window.UBY_SUPABASE?.configured()){el.textContent="Supabase ainda nao configurado. Preencha supabase_config.js com URL e anonKey.";return}const user=await window.UBY_SUPABASE.currentUser();const status=await window.UBY_SUPABASE.cloudStatus();el.textContent=`Conectado. Usuario: ${user?.email||"sem login"}. Obras na nuvem: ${status.obras}.`;}catch(err){el.textContent="Erro ao consultar nuvem: "+err.message}});
+document.getElementById("syncCoreWorks").addEventListener("click",async()=>{const el=document.getElementById("cloudStatus");try{el.textContent="Sincronizando base oficial de 4 obras...";const result=await window.UBY_SUPABASE.ensureCoreWorks(baseObras);const status=await window.UBY_SUPABASE.cloudStatus();el.textContent=`Base oficial conferida: ${result.inserted} obra(s) adicionada(s), ${result.existing} ja existiam. Obras na nuvem: ${status.obras}.`;obras=await window.UBY_STORE.loadWorks(obras);renderCards(filteredObras());updateStats();}catch(err){el.textContent="Nao foi possivel sincronizar a base oficial: "+err.message}});
 document.getElementById("migrateCloud").addEventListener("click",async()=>{const el=document.getElementById("cloudStatus");if(!confirm("Migrar uma copia da base local para o Supabase agora? A base local sera preservada."))return;try{el.textContent="Migrando base local para a nuvem...";const result=await window.UBY_SUPABASE.migrateLocalToCloud();el.textContent=`Migracao concluida: ${result.works} obra(s) e ${result.keys} chave(s) locais copiadas.`;}catch(err){el.textContent="Nao foi possivel migrar: "+err.message}});
 document.getElementById("seedProspects").addEventListener("click",async()=>{const el=document.getElementById("cloudStatus");if(!confirm("Migrar a base inicial de prospeccao para a tabela Supabase agora?"))return;try{el.textContent="Migrando prospeccao para a nuvem...";const result=await window.UBY_SUPABASE.upsertProspects(prospects);el.textContent=`Prospecao migrada: ${result.count} ponto(s) copiados para a nuvem.`;}catch(err){el.textContent="Nao foi possivel migrar prospeccao: "+err.message}});
 document.getElementById("sendGeneralMessage").addEventListener("click",sendGeneralMessage);
-async function initData(){renderPhases();renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();try{await window.UBY_ACTIVITY?.refresh?.();obras=await window.UBY_STORE.loadWorks(obras);prospects=await window.UBY_STORE.loadProspects(prospects);renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();}catch(err){document.getElementById("cloudStatus").textContent="Banco indisponivel: "+err.message}}
+async function initData(){renderPhases();renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();try{await window.UBY_ACTIVITY?.refresh?.();if(window.UBY_SUPABASE?.configured?.()&&await window.UBY_SUPABASE.currentUser()){try{const ensured=await window.UBY_SUPABASE.ensureCoreWorks(baseObras);if(ensured.inserted)document.getElementById("cloudStatus").textContent=`Base oficial sincronizada automaticamente: ${ensured.inserted} obra(s) adicionada(s).`;}catch(syncErr){document.getElementById("cloudStatus").textContent="Base local preservada. Sincronizacao automatica pendente: "+syncErr.message}}obras=await window.UBY_STORE.loadWorks(obras);prospects=await window.UBY_STORE.loadProspects(prospects);renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();}catch(err){document.getElementById("cloudStatus").textContent="Banco indisponivel: "+err.message}}
 initData();
 </script>
 </body>

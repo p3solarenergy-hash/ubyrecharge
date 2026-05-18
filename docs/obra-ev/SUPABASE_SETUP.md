@@ -20,11 +20,27 @@ Para liberar upload real de documentos da obra, rode tambem:
 
 `docs/obra-ev/supabase_storage_patch.sql`
 
+Para ativar a nova pagina de Mercado com banco real, rode tambem:
+
+`docs/obra-ev/supabase_market_patch.sql`
+
+Para garantir que a base principal apareca igual para todos os perfis, rode:
+
+`docs/obra-ev/supabase_seed_core_works.sql`
+
+Esse seed fixa as 4 obras principais no banco: Rio Beach EV, Posto Robert Koch R.K., Posto Duim e Posto Araguaia.
+
 ## 2. Criar usuario admin
 
-No Supabase, abra `Authentication > Users` e crie seu usuario com e-mail e senha.
+No Supabase, abra `Authentication > Users` e crie os usuarios com e-mail e senha.
 
-Depois volte ao `SQL Editor` e rode:
+A senha fica somente no Supabase Auth. Nao coloque senha em arquivo do projeto.
+
+Depois volte ao `SQL Editor`, edite os e-mails no arquivo abaixo e rode:
+
+`docs/obra-ev/supabase_profiles_setup_template.sql`
+
+Se quiser criar apenas um admin rapido, rode:
 
 ```sql
 insert into public.profiles (id, nome, perfil)
@@ -73,6 +89,16 @@ select count(*) from public.prospeccao_areas;
 select count(*) from public.operational_tasks;
 select count(*) from public.obra_atividade;
 select count(*) from public.obra_mensagens;
+select count(*) from public.mercado_items;
+```
+
+Para conferir a base principal:
+
+```sql
+select id, nome, status_exec, progresso, potencia_kw
+from public.obras
+where id in ('rio', 'malassise', 'prospect-1', 'prospect-29')
+order by nome;
 ```
 
 Se alguma consulta falhar, o schema novo ainda nao foi executado no projeto Supabase atual.

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 320" width="1100" height="320">
+  <defs>
+    <linearGradient id="boltU" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00FF85"/>
+      <stop offset="100%" stop-color="#00E5FF"/>
+    </linearGradient>
+    <linearGradient id="hexU" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A1628"/>
+      <stop offset="100%" stop-color="#142442"/>
+    </linearGradient>
+  </defs>
+  <rect width="1100" height="320" fill="#FFFFFF"/>
+
+  <g transform="translate(40,60)">
+    <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="url(#hexU)"/>
+    <path d="M 124 16 L 56 112 L 96 112 L 76 184 L 144 88 L 104 88 Z" fill="url(#boltU)"/>
+  </g>
+
+  <g transform="translate(280,40)">
+    <text x="0" y="170" font-family="Poppins, Arial, sans-serif" font-weight="800"
+          font-size="160" fill="#0A1628" letter-spacing="-2">UBY</text>
+    <rect x="4" y="200" width="262" height="5" rx="2.5" fill="#00FF85"/>
+    <text x="2" y="245" font-family="Poppins, Arial, sans-serif" font-weight="500"
+          font-size="32" fill="#0A1628" letter-spacing="14">RECHARGE</text>
+  </g>
+</svg
+>

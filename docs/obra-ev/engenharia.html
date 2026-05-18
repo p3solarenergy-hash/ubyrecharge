@@ -3,15 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>P3 Energy - Portal Engenharia EV</title>
+<title>UBY Recharge - Portal Engenharia EV</title>
+<link rel="icon" type="image/svg+xml" href="assets/brand/04_simbolo_badge.svg">
 <link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="brand.css">
 <style>
   :root{--p3-primary:#3FB66B;--p3-accent:#5BC882;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#2A3530;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#3FB66B;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.5;min-height:100vh}
   .page{max-width:1540px;margin:0 auto;padding:32px 36px 80px}
   .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);border-radius:16px;padding:30px 34px;margin-bottom:24px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
-  .brand{display:flex;align-items:center;gap:14px;margin-bottom:18px}.logo{width:48px;height:48px;border-radius:10px;border:1px solid var(--p3-accent);display:grid;place-items:center;color:var(--p3-accent);font-size:22px;font-weight:900;background:#0F3D2E}.brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.86}.brand-tag{font-size:11px;color:#c7d7cf;letter-spacing:1px}.header h1{font-size:28px;margin-bottom:6px}.header p{color:#c8d8d0;max-width:760px}.nav{position:absolute;right:24px;top:24px;display:flex;gap:8px;flex-wrap:wrap}.nav a,.ghost-btn{border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:8px;padding:9px 12px;font-size:12px;font-weight:800;text-decoration:none;cursor:pointer}.nav a.main,.primary-btn{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:18px}.logo{width:54px;height:54px;border-radius:12px;display:grid;place-items:center;background:#071527;overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,.24)}.logo img{width:100%;height:100%;object-fit:cover}.brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.86}.brand-tag{font-size:11px;color:#c7d7cf;letter-spacing:1px}.header h1{font-size:28px;margin-bottom:6px}.header p{color:#c8d8d0;max-width:760px}.nav{position:absolute;right:24px;top:24px;display:flex;gap:8px;flex-wrap:wrap}.nav a,.ghost-btn{border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:8px;padding:9px 12px;font-size:12px;font-weight:800;text-decoration:none;cursor:pointer}.nav a.main,.primary-btn{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
   .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px}.stat{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:12px;padding:17px;box-shadow:var(--p3-shadow)}.label{font-size:10px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:1px;font-weight:800}.value{font-size:26px;color:var(--p3-primary);font-weight:900;margin-top:5px}.sub{font-size:11px;color:var(--p3-muted);margin-top:5px}
   .grid{display:grid;grid-template-columns:1fr 1.15fr;gap:18px}.panel{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:20px;box-shadow:var(--p3-shadow);margin-bottom:18px}.panel h2{font-size:16px;color:var(--p3-primary);margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}.toolbar input,.toolbar select{height:40px;border:1px solid var(--p3-border);border-radius:8px;background:#121d18;color:var(--p3-text);padding:0 11px;font-weight:700}.toolbar input{flex:1;min-width:240px}
   .work-list{display:grid;gap:10px}.work-card{border:1px solid var(--p3-border);background:#1A2622;border-radius:12px;padding:14px;cursor:pointer}.work-card.active{border-color:var(--p3-accent);box-shadow:inset 0 3px 0 var(--p3-accent)}.work-head{display:flex;justify-content:space-between;gap:10px}.work-title{font-size:15px;color:var(--p3-primary);font-weight:900}.work-sub{font-size:11px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}.badge{display:inline-block;border-radius:8px;padding:3px 8px;font-size:10px;font-weight:900;text-transform:uppercase}.ok{background:#0E2A1B;color:#7FE2A0}.warn{background:#2E2310;color:#F2D77F}.danger{background:#2E1714;color:#FF8B7C}.info{background:#0D2030;color:#7FCCFF}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;border-top:1px solid var(--p3-border);margin-top:11px;padding-top:11px}.meta strong{display:block;color:var(--p3-primary);font-size:15px}
@@ -132,7 +134,7 @@
       <a href="index.html">Dashboard obras</a>
       <a class="main" href="analisadores/dashboard.html" target="_blank" rel="noopener">Analisadores</a>
     </div>
-    <div class="brand"><div class="logo">P3</div><div><div class="brand-name">P3 Energy</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div></div>
+    <div class="brand"><div class="logo"><img src="assets/brand/04_simbolo_badge.svg" alt=""></div><div><div class="brand-name">UBY Recharge</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div></div>
     <h1>Portal Engenharia EV</h1>
     <p>Fila tecnica para controlar obras, prazos, estudos, orcamentos e principalmente pedidos de segundo padrao ou aumento de carga.</p>
   </div>

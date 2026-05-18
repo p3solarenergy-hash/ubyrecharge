@@ -219,6 +219,41 @@
     return { count: payload.length };
   }
 
+  async function ensureCoreWorks(items) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre com seu usuario Supabase antes de sincronizar a base.");
+    const core = (items || []).filter(item => item?.id);
+    if (!core.length) return { inserted: 0, existing: 0, total: 0 };
+    const ids = core.map(item => String(item.id));
+    const { data: existingRows, error: readError } = await sb
+      .from("obras")
+      .select("id")
+      .in("id", ids);
+    if (readError) throw readError;
+    const existing = new Set((existingRows || []).map(row => row.id));
+    const missing = core.filter(item => !existing.has(String(item.id)));
+    if (!missing.length) return { inserted: 0, existing: existing.size, total: core.length };
+    const payload = missing.map(item => ({
+      id: String(item.id),
+      nome: item.nome,
+      cliente: item.cliente || item.nome || "",
+      local: item.local || "",
+      status_exec: item.status || "Projeto",
+      progresso: Number(item.pct || 0),
+      potencia_kw: Number(item.kw || 0),
+      carregadores: item.carregadores || "",
+      criticas: Number(item.crit || 0),
+      origem: "base-oficial-app",
+      raw_data: item,
+      updated_at: new Date().toISOString()
+    }));
+    const { error: insertError } = await sb.from("obras").insert(payload);
+    if (insertError) throw insertError;
+    return { inserted: payload.length, existing: existing.size, total: core.length };
+  }
+
   function safePathPart(value) {
     return String(value || "arquivo")
       .normalize("NFD")
@@ -269,6 +304,7 @@
     signOut,
     currentUser,
     currentProfile,
+    ensureCoreWorks,
     upsertProspects,
     uploadDocumentFile
   };

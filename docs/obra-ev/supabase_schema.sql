@@ -166,6 +166,23 @@ create table if not exists public.obra_snapshots (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.mercado_items (
+  id text primary key,
+  tipo text not null default 'indicador',
+  titulo text not null,
+  valor text,
+  unidade text,
+  segmento text,
+  regiao text,
+  status text,
+  fonte text,
+  url text,
+  observacao text,
+  raw_data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.obras enable row level security;
 alter table public.obra_fases enable row level security;
@@ -178,6 +195,7 @@ alter table public.operational_tasks enable row level security;
 alter table public.obra_atividade enable row level security;
 alter table public.obra_mensagens enable row level security;
 alter table public.obra_snapshots enable row level security;
+alter table public.mercado_items enable row level security;
 
 drop policy if exists "admin all profiles" on public.profiles;
 drop policy if exists "admin all obras" on public.obras;
@@ -191,6 +209,7 @@ drop policy if exists "admin all operational tasks" on public.operational_tasks;
 drop policy if exists "obra app all atividade" on public.obra_atividade;
 drop policy if exists "obra app all mensagens" on public.obra_mensagens;
 drop policy if exists "admin all snapshots" on public.obra_snapshots;
+drop policy if exists "obra app all mercado" on public.mercado_items;
 
 create or replace function public.is_admin()
 returns boolean
@@ -230,6 +249,7 @@ create policy "admin all operational tasks" on public.operational_tasks for all 
 create policy "obra app all atividade" on public.obra_atividade for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
 create policy "obra app all mensagens" on public.obra_mensagens for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
 create policy "admin all snapshots" on public.obra_snapshots for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "obra app all mercado" on public.mercado_items for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
 
 insert into storage.buckets (id, name, public)
 values ('obra-documentos', 'obra-documentos', false)

@@ -3,6 +3,7 @@
   const TASKS_KEY = "uby-tarefas-v1";
   const ACTIVITY_KEY = "uby-activity-v1";
   const MESSAGE_KEY = "uby-messages-v1";
+  const MARKET_KEY = "uby-mercado-v1";
 
   function available() {
     return Boolean(window.UBY_SUPABASE?.configured?.() && window.UBY_SUPABASE?.client?.());
@@ -143,6 +144,43 @@
     };
   }
 
+  function marketToRow(item) {
+    return {
+      id: String(item.id),
+      tipo: item.type || "indicador",
+      titulo: item.title || "",
+      valor: item.value || "",
+      unidade: item.unit || "",
+      segmento: item.segment || "",
+      regiao: item.region || "",
+      status: item.status || "",
+      fonte: item.source || "",
+      url: item.url || "",
+      observacao: item.note || "",
+      raw_data: item,
+      updated_at: item.updatedAt || new Date().toISOString()
+    };
+  }
+
+  function rowToMarket(row) {
+    const raw = row.raw_data || {};
+    return {
+      ...raw,
+      id: row.id,
+      type: row.tipo || raw.type || "indicador",
+      title: row.titulo || raw.title || "",
+      value: row.valor || raw.value || "",
+      unit: row.unidade || raw.unit || "",
+      segment: row.segmento || raw.segment || "",
+      region: row.regiao || raw.region || "",
+      status: row.status || raw.status || "",
+      source: row.fonte || raw.source || "",
+      url: row.url || raw.url || "",
+      note: row.observacao || raw.note || "",
+      updatedAt: row.updated_at || raw.updatedAt || row.created_at
+    };
+  }
+
   function rowToMessage(row) {
     const raw = row.raw_data || {};
     return {
@@ -181,12 +219,24 @@
       const rows = await cloudSelect("obras");
       if (!rows) return fallback;
       const works = rows.map(rowToWork);
-      if (works.length) writeLocal(WORKS_KEY, works);
-      return works.length ? works : fallback;
+      const merged = mergeWorks(fallback, works);
+      if (merged.length) writeLocal(WORKS_KEY, merged);
+      return merged.length ? merged : fallback;
     } catch (err) {
       console.warn("Falha ao ler obras no Supabase:", err.message);
       return fallback;
     }
+  }
+
+  function mergeWorks(localItems = [], cloudItems = []) {
+    const byId = new Map();
+    localItems.forEach(item => {
+      if (item?.id) byId.set(item.id, item);
+    });
+    cloudItems.forEach(item => {
+      if (item?.id) byId.set(item.id, { ...(byId.get(item.id) || {}), ...item });
+    });
+    return [...byId.values()];
   }
 
   async function saveWork(work, detail) {
@@ -289,6 +339,46 @@
     }
   }
 
+  async function loadMarket(fallback = []) {
+    try {
+      const user = await requireUser();
+      if (!user) return readLocal(MARKET_KEY, fallback);
+      const { data, error } = await window.UBY_SUPABASE.client()
+        .from("mercado_items")
+        .select("*")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      const items = (data || []).map(rowToMarket);
+      if (items.length) writeLocal(MARKET_KEY, items);
+      return items.length ? items : readLocal(MARKET_KEY, fallback);
+    } catch (err) {
+      console.warn("Falha ao ler mercado no Supabase:", err.message);
+      return readLocal(MARKET_KEY, fallback);
+    }
+  }
+
+  async function saveMarket(items) {
+    const stamped = items.map(item => ({ ...item, updatedAt: item.updatedAt || new Date().toISOString() }));
+    writeLocal(MARKET_KEY, stamped);
+    const user = await requireUser();
+    if (!user) return { cloud: false };
+    const rows = stamped.map(marketToRow);
+    if (rows.length) {
+      const { error } = await window.UBY_SUPABASE.client().from("mercado_items").upsert(rows, { onConflict: "id" });
+      if (error) throw error;
+    }
+    return { cloud: true };
+  }
+
+  async function deleteMarketItem(id) {
+    writeLocal(MARKET_KEY, readLocal(MARKET_KEY, []).filter(item => item.id !== id));
+    const user = await requireUser();
+    if (!user) return { cloud: false };
+    const { error } = await window.UBY_SUPABASE.client().from("mercado_items").delete().eq("id", id);
+    if (error) throw error;
+    return { cloud: true };
+  }
+
   async function saveActivity(item) {
     writeLocal(ACTIVITY_KEY, mergeById([item], readLocal(ACTIVITY_KEY, [])));
     const user = await requireUser();
@@ -356,6 +446,9 @@
     saveTasks,
     deleteTask,
     loadProspects,
+    loadMarket,
+    saveMarket,
+    deleteMarketItem,
     saveActivity,
     loadActivity,
     saveMessage,

@@ -9,11 +9,13 @@
   const dashboardHref = inPrototypes ? "gestao_obra_ev.html" : base + "index.html";
   const engineeringHref = inPrototypes ? "../../docs/obra-ev/engenharia.html" : base + "engenharia.html";
   const analyzersHref = inPrototypes ? "../../docs/obra-ev/analisadores/dashboard.html" : base + "analisadores/dashboard.html";
+  const marketHref = inPrototypes ? "../../docs/obra-ev/mercado.html" : base + "mercado.html";
   const tasksHref = inAnalyzers ? "../../tarefas/" : inTasks ? "./" : inRoot ? "tarefas/" : "../tarefas/";
   const loginHref = inAnalyzers ? "../login.html" : inPrototypes ? "../../docs/obra-ev/login.html" : inTasks ? "../obra-ev/login.html" : inRoot ? "obra-ev/login.html" : "login.html";
   const current = location.pathname.split("/").pop() || "index.html";
   const isDetail = current === "gestao_obra_ev_detalhe.html";
   const isEngineering = current === "engenharia.html";
+  const isMarket = current === "mercado.html";
   const isLogin = current === "login.html";
   const isAnalyzer = inAnalyzers;
   const isDashboard = (current === "index.html" && inObras && !inAnalyzers) || current === "gestao_obra_ev.html";
@@ -35,7 +37,7 @@
     return isAdmin || module === "login" || (profile?.modules || []).includes(module);
   }
 
-  const currentModule = isLogin ? "login" : isTasks ? "tasks" : isAnalyzer ? "analyzers" : isEngineering ? "engineering" : isDetail ? "detail" : isDashboard ? "dashboard" : isHome ? "home" : "home";
+  const currentModule = isLogin ? "login" : isTasks ? "tasks" : isAnalyzer ? "analyzers" : isEngineering ? "engineering" : isMarket ? "market" : isDetail ? "detail" : isDashboard ? "dashboard" : isHome ? "home" : "home";
   if (!profile && currentModule !== "login") {
     const next = encodeURIComponent(`${location.pathname}${location.search}${location.hash}`);
     location.href = `${loginHref}?next=${next}`;
@@ -52,6 +54,7 @@
       items: [
         ["Pagina inicial", home, "P", isHome, "home"],
         ["Dashboard obras", dashboardHref, "O", isDashboard && !isHome, "dashboard"],
+        ["Mercado", marketHref, "M", isMarket, "market"],
         ["Portal engenharia", engineeringHref, "E", isEngineering, "engineering"]
       ]
     },
@@ -80,23 +83,42 @@
     return `<div class="uby-section"><div class="uby-section-title">${section.title}</div>${items.map(([label, href, mark, active]) => `<a class="uby-link ${active ? "active" : ""}" href="${href}"><span class="uby-link-mark">${mark}</span><span class="uby-link-text">${label}</span></a>`).join("")}</div>`;
   }
 
+  function ensureBrandAssets() {
+    if (!document.querySelector('link[data-uby-brand="css"]')) {
+      const css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = base + "brand.css";
+      css.dataset.ubyBrand = "css";
+      document.head.appendChild(css);
+    }
+    if (!document.querySelector('link[rel="icon"]')) {
+      const icon = document.createElement("link");
+      icon.rel = "icon";
+      icon.type = "image/svg+xml";
+      icon.href = base + "assets/brand/04_simbolo_badge.svg";
+      document.head.appendChild(icon);
+    }
+  }
+
+  ensureBrandAssets();
+
   const shell = document.createElement("div");
   shell.innerHTML = `
     <aside class="uby-sidebar">
       <div class="uby-brand">
-        <div class="uby-grid-icon" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <a class="uby-brand-mark" href="${home}" aria-label="UBY Recharge"><img src="${base}assets/brand/04_simbolo_badge.svg" alt=""></a>
         <div class="uby-brand-divider"></div>
-        <div class="uby-brand-title">P3 Energy - Central</div>
+        <div class="uby-brand-title">UBY Recharge</div>
         <button class="uby-collapse" type="button" aria-label="Recolher menu">&lt;&lt;</button>
       </div>
       <nav class="uby-nav">${links.map(navSection).join("")}</nav>
     </aside>
     <div class="uby-topbar">
-      <div class="uby-grid-icon" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <span class="uby-brand-mark" aria-hidden="true"><img src="${base}assets/brand/04_simbolo_badge.svg" alt=""></span>
       <div class="uby-topbar-divider"></div>
-      <strong>P3 Energy - Central</strong>
+      <strong>UBY Recharge</strong>
       <span>|</span>
-      <span class="uby-recharge">UBY Recharge</span>
+      <span class="uby-recharge">Central de opera&ccedil;&atilde;o EV</span>
       <a class="uby-profile-pill" href="${loginHref}">${profile?.label || "Entrar"}</a>
     </div>
   `;

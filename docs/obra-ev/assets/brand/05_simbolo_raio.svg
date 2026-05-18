@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 280" width="280" height="280">
+  <defs>
+    <linearGradient id="boltR" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00FF85"/>
+      <stop offset="100%" stop-color="#00E5FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="280" height="280" fill="none"/>
+  <g transform="translate(140,140) scale(1.4) translate(-100,-100)">
+    <path d="M 124 16 L 56 112 L 96 112 L 76 184 L 144 88 L 104 88 Z" fill="url(#boltR)"/>
+  </g>
+</svg>

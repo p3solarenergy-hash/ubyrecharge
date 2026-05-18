@@ -3,18 +3,20 @@
 
   const baseWorks = [
     { id: "rio", nome: "Rio Beach EV", status: "Concluida", pct: 100, kw: 7, crit: 0 },
-    { id: "malassise", nome: "Posto Malassise R.K.", status: "Projeto", pct: 42, kw: 60, crit: 4 },
+    { id: "malassise", nome: "Posto Robert Koch R.K.", status: "Projeto", pct: 42, kw: 60, crit: 4 },
+    { id: "prospect-1", nome: "Posto Duim", status: "Projeto", pct: 0, kw: 60, crit: 0 },
     { id: "prospect-29", nome: "Posto Araguaia", status: "Projeto", pct: 0, kw: 60, crit: 0 }
   ];
 
   const baseObras = [
     { id: "rio", nome: "Rio Beach EV", cliente: "Rio Beach", local: "Rua Luiz Lerco 159", status: "Concluida", kind: "ok", pct: 100, kw: 7, carregadores: "1 x 7 kW", crit: 0, flags: ["Obra completa"], link: "gestao_obra_ev_detalhe.html" },
-    { id: "malassise", nome: "Posto Malassise R.K.", cliente: "Malassise Robert Koch", local: "Maringa - PR", status: "Projeto", kind: "warn", pct: 42, kw: 60, carregadores: "1 x 60 kW", crit: 4, flags: ["Aumento de carga", "Trafo a validar", "Orcamento civil"], link: "gestao_obra_ev_detalhe.html?obra=malassise" },
+    { id: "malassise", nome: "Posto Robert Koch R.K.", cliente: "Malassise Robert Koch", local: "Maringa - PR", status: "Projeto", kind: "warn", pct: 42, kw: 60, carregadores: "1 x 60 kW", crit: 4, flags: ["Aumento de carga", "Trafo a validar", "Orcamento civil"], link: "gestao_obra_ev_detalhe.html?obra=malassise" },
+    { id: "prospect-1", nome: "Posto Duim", cliente: "Posto Duim", local: "Av. Maringa, 241 - Londrina/PR", status: "Projeto", kind: "warn", pct: 0, kw: 60, carregadores: "1 x 60 kW", crit: 0, flags: ["Obra real", "Estudo realizado", "DLM a validar"], link: "gestao_obra_ev_detalhe.html?obra=prospect-1" },
     { id: "prospect-29", nome: "Posto Araguaia", cliente: "Malassise Araguaia", local: "Av Araguaia - Londrina/PR", status: "Projeto", kind: "warn", pct: 0, kw: 60, carregadores: "1 x 60 kW", crit: 0, flags: ["Obra real", "Analise vinculada", "DLM a validar"], link: "gestao_obra_ev_detalhe.html?obra=prospect-29" }
   ];
 
   const baseTasks = [
-    { id: "t1", title: "Validar protocolo de aumento de carga", project: "Posto Malassise R.K.", owner: "UBY Recharge", dueOffset: 2, priority: "Alta", status: "Em andamento", note: "Conferir retorno da concessionaria e refletir no checklist da obra." },
+    { id: "t1", title: "Validar protocolo de aumento de carga", project: "Posto Robert Koch R.K.", owner: "UBY Recharge", dueOffset: 2, priority: "Alta", status: "Em andamento", note: "Conferir retorno da concessionaria e refletir no checklist da obra." },
     { id: "t2", title: "Enviar orcamento civil revisado", project: "Posto Araguaia", owner: "Equipe civil", dueOffset: 4, priority: "Media", status: "Pendente", note: "Separar base, recomposicao e protecao mecanica." },
     { id: "t3", title: "Arquivar fotos finais da Rio Beach", project: "Rio Beach EV", owner: "Campo", dueOffset: 0, priority: "Baixa", status: "Pendente", note: "Subir fotos no documento da obra." },
     { id: "t4", title: "Definir padrao de documentos para cada obra", project: "Administrativo", owner: "UBY Recharge", dueOffset: 7, priority: "Media", status: "Aguardando terceiro", note: "Base para Drive e historico." }

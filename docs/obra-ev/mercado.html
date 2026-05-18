@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UBY Recharge - Mercado EV</title>
+<link rel="icon" type="image/svg+xml" href="assets/brand/04_simbolo_badge.svg">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="brand.css">
+<style>
+  :root{--p3-primary:#00FF85;--p3-primary-deep:#071527;--p3-accent:#00E5FF;--p3-bg:#08111F;--p3-card:#101B2D;--p3-card-2:#13243B;--p3-text:#F4FBF8;--p3-muted:#A6B8C6;--p3-border:#24364E;--p3-danger:#F0685F;--p3-warn:#F2C14E;--p3-ok:#00FF85;--p3-shadow:0 1px 3px rgba(0,0,0,.35),0 14px 34px rgba(0,0,0,.28)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:radial-gradient(circle at top right,rgba(0,255,133,.12),transparent 34%),var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.55;min-height:100vh}
+  .page{max-width:1480px;margin:0 auto;padding:32px 36px 80px}
+  .hero{position:relative;overflow:hidden;border:1px solid rgba(0,255,133,.18);background:linear-gradient(135deg,#071527 0%,#0D2138 62%,#062019 100%);border-radius:18px;padding:30px;margin-bottom:24px;box-shadow:var(--p3-shadow)}
+  .hero .uby-brand-glow{right:-70px;top:-90px}
+  .hero-top{display:flex;justify-content:space-between;gap:22px;align-items:flex-start;position:relative;z-index:1}
+  .brand-lockup{display:flex;align-items:center;gap:16px}
+  .brand-lockup img{height:64px;width:auto}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:var(--p3-primary);font-weight:900;margin-bottom:6px}
+  h1{font-size:32px;line-height:1.12;margin:0 0 8px}
+  .subtitle{max-width:780px;color:#D4E2DC;font-size:14px}
+  .status-pill{border:1px solid rgba(0,255,133,.28);background:rgba(0,255,133,.10);color:#DFFFF0;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:900;white-space:nowrap}
+  .status-pill.warn{border-color:rgba(242,193,78,.35);background:rgba(242,193,78,.12);color:#FFE5A3}
+  .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin:0 0 18px}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab,.primary-btn,.ghost-btn,.danger-btn{height:40px;border-radius:9px;padding:0 13px;font-size:12px;font-weight:900;border:1px solid var(--p3-border);background:#0C1728;color:var(--p3-text)}
+  .tab.active,.primary-btn{background:var(--p3-primary);border-color:var(--p3-primary);color:#061321}
+  .danger-btn{border-color:rgba(240,104,95,.55);color:#FFB1AA;background:rgba(240,104,95,.10)}
+  .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+  .panel{background:rgba(16,27,45,.92);border:1px solid var(--p3-border);border-radius:14px;padding:20px;box-shadow:var(--p3-shadow)}
+  .panel h2{font-size:16px;color:var(--p3-primary);margin-bottom:4px}
+  .panel .sub{font-size:12px;color:var(--p3-muted);margin-bottom:14px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+  .kpi{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:12px;padding:15px;min-height:112px}
+  .kpi small{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:900}
+  .kpi strong{display:block;color:var(--p3-primary);font-size:26px;line-height:1.1;margin:8px 0 2px;word-break:break-word}
+  .kpi span{display:block;color:var(--p3-muted);font-size:11px}
+  .market-list{display:grid;gap:10px}
+  .market-card{background:var(--p3-card-2);border:1px solid var(--p3-border);border-left:4px solid var(--p3-primary);border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr auto;gap:12px}
+  .market-card.oportunidade{border-left-color:var(--p3-accent)}
+  .market-card.risco{border-left-color:var(--p3-warn)}
+  .market-title{font-size:14px;font-weight:900;margin-bottom:3px}
+  .market-meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--p3-muted);font-size:11px}
+  .market-value{font-size:20px;color:var(--p3-primary);font-weight:900;text-align:right;min-width:120px}
+  .market-actions{display:flex;gap:7px;justify-content:flex-end;margin-top:10px}
+  .chip{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.05);border-radius:999px;padding:3px 8px}
+  form{display:grid;gap:12px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .field.full{grid-column:1/-1}
+  label{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:900;margin-bottom:5px}
+  input,select,textarea{width:100%;border:1px solid var(--p3-border);border-radius:9px;background:#0B1524;color:var(--p3-text);padding:10px 11px;font:inherit;font-weight:700}
+  textarea{min-height:82px;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--p3-primary);box-shadow:0 0 0 3px rgba(0,255,133,.14)}
+  .source-list{display:grid;gap:8px;margin-top:10px}
+  .source-item{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#0B1524;border:1px solid var(--p3-border);border-radius:10px;padding:10px;color:var(--p3-muted);font-size:12px}
+  .source-item a{color:var(--p3-primary);font-weight:900;text-decoration:none}
+  .empty{border:1px dashed rgba(166,184,198,.35);border-radius:12px;padding:22px;text-align:center;color:var(--p3-muted)}
+  .footer-note{margin-top:14px;color:var(--p3-muted);font-size:11px}
+  @media(max-width:1050px){.grid,.kpis{grid-template-columns:1fr 1fr}.hero-top{flex-direction:column}.status-pill{white-space:normal}}
+  @media(max-width:680px){.page{padding:18px 14px 60px}.grid,.kpis,.form-grid{grid-template-columns:1fr}.toolbar{grid-template-columns:1fr}.market-card{grid-template-columns:1fr}.market-value{text-align:left}.brand-lockup img{height:48px}h1{font-size:26px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <span class="uby-brand-glow"></span>
+    <div class="hero-top">
+      <div>
+        <div class="brand-lockup">
+          <img src="assets/brand/02_logo_dark.svg" alt="UBY Recharge">
+          <div>
+            <div class="eyebrow">Inteligencia comercial</div>
+            <h1>Mercado EV Brasil</h1>
+          </div>
+        </div>
+        <p class="subtitle">Painel para registrar indicadores, fontes, oportunidades e riscos do mercado de recarga. Os dados editados ficam na tabela `mercado_items` quando o patch do Supabase estiver aplicado.</p>
+      </div>
+      <div id="dbStatus" class="status-pill warn">Verificando banco...</div>
+    </div>
+  </header>
+
+  <section class="kpis" id="kpiGrid"></section>
+
+  <div class="toolbar">
+    <div class="tabs" id="tabs">
+      <button class="tab active" type="button" data-filter="todos">Todos</button>
+      <button class="tab" type="button" data-filter="indicador">Indicadores</button>
+      <button class="tab" type="button" data-filter="oportunidade">Oportunidades</button>
+      <button class="tab" type="button" data-filter="risco">Riscos</button>
+      <button class="tab" type="button" data-filter="fonte">Fontes</button>
+    </div>
+    <button class="primary-btn" type="button" id="newButton">Novo registro</button>
+  </div>
+
+  <main class="grid">
+    <section class="panel">
+      <h2>Registros de mercado</h2>
+      <p class="sub">Use como uma base viva: numero, fonte, data e impacto comercial.</p>
+      <div class="market-list" id="marketList"></div>
+    </section>
+
+    <aside class="panel">
+      <h2 id="formTitle">Novo registro</h2>
+      <p class="sub">Atualize valores conforme as fontes oficiais forem revisadas.</p>
+      <form id="marketForm">
+        <input type="hidden" id="itemId">
+        <div class="form-grid">
+          <div class="field">
+            <label for="itemType">Tipo</label>
+            <select id="itemType">
+              <option value="indicador">Indicador</option>
+              <option value="oportunidade">Oportunidade</option>
+              <option value="risco">Risco</option>
+              <option value="fonte">Fonte</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="itemStatus">Status</label>
+            <input id="itemStatus" placeholder="Monitorar, Atualizar, Prioritario">
+          </div>
+          <div class="field full">
+            <label for="itemTitle">Titulo</label>
+            <input id="itemTitle" required placeholder="Ex.: Frota eletrificada Brasil">
+          </div>
+          <div class="field">
+            <label for="itemValue">Valor</label>
+            <input id="itemValue" placeholder="Ex.: atualizar">
+          </div>
+          <div class="field">
+            <label for="itemUnit">Unidade</label>
+            <input id="itemUnit" placeholder="veiculos, pontos, R$/kWh">
+          </div>
+          <div class="field">
+            <label for="itemSegment">Segmento</label>
+            <input id="itemSegment" placeholder="Varejo, rodovia, frota">
+          </div>
+          <div class="field">
+            <label for="itemRegion">Regiao</label>
+            <input id="itemRegion" placeholder="Brasil, PR, SP">
+          </div>
+          <div class="field">
+            <label for="itemSource">Fonte</label>
+            <input id="itemSource" placeholder="ABVE, ANEEL, EPE">
+          </div>
+          <div class="field">
+            <label for="itemUrl">Link</label>
+            <input id="itemUrl" type="url" placeholder="https://">
+          </div>
+          <div class="field full">
+            <label for="itemNote">Observacao</label>
+            <textarea id="itemNote" placeholder="Como essa informacao afeta prospeccao, precificacao ou prioridade de obras."></textarea>
+          </div>
+        </div>
+        <div class="market-actions">
+          <button class="ghost-btn" type="button" id="resetButton">Limpar</button>
+          <button class="primary-btn" type="submit">Salvar</button>
+        </div>
+      </form>
+
+      <div class="footer-note">Para virar banco real, rode `docs/obra-ev/supabase_market_patch.sql` no Supabase. Sem isso, a pagina preserva uma copia local como contingencia.</div>
+    </aside>
+  </main>
+</div>
+
+<script src="supabase_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_bridge.js"></script>
+<script src="auth.js"></script>
+<script src="app_store.js"></script>
+<script src="sidebar.js"></script>
+<script src="backup_guard.js"></script>
+<script>
+UBY_AUTH.require("market");
+
+const seedItems = [
+  { id: "mercado-frota-br", type: "indicador", title: "Frota eletrificada Brasil", value: "Atualizar", unit: "veiculos", segment: "Demanda", region: "Brasil", status: "Atualizar mensal", source: "ABVE", url: "", note: "Indicador base para medir ritmo de adocao e estimar demanda por recarga.", updatedAt: new Date().toISOString() },
+  { id: "mercado-recarga-publica", type: "indicador", title: "Infraestrutura publica de recarga", value: "Atualizar", unit: "pontos", segment: "Infraestrutura", region: "Brasil", status: "Monitorar", source: "ABVE / mercado", url: "", note: "Acompanhar crescimento de pontos publicos e lacunas por regiao.", updatedAt: new Date().toISOString() },
+  { id: "mercado-tarifa-alvo", type: "indicador", title: "Tarifa de energia alvo", value: "Atualizar", unit: "R$/kWh", segment: "Precificacao", region: "Por concessionaria", status: "Revisar por projeto", source: "Concessionaria", url: "", note: "Base para simulacao de margem, payback e preco de recarga.", updatedAt: new Date().toISOString() },
+  { id: "mercado-rodovias-varejo", type: "oportunidade", title: "Rodovias e varejo de conveniencia", value: "Mapear", unit: "sites", segment: "Prospeccao", region: "Sul / Sudeste", status: "Prioritario", source: "Pipeline comercial", url: "", note: "Cruzar trafego, tempo de permanencia e energia disponivel para priorizar contatos.", updatedAt: new Date().toISOString() },
+  { id: "mercado-risco-rede", type: "risco", title: "Disponibilidade de rede em pontos rapidos", value: "Alto", unit: "risco", segment: "Engenharia", region: "Por obra", status: "Mitigar cedo", source: "Analise tecnica", url: "", note: "Entrar com consulta de carga e alternativas antes de prometer potencia ao cliente.", updatedAt: new Date().toISOString() },
+  { id: "mercado-fontes-oficiais", type: "fonte", title: "Fontes oficiais e recorrentes", value: "ABVE, ANEEL, EPE", unit: "links", segment: "Pesquisa", region: "Brasil", status: "Manter atualizado", source: "Base interna", url: "", note: "Registrar aqui os links usados para atualizar os indicadores do painel.", updatedAt: new Date().toISOString() }
+];
+
+let items = [];
+let currentFilter = "todos";
+
+const listEl = document.getElementById("marketList");
+const kpiGrid = document.getElementById("kpiGrid");
+const dbStatus = document.getElementById("dbStatus");
+const form = document.getElementById("marketForm");
+const fields = {
+  id: document.getElementById("itemId"),
+  type: document.getElementById("itemType"),
+  status: document.getElementById("itemStatus"),
+  title: document.getElementById("itemTitle"),
+  value: document.getElementById("itemValue"),
+  unit: document.getElementById("itemUnit"),
+  segment: document.getElementById("itemSegment"),
+  region: document.getElementById("itemRegion"),
+  source: document.getElementById("itemSource"),
+  url: document.getElementById("itemUrl"),
+  note: document.getElementById("itemNote")
+};
+
+function safe(text) {
+  return String(text || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+}
+
+function makeId() {
+  return `mercado-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function renderKpis() {
+  const indicators = items.filter(item => item.type === "indicador").slice(0, 4);
+  kpiGrid.innerHTML = indicators.map(item => `
+    <article class="kpi">
+      <small>${safe(item.segment || item.source || "Indicador")}</small>
+      <strong>${safe(item.value || "-")}</strong>
+      <span>${safe(item.title)} ${item.unit ? `- ${safe(item.unit)}` : ""}</span>
+    </article>
+  `).join("") || `<article class="kpi"><small>Mercado</small><strong>0</strong><span>Nenhum indicador cadastrado.</span></article>`;
+}
+
+function renderList() {
+  const visible = currentFilter === "todos" ? items : items.filter(item => item.type === currentFilter);
+  if (!visible.length) {
+    listEl.innerHTML = `<div class="empty">Nenhum registro neste filtro.</div>`;
+    renderKpis();
+    return;
+  }
+  listEl.innerHTML = visible.map(item => `
+    <article class="market-card ${safe(item.type)}">
+      <div>
+        <div class="market-title">${safe(item.title)}</div>
+        <div class="market-meta">
+          <span class="chip">${safe(item.type)}</span>
+          ${item.status ? `<span class="chip">${safe(item.status)}</span>` : ""}
+          ${item.region ? `<span>${safe(item.region)}</span>` : ""}
+          ${item.segment ? `<span>${safe(item.segment)}</span>` : ""}
+          ${item.source ? `<span>Fonte: ${safe(item.source)}</span>` : ""}
+        </div>
+        ${item.note ? `<p class="footer-note">${safe(item.note)}</p>` : ""}
+        ${item.url ? `<div class="source-list"><div class="source-item"><span>${safe(item.url)}</span><a href="${safe(item.url)}" target="_blank" rel="noopener">Abrir</a></div></div>` : ""}
+      </div>
+      <div>
+        <div class="market-value">${safe(item.value || "-")} ${item.unit ? `<small>${safe(item.unit)}</small>` : ""}</div>
+        <div class="market-actions">
+          <button class="ghost-btn" type="button" data-edit="${safe(item.id)}">Editar</button>
+          <button class="danger-btn" type="button" data-delete="${safe(item.id)}">Excluir</button>
+        </div>
+      </div>
+    </article>
+  `).join("");
+  renderKpis();
+}
+
+function resetForm() {
+  form.reset();
+  fields.id.value = "";
+  document.getElementById("formTitle").textContent = "Novo registro";
+}
+
+function fillForm(item) {
+  fields.id.value = item.id;
+  fields.type.value = item.type || "indicador";
+  fields.status.value = item.status || "";
+  fields.title.value = item.title || "";
+  fields.value.value = item.value || "";
+  fields.unit.value = item.unit || "";
+  fields.segment.value = item.segment || "";
+  fields.region.value = item.region || "";
+  fields.source.value = item.source || "";
+  fields.url.value = item.url || "";
+  fields.note.value = item.note || "";
+  document.getElementById("formTitle").textContent = "Editar registro";
+}
+
+async function persist(nextItems) {
+  items = nextItems;
+  renderList();
+  try {
+    const result = await UBY_STORE.saveMarket(items);
+    dbStatus.textContent = result.cloud ? "Banco conectado: mercado salvo" : "Modo local: login/banco pendente";
+    dbStatus.className = result.cloud ? "status-pill" : "status-pill warn";
+  } catch (err) {
+    dbStatus.textContent = "Tabela mercado_items ainda nao aplicada";
+    dbStatus.className = "status-pill warn";
+    console.warn(err);
+  }
+}
+
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  const item = {
+    id: fields.id.value || makeId(),
+    type: fields.type.value,
+    title: fields.title.value,
+    value: fields.value.value,
+    unit: fields.unit.value,
+    segment: fields.segment.value,
+    region: fields.region.value,
+    status: fields.status.value,
+    source: fields.source.value,
+    url: fields.url.value,
+    note: fields.note.value,
+    updatedAt: new Date().toISOString()
+  };
+  const next = items.filter(current => current.id !== item.id);
+  next.unshift(item);
+  await persist(next);
+  resetForm();
+});
+
+listEl.addEventListener("click", async event => {
+  const editId = event.target.dataset.edit;
+  const deleteId = event.target.dataset.delete;
+  if (editId) {
+    const item = items.find(current => current.id === editId);
+    if (item) fillForm(item);
+  }
+  if (deleteId) {
+    const next = items.filter(current => current.id !== deleteId);
+    await persist(next);
+    try { await UBY_STORE.deleteMarketItem(deleteId); } catch (err) { console.warn(err); }
+  }
+});
+
+document.getElementById("tabs").addEventListener("click", event => {
+  if (!event.target.dataset.filter) return;
+  currentFilter = event.target.dataset.filter;
+  document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.filter === currentFilter));
+  renderList();
+});
+
+document.getElementById("newButton").addEventListener("click", resetForm);
+document.getElementById("resetButton").addEventListener("click", resetForm);
+
+(async function init() {
+  try {
+    items = await UBY_STORE.loadMarket(seedItems);
+    dbStatus.textContent = UBY_STORE.available() ? "Banco pronto para mercado" : "Modo local: conecte o Supabase";
+    dbStatus.className = UBY_STORE.available() ? "status-pill" : "status-pill warn";
+  } catch (err) {
+    items = seedItems;
+    dbStatus.textContent = "Tabela mercado_items ainda nao aplicada";
+    dbStatus.className = "status-pill warn";
+  }
+  renderList();
+})();
+</script>
+</body>
+</html>

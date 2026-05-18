@@ -13,8 +13,8 @@
       : "engenharia.html";
 
   const roleModules = {
-    admin: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "documents", "analyzers", "tasks", "backup", "login"],
-    engenharia: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "analyzers", "login"]
+    admin: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "documents", "analyzers", "market", "tasks", "backup", "login"],
+    engenharia: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "analyzers", "market", "login"]
   };
 
   const fallbackProfiles = {
