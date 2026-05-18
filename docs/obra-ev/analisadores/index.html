@@ -133,6 +133,109 @@
   [data-theme="light"] .report-card,[data-theme="light"] .compare-section,[data-theme="light"] .stat{background:#FFFFFF !important;color:#1F2A24 !important}
   [data-theme="light"] .report-title,[data-theme="light"] .toolbar h2,[data-theme="light"] .compare-section h2{color:#0F3D2E !important}
   [data-theme="light"] .report-sub,[data-theme="light"] .stat .sub,[data-theme="light"] .mu{color:#4D5F55 !important}
+
+
+  /* === UBY THEME STANDARD === */
+  .ghost-btn,.analyzer-links a,.mini-link,.nav a:not(.main),.tiny-btn{
+    border-color:#345447;
+    background:#101B16;
+    color:#E8EFEB;
+  }
+  .ghost-btn:hover,.analyzer-links a:hover,.mini-link:hover,.nav a:not(.main):hover,.tiny-btn:hover{
+    border-color:var(--p3-accent);
+    background:#14231C;
+  }
+  .new-btn,.primary-btn,.primary-link,.analyzer-links a.main,.mini-link.primary,.nav a.main{
+    background:#2EA85C;
+    border-color:#2EA85C;
+    color:#FFFFFF;
+  }
+  .new-btn:hover,.primary-btn:hover,.primary-link:hover,.analyzer-links a.main:hover,.mini-link.primary:hover,.nav a.main:hover{
+    background:#248F50;
+    border-color:#248F50;
+  }
+  .theme-toggle{
+    background:#16221E;
+    color:#E8EFEB;
+    border-color:#345447;
+  }
+  [data-theme="light"] .ghost-btn,
+  [data-theme="light"] .analyzer-links a,
+  [data-theme="light"] .mini-link,
+  [data-theme="light"] .nav a:not(.main),
+  [data-theme="light"] .tiny-btn{
+    background:#FFFFFF !important;
+    color:#0F3D2E !important;
+    border-color:#B7D9C4 !important;
+  }
+  [data-theme="light"] .ghost-btn:hover,
+  [data-theme="light"] .analyzer-links a:hover,
+  [data-theme="light"] .mini-link:hover,
+  [data-theme="light"] .nav a:not(.main):hover,
+  [data-theme="light"] .tiny-btn:hover{
+    background:#EAF6EF !important;
+    border-color:#2EA85C !important;
+  }
+  [data-theme="light"] .new-btn,
+  [data-theme="light"] .primary-btn,
+  [data-theme="light"] .primary-link,
+  [data-theme="light"] .analyzer-links a.main,
+  [data-theme="light"] .mini-link.primary,
+  [data-theme="light"] .nav a.main{
+    background:#2EA85C !important;
+    border-color:#2EA85C !important;
+    color:#FFFFFF !important;
+  }
+  [data-theme="light"] .stat,
+  [data-theme="light"] .compare-section,
+  [data-theme="light"] .analyzer-section,
+  [data-theme="light"] .cloud-panel,
+  [data-theme="light"] .prospect-section,
+  [data-theme="light"] .panel,
+  [data-theme="light"] section,
+  [data-theme="light"] .report-card,
+  [data-theme="light"] .new-panel{
+    background:#FFFFFF !important;
+    color:#1F2A24 !important;
+    border-color:#D9E5DE !important;
+  }
+  [data-theme="light"] .phase-mini,
+  [data-theme="light"] .macro-item,
+  [data-theme="light"] .prospect-row,
+  [data-theme="light"] .work-card,
+  [data-theme="light"] .task-block,
+  [data-theme="light"] .planner-row,
+  [data-theme="light"] .chart-card,
+  [data-theme="light"] .analysis-card,
+  [data-theme="light"] .agent-card,
+  [data-theme="light"] .library-card,
+  [data-theme="light"] .doc-card,
+  [data-theme="light"] .agent-item,
+  [data-theme="light"] .insight{
+    background:#FAFCFA !important;
+    color:#1F2A24 !important;
+    border-color:#D9E5DE !important;
+  }
+  [data-theme="light"] input,
+  [data-theme="light"] select,
+  [data-theme="light"] textarea,
+  [data-theme="light"] .note{
+    background:#FFFFFF !important;
+    color:#1F2A24 !important;
+    border-color:#B7D9C4 !important;
+  }
+  [data-theme="light"] .progress,
+  [data-theme="light"] .pipeline-track,
+  [data-theme="light"] .mini-track,
+  [data-theme="light"] .seg{
+    background:#E7EFEA !important;
+  }
+  [data-theme="light"] .theme-toggle{
+    background:#FFFFFF !important;
+    color:#0F3D2E !important;
+    border-color:#D9E5DE !important;
+  }
+
 </style>
 </head>
 <body>
@@ -209,6 +312,7 @@
   const btn = document.getElementById('themeToggle');
   const apply = (t) => {
     root.setAttribute('data-theme', t);
+    if (window.Chart) { Chart.defaults.color = t === 'light' ? '#4D5F55' : '#B7CBC1'; Chart.defaults.borderColor = t === 'light' ? '#D9E5DE' : '#2A3530'; }
     if(btn) btn.textContent = t === 'light' ? '🌙' : '☀️';
     if(btn) btn.title = 'Mudar para tema ' + (t === 'light' ? 'escuro' : 'claro');
   };
@@ -223,9 +327,12 @@
   });
 })();
 
-const P3 = { primary:'#0F3D2E', accent:'#2EA85C', danger:'#C0392B', warn:'#E08E0B', muted:'#5C6B62' };
+const P3 = (document.documentElement.getAttribute('data-theme') === 'light')
+  ? { primary:'#0F3D2E', accent:'#2EA85C', danger:'#C0392B', warn:'#E08E0B', muted:'#5C6B62' }
+  : { primary:'#3FB66B', accent:'#5BC882', danger:'#E55545', warn:'#F2A93D', muted:'#B7CBC1' };
 Chart.defaults.font.family = "'Inter','Segoe UI',Arial,sans-serif";
-Chart.defaults.color = '#1F2A24';
+Chart.defaults.color = document.documentElement.getAttribute('data-theme') === 'light' ? '#4D5F55' : '#B7CBC1';
+Chart.defaults.borderColor = document.documentElement.getAttribute('data-theme') === 'light' ? '#D9E5DE' : '#2A3530';
 
 // === CADASTRO DE RELATÓRIOS ===
 // Para adicionar um novo relatório, basta colocar uma entrada aqui:
@@ -390,7 +497,7 @@ function renderComparison(){
       {label:'Pico Ativa (kW)', data:RELATORIOS.map(r=>r.pico_kw), backgroundColor:P3.primary, borderRadius:6},
       {label:'Demanda diária (kW)', data:RELATORIOS.map(r=>r.demanda_kw), backgroundColor:P3.accent, borderRadius:6}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Pico e demanda base por ponto'}},scales:{y:{title:{display:true,text:'Potência (kW)'},beginAtZero:true}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Pico e demanda base por ponto'}},scales:{x:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color}},y:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color},title:{display:true,text:'Potência (kW)',color:Chart.defaults.color},beginAtZero:true}}}
   });
 
   new Chart(document.getElementById('chartCompareFP'), {
@@ -398,7 +505,7 @@ function renderComparison(){
     data:{labels, datasets:[
       {label:'Fator de Potência médio', data:RELATORIOS.map(r=>r.fp), backgroundColor:RELATORIOS.map(r=>r.fp >= 0.92 ? P3.accent : P3.danger), borderRadius:6}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'FP Médio (mín. NBR = 0,92)'},annotation:{}},scales:{y:{min:0,max:1,title:{display:true,text:'FP'}}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'FP Médio (mín. NBR = 0,92)'},annotation:{}},scales:{x:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color}},y:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color},min:0,max:1,title:{display:true,text:'FP',color:Chart.defaults.color}}}}
   });
 }
 

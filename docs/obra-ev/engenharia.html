@@ -18,9 +18,113 @@
   .task-grid{display:grid;gap:12px}.task-block{background:#1A2622;border:1px solid var(--p3-border);border-radius:12px;padding:14px}.task-top{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px}.task-top strong{font-size:14px}.task-fields{display:grid;grid-template-columns:160px 1fr 1fr;gap:8px}.task-fields label{display:block;color:var(--p3-muted);font-size:9px;text-transform:uppercase;letter-spacing:.7px;font-weight:800;margin-bottom:4px}.task-fields input,.task-fields select,.task-fields textarea{width:100%;border:1px solid var(--p3-border);background:#121d18;color:var(--p3-text);border-radius:8px;padding:9px;font-weight:700}.task-fields textarea{min-height:38px;resize:vertical}.wide{grid-column:1/-1}.mini-table{width:100%;border-collapse:collapse;font-size:13px}th{background:#1F2A26;color:var(--p3-primary);font-size:10px;text-transform:uppercase;letter-spacing:.7px;text-align:left;padding:9px;border-bottom:2px solid var(--p3-border)}td{padding:9px;border-bottom:1px solid var(--p3-border);vertical-align:top}.insights{display:grid;gap:10px}.insight{background:#121d18;border-left:3px solid var(--p3-accent);border-radius:8px;padding:10px}.insight.warn{border-left-color:var(--p3-warn)}.insight.danger{border-left-color:var(--p3-danger)}.insight strong{display:block;margin-bottom:3px}.insight span{color:var(--p3-muted);font-size:12px}.empty{color:var(--p3-muted);padding:18px;border:1px dashed var(--p3-border);border-radius:10px;text-align:center}
   .engineering-tools{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-top:18px}.form-grid{display:grid;grid-template-columns:1.1fr .8fr .8fr .8fr auto;gap:8px;margin-bottom:12px}.form-grid input,.form-grid select,.calc-grid input,.calc-grid select{height:40px;border:1px solid var(--p3-border);border-radius:8px;background:#121d18;color:var(--p3-text);padding:0 10px;font-weight:800}.planner-list{display:grid;gap:8px}.planner-row{display:grid;grid-template-columns:1fr 120px 108px 92px;gap:10px;align-items:center;background:#1A2622;border:1px solid var(--p3-border);border-radius:10px;padding:10px}.planner-row strong{color:var(--p3-primary)}.planner-row span{color:var(--p3-muted);font-size:12px}.tiny-btn{height:34px;border:1px solid var(--p3-border);background:#121d18;color:#fff;border-radius:7px;font-weight:900;cursor:pointer}.calc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}.calc-result{display:grid;gap:8px}.calc-item{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--p3-border);padding-top:8px}.calc-item strong{color:var(--p3-primary)}.calc-note{color:var(--p3-muted);font-size:12px;margin-top:10px;line-height:1.45}
   @media(max-width:980px){.stats{grid-template-columns:repeat(2,1fr)}.grid,.engineering-tools{grid-template-columns:1fr}.nav{position:static;margin-bottom:16px}.task-fields,.form-grid{grid-template-columns:1fr}.meta{grid-template-columns:repeat(2,1fr)}}@media(max-width:620px){.page{padding:18px 14px 60px}.stats,.calc-grid{grid-template-columns:1fr}.planner-row{grid-template-columns:1fr}.header{padding:24px 20px}.toolbar input{min-width:100%}}
+
+
+  /* === UBY THEME STANDARD === */
+  .ghost-btn,.analyzer-links a,.mini-link,.nav a:not(.main),.tiny-btn{
+    border-color:#345447;
+    background:#101B16;
+    color:#E8EFEB;
+  }
+  .ghost-btn:hover,.analyzer-links a:hover,.mini-link:hover,.nav a:not(.main):hover,.tiny-btn:hover{
+    border-color:var(--p3-accent);
+    background:#14231C;
+  }
+  .new-btn,.primary-btn,.primary-link,.analyzer-links a.main,.mini-link.primary,.nav a.main{
+    background:#2EA85C;
+    border-color:#2EA85C;
+    color:#FFFFFF;
+  }
+  .new-btn:hover,.primary-btn:hover,.primary-link:hover,.analyzer-links a.main:hover,.mini-link.primary:hover,.nav a.main:hover{
+    background:#248F50;
+    border-color:#248F50;
+  }
+  .theme-toggle{
+    background:#16221E;
+    color:#E8EFEB;
+    border-color:#345447;
+  }
+  [data-theme="light"] .ghost-btn,
+  [data-theme="light"] .analyzer-links a,
+  [data-theme="light"] .mini-link,
+  [data-theme="light"] .nav a:not(.main),
+  [data-theme="light"] .tiny-btn{
+    background:#FFFFFF !important;
+    color:#0F3D2E !important;
+    border-color:#B7D9C4 !important;
+  }
+  [data-theme="light"] .ghost-btn:hover,
+  [data-theme="light"] .analyzer-links a:hover,
+  [data-theme="light"] .mini-link:hover,
+  [data-theme="light"] .nav a:not(.main):hover,
+  [data-theme="light"] .tiny-btn:hover{
+    background:#EAF6EF !important;
+    border-color:#2EA85C !important;
+  }
+  [data-theme="light"] .new-btn,
+  [data-theme="light"] .primary-btn,
+  [data-theme="light"] .primary-link,
+  [data-theme="light"] .analyzer-links a.main,
+  [data-theme="light"] .mini-link.primary,
+  [data-theme="light"] .nav a.main{
+    background:#2EA85C !important;
+    border-color:#2EA85C !important;
+    color:#FFFFFF !important;
+  }
+  [data-theme="light"] .stat,
+  [data-theme="light"] .compare-section,
+  [data-theme="light"] .analyzer-section,
+  [data-theme="light"] .cloud-panel,
+  [data-theme="light"] .prospect-section,
+  [data-theme="light"] .panel,
+  [data-theme="light"] section,
+  [data-theme="light"] .report-card,
+  [data-theme="light"] .new-panel{
+    background:#FFFFFF !important;
+    color:#1F2A24 !important;
+    border-color:#D9E5DE !important;
+  }
+  [data-theme="light"] .phase-mini,
+  [data-theme="light"] .macro-item,
+  [data-theme="light"] .prospect-row,
+  [data-theme="light"] .work-card,
+  [data-theme="light"] .task-block,
+  [data-theme="light"] .planner-row,
+  [data-theme="light"] .chart-card,
+  [data-theme="light"] .analysis-card,
+  [data-theme="light"] .agent-card,
+  [data-theme="light"] .library-card,
+  [data-theme="light"] .doc-card,
+  [data-theme="light"] .agent-item,
+  [data-theme="light"] .insight{
+    background:#FAFCFA !important;
+    color:#1F2A24 !important;
+    border-color:#D9E5DE !important;
+  }
+  [data-theme="light"] input,
+  [data-theme="light"] select,
+  [data-theme="light"] textarea,
+  [data-theme="light"] .note{
+    background:#FFFFFF !important;
+    color:#1F2A24 !important;
+    border-color:#B7D9C4 !important;
+  }
+  [data-theme="light"] .progress,
+  [data-theme="light"] .pipeline-track,
+  [data-theme="light"] .mini-track,
+  [data-theme="light"] .seg{
+    background:#E7EFEA !important;
+  }
+  [data-theme="light"] .theme-toggle{
+    background:#FFFFFF !important;
+    color:#0F3D2E !important;
+    border-color:#D9E5DE !important;
+  }
+
 </style>
 </head>
 <body>
+<button id="themeToggle" class="theme-toggle" title="Alternar tema">Sol</button>
 <div class="page">
   <div class="header">
     <div class="nav">
@@ -100,6 +204,9 @@
 
 <script src="sidebar.js"></script>
 <script src="backup_guard.js"></script>
+<script>
+const themeKey="p3_obras_theme";const root=document.documentElement;const themeBtn=document.getElementById("themeToggle");function applyTheme(t){root.setAttribute("data-theme",t);themeBtn.textContent=t==="light"?"Lua":"Sol"}applyTheme(localStorage.getItem(themeKey)||"dark");themeBtn.onclick=()=>{const nxt=root.getAttribute("data-theme")==="light"?"dark":"light";localStorage.setItem(themeKey,nxt);applyTheme(nxt)};
+</script>
 <script>
 const dashboardKey="uby-obras-dashboard-v1";
 const deletedKey="uby-obras-dashboard-deleted-v1";

@@ -1,0 +1,222 @@
+(function () {
+  const WORKS_KEY = "uby-obras-dashboard-v1";
+  const TASKS_KEY = "uby-tarefas-v1";
+
+  function available() {
+    return Boolean(window.UBY_SUPABASE?.configured?.() && window.UBY_SUPABASE?.client?.());
+  }
+
+  async function requireUser() {
+    if (!available()) return null;
+    return await window.UBY_SUPABASE.currentUser();
+  }
+
+  function readLocal(key, fallback) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "null") || fallback;
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function writeLocal(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function workToRow(work, detail) {
+    return {
+      id: String(work.id),
+      nome: work.nome,
+      cliente: work.cliente || "",
+      local: work.local || "",
+      status_exec: work.status || work.status_exec || "Projeto",
+      progresso: Number(work.pct ?? work.progresso ?? 0),
+      potencia_kw: Number(work.kw ?? work.potencia_kw ?? 0),
+      carregadores: work.carregadores || "",
+      criticas: Number(work.crit ?? work.criticas ?? 0),
+      origem: "app",
+      raw_data: detail || work,
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  function rowToWork(row) {
+    const raw = row.raw_data || {};
+    return {
+      id: row.id,
+      nome: row.nome,
+      cliente: row.cliente || raw.cliente || row.nome,
+      local: row.local || raw.local || "",
+      status: row.status_exec || raw.status || "Projeto",
+      kind: raw.kind || ((row.criticas || 0) ? "danger" : "warn"),
+      pct: Number(row.progresso || 0),
+      kw: Number(row.potencia_kw || 0),
+      carregadores: row.carregadores || raw.carregadores || "",
+      crit: Number(row.criticas || 0),
+      flags: raw.flags || [],
+      link: raw.link || (row.id === "rio" ? "gestao_obra_ev_detalhe.html" : `gestao_obra_ev_detalhe.html?obra=${row.id}`)
+    };
+  }
+
+  function taskToRow(task) {
+    return {
+      id: String(task.id),
+      titulo: task.title,
+      projeto: task.project || "",
+      responsavel: task.owner || "",
+      prazo: task.due || null,
+      prioridade: task.priority || "Media",
+      status: task.status || "Pendente",
+      observacao: task.note || "",
+      raw_data: task,
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  function rowToTask(row) {
+    return {
+      id: row.id,
+      title: row.titulo,
+      project: row.projeto || "",
+      owner: row.responsavel || "",
+      due: row.prazo || "",
+      priority: row.prioridade || "Media",
+      status: row.status || "Pendente",
+      note: row.observacao || ""
+    };
+  }
+
+  async function cloudSelect(table, columns = "*") {
+    const user = await requireUser();
+    if (!user) return null;
+    const { data, error } = await window.UBY_SUPABASE.client().from(table).select(columns);
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function loadWorks(fallback) {
+    try {
+      const rows = await cloudSelect("obras");
+      if (!rows) return fallback;
+      const works = rows.map(rowToWork);
+      if (works.length) writeLocal(WORKS_KEY, works);
+      return works.length ? works : fallback;
+    } catch (err) {
+      console.warn("Falha ao ler obras no Supabase:", err.message);
+      return fallback;
+    }
+  }
+
+  async function saveWork(work, detail) {
+    writeLocal(WORKS_KEY, mergeLocalWork(work));
+    const user = await requireUser();
+    if (!user) return { cloud: false };
+    const { error } = await window.UBY_SUPABASE.client().from("obras").upsert(workToRow(work, detail), { onConflict: "id" });
+    if (error) throw error;
+    return { cloud: true };
+  }
+
+  function mergeLocalWork(work) {
+    const current = readLocal(WORKS_KEY, []);
+    const idx = current.findIndex(item => item.id === work.id);
+    if (idx >= 0) current[idx] = { ...current[idx], ...work };
+    else current.unshift(work);
+    return current;
+  }
+
+  async function deleteWork(id) {
+    writeLocal(WORKS_KEY, readLocal(WORKS_KEY, []).filter(item => item.id !== id));
+    const user = await requireUser();
+    if (!user) return { cloud: false };
+    const { error } = await window.UBY_SUPABASE.client().from("obras").delete().eq("id", id);
+    if (error) throw error;
+    return { cloud: true };
+  }
+
+  async function loadDetail(id, fallback) {
+    try {
+      const user = await requireUser();
+      if (!user) return fallback;
+      const { data, error } = await window.UBY_SUPABASE.client().from("obras").select("raw_data").eq("id", id).maybeSingle();
+      if (error) throw error;
+      return data?.raw_data?.project ? data.raw_data : fallback;
+    } catch (err) {
+      console.warn("Falha ao ler detalhe no Supabase:", err.message);
+      return fallback;
+    }
+  }
+
+  async function saveDetail(id, detail, card) {
+    localStorage.setItem(`uby-obra-detalhe-${id}`, JSON.stringify(detail));
+    return await saveWork(card, detail);
+  }
+
+  async function loadTasks(fallback) {
+    try {
+      const rows = await cloudSelect("operational_tasks");
+      if (!rows) return fallback;
+      const tasks = rows.map(rowToTask);
+      if (tasks.length) writeLocal(TASKS_KEY, tasks);
+      return tasks.length ? tasks : fallback;
+    } catch (err) {
+      console.warn("Falha ao ler tarefas no Supabase:", err.message);
+      return fallback;
+    }
+  }
+
+  async function saveTasks(tasks) {
+    writeLocal(TASKS_KEY, tasks);
+    const user = await requireUser();
+    if (!user) return { cloud: false };
+    const rows = tasks.map(taskToRow);
+    if (rows.length) {
+      const { error } = await window.UBY_SUPABASE.client().from("operational_tasks").upsert(rows, { onConflict: "id" });
+      if (error) throw error;
+    }
+    return { cloud: true };
+  }
+
+  async function deleteTask(id) {
+    const user = await requireUser();
+    if (!user) return { cloud: false };
+    const { error } = await window.UBY_SUPABASE.client().from("operational_tasks").delete().eq("id", id);
+    if (error) throw error;
+    return { cloud: true };
+  }
+
+  async function loadProspects(fallback) {
+    try {
+      const rows = await cloudSelect("prospeccao_areas");
+      if (!rows || !rows.length) return fallback;
+      return rows.map(row => ({
+        ...(row.raw_data || {}),
+        id: row.id,
+        ponto: row.ponto,
+        cidade: row.cidade,
+        uf: row.uf,
+        prioridade: row.prioridade,
+        tipo: row.tipo,
+        status: row.status,
+        etapa: row.etapa,
+        contato: row.contato,
+        kw: row.potencia_kw ? String(row.potencia_kw) : row.raw_data?.kw || ""
+      }));
+    } catch (err) {
+      console.warn("Falha ao ler prospeccao no Supabase:", err.message);
+      return fallback;
+    }
+  }
+
+  window.UBY_STORE = {
+    available,
+    loadWorks,
+    saveWork,
+    deleteWork,
+    loadDetail,
+    saveDetail,
+    loadTasks,
+    saveTasks,
+    deleteTask,
+    loadProspects
+  };
+})();

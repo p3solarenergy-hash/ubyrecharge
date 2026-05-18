@@ -1,6 +1,6 @@
 (function () {
   const config = window.UBY_SUPABASE_CONFIG || {};
-  const managedPrefixes = ["uby-obra-detalhe-", "uby-obras-dashboard", "uby-tarefas", "uby-auth-", "uby-engineering-", "uby-material-", "p3_obras_theme", "uby-sidebar"];
+  const managedPrefixes = ["uby-obra-detalhe-", "uby-obras-dashboard", "uby-tarefas", "uby-auth-", "uby-engineering-", "uby-material-", "uby-activity", "uby-messages", "p3_obras_theme", "uby-sidebar"];
 
   function configured() {
     return Boolean(config.enabled && config.url && config.anonKey && window.supabase);
@@ -182,6 +182,43 @@
     return data.user || null;
   }
 
+  async function currentProfile() {
+    const sb = client();
+    if (!sb) return null;
+    const user = await currentUser();
+    if (!user) return null;
+    const { data, error } = await sb
+      .from("profiles")
+      .select("id,nome,perfil")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? { ...data, email: user.email } : null;
+  }
+
+  async function upsertProspects(items) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const payload = (items || []).map(item => ({
+      id: String(item.id),
+      ponto: item.ponto,
+      cidade: item.cidade || "",
+      uf: item.uf || "",
+      prioridade: item.prioridade || "",
+      tipo: item.tipo || "",
+      status: item.status || "",
+      etapa: item.etapa || "",
+      contato: item.contato || "",
+      potencia_kw: Number(item.kw || 0),
+      raw_data: item,
+      updated_at: new Date().toISOString()
+    }));
+    if (!payload.length) return { count: 0 };
+    const { error } = await sb.from("prospeccao_areas").upsert(payload, { onConflict: "id" });
+    if (error) throw error;
+    return { count: payload.length };
+  }
+
   window.UBY_SUPABASE = {
     configured,
     client,
@@ -191,6 +228,8 @@
     cloudStatus,
     signIn,
     signOut,
-    currentUser
+    currentUser,
+    currentProfile,
+    upsertProspects
   };
 })();

@@ -29,6 +29,120 @@
   footer{text-align:center;padding:24px 0;color:var(--p3-muted);font-size:11px;margin-top:30px;border-top:1px solid var(--p3-border)}footer strong{color:var(--p3-primary)}
   [data-theme="light"]{--p3-primary:#0F3D2E;--p3-primary-deep:#0F3D2E;--p3-accent:#2EA85C;--p3-accent-2:#FFB300;--p3-bg:#F5F7F6;--p3-card:#FFFFFF;--p3-text:#1F2A24;--p3-muted:#5C6B62;--p3-border:#E2E8E4;--p3-danger:#C0392B;--p3-warn:#E08E0B;--p3-ok:#1F8A4C;--p3-shadow:0 1px 3px rgba(15,61,46,.06),0 4px 12px rgba(15,61,46,.05)}[data-theme="light"] .header{background:linear-gradient(135deg,#0F3D2E 0%,#155340 100%)}[data-theme="light"] .logo-mark{background:#2EA85C;color:#fff;border:none}[data-theme="light"] .controls,[data-theme="light"] .phase,[data-theme="light"] .ctrl input,[data-theme="light"] .ctrl select,[data-theme="light"] .note{background:#FAFCFA}
   @media(max-width:880px){.kpis,.header-meta,.controls,.section-grid{grid-template-columns:repeat(2,1fr)}.task,.phase-head{grid-template-columns:1fr}}@media(max-width:620px){.page{padding:18px 14px 60px}.kpis,.header-meta,.controls,.section-grid{grid-template-columns:1fr}.header{padding:26px 22px}.nav-back{position:static;display:inline-block;margin-bottom:14px}}
+
+
+  /* === UBY THEME STANDARD === */
+  .ghost-btn,.analyzer-links a,.mini-link,.nav a:not(.main),.tiny-btn{
+    border-color:#345447;
+    background:#101B16;
+    color:#E8EFEB;
+  }
+  .ghost-btn:hover,.analyzer-links a:hover,.mini-link:hover,.nav a:not(.main):hover,.tiny-btn:hover{
+    border-color:var(--p3-accent);
+    background:#14231C;
+  }
+  .new-btn,.primary-btn,.primary-link,.analyzer-links a.main,.mini-link.primary,.nav a.main{
+    background:#2EA85C;
+    border-color:#2EA85C;
+    color:#FFFFFF;
+  }
+  .new-btn:hover,.primary-btn:hover,.primary-link:hover,.analyzer-links a.main:hover,.mini-link.primary:hover,.nav a.main:hover{
+    background:#248F50;
+    border-color:#248F50;
+  }
+  .theme-toggle{
+    background:#16221E;
+    color:#E8EFEB;
+    border-color:#345447;
+  }
+  [data-theme="light"] .ghost-btn,
+  [data-theme="light"] .analyzer-links a,
+  [data-theme="light"] .mini-link,
+  [data-theme="light"] .nav a:not(.main),
+  [data-theme="light"] .tiny-btn{
+    background:#FFFFFF !important;
+    color:#0F3D2E !important;
+    border-color:#B7D9C4 !important;
+  }
+  [data-theme="light"] .ghost-btn:hover,
+  [data-theme="light"] .analyzer-links a:hover,
+  [data-theme="light"] .mini-link:hover,
+  [data-theme="light"] .nav a:not(.main):hover,
+  [data-theme="light"] .tiny-btn:hover{
+    background:#EAF6EF !important;
+    border-color:#2EA85C !important;
+  }
+  [data-theme="light"] .new-btn,
+  [data-theme="light"] .primary-btn,
+  [data-theme="light"] .primary-link,
+  [data-theme="light"] .analyzer-links a.main,
+  [data-theme="light"] .mini-link.primary,
+  [data-theme="light"] .nav a.main{
+    background:#2EA85C !important;
+    border-color:#2EA85C !important;
+    color:#FFFFFF !important;
+  }
+  [data-theme="light"] .stat,
+  [data-theme="light"] .compare-section,
+  [data-theme="light"] .analyzer-section,
+  [data-theme="light"] .cloud-panel,
+  [data-theme="light"] .prospect-section,
+  [data-theme="light"] .panel,
+  [data-theme="light"] section,
+  [data-theme="light"] .report-card,
+  [data-theme="light"] .new-panel{
+    background:#FFFFFF !important;
+    color:#1F2A24 !important;
+    border-color:#D9E5DE !important;
+  }
+  [data-theme="light"] .phase-mini,
+  [data-theme="light"] .macro-item,
+  [data-theme="light"] .prospect-row,
+  [data-theme="light"] .work-card,
+  [data-theme="light"] .task-block,
+  [data-theme="light"] .planner-row,
+  [data-theme="light"] .chart-card,
+  [data-theme="light"] .analysis-card,
+  [data-theme="light"] .agent-card,
+  [data-theme="light"] .library-card,
+  [data-theme="light"] .doc-card,
+  [data-theme="light"] .agent-item,
+  [data-theme="light"] .insight{
+    background:#FAFCFA !important;
+    color:#1F2A24 !important;
+    border-color:#D9E5DE !important;
+  }
+  [data-theme="light"] input,
+  [data-theme="light"] select,
+  [data-theme="light"] textarea,
+  [data-theme="light"] .note{
+    background:#FFFFFF !important;
+    color:#1F2A24 !important;
+    border-color:#B7D9C4 !important;
+  }
+  [data-theme="light"] .progress,
+  [data-theme="light"] .pipeline-track,
+  [data-theme="light"] .mini-track,
+  [data-theme="light"] .seg{
+    background:#E7EFEA !important;
+  }
+  [data-theme="light"] .theme-toggle{
+    background:#FFFFFF !important;
+    color:#0F3D2E !important;
+    border-color:#D9E5DE !important;
+  }
+  .activity-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .activity-panel{background:#1A2622;border:1px solid var(--p3-border);border-radius:10px;padding:16px}
+  .activity-panel h3{font-size:14px;color:var(--p3-primary);margin-bottom:10px}
+  .message-compose{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px}
+  .message-compose textarea{min-height:76px;border:1px solid var(--p3-border);border-radius:8px;background:#121d18;color:var(--p3-text);padding:10px;resize:vertical;font-family:inherit}
+  .activity-list{display:grid;gap:8px;max-height:330px;overflow:auto}
+  .activity-item{background:#121d18;border:1px solid var(--p3-border);border-left:3px solid var(--p3-accent);border-radius:8px;padding:10px}
+  .activity-item strong{display:block;color:var(--p3-text);font-size:12px;margin-bottom:3px}
+  .activity-item span{display:block;color:var(--p3-muted);font-size:11px;line-height:1.4}
+  .activity-item .meta{color:var(--p3-primary);font-weight:800;text-transform:uppercase;letter-spacing:.4px;font-size:9px;margin-bottom:4px}
+  @media(max-width:880px){.activity-grid{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
@@ -155,7 +269,25 @@
     <div class="docs-grid" id="docsGrid"></div>
   </section>
 
-  <div class="part-divider"><div class="num">5</div><div><h2>Checklist operacional</h2><p>Marque OK ou N/A para liberar o progresso ate 100%.</p></div></div>
+  <div class="part-divider"><div class="num">5</div><div><h2>Historico e mensagens</h2><p>Registro de quem alterou o que e conversa interna da obra.</p></div></div>
+  <section>
+    <div class="activity-grid">
+      <div class="activity-panel">
+        <h3>Mensagens da obra</h3>
+        <div class="message-compose">
+          <textarea id="projectMessageText" placeholder="Escreva uma mensagem para esta obra..."></textarea>
+          <button class="primary-link" type="button" id="sendProjectMessage">Enviar</button>
+        </div>
+        <div class="activity-list" id="projectMessages"></div>
+      </div>
+      <div class="activity-panel">
+        <h3>Ultimas alteracoes</h3>
+        <div class="activity-list" id="projectActivity"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="part-divider"><div class="num">6</div><div><h2>Checklist operacional</h2><p>Marque OK ou N/A para liberar o progresso ate 100%.</p></div></div>
   <section id="checklist"></section>
 
   <footer><strong>P3 Energy</strong> - Prototipo dedicado da obra EV<br>Dados salvos no navegador para teste visual antes de anexar a plataforma.</footer>
@@ -164,6 +296,11 @@
 <script src="sidebar.js"></script>
 <script src="backup_guard.js"></script>
 <script src="drive_config.js"></script>
+<script src="supabase_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_bridge.js"></script>
+<script src="app_store.js"></script>
+<script src="activity.js"></script>
 <script>
 const themeKey="p3_obras_theme";const root=document.documentElement;const themeBtn=document.getElementById("themeToggle");function applyTheme(t){root.setAttribute("data-theme",t);themeBtn.textContent=t==="light"?"Lua":"Sol"}applyTheme(localStorage.getItem(themeKey)||"dark");themeBtn.onclick=()=>{const nxt=root.getAttribute("data-theme")==="light"?"dark":"light";localStorage.setItem(themeKey,nxt);applyTheme(nxt)};
 const statusDef={pending:{label:"Pendente",short:"P",color:"#8FA39A"},doing:{label:"Em andamento",short:"...",color:"#F2A93D"},done:{label:"Concluido",short:"OK",color:"#3FB66B"},na:{label:"Nao se aplica",short:"N/A",color:"#6CBCFF"}};
@@ -224,7 +361,7 @@ const availableReports=[
 ];
 let analysis=analysisMap[obraParam]||analysisMap.rio;
 let state=load();function load(){try{return migrate(JSON.parse(localStorage.getItem(storeKey))||structuredClone(base))}catch{return migrate(structuredClone(base))}}function migrate(saved){saved.project={prospectId:"",prospectStage:"02_PONTOS_CRM",prospectLink:"https://docs.google.com/spreadsheets/d/1IiUqtF8xobzwmMkRqJiNXcT1CFW6tskEybT6GWgvvPs/edit?gid=2137351283",...base.project,...(saved.project||{})};if(!saved.project.qtdCarregadores)saved.project.qtdCarregadores=parseInt((saved.project.equip||"1 x 60").split("x")[0],10)||base.project.qtdCarregadores;if(!saved.project.potenciaCarregador)saved.project.potenciaCarregador=parseInt((saved.project.equip||"1 x 60").split("x")[1],10)||base.project.potenciaCarregador;const existing=new Map((saved.phases||[]).map(p=>[p.name,p]));saved.phases=base.phases.map(bp=>{const old=existing.get(bp.name);if(!old)return bp;const oldTasks=new Map((old.tasks||[]).map(t=>[t.title,t]));return{...bp,tasks:bp.tasks.map(bt=>({...bt,...(oldTasks.get(bt.title)||{})}))}});const oldDocs=new Map((saved.documents||[]).map(d=>[d.id,d]));saved.documents=docDefaults.map(d=>({...d,...(oldDocs.get(d.id)||{})}));if(obraParam==="rio"&&stats(saved.phases.flatMap(p=>p.tasks)).pct<1){saved.project={...saved.project,...base.project};saved.phases=base.phases}localStorage.setItem(storeKey,JSON.stringify(saved));return saved}function equipmentLabel(){const qtd=Math.max(1,parseInt(state.project.qtdCarregadores,10)||1);const kw=Math.max(1,parseInt(state.project.potenciaCarregador,10)||1);return `${qtd} x ${kw} kW (${qtd*kw} kW total)`}function save(){state.project.obraNome=document.getElementById("obraNome").value;state.project.local=document.getElementById("localObra").value;state.project.qtdCarregadores=parseInt(document.getElementById("qtdCarregadores").value,10)||1;state.project.potenciaCarregador=parseInt(document.getElementById("potenciaCarregador").value,10)||1;state.project.entrega=document.getElementById("entrega").value;state.project.statusExec=document.getElementById("statusExec").value;state.project.prospectId=document.getElementById("prospectId").value;state.project.prospectStage=document.getElementById("prospectStage").value;state.project.prospectLink=document.getElementById("prospectLink").value;localStorage.setItem(storeKey,JSON.stringify(state));render()}
-function deleteCurrentObra(){if(!confirm(`Excluir a obra "${state.project.obraNome}" deste prototipo?`))return;localStorage.removeItem(storeKey);const dashboardKey="uby-obras-dashboard-v1";const deletedKey="uby-obras-dashboard-deleted-v1";try{const obras=JSON.parse(localStorage.getItem(dashboardKey))||[];localStorage.setItem(dashboardKey,JSON.stringify(obras.filter(o=>o.id!==obraParam&&o.nome!==state.project.obraNome)));const deleted=JSON.parse(localStorage.getItem(deletedKey))||[];localStorage.setItem(deletedKey,JSON.stringify([...new Set([...deleted,obraParam])]))}catch{}window.location.href="index.html"}
+async function deleteCurrentObra(){if(!confirm(`Excluir a obra "${state.project.obraNome}" deste prototipo?`))return;localStorage.removeItem(storeKey);const dashboardKey="uby-obras-dashboard-v1";const deletedKey="uby-obras-dashboard-deleted-v1";try{const obras=JSON.parse(localStorage.getItem(dashboardKey))||[];localStorage.setItem(dashboardKey,JSON.stringify(obras.filter(o=>o.id!==obraParam&&o.nome!==state.project.obraNome)));const deleted=JSON.parse(localStorage.getItem(deletedKey))||[];localStorage.setItem(deletedKey,JSON.stringify([...new Set([...deleted,obraParam])]))}catch{}try{await window.UBY_STORE?.deleteWork(obraParam)}catch(err){alert("Obra removida localmente, mas nao foi possivel excluir no banco: "+err.message)}window.location.href="index.html"}
 function allTasks(){return state.phases.flatMap(p=>p.tasks.map(t=>({...t,phase:p.name,owner:p.owner})))}function stats(tasks){const total=tasks.length,done=tasks.filter(t=>t.status==="done").length,na=tasks.filter(t=>t.status==="na").length,doing=tasks.filter(t=>t.status==="doing").length,pending=tasks.filter(t=>t.status==="pending").length;return{total,done,na,doing,pending,pct:total?(done+na)/total:0}}
 function updateTask(phaseName,id,field,value,rerender=false){const p=state.phases.find(x=>x.name===phaseName);p.tasks.find(t=>t.id===id)[field]=value;localStorage.setItem(storeKey,JSON.stringify(state));if(rerender)render()}function setStatus(phaseName,id,status){updateTask(phaseName,id,"status",status,true)}
 function updateDoc(id,field,value){const doc=state.documents.find(d=>d.id===id);doc[field]=value;localStorage.setItem(storeKey,JSON.stringify(state));if(field==="status")renderDocuments()}function renderDocuments(){const docs=state.documents||[];const ok=docs.filter(d=>d.status==="done"||d.status==="na").length;document.getElementById("docSummary").textContent=`${ok} / ${docs.length} recebidos`;document.getElementById("docsGrid").innerHTML=docs.map(d=>`<div class="doc-card"><div class="doc-card-head"><div><strong>${d.name}</strong><br><span class="tag info">${d.phase}</span></div><span class="tag ${d.status==="done"?"ok":d.status==="na"?"info":d.status==="doing"?"warn":"danger"}">${statusDef[d.status]?.label||"Pendente"}</span></div><div class="doc-fields"><div><label>Status</label><select onchange="updateDoc('${d.id}','status',this.value)">${Object.entries(statusDef).map(([k,v])=>`<option value="${k}" ${d.status===k?"selected":""}>${v.label}</option>`).join("")}</select></div><div><label>Responsavel</label><input value="${d.owner||""}" oninput="updateDoc('${d.id}','owner',this.value)"></div><div><label>Validade / prazo</label><input type="date" value="${d.due||""}" oninput="updateDoc('${d.id}','due',this.value)"></div><div><label>Link ou pasta</label><input value="${d.link||""}" placeholder="Cole o link, caminho ou pasta" oninput="updateDoc('${d.id}','link',this.value)"></div><div class="wide"><label>Arquivo para pasta da obra</label><input type="file" onchange="uploadDocFile('${d.id}',this.files[0])"></div></div>${d.link?`<div class="library-actions"><a class="mini-link" href="${normalizeAnalysisPath(d.link)}" target="_blank" rel="noopener">Abrir documento</a></div>`:""}</div>`).join("")}
@@ -234,8 +371,12 @@ document.getElementById("phaseRows").innerHTML=state.phases.map(p=>{const ps=sta
 document.getElementById("criticalRows").innerHTML=crit.length?crit.slice(0,8).map(t=>`<tr><td>${t.phase}</td><td>${t.title}<br><span class="tag ${t.status==="doing"?"warn":"danger"}">${statusDef[t.status].label}</span></td><td>${t.forecastDate?`Prev. ${formatDate(t.forecastDate)}<br>`:""}${t.protocol?`Prot. ${t.protocol}`:"-"}</td></tr>`).join(""):`<tr><td colspan="3"><span class="tag ok">Sem pendencias criticas</span></td></tr>`;
 document.getElementById("checklist").innerHTML=state.phases.map((p,idx)=>{const ps=stats(p.tasks);return`<div class="phase"><div class="phase-head"><div><div class="phase-title">${idx+1}. ${p.name}</div><div class="phase-owner">${p.owner} - ${Math.round(ps.pct*100)}% concluido</div></div><div class="progress"><div class="bar" style="width:${ps.pct*100}%"></div></div></div><div class="phase-body">${p.tasks.map(t=>taskHtml(p.name,t)).join("")}</div></div>`}).join("")}
 function shouldShowProtocol(phaseName,title){return phaseName==="Concessionaria"&&/pedido|consulta/i.test(title)}function formatDate(value){if(!value)return"";const [y,m,d]=value.split("-");return `${d}/${m}/${y}`}function taskHtml(phaseName,t){const showDeadlines=shouldShowProtocol(phaseName,t.title);return`<div class="task"><div><strong>${t.title}</strong><small>${statusDef[t.status].label}${showDeadlines&&t.protocol?" - Protocolo "+t.protocol:""}${showDeadlines&&t.forecastDate?" - Prev. "+formatDate(t.forecastDate):""}</small></div><div class="seg">${Object.entries(statusDef).map(([k,v])=>`<button class="${t.status===k?"active":""}" style="--c:${v.color}" onclick="setStatus('${phaseName}','${t.id}','${k}')">${v.short}</button>`).join("")}</div><div class="task-extra">${showDeadlines?`<div class="mini-field extra-wide"><label>Protocolo</label><input value="${t.protocol||""}" oninput="updateTask('${phaseName}','${t.id}','protocol',this.value)"></div><div class="mini-field"><label>Data do pedido</label><input type="date" value="${t.requestDate||""}" oninput="updateTask('${phaseName}','${t.id}','requestDate',this.value)"></div><div class="mini-field"><label>Data prevista</label><input type="date" value="${t.forecastDate||""}" oninput="updateTask('${phaseName}','${t.id}','forecastDate',this.value)"></div>`:""}<div class="mini-field extra-wide"><label>Observacao</label><textarea class="note" placeholder="Observacao" oninput="updateTask('${phaseName}','${t.id}','note',this.value)">${t.note||""}</textarea></div></div></div>`}
+function workLabel(){return state.project.obraNome||obraParam||"Obra"}
+function recordProjectChange(type,title,detail,field,before,after){window.UBY_ACTIVITY?.record({workId:obraParam,workName:workLabel(),type,title,detail,field,before,after})}
+function renderProjectActivity(){if(!window.UBY_ACTIVITY)return;const acts=window.UBY_ACTIVITY.list({workId:obraParam,limit:24});document.getElementById("projectActivity").innerHTML=acts.map(item=>`<div class="activity-item"><div class="meta">${window.UBY_ACTIVITY.nowLabel(item.createdAt)} - ${item.user?.label||"Usuario"}</div><strong>${item.title||window.UBY_ACTIVITY.summarize(item)}</strong><span>${item.detail||""}${item.after?`<br><b>Valor:</b> ${item.after}`:""}</span></div>`).join("")||'<div class="activity-item"><strong>Sem alteracoes registradas ainda</strong><span>As proximas edicoes da obra aparecerao aqui com usuario e horario.</span></div>';const msgs=window.UBY_ACTIVITY.messages({workId:obraParam,limit:24});document.getElementById("projectMessages").innerHTML=msgs.map(item=>`<div class="activity-item"><div class="meta">${window.UBY_ACTIVITY.nowLabel(item.createdAt)} - ${item.user?.label||"Usuario"}</div><strong>${item.workName}</strong><span>${item.text}</span></div>`).join("")||'<div class="activity-item"><strong>Nenhuma mensagem nesta obra</strong><span>Use o campo acima para alinhar pendencias com a equipe.</span></div>'}
+function sendProjectMessage(){const input=document.getElementById("projectMessageText");const msg=window.UBY_ACTIVITY?.sendMessage({workId:obraParam,workName:workLabel(),text:input.value});if(msg){input.value="";renderProjectActivity()}}
 function renderAgentV2(){loadSavedAnalysis();const tasks=allTasks();const s=stats(tasks);const kw=parseInt(state.project.potenciaCarregador,10)||0;const qtd=parseInt(state.project.qtdCarregadores,10)||0;const totalKw=qtd*kw;const docs=state.documents||[];const missingDocs=docs.filter(d=>d.status==="pending"||d.status==="doing");const crit=tasks.filter(t=>["Concessionaria","Orcamentos e contratacoes","Materiais e equipamentos","Obra eletrica"].includes(t.phase)&&["pending","doing"].includes(t.status));const worstPhase=[...state.phases].map(p=>({name:p.name,pct:stats(p.tasks).pct})).sort((a,b)=>a.pct-b.pct)[0];const insights=[];const questions=[];if(state.project.statusExec==="Concluida"||s.pct===1){insights.push(["Fechamento de obra",`${state.project.obraNome} esta operacionalmente completa. Foco em evidencias, termo de entrega, fotos finais e historico tecnico.`, "ok"])}else if(worstPhase){insights.push(["Gargalo atual",`${worstPhase.name} esta em ${Math.round(worstPhase.pct*100)}%. Essa fase deve orientar a proxima cobranca da equipe ou fornecedor.`, worstPhase.pct<.4?"danger":"warn"])}if(totalKw>=100)insights.push(["Projeto de alto impacto",`${totalKw} kW muda a conversa com concessionaria: demanda, trafo, DLM e protecao precisam estar fechados antes de compra pesada.`,"danger"]);else if(totalKw>=50)insights.push(["Carga relevante",`${totalKw} kW exige confirmar medicao, padrao, DLM e queda de tensao antes de liberar execucao eletrica.`,"warn"]);else insights.push(["Carga AC/baixa potencia",`${totalKw} kW tende a ser mais simples, mas precisa validar experiencia do usuario, vaga dedicada e tempo de recarga esperado.`,"ok"]);if(analysis.url==="#")insights.push(["Analisador ausente","Sem relatorio vinculado, a decisao de potencia ainda esta comercial demais. Vincule o analisador antes de fechar concessionaria.","warn"]);else insights.push(["Analisador aplicado",`${analysis.peak} de pico e ${analysis.consumption} estimado. Acao tecnica indicada: ${analysis.action}.`,analysis.status.includes("parcial")||analysis.status.includes("baixa")?"warn":"ok"]);if(state.project.prospectId)insights.push(["Origem rastreada",`Esta obra veio do ponto ${state.project.prospectId} da prospeccao. Mantenha o par atualizado para nao perder historico comercial e tecnico.`,"ok"]);if(missingDocs.length)insights.push(["Documentacao pendente",`${missingDocs.length} documento(s) ainda nao recebidos. Prioridade: ${missingDocs[0].name}.`,"warn"]);questions.push(["Decisao executiva",crit.length?`Quais das ${crit.length} pendencias criticas impedem obra fisica ou compra de materiais?`:"Existe algum item externo fora do checklist que ainda trava entrega?"]);questions.push(["Concessionaria",totalKw>=50?"O pedido de aumento/segundo padrao esta sustentado por medicao e protocolo?":"A instalacao pode ser atendida pelo padrao atual sem piorar demanda do local?"]);questions.push(["Documento-chave",missingDocs[0]?`Quem entrega ${missingDocs[0].name} e ate quando?`:"Os documentos finais ja estao salvos no historico da obra?"]);document.getElementById("agentInsights").innerHTML=insights.slice(0,5).map(i=>`<div class="agent-item ${i[2]||""}"><strong>${i[0]}</strong><span>${i[1]}</span></div>`).join("");document.getElementById("agentQuestions").innerHTML=questions.map(q=>`<div class="agent-item"><strong>${q[0]}</strong><span>${q[1]}</span></div>`).join("")}
-function dashboardCardFromState(){const tasks=allTasks();const s=stats(tasks);const qtd=Math.max(1,parseInt(state.project.qtdCarregadores,10)||1);const kw=Math.max(1,parseInt(state.project.potenciaCarregador,10)||1);const crit=tasks.filter(t=>["Concessionaria","Orcamentos e contratacoes","Materiais e equipamentos","Obra eletrica"].includes(t.phase)&&["pending","doing"].includes(t.status));const flags=crit.slice(0,3).map(t=>t.title);return{id:obraParam,nome:state.project.obraNome,cliente:state.project.cliente||state.project.obraNome,local:state.project.local,status:state.project.statusExec,kind:s.pct>=1?"ok":crit.length?"danger":"warn",pct:Math.round(s.pct*100),kw:qtd*kw,carregadores:`${qtd} x ${kw} kW`,crit:crit.length,flags:flags.length?flags:(s.pct>=1?["Obra completa"]:["Obra criada"]),link:obraParam==="rio"?"gestao_obra_ev_detalhe.html":`gestao_obra_ev_detalhe.html?obra=${obraParam}`}}function persistDashboardCard(){const dashboardKey="uby-obras-dashboard-v1";try{const obras=JSON.parse(localStorage.getItem(dashboardKey))||[];const card=dashboardCardFromState();const idx=obras.findIndex(o=>o.id===card.id);if(idx>=0)obras[idx]={...obras[idx],...card};else obras.unshift(card);localStorage.setItem(dashboardKey,JSON.stringify(obras))}catch{}}async function uploadDocFile(docId,file){if(!file)return;const cfg=window.UBY_DRIVE_CONFIG||{};if(!cfg.APPS_SCRIPT_URL){alert("A estrutura da pasta da obra ja esta preparada, mas falta publicar o conector do Google Drive. Por enquanto cole o link do arquivo ou da pasta no campo acima.");return}const reader=new FileReader();reader.onload=async()=>{try{const base64=String(reader.result).split(",")[1];const resp=await fetch(cfg.APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"uploadFile",workId:obraParam,workName:state.project.obraNome,folderId:cfg.KNOWN_OBRA_FOLDERS?.[obraParam]||"",documentId:docId,fileName:file.name,mimeType:file.type||"application/octet-stream",base64})});const data=await resp.json();if(!data.ok)throw new Error(data.error||"Falha no envio");updateDoc(docId,"link",data.webViewLink||data.url||"");updateDoc(docId,"status","done");persistDashboardCard();render();alert("Arquivo enviado para a pasta da obra no Drive.")}catch(err){alert("Nao foi possivel enviar para o Drive: "+err.message)}};reader.readAsDataURL(file)}const originalSave=save;save=function(){originalSave();persistDashboardCard()};const originalUpdateTask=updateTask;updateTask=function(phaseName,id,field,value,rerender=false){originalUpdateTask(phaseName,id,field,value,rerender);persistDashboardCard()};const originalUpdateDoc=updateDoc;updateDoc=function(id,field,value){originalUpdateDoc(id,field,value);persistDashboardCard()};renderAgent=renderAgentV2;["obraNome","localObra","qtdCarregadores","potenciaCarregador","entrega","statusExec","prospectId","prospectStage","prospectLink"].forEach(id=>document.getElementById(id).addEventListener("change",save));document.getElementById("deleteObraBtn").addEventListener("click",deleteCurrentObra);document.getElementById("analysisApply").addEventListener("click",applyAnalysisToWork);document.getElementById("analysisChoose").addEventListener("click",chooseAnalysisFile);document.getElementById("analysisSavePath").addEventListener("click",saveAnalysisPath);document.getElementById("analysisUseSelected").addEventListener("click",useSelectedReport);document.getElementById("analysisSearch").addEventListener("input",renderAvailableReports);document.getElementById("analysisFile").addEventListener("change",e=>handleAnalysisFile(e.target.files[0]));render();persistDashboardCard();
+function dashboardCardFromState(){const tasks=allTasks();const s=stats(tasks);const qtd=Math.max(1,parseInt(state.project.qtdCarregadores,10)||1);const kw=Math.max(1,parseInt(state.project.potenciaCarregador,10)||1);const crit=tasks.filter(t=>["Concessionaria","Orcamentos e contratacoes","Materiais e equipamentos","Obra eletrica"].includes(t.phase)&&["pending","doing"].includes(t.status));const flags=crit.slice(0,3).map(t=>t.title);return{id:obraParam,nome:state.project.obraNome,cliente:state.project.cliente||state.project.obraNome,local:state.project.local,status:state.project.statusExec,kind:s.pct>=1?"ok":crit.length?"danger":"warn",pct:Math.round(s.pct*100),kw:qtd*kw,carregadores:`${qtd} x ${kw} kW`,crit:crit.length,flags:flags.length?flags:(s.pct>=1?["Obra completa"]:["Obra criada"]),link:obraParam==="rio"?"gestao_obra_ev_detalhe.html":`gestao_obra_ev_detalhe.html?obra=${obraParam}`}}function persistDashboardCard(){const dashboardKey="uby-obras-dashboard-v1";try{const obras=JSON.parse(localStorage.getItem(dashboardKey))||[];const card=dashboardCardFromState();const idx=obras.findIndex(o=>o.id===card.id);if(idx>=0)obras[idx]={...obras[idx],...card};else obras.unshift(card);localStorage.setItem(dashboardKey,JSON.stringify(obras))}catch{}}const persistDashboardCardLocal=persistDashboardCard;persistDashboardCard=async function(){persistDashboardCardLocal();try{await window.UBY_STORE?.saveDetail(obraParam,state,dashboardCardFromState())}catch(err){console.warn("Nao foi possivel salvar detalhe no banco:",err.message)}};async function initCloudDetail(){try{const cloud=await window.UBY_STORE?.loadDetail(obraParam,state);if(cloud&&cloud.project){state=migrate(cloud);render();await persistDashboardCard()}}catch(err){console.warn("Nao foi possivel carregar detalhe do banco:",err.message)}}async function uploadDocFile(docId,file){if(!file)return;const cfg=window.UBY_DRIVE_CONFIG||{};if(!cfg.APPS_SCRIPT_URL){alert("A estrutura da pasta da obra ja esta preparada, mas falta publicar o conector do Google Drive. Por enquanto cole o link do arquivo ou da pasta no campo acima.");return}const reader=new FileReader();reader.onload=async()=>{try{const base64=String(reader.result).split(",")[1];const resp=await fetch(cfg.APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"uploadFile",workId:obraParam,workName:state.project.obraNome,folderId:cfg.KNOWN_OBRA_FOLDERS?.[obraParam]||"",documentId:docId,fileName:file.name,mimeType:file.type||"application/octet-stream",base64})});const data=await resp.json();if(!data.ok)throw new Error(data.error||"Falha no envio");updateDoc(docId,"link",data.webViewLink||data.url||"");updateDoc(docId,"status","done");persistDashboardCard();render();alert("Arquivo enviado para a pasta da obra no Drive.")}catch(err){alert("Nao foi possivel enviar para o Drive: "+err.message)}};reader.readAsDataURL(file)}const originalSave=save;save=function(){const before=JSON.stringify(state.project);originalSave();if(before!==JSON.stringify(state.project))recordProjectChange("project","Dados da obra atualizados","Campos gerais da obra foram alterados.","project","",state.project.statusExec||"");persistDashboardCard()};const originalUpdateTask=updateTask;updateTask=function(phaseName,id,field,value,rerender=false){const phase=state.phases.find(x=>x.name===phaseName);const task=phase?.tasks.find(t=>t.id===id);const before=task?task[field]:"";originalUpdateTask(phaseName,id,field,value,rerender);if(String(before||"")!==String(value||"")){const type=field==="protocol"?"protocol":field==="status"?"status":"update";const label={protocol:"Protocolo",status:"Status",requestDate:"Data do pedido",forecastDate:"Data prevista",note:"Observacao"}[field]||field;recordProjectChange(type,task?.title||"Checklist",label+" alterado em "+phaseName,field,before,value)}persistDashboardCard();renderProjectActivity()};const originalUpdateDoc=updateDoc;updateDoc=function(id,field,value){const doc=state.documents.find(d=>d.id===id);const before=doc?doc[field]:"";originalUpdateDoc(id,field,value);if(String(before||"")!==String(value||""))recordProjectChange("document",doc?.name||"Documento","Documento atualizado",field,before,value);persistDashboardCard();renderProjectActivity()};const originalSaveAnalysisLink=saveAnalysisLink;saveAnalysisLink=function(url,title,kind,meta={}){const before=analysis.url;originalSaveAnalysisLink(url,title,kind,meta);recordProjectChange("analysis",title||"Analise vinculada","Relatorio do analisador vinculado a obra","analysis",before,url);renderProjectActivity()};const originalRender=render;render=function(){originalRender();renderProjectActivity()};renderAgent=renderAgentV2;["obraNome","localObra","qtdCarregadores","potenciaCarregador","entrega","statusExec","prospectId","prospectStage","prospectLink"].forEach(id=>document.getElementById(id).addEventListener("change",save));document.getElementById("deleteObraBtn").addEventListener("click",deleteCurrentObra);document.getElementById("analysisApply").addEventListener("click",applyAnalysisToWork);document.getElementById("analysisChoose").addEventListener("click",chooseAnalysisFile);document.getElementById("analysisSavePath").addEventListener("click",saveAnalysisPath);document.getElementById("analysisUseSelected").addEventListener("click",useSelectedReport);document.getElementById("analysisSearch").addEventListener("input",renderAvailableReports);document.getElementById("analysisFile").addEventListener("change",e=>handleAnalysisFile(e.target.files[0]));document.getElementById("sendProjectMessage").addEventListener("click",sendProjectMessage);render();persistDashboardCard();initCloudDetail();
 </script>
 </body>
 </html>
