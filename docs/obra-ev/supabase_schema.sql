@@ -231,6 +231,32 @@ create policy "obra app all atividade" on public.obra_atividade for all to authe
 create policy "obra app all mensagens" on public.obra_mensagens for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
 create policy "admin all snapshots" on public.obra_snapshots for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
+insert into storage.buckets (id, name, public)
+values ('obra-documentos', 'obra-documentos', false)
+on conflict (id) do nothing;
+
+drop policy if exists "admin read obra documentos storage" on storage.objects;
+drop policy if exists "admin insert obra documentos storage" on storage.objects;
+drop policy if exists "admin update obra documentos storage" on storage.objects;
+drop policy if exists "admin delete obra documentos storage" on storage.objects;
+
+create policy "admin read obra documentos storage"
+on storage.objects for select to authenticated
+using (bucket_id = 'obra-documentos' and public.is_admin());
+
+create policy "admin insert obra documentos storage"
+on storage.objects for insert to authenticated
+with check (bucket_id = 'obra-documentos' and public.is_admin());
+
+create policy "admin update obra documentos storage"
+on storage.objects for update to authenticated
+using (bucket_id = 'obra-documentos' and public.is_admin())
+with check (bucket_id = 'obra-documentos' and public.is_admin());
+
+create policy "admin delete obra documentos storage"
+on storage.objects for delete to authenticated
+using (bucket_id = 'obra-documentos' and public.is_admin());
+
 -- Depois de criar seu usuario em Authentication > Users, rode uma vez:
 -- insert into public.profiles (id, nome, perfil)
 -- select id, email, 'admin'

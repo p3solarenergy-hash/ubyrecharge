@@ -12,35 +12,15 @@
       ? "../obra-ev/engenharia.html"
       : "engenharia.html";
 
-  const profiles = {
-    eduardo: {
-      id: "eduardo",
-      email: "eduardoprochet@gmail.com",
-      label: "Eduardo / Admin",
-      role: "admin",
-      modules: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "documents", "analyzers", "tasks", "backup", "login"]
-    },
-    p3solar: {
-      id: "p3solar",
-      email: "p3solarenergy@gmail.com",
-      label: "P3 Solar / Admin",
-      role: "admin",
-      modules: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "documents", "analyzers", "tasks", "backup", "login"]
-    },
-    engineer: {
-      id: "engineer",
-      email: "eng.alanbrunelli@gmail.com",
-      label: "Alan / Engenharia",
-      role: "engineering",
-      modules: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "analyzers", "login"]
-    }
+  const roleModules = {
+    admin: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "documents", "analyzers", "tasks", "backup", "login"],
+    engenharia: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "analyzers", "login"]
   };
 
-  const users = [
-    { email: profiles.eduardo.email, profile: "eduardo", passwordHash: "a59dda367b884701d91d10c157927d6e540c8b8c6f07c88fa6ebd3d93671128a" },
-    { email: profiles.p3solar.email, profile: "p3solar", passwordHash: "a59dda367b884701d91d10c157927d6e540c8b8c6f07c88fa6ebd3d93671128a" },
-    { email: profiles.engineer.email, profile: "engineer", passwordHash: "193a0fbb305e24428944bc8ddd4bd7f0e5ebefa44e5dc69faaebcfff4e8bcd9a" }
-  ];
+  const fallbackProfiles = {
+    admin: { id: "admin", label: "Admin", role: "admin", modules: roleModules.admin },
+    engenharia: { id: "engenharia", label: "Engenharia", role: "engineering", modules: roleModules.engenharia }
+  };
 
   function loginUrl(target) {
     const current = encodeURIComponent(target || `${location.pathname}${location.search}${location.hash}`);
@@ -51,51 +31,50 @@
     return String(email || "").trim().toLowerCase();
   }
 
-  async function sha256(text) {
-    const bytes = new TextEncoder().encode(String(text || ""));
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
-  }
-
-  function publicProfile(profileId) {
-    const profile = profiles[profileId];
-    if (!profile) return null;
-    return { ...profile, authenticated: true };
+  function publicProfile(profile) {
+    const perfil = profile?.perfil === "engenharia" ? "engenharia" : "admin";
+    const base = fallbackProfiles[perfil];
+    return {
+      id: profile?.id || base.id,
+      email: profile?.email || "",
+      label: profile?.nome || profile?.email || base.label,
+      role: perfil === "admin" ? "admin" : "engineering",
+      modules: base.modules,
+      authenticated: true
+    };
   }
 
   function readSession() {
     try {
       const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
-      if (!saved || !profiles[saved.profile]) return null;
-      return { ...publicProfile(saved.profile), email: saved.email, loginAt: saved.loginAt };
+      if (!saved || !saved.email || !saved.loginAt) return null;
+      const ageMs = Date.now() - new Date(saved.loginAt).getTime();
+      if (ageMs > 12 * 60 * 60 * 1000) return null;
+      return saved;
     } catch (err) {
       return null;
     }
   }
 
-  function writeSession(user) {
-    const profile = publicProfile(user.profile);
-    const session = {
-      profile: user.profile,
-      email: user.email,
-      label: profile.label,
-      role: profile.role,
-      modules: profile.modules,
-      loginAt: new Date().toISOString()
-    };
+  function writeSession(profile) {
+    const session = { ...publicProfile(profile), loginAt: new Date().toISOString() };
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
     localStorage.setItem(LEGACY_PROFILE_KEY, JSON.stringify(session));
     return session;
   }
 
   async function login(email, password) {
-    const normalized = normalizeEmail(email);
-    const user = users.find(item => item.email === normalized);
-    const passwordHash = await sha256(password);
-    if (!user || user.passwordHash !== passwordHash) {
-      throw new Error("E-mail ou senha invalidos.");
+    if (!window.UBY_SUPABASE?.configured()) {
+      throw new Error("Supabase nao esta carregado ou configurado. O login real depende da conexao com a nuvem.");
     }
-    return writeSession(user);
+    const data = await window.UBY_SUPABASE.signIn(normalizeEmail(email), password);
+    const profile = await window.UBY_SUPABASE.currentProfile();
+    if (!profile) {
+      await window.UBY_SUPABASE.signOut();
+      throw new Error("Usuario autenticado, mas sem perfil na tabela profiles. Cadastre o perfil antes de liberar acesso.");
+    }
+    const supabaseEmail = data?.user?.email || normalizeEmail(email);
+    return writeSession({ ...profile, email: supabaseEmail, nome: profile?.nome || supabaseEmail });
   }
 
   function logout(target) {
@@ -123,16 +102,14 @@
   }
 
   function setProfile(id, target) {
-    const profile = profiles[id];
-    if (!profile) return;
-    const user = users.find(item => item.profile === id);
-    writeSession(user);
+    const profile = fallbackProfiles[id] || fallbackProfiles.admin;
+    writeSession({ id, email: "", nome: profile.label, perfil: id === "engenharia" ? "engenharia" : "admin" });
     location.href = target || (profile.role === "engineering" ? "engenharia.html" : "index.html");
   }
 
   window.UBY_AUTH = {
-    profiles,
-    users: users.map(({ email, profile }) => ({ email, profile })),
+    profiles: fallbackProfiles,
+    users: [],
     current: readSession,
     login,
     logout,

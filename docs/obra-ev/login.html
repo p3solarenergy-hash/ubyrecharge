@@ -47,7 +47,7 @@
 
   <section class="login-card">
     <h2>Acessar sistema</h2>
-    <p class="sub">Use um dos logins cadastrados inicialmente. A sess&atilde;o fica salva neste navegador at&eacute; sair.</p>
+    <p class="sub">Use o e-mail e senha cadastrados no Supabase. A sess&atilde;o local expira automaticamente e o perfil vem da tabela de acesso.</p>
     <form id="loginForm">
       <div class="field">
         <label for="email">E-mail</label>
@@ -70,10 +70,13 @@
       <div class="user-row"><strong>P3 Solar</strong><span>Admin completo</span><span class="pill">Admin</span></div>
       <div class="user-row"><strong>Alan</strong><span>Portal engenharia</span><span class="pill">Engenharia</span></div>
     </div>
-    <div class="notice">Nesta fase est&aacute;tica, o login organiza o acesso no navegador. A blindagem real de dados deve ser feita no backend/Supabase antes de liberar informa&ccedil;&otilde;es sens&iacute;veis.</div>
+    <div class="notice">O login agora valida no Supabase. As telas est&aacute;ticas ainda n&atilde;o substituem uma API protegida, mas a senha n&atilde;o fica mais gravada no JavaScript do site.</div>
   </section>
 </main>
 
+<script src="supabase_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_bridge.js"></script>
 <script src="auth.js"></script>
 <script src="backup_guard.js"></script>
 <script>

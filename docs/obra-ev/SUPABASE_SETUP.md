@@ -16,6 +16,10 @@ Depois rode tambem:
 
 `docs/obra-ev/supabase_activity_messages_patch.sql`
 
+Para liberar upload real de documentos da obra, rode tambem:
+
+`docs/obra-ev/supabase_storage_patch.sql`
+
 ## 2. Criar usuario admin
 
 No Supabase, abra `Authentication > Users` e crie seu usuario com e-mail e senha.
@@ -55,6 +59,7 @@ Use apenas a chave anon/publishable. Nunca coloque service_role no HTML.
 7. Clique em `Migrar prospeccao`.
 8. Abra `Tarefas`; ao criar/alterar tarefas, elas passam a salvar em `operational_tasks`.
 9. Abra a central ou uma obra, envie uma mensagem e altere um protocolo/status para validar `obra_mensagens` e `obra_atividade`.
+10. Em uma obra, envie um arquivo em `Base de documentos da obra` para validar o bucket `obra-documentos`.
 
 Essa etapa copia os dados locais para a nuvem. Ela nao apaga a base local.
 
@@ -71,3 +76,5 @@ select count(*) from public.obra_mensagens;
 ```
 
 Se alguma consulta falhar, o schema novo ainda nao foi executado no projeto Supabase atual.
+
+Para validar o armazenamento de documentos, confira em `Storage` se existe o bucket privado `obra-documentos`.

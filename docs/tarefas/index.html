@@ -90,32 +90,32 @@
 
 <script src="../obra-ev/sidebar.js"></script>
 <script src="../obra-ev/backup_guard.js"></script>
+<script src="../obra-ev/supabase_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../obra-ev/supabase_bridge.js"></script>
+<script src="../obra-ev/app_data.js"></script>
+<script src="../obra-ev/app_store.js"></script>
 <script>
 const tasksKey="uby-tarefas-v1";
 const backupKey="uby-tarefas-backups-v1";
 const statuses=["Pendente","Em andamento","Aguardando terceiro","Concluida"];
-const seed=[
-  {id:"t1",title:"Validar protocolo de aumento de carga",project:"Posto Malassise R.K.",owner:"UBY Recharge",due:addDays(2),priority:"Alta",status:"Em andamento",note:"Conferir retorno da concessionaria e refletir no checklist da obra."},
-  {id:"t2",title:"Enviar orcamento civil revisado",project:"Posto Araguaia",owner:"Equipe civil",due:addDays(4),priority:"Media",status:"Pendente",note:"Separar base, recomposicao e protecao mecanica."},
-  {id:"t3",title:"Arquivar fotos finais da Rio Beach",project:"Rio Beach EV",owner:"Campo",due:addDays(0),priority:"Baixa",status:"Pendente",note:"Subir fotos no documento da obra."},
-  {id:"t4",title:"Definir padrao de documentos para cada obra",project:"Administrativo",owner:"UBY Recharge",due:addDays(7),priority:"Media",status:"Aguardando terceiro",note:"Base para Drive e historico."}
-];
+const seed=(window.UBY_APP_DATA?.baseTasks||[]).map(task=>({...task,due:addDays(task.dueOffset||0)}));
 let tasks=loadTasks();
 function addDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
 function loadTasks(){try{return JSON.parse(localStorage.getItem(tasksKey))||seed}catch{return seed}}
-function saveTasks(){localStorage.setItem(tasksKey,JSON.stringify(tasks))}
+async function saveTasks(){localStorage.setItem(tasksKey,JSON.stringify(tasks));try{await window.UBY_STORE?.saveTasks(tasks)}catch(err){alert("Tarefas salvas localmente, mas nao foi possivel salvar no banco: "+err.message)}}
 function managedBackup(reason){const payload={createdAt:new Date().toISOString(),reason,data:{[tasksKey]:localStorage.getItem(tasksKey)||JSON.stringify(tasks)}};const backups=JSON.parse(localStorage.getItem(backupKey)||"[]");backups.unshift(payload);localStorage.setItem(backupKey,JSON.stringify(backups.slice(0,20)));return payload}
 function exportBackup(){const backup=managedBackup("manual");const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="backup-tarefas-"+backup.createdAt.slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}
-function importBackup(file){if(!file)return;const reader=new FileReader();reader.onload=()=>{try{managedBackup("antes de restaurar");const imported=JSON.parse(String(reader.result||"{}"));const data=imported.data||imported;if(data[tasksKey])localStorage.setItem(tasksKey,data[tasksKey]);tasks=loadTasks();render();alert("Backup restaurado.")}catch(err){alert("Nao foi possivel restaurar: "+err.message)}};reader.readAsText(file)}
+function importBackup(file){if(!file)return;const reader=new FileReader();reader.onload=async()=>{try{managedBackup("antes de restaurar");const imported=JSON.parse(String(reader.result||"{}"));const data=imported.data||imported;if(data[tasksKey])localStorage.setItem(tasksKey,data[tasksKey]);tasks=loadTasks();await saveTasks();render();alert("Backup restaurado.")}catch(err){alert("Nao foi possivel restaurar: "+err.message)}};reader.readAsText(file)}
 function projects(){const base=["Administrativo","Comercial","Operacao","Compras","Concessionaria"];try{const obras=JSON.parse(localStorage.getItem("uby-obras-dashboard-v1"))||[];obras.forEach(o=>base.push(o.nome))}catch{}return [...new Set(base)]}
 function daysTo(due){if(!due)return 999;const today=new Date();today.setHours(0,0,0,0);const d=new Date(due+"T00:00:00");return Math.round((d-today)/86400000)}
 function dueClass(t){const d=daysTo(t.due);if(t.status==="Concluida")return"due-ok";if(d<0)return"due-danger";if(d<=1)return"due-warn";return"due-ok"}
 function dueText(t){const d=daysTo(t.due);if(!t.due)return"Sem prazo";if(d<0)return`${Math.abs(d)} dia(s) atrasada`;if(d===0)return"Hoje";if(d===1)return"Amanha";return`${d} dias`}
 function priorityClass(p){return p==="Alta"?"high":p==="Media"?"medium":"low"}
 function filtered(){const q=document.getElementById("search").value.toLowerCase();const fs=document.getElementById("filterStatus").value;const fp=document.getElementById("filterPriority").value;return tasks.filter(t=>(!fs||t.status===fs)&&(!fp||t.priority===fp)&&[t.title,t.project,t.owner,t.note].join(" ").toLowerCase().includes(q))}
-function setStatus(id,status){const t=tasks.find(x=>x.id===id);if(!t)return;t.status=status;saveTasks();render()}
-function removeTask(id){if(!confirm("Excluir esta tarefa?"))return;tasks=tasks.filter(t=>t.id!==id);saveTasks();render()}
-function createTask(){const title=document.getElementById("taskTitle").value.trim();if(!title){alert("Informe a tarefa.");return}tasks.unshift({id:"task-"+Date.now(),title,project:document.getElementById("taskProject").value,owner:document.getElementById("taskOwner").value||"Sem responsavel",due:document.getElementById("taskDue").value,priority:document.getElementById("taskPriority").value,status:document.getElementById("taskStatus").value,note:document.getElementById("taskNote").value});saveTasks();document.getElementById("newPanel").classList.remove("open");["taskTitle","taskOwner","taskDue","taskNote"].forEach(id=>document.getElementById(id).value="");render()}
+async function setStatus(id,status){const t=tasks.find(x=>x.id===id);if(!t)return;t.status=status;await saveTasks();render()}
+async function removeTask(id){if(!confirm("Excluir esta tarefa?"))return;tasks=tasks.filter(t=>t.id!==id);localStorage.setItem(tasksKey,JSON.stringify(tasks));try{await window.UBY_STORE?.deleteTask(id);await window.UBY_STORE?.saveTasks(tasks)}catch(err){alert("Tarefa removida localmente, mas nao foi possivel excluir no banco: "+err.message)}render()}
+async function createTask(){const title=document.getElementById("taskTitle").value.trim();if(!title){alert("Informe a tarefa.");return}tasks.unshift({id:"task-"+Date.now(),title,project:document.getElementById("taskProject").value,owner:document.getElementById("taskOwner").value||"Sem responsavel",due:document.getElementById("taskDue").value,priority:document.getElementById("taskPriority").value,status:document.getElementById("taskStatus").value,note:document.getElementById("taskNote").value});await saveTasks();document.getElementById("newPanel").classList.remove("open");["taskTitle","taskOwner","taskDue","taskNote"].forEach(id=>document.getElementById(id).value="");render()}
 function renderProjects(){document.getElementById("taskProject").innerHTML=projects().map(p=>`<option>${p}</option>`).join("")}
 function renderStats(list){const open=tasks.filter(t=>t.status!=="Concluida");document.getElementById("kOpen").textContent=open.length;document.getElementById("kLate").textContent=tasks.filter(t=>t.status!=="Concluida"&&daysTo(t.due)<0).length;document.getElementById("kToday").textContent=tasks.filter(t=>t.status!=="Concluida"&&daysTo(t.due)===0).length;document.getElementById("kDone").textContent=tasks.filter(t=>t.status==="Concluida").length;document.getElementById("kHigh").textContent=open.filter(t=>t.priority==="Alta").length}
 function renderInsights(list){const late=tasks.filter(t=>t.status!=="Concluida"&&daysTo(t.due)<0);const high=tasks.filter(t=>t.status!=="Concluida"&&t.priority==="Alta");const waiting=tasks.filter(t=>t.status==="Aguardando terceiro");const byOwner={};tasks.filter(t=>t.status!=="Concluida").forEach(t=>byOwner[t.owner]=(byOwner[t.owner]||0)+1);const owner=Object.entries(byOwner).sort((a,b)=>b[1]-a[1])[0];const insights=[];if(late.length)insights.push(["Atraso exige corte diario",`${late.length} tarefa(s) vencidas. Primeira: ${late[0].title}.`,"danger"]);else insights.push(["Sem atraso critico","Nao ha tarefa vencida na base atual.","ok"]);if(high.length)insights.push(["Prioridade alta aberta",`${high.length} tarefa(s) de prioridade alta ainda abertas. Validar se travam obra ou compra.`,"warn"]);if(waiting.length)insights.push(["Dependencia externa",`${waiting.length} tarefa(s) aguardando terceiro. Registrar cobranca, prazo e responsavel externo.`,"warn"]);if(owner)insights.push(["Carga por responsavel",`${owner[0]} concentra ${owner[1]} tarefa(s) abertas. Pode precisar redistribuicao.`,"ok"]);document.getElementById("insights").innerHTML=insights.map(i=>`<div class="insight ${i[2]}"><strong>${i[0]}</strong><span>${i[1]}</span></div>`).join("")}
@@ -130,8 +130,8 @@ document.getElementById("backupBtn").addEventListener("click",exportBackup);
 document.getElementById("restoreBtn").addEventListener("click",()=>document.getElementById("restoreFile").click());
 document.getElementById("restoreFile").addEventListener("change",e=>importBackup(e.target.files[0]));
 ["search","filterStatus","filterPriority"].forEach(id=>document.getElementById(id).addEventListener("input",render));
-managedBackup("antes de carregar pagina");
-render();
+async function initData(){managedBackup("antes de carregar pagina");render();tasks=await window.UBY_STORE.loadTasks(tasks);render()}
+initData();
 </script>
 </body>
 </html>

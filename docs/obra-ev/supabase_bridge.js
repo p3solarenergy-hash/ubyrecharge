@@ -219,6 +219,45 @@
     return { count: payload.length };
   }
 
+  function safePathPart(value) {
+    return String(value || "arquivo")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 90) || "arquivo";
+  }
+
+  async function uploadDocumentFile(workId, workName, docId, file) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre no Supabase antes de enviar arquivos.");
+    const fileName = safePathPart(file.name);
+    const path = `${safePathPart(workId)}/${safePathPart(docId)}/${Date.now()}-${fileName}`;
+    const { error: uploadError } = await sb.storage
+      .from("obra-documentos")
+      .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type || "application/octet-stream" });
+    if (uploadError) throw uploadError;
+    const { data: signed, error: signedError } = await sb.storage
+      .from("obra-documentos")
+      .createSignedUrl(path, 60 * 60 * 24 * 7);
+    if (signedError) throw signedError;
+    const link = signed?.signedUrl || "";
+    const { error: docError } = await sb.from("obra_documentos").upsert({
+      obra_id: workId,
+      documento_id: docId,
+      nome: file.name,
+      status: "done",
+      link,
+      storage_path: path,
+      raw_data: { workName, fileName: file.name, mimeType: file.type || "", size: file.size || 0, storagePath: path },
+      updated_at: new Date().toISOString()
+    }, { onConflict: "obra_id,documento_id" });
+    if (docError) throw docError;
+    return { link, storagePath: path, fileName: file.name };
+  }
+
   window.UBY_SUPABASE = {
     configured,
     client,
@@ -230,6 +269,7 @@
     signOut,
     currentUser,
     currentProfile,
-    upsertProspects
+    upsertProspects,
+    uploadDocumentFile
   };
 })();

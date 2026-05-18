@@ -103,27 +103,12 @@
 
 <script src="obra-ev/sidebar.js"></script>
 <script src="obra-ev/backup_guard.js"></script>
+<script src="obra-ev/app_data.js"></script>
 <script>
-const baseWorks=[
-  {id:"rio",nome:"Rio Beach EV",status:"Concluida",pct:100,kw:7,crit:0},
-  {id:"malassise",nome:"Posto Malassise R.K.",status:"Projeto",pct:42,kw:60,crit:4},
-  {id:"prospect-29",nome:"Posto Araguaia",status:"Projeto",pct:0,kw:60,crit:0}
-];
-const baseTasks=[
-  {status:"Em andamento",priority:"Alta",due:addDays(2)},
-  {status:"Pendente",priority:"Media",due:addDays(4)},
-  {status:"Pendente",priority:"Baixa",due:addDays(0)},
-  {status:"Aguardando terceiro",priority:"Media",due:addDays(7)}
-];
-const recentFiles=[
-  {name:"RELATORIOS BASE",type:"folder",when:"Pasta principal",url:"https://drive.google.com/drive/folders/1jSvPzSwJOHBc8GkV1qbzxYWOkJIreO2f"},
-  {name:"POSTO ROBERT KOCH",type:"folder",when:"Pasta da obra",url:"https://drive.google.com/drive/folders/17qtw1l9OHRRcjkiuK8jIROgCupKeBdPb"},
-  {name:"POSTO ARAGUAIA",type:"folder",when:"Pasta da obra",url:"https://drive.google.com/drive/folders/1BQcfreo6D_FswiKjgBYe3zccR2UpUE2r"},
-  {name:"CONTROLE DE PROSPECCAO - AREAS EV",type:"sheet",when:"Base comercial",url:"https://docs.google.com/spreadsheets/d/1IiUqtF8xobzwmMkRqJiNXcT1CFW6tskEybT6GWgvvPs/edit?gid=2137351283"},
-  {name:"ARAGUAIA EV - V12",type:"sheet",when:"Analisador",url:"https://docs.google.com/spreadsheets/d/1XbMc4FoHhq0B-ZEFUBsWJc01ObyJK13xMsVNZR8iKac/edit"},
-  {name:"ROBERT KOCH EV - V12",type:"sheet",when:"Analisador",url:"https://docs.google.com/spreadsheets/d/1NWXav-JMnshFaa0jTcj2kOggDDk-T2YqSctX4MP0q2k/edit"},
-  {name:"RIO BEACH EV - V12",type:"sheet",when:"Analisador",url:"https://docs.google.com/spreadsheets/d/14giw1FZcQX8zaRYe6H_NUDvZBG2DFyrQuhBxecJr5nw/edit"}
-];
+const appData=window.UBY_APP_DATA||{};
+const baseWorks=appData.baseWorks||[];
+const baseTasks=(appData.baseTasks||[]).map(task=>({...task,due:addDays(task.dueOffset||0)}));
+const recentFiles=appData.recentFiles||[];
 function addDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
 function daysTo(due){if(!due)return 999;const today=new Date();today.setHours(0,0,0,0);const d=new Date(due+"T00:00:00");return Math.round((d-today)/86400000)}
 function readJson(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}}
