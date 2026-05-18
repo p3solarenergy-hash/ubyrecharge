@@ -6,6 +6,16 @@ No Supabase, abra `SQL Editor` e rode o arquivo:
 
 `docs/obra-ev/supabase_schema.sql`
 
+Esse arquivo agora tambem cria as tabelas `operational_tasks`, `obra_atividade` e `obra_mensagens`. Elas fazem as tarefas, historico de alteracoes e mensagens virarem banco real.
+
+Se voce ja rodou o schema antigo e quer aplicar apenas a mudanca nova, rode:
+
+`docs/obra-ev/supabase_operational_tasks_patch.sql`
+
+Depois rode tambem:
+
+`docs/obra-ev/supabase_activity_messages_patch.sql`
+
 ## 2. Criar usuario admin
 
 No Supabase, abra `Authentication > Users` e crie seu usuario com e-mail e senha.
@@ -42,5 +52,22 @@ Use apenas a chave anon/publishable. Nunca coloque service_role no HTML.
 4. Volte ao dashboard.
 5. Clique em `Ver status`.
 6. Clique em `Migrar base local`.
+7. Clique em `Migrar prospeccao`.
+8. Abra `Tarefas`; ao criar/alterar tarefas, elas passam a salvar em `operational_tasks`.
+9. Abra a central ou uma obra, envie uma mensagem e altere um protocolo/status para validar `obra_mensagens` e `obra_atividade`.
 
 Essa etapa copia os dados locais para a nuvem. Ela nao apaga a base local.
+
+## 5. Validar banco real
+
+No `SQL Editor`, rode:
+
+```sql
+select count(*) from public.obras;
+select count(*) from public.prospeccao_areas;
+select count(*) from public.operational_tasks;
+select count(*) from public.obra_atividade;
+select count(*) from public.obra_mensagens;
+```
+
+Se alguma consulta falhar, o schema novo ainda nao foi executado no projeto Supabase atual.

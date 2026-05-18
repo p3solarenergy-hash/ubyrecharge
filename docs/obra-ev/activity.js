@@ -15,6 +15,21 @@
     localStorage.setItem(key, JSON.stringify(value.slice(0, MAX_ITEMS)));
   }
 
+  function mergeById(localItems, cloudItems) {
+    const map = new Map();
+    [...cloudItems, ...localItems].forEach(item => {
+      if (item?.id) map.set(item.id, item);
+    });
+    return [...map.values()].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }
+
+  function saveCloud(kind, item) {
+    const store = window.UBY_STORE;
+    const method = kind === "message" ? store?.saveMessage : store?.saveActivity;
+    if (!method) return;
+    method(item).catch(err => console.warn("Nao foi possivel sincronizar no Supabase:", err.message));
+  }
+
   function user() {
     const current = window.UBY_AUTH?.current?.();
     if (current) return {
@@ -67,6 +82,7 @@
       after: clean(entry.after)
     };
     write(ACTIVITY_KEY, [item, ...read(ACTIVITY_KEY)]);
+    saveCloud("activity", item);
     return item;
   }
 
@@ -88,6 +104,7 @@
       text
     };
     write(MESSAGE_KEY, [item, ...read(MESSAGE_KEY)]);
+    saveCloud("message", item);
     record({
       workId: item.workId,
       workName: item.workName,
@@ -104,11 +121,28 @@
     return filtered.slice(0, options.limit || 40);
   }
 
+  async function refresh() {
+    const store = window.UBY_STORE;
+    if (!store) return { activity: read(ACTIVITY_KEY), messages: read(MESSAGE_KEY) };
+    const localActivity = read(ACTIVITY_KEY);
+    const localMessages = read(MESSAGE_KEY);
+    const [cloudActivity, cloudMessages] = await Promise.all([
+      store.loadActivity ? store.loadActivity(localActivity) : localActivity,
+      store.loadMessages ? store.loadMessages(localMessages) : localMessages
+    ]);
+    const activity = mergeById(localActivity, cloudActivity || []);
+    const messagesList = mergeById(localMessages, cloudMessages || []);
+    write(ACTIVITY_KEY, activity);
+    write(MESSAGE_KEY, messagesList);
+    return { activity, messages: messagesList };
+  }
+
   window.UBY_ACTIVITY = {
     record,
     list,
     sendMessage,
     messages,
+    refresh,
     summarize,
     nowLabel
   };

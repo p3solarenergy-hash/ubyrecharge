@@ -112,6 +112,51 @@ create table if not exists public.prospeccao_areas (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.operational_tasks (
+  id text primary key,
+  titulo text not null,
+  projeto text,
+  responsavel text,
+  prazo date,
+  prioridade text,
+  status text not null default 'Pendente',
+  observacao text,
+  raw_data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.obra_atividade (
+  id text primary key,
+  obra_id text,
+  obra_nome text,
+  tipo text not null default 'update',
+  titulo text,
+  detalhe text,
+  campo text,
+  valor_anterior text,
+  valor_novo text,
+  usuario_id text,
+  usuario_nome text,
+  usuario_email text,
+  raw_data jsonb not null default '{}'::jsonb,
+  created_at_client timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.obra_mensagens (
+  id text primary key,
+  obra_id text,
+  obra_nome text,
+  mensagem text not null,
+  usuario_id text,
+  usuario_nome text,
+  usuario_email text,
+  raw_data jsonb not null default '{}'::jsonb,
+  created_at_client timestamptz,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.obra_snapshots (
   id uuid primary key default gen_random_uuid(),
   origin text,
@@ -129,6 +174,9 @@ alter table public.obra_documentos enable row level security;
 alter table public.obra_analisadores enable row level security;
 alter table public.planejamento_engenharia enable row level security;
 alter table public.prospeccao_areas enable row level security;
+alter table public.operational_tasks enable row level security;
+alter table public.obra_atividade enable row level security;
+alter table public.obra_mensagens enable row level security;
 alter table public.obra_snapshots enable row level security;
 
 drop policy if exists "admin all profiles" on public.profiles;
@@ -139,6 +187,9 @@ drop policy if exists "admin all documentos" on public.obra_documentos;
 drop policy if exists "admin all analisadores" on public.obra_analisadores;
 drop policy if exists "admin all planejamento" on public.planejamento_engenharia;
 drop policy if exists "admin all prospeccao" on public.prospeccao_areas;
+drop policy if exists "admin all operational tasks" on public.operational_tasks;
+drop policy if exists "obra app all atividade" on public.obra_atividade;
+drop policy if exists "obra app all mensagens" on public.obra_mensagens;
 drop policy if exists "admin all snapshots" on public.obra_snapshots;
 
 create or replace function public.is_admin()
@@ -154,6 +205,19 @@ as $$
   );
 $$;
 
+create or replace function public.can_access_obra_app()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and perfil in ('admin', 'engenharia')
+  );
+$$;
+
 create policy "admin all profiles" on public.profiles for all to authenticated using (public.is_admin() or id = auth.uid()) with check (public.is_admin() or id = auth.uid());
 create policy "admin all obras" on public.obras for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "admin all fases" on public.obra_fases for all to authenticated using (public.is_admin()) with check (public.is_admin());
@@ -162,6 +226,9 @@ create policy "admin all documentos" on public.obra_documentos for all to authen
 create policy "admin all analisadores" on public.obra_analisadores for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "admin all planejamento" on public.planejamento_engenharia for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "admin all prospeccao" on public.prospeccao_areas for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "admin all operational tasks" on public.operational_tasks for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "obra app all atividade" on public.obra_atividade for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
+create policy "obra app all mensagens" on public.obra_mensagens for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
 create policy "admin all snapshots" on public.obra_snapshots for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 -- Depois de criar seu usuario em Authentication > Users, rode uma vez:

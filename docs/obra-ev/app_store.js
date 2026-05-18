@@ -1,6 +1,8 @@
 (function () {
   const WORKS_KEY = "uby-obras-dashboard-v1";
   const TASKS_KEY = "uby-tarefas-v1";
+  const ACTIVITY_KEY = "uby-activity-v1";
+  const MESSAGE_KEY = "uby-messages-v1";
 
   function available() {
     return Boolean(window.UBY_SUPABASE?.configured?.() && window.UBY_SUPABASE?.client?.());
@@ -84,6 +86,86 @@
       status: row.status || "Pendente",
       note: row.observacao || ""
     };
+  }
+
+  function activityToRow(item) {
+    return {
+      id: String(item.id),
+      obra_id: item.workId || "geral",
+      obra_nome: item.workName || "Geral",
+      tipo: item.type || "update",
+      titulo: item.title || "",
+      detalhe: item.detail || "",
+      campo: item.field || "",
+      valor_anterior: item.before || "",
+      valor_novo: item.after || "",
+      usuario_id: item.user?.id || "",
+      usuario_nome: item.user?.label || "",
+      usuario_email: item.user?.email || "",
+      raw_data: item,
+      created_at_client: item.createdAt || new Date().toISOString()
+    };
+  }
+
+  function rowToActivity(row) {
+    const raw = row.raw_data || {};
+    return {
+      ...raw,
+      id: row.id,
+      createdAt: raw.createdAt || row.created_at_client || row.created_at,
+      user: raw.user || {
+        id: row.usuario_id || "",
+        label: row.usuario_nome || row.usuario_email || "Usuario",
+        email: row.usuario_email || ""
+      },
+      workId: row.obra_id || raw.workId || "geral",
+      workName: row.obra_nome || raw.workName || "Geral",
+      type: row.tipo || raw.type || "update",
+      title: row.titulo || raw.title || "",
+      detail: row.detalhe || raw.detail || "",
+      field: row.campo || raw.field || "",
+      before: row.valor_anterior || raw.before || "",
+      after: row.valor_novo || raw.after || ""
+    };
+  }
+
+  function messageToRow(item) {
+    return {
+      id: String(item.id),
+      obra_id: item.workId || "geral",
+      obra_nome: item.workName || "Geral",
+      mensagem: item.text || "",
+      usuario_id: item.user?.id || "",
+      usuario_nome: item.user?.label || "",
+      usuario_email: item.user?.email || "",
+      raw_data: item,
+      created_at_client: item.createdAt || new Date().toISOString()
+    };
+  }
+
+  function rowToMessage(row) {
+    const raw = row.raw_data || {};
+    return {
+      ...raw,
+      id: row.id,
+      createdAt: raw.createdAt || row.created_at_client || row.created_at,
+      user: raw.user || {
+        id: row.usuario_id || "",
+        label: row.usuario_nome || row.usuario_email || "Usuario",
+        email: row.usuario_email || ""
+      },
+      workId: row.obra_id || raw.workId || "geral",
+      workName: row.obra_nome || raw.workName || "Geral",
+      text: row.mensagem || raw.text || ""
+    };
+  }
+
+  function mergeById(localItems, cloudItems) {
+    const map = new Map();
+    [...cloudItems, ...localItems].forEach(item => {
+      if (item?.id) map.set(item.id, item);
+    });
+    return [...map.values()].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   }
 
   async function cloudSelect(table, columns = "*") {
@@ -207,6 +289,62 @@
     }
   }
 
+  async function saveActivity(item) {
+    writeLocal(ACTIVITY_KEY, mergeById([item], readLocal(ACTIVITY_KEY, [])));
+    const user = await requireUser();
+    if (!user) return { cloud: false };
+    const { error } = await window.UBY_SUPABASE.client().from("obra_atividade").upsert(activityToRow(item), { onConflict: "id" });
+    if (error) throw error;
+    return { cloud: true };
+  }
+
+  async function loadActivity(fallback = []) {
+    try {
+      const user = await requireUser();
+      if (!user) return fallback;
+      const { data, error } = await window.UBY_SUPABASE.client()
+        .from("obra_atividade")
+        .select("*")
+        .order("created_at_client", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      const items = mergeById(fallback, (data || []).map(rowToActivity));
+      writeLocal(ACTIVITY_KEY, items);
+      return items;
+    } catch (err) {
+      console.warn("Falha ao ler historico no Supabase:", err.message);
+      return fallback;
+    }
+  }
+
+  async function saveMessage(item) {
+    writeLocal(MESSAGE_KEY, mergeById([item], readLocal(MESSAGE_KEY, [])));
+    const user = await requireUser();
+    if (!user) return { cloud: false };
+    const { error } = await window.UBY_SUPABASE.client().from("obra_mensagens").upsert(messageToRow(item), { onConflict: "id" });
+    if (error) throw error;
+    return { cloud: true };
+  }
+
+  async function loadMessages(fallback = []) {
+    try {
+      const user = await requireUser();
+      if (!user) return fallback;
+      const { data, error } = await window.UBY_SUPABASE.client()
+        .from("obra_mensagens")
+        .select("*")
+        .order("created_at_client", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      const items = mergeById(fallback, (data || []).map(rowToMessage));
+      writeLocal(MESSAGE_KEY, items);
+      return items;
+    } catch (err) {
+      console.warn("Falha ao ler mensagens no Supabase:", err.message);
+      return fallback;
+    }
+  }
+
   window.UBY_STORE = {
     available,
     loadWorks,
@@ -217,6 +355,10 @@
     loadTasks,
     saveTasks,
     deleteTask,
-    loadProspects
+    loadProspects,
+    saveActivity,
+    loadActivity,
+    saveMessage,
+    loadMessages
   };
 })();
