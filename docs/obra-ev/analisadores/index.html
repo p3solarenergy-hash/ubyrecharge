@@ -65,18 +65,16 @@
 
 
   .report-versions{display:flex;gap:6px;margin-top:8px}
-  .vbtn{flex:1;text-align:center;padding:8px 6px;border-radius:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-decoration:none;transition:all .15s;border:1px solid transparent}
-  .vbtn.completo{background:#0F3D2E;color:var(--p3-accent);border-color:var(--p3-accent)}
-  .vbtn.completo:hover{background:#1A5C42}
-  .vbtn.eletrico{background:#FFF1D6;color:#F2D77F;border-color:#3D2E14}
-  .vbtn.eletrico:hover{background:#5C4520}
-  .vbtn.carregador{background:#E2F4E9;color:#7FE2A0;border-color:#1A4528}
-  .vbtn.carregador:hover{background:#1A4528}
+  .vbtn{flex:1;text-align:center;padding:9px 8px;border-radius:8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;text-decoration:none;transition:all .15s;border:1px solid var(--p3-border);background:#101B16;color:#fff;line-height:1.15}
+  .vbtn:hover{transform:translateY(-1px);border-color:var(--p3-accent)}
+  .vbtn.completo{background:#0F3D2E;color:#fff;border-color:var(--p3-accent)}
+  .vbtn.eletrico{background:#2E2310;color:#FFE2A3;border-color:#7C5D1B}
+  .vbtn.carregador{background:#0E2A1B;color:#9EF0B7;border-color:#1F8A4C}
 
   .empty{background:var(--p3-card);border:2px dashed var(--p3-border);border-radius:14px;padding:60px 20px;text-align:center;color:var(--p3-muted)}
   .empty h3{font-size:16px;color:var(--p3-primary);margin-bottom:6px}
 
-  /* COMPARISON CHART */
+  /* ANALYZER OVERVIEW */
   .compare-section{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:24px;margin-bottom:28px;box-shadow:var(--p3-shadow)}
   .compare-section h2{font-size:16px;font-weight:700;color:var(--p3-primary);margin-bottom:14px;display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}
   .compare-section h2::before{content:"";width:4px;height:18px;background:var(--p3-accent);border-radius:3px}
@@ -128,12 +126,13 @@
   [data-theme="light"] .band-card.b2{border-bottom-color:#FFC940 !important}
   [data-theme="light"] .band-card.b3{border-bottom-color:#7DCB97 !important}
   [data-theme="light"] tr[style*="background:#1F2A26"]{background:#F1F5F2 !important;color:#1F2A24 !important}
-  [data-theme="light"] .vbtn.completo{background:#0F3D2E !important;color:#fff !important;border-color:transparent !important}
-  [data-theme="light"] .vbtn.completo:hover{background:#155340 !important}
-  [data-theme="light"] .vbtn.eletrico{background:#FFF1D6 !important;color:#7A4F0A !important;border-color:#F0C97D !important}
-  [data-theme="light"] .vbtn.eletrico:hover{background:#FFE6B0 !important}
-  [data-theme="light"] .vbtn.carregador{background:#E2F4E9 !important;color:#0F4824 !important;border-color:#A5D9B8 !important}
-  [data-theme="light"] .vbtn.carregador:hover{background:#CCE9D6 !important}
+  [data-theme="light"] .vbtn{background:#FFFFFF !important;color:#0F3D2E !important;border-color:#B7D9C4 !important}
+  [data-theme="light"] .vbtn.completo{background:#0F3D2E !important;color:#fff !important;border-color:#0F3D2E !important}
+  [data-theme="light"] .vbtn.eletrico{background:#FFF4D8 !important;color:#6B4700 !important;border-color:#D9A536 !important}
+  [data-theme="light"] .vbtn.carregador{background:#E2F4E9 !important;color:#0F4824 !important;border-color:#7BC895 !important}
+  [data-theme="light"] .report-card,[data-theme="light"] .compare-section,[data-theme="light"] .stat{background:#FFFFFF !important;color:#1F2A24 !important}
+  [data-theme="light"] .report-title,[data-theme="light"] .toolbar h2,[data-theme="light"] .compare-section h2{color:#0F3D2E !important}
+  [data-theme="light"] .report-sub,[data-theme="light"] .stat .sub,[data-theme="light"] .mu{color:#4D5F55 !important}
 </style>
 </head>
 <body>
@@ -161,25 +160,25 @@
       <div class="sub">Total de relatórios gerados</div>
     </div>
     <div class="stat">
-      <div class="label">Demanda Total (Pico)</div>
-      <div class="value" id="statDemanda">72,24<span class="unit">kW</span></div>
-      <div class="sub">Soma dos picos medidos</div>
+      <div class="label">Medi&ccedil;&otilde;es completas</div>
+      <div class="value" id="statDemanda">0<span class="unit">/0</span></div>
+      <div class="sub">Relat&oacute;rios com janela adequada</div>
     </div>
     <div class="stat">
-      <div class="label">Consumo agregado/mês</div>
-      <div class="value" id="statConsumo">12,9<span class="unit">MWh</span></div>
-      <div class="sub">Projeção mensal estimada</div>
+      <div class="label">Pontos em aten&ccedil;&atilde;o</div>
+      <div class="value" id="statConsumo">0<span class="unit">pontos</span></div>
+      <div class="sub">FP, desequil&iacute;brio ou dados parciais</div>
     </div>
     <div class="stat">
-      <div class="label">Potência EV planejada</div>
-      <div class="value" id="statEV">120<span class="unit">kW</span></div>
-      <div class="sub">2 × 60 kW (default P3)</div>
+      <div class="label">Melhor FP medido</div>
+      <div class="value" id="statEV">0,00<span class="unit">FP</span></div>
+      <div class="sub">Refer&ecirc;ncia geral de qualidade</div>
     </div>
   </div>
 
-  <!-- Comparativo entre sites -->
+  <!-- Leitura geral dos analisadores -->
   <div class="compare-section">
-    <h2>Comparativo entre sites</h2>
+    <h2>Leitura geral dos analisadores</h2>
     <div class="compare-grid">
       <div class="chart-wrapper"><canvas id="chartCompareDemanda"></canvas></div>
       <div class="chart-wrapper"><canvas id="chartCompareFP"></canvas></div>
@@ -374,12 +373,12 @@ function renderReports(filter=''){
 // Update aggregated stats
 function updateStats(){
   document.getElementById('statSites').textContent = RELATORIOS.length;
-  const totalKw = RELATORIOS.reduce((s,r)=>s+r.pico_kw, 0);
-  document.getElementById('statDemanda').innerHTML = `${fmt(totalKw)}<span class="unit">kW</span>`;
-  const totalConsumoMWh = RELATORIOS.reduce((s,r)=>s + r.consumo_kwh / r.consumo_dias * 30, 0) / 1000;
-  document.getElementById('statConsumo').innerHTML = `${fmt(totalConsumoMWh)}<span class="unit">MWh</span>`;
-  const totalEv = RELATORIOS.reduce((s,r)=>s + r.ev_kw, 0);
-  document.getElementById('statEV').innerHTML = `${totalEv}<span class="unit">kW</span>`;
+  const completos = RELATORIOS.filter(r => !r.flags.some(f => /parciais|estimado/i.test(f))).length;
+  document.getElementById('statDemanda').innerHTML = `${completos}<span class="unit">/${RELATORIOS.length}</span>`;
+  const atencao = RELATORIOS.filter(r => r.status !== 'ok' || r.fp < 0.92 || r.flags.some(f => /parciais|estimado|baixo|desequil/i.test(f))).length;
+  document.getElementById('statConsumo').innerHTML = `${atencao}<span class="unit">pontos</span>`;
+  const melhorFp = RELATORIOS.reduce((best,r)=>Math.max(best,r.fp),0);
+  document.getElementById('statEV').innerHTML = `${melhorFp.toFixed(2)}<span class="unit">FP</span>`;
 }
 
 // Comparison charts
@@ -391,7 +390,7 @@ function renderComparison(){
       {label:'Pico Ativa (kW)', data:RELATORIOS.map(r=>r.pico_kw), backgroundColor:P3.primary, borderRadius:6},
       {label:'Demanda diária (kW)', data:RELATORIOS.map(r=>r.demanda_kw), backgroundColor:P3.accent, borderRadius:6}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Demanda — Pico vs Diária'}},scales:{y:{title:{display:true,text:'Potência (kW)'},beginAtZero:true}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Pico e demanda base por ponto'}},scales:{y:{title:{display:true,text:'Potência (kW)'},beginAtZero:true}}}
   });
 
   new Chart(document.getElementById('chartCompareFP'), {
@@ -411,6 +410,8 @@ renderReports();
 updateStats();
 renderComparison();
 </script>
+<script src="../auth.js"></script>
+<script>UBY_AUTH.require("analyzers");</script>
 <script src="../sidebar.js"></script>
 </body>
 </html>

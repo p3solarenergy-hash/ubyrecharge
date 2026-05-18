@@ -21,21 +21,26 @@
   const isHome = inRoot;
   const collapsed = localStorage.getItem("uby-sidebar-collapsed") === "1";
   const profile = readProfile();
-  const isAdmin = profile.role === "admin";
+  const isAdmin = profile?.role === "admin";
 
   function readProfile() {
     try {
-      return JSON.parse(localStorage.getItem("uby-auth-profile-v1") || "null") || { label: "Eduardo / Admin", role: "admin", modules: [] };
+      return JSON.parse(localStorage.getItem("uby-auth-session-v1") || localStorage.getItem("uby-auth-profile-v1") || "null");
     } catch (err) {
-      return { label: "Eduardo / Admin", role: "admin", modules: [] };
+      return null;
     }
   }
 
   function allowed(module) {
-    return isAdmin || module === "login" || (profile.modules || []).includes(module);
+    return isAdmin || module === "login" || (profile?.modules || []).includes(module);
   }
 
   const currentModule = isLogin ? "login" : isTasks ? "tasks" : isAnalyzer ? "analyzers" : isEngineering ? "engineering" : isDetail ? "detail" : isDashboard ? "dashboard" : isHome ? "home" : "home";
+  if (!profile && currentModule !== "login") {
+    const next = encodeURIComponent(`${location.pathname}${location.search}${location.hash}`);
+    location.href = `${loginHref}?next=${next}`;
+    return;
+  }
   if (!allowed(currentModule)) {
     location.href = engineeringHref;
     return;
@@ -92,7 +97,7 @@
       <strong>P3 Energy - Central</strong>
       <span>|</span>
       <span class="uby-recharge">UBY Recharge</span>
-      <a class="uby-profile-pill" href="${loginHref}">${profile.label || "Admin"}</a>
+      <a class="uby-profile-pill" href="${loginHref}">${profile?.label || "Entrar"}</a>
     </div>
   `;
   document.body.prepend(shell);

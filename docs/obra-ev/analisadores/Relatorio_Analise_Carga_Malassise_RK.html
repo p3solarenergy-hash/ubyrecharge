@@ -9,7 +9,7 @@
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:var(--p3-bg);color:var(--p3-text);font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
   .page{max-width:1180px;margin:0 auto;padding:32px 28px 80px}
-  .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);color:#fff;border-radius:14px;padding:28px 32px;margin-bottom:24px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
+  .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);color:#fff;border-radius:14px;padding:84px 32px 28px;margin-bottom:24px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
   .header::after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;background:radial-gradient(circle,rgba(46,168,92,.35),transparent 70%);border-radius:50%}
   .header .brand{display:flex;align-items:center;gap:14px;margin-bottom:18px;position:relative;z-index:1}
   .logo-mark{width:46px;height:46px;border-radius:10px;background:#0F3D2E;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--p3-accent);font-size:22px;border:1px solid var(--p3-accent);letter-spacing:.5px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
@@ -23,6 +23,14 @@
   .header-meta .value{font-weight:600;font-size:13px}
   .nav-back{position:absolute;top:18px;right:24px;background:rgba(255,255,255,.08);color:#fff;padding:6px 14px;border-radius:18px;font-size:12px;text-decoration:none;backdrop-filter:blur(8px);z-index:2}
   .nav-back:hover{background:rgba(255,255,255,.14)}
+  .top-nav{position:absolute;top:30px;right:32px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center;z-index:2}
+  .top-nav a{min-width:112px;text-align:center;background:#0E1813;color:#fff;padding:9px 14px;border-radius:8px;font-size:12px;text-decoration:none;border:1px solid rgba(255,255,255,.12);box-shadow:0 4px 12px rgba(0,0,0,.18);font-weight:800;white-space:nowrap;line-height:1.15}
+  .top-nav a:hover{background:#14231C;border-color:rgba(255,255,255,.22)}
+  .top-nav a.active{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
+  [data-theme="light"] .top-nav a{background:#0F3D2E;color:#fff;border-color:rgba(15,61,46,.25)}
+  [data-theme="light"] .top-nav a:hover{background:#155340}
+  [data-theme="light"] .top-nav a.active{background:#2EA85C;border-color:#2EA85C;color:#fff}
+  @media (max-width:860px){.header{padding-top:28px}.top-nav{position:relative;top:auto;right:auto;margin-bottom:22px;justify-content:flex-start}.top-nav a{min-width:auto;flex:1 1 130px}}
   .alert{border-left:4px solid var(--p3-warn);background:#2E2310;color:#F2D77F;padding:14px 18px;border-radius:8px;margin-bottom:22px;display:flex;gap:12px;align-items:flex-start}
   .alert.danger{border-left-color:var(--p3-danger);background:#2E1714;color:#FF8B7C}
   .alert.ok{border-left-color:var(--p3-ok);background:#0E2A1B;color:#7FE2A0}
@@ -194,7 +202,13 @@
 <div class="page">
 
   <div class="header">
-    <a href="../../" class="nav-back">Pagina inicial</a>
+    <div class="top-nav">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="Relatorio_Analise_Carga_Malassise_RK.html" class="active">Completo</a>
+      <a href="Relatorio_Eletrico_Malassise_RK.html">El&eacute;trico</a>
+      <a href="Relatorio_Carregador_Malassise_RK.html">Carregador</a>
+      <a href="../../">P&aacute;gina inicial</a>
+    </div>
     <div class="brand">
       <div class="logo-mark">P3</div>
       <div>
@@ -768,6 +782,8 @@ function atualizarPainelOperacional(P_ev, padrao, dlm){
 loadConfig();
 calcular();
 </script>
+<script src="../auth.js"></script>
+<script>UBY_AUTH.require("analyzers");</script>
 </body>
 </html>
 

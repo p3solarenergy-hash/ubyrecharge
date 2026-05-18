@@ -3,89 +3,114 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>P3 Energy - Acesso UBY Recharge</title>
-<link rel="stylesheet" href="sidebar.css">
+<title>P3 Energy - Login UBY Recharge</title>
 <style>
-  :root{--p3-primary:#3FB66B;--p3-accent:#5BC882;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#9DB5AA;--p3-border:#2A3530;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  :root{--p3-primary:#3FB66B;--p3-accent:#5BC882;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#9DB5AA;--p3-border:#2A3530;--p3-danger:#E55545;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;min-height:100vh}
-  .page{max-width:1120px;margin:0 auto;padding:32px 36px 80px}
-  .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);border-radius:16px;padding:30px 34px;margin-bottom:24px;box-shadow:var(--p3-shadow)}
-  .brand{display:flex;align-items:center;gap:14px;margin-bottom:20px}.logo{width:52px;height:52px;border-radius:11px;border:1px solid var(--p3-accent);display:grid;place-items:center;color:var(--p3-accent);font-size:24px;font-weight:900;background:#0F3D2E}.brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.88}.brand-tag{font-size:11px;color:#c7d7cf;letter-spacing:1px}
-  h1{font-size:30px;margin-bottom:8px}.header p{max-width:760px;color:#c8d8d0;line-height:1.55}
-  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}.card{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:22px;box-shadow:var(--p3-shadow)}.card h2{color:var(--p3-primary);font-size:19px;margin-bottom:10px}.card p{color:var(--p3-muted);line-height:1.55;margin-bottom:16px}.list{display:grid;gap:8px;margin-bottom:18px}.item{border-top:1px solid var(--p3-border);padding-top:8px;color:#d9e6df;font-size:13px}.btn{height:42px;border:1px solid var(--p3-accent);background:var(--p3-accent);color:#fff;border-radius:8px;padding:0 16px;font-weight:900;cursor:pointer}.ghost{background:#121d18;border-color:var(--p3-border)}
-  .cloud-login{background:var(--p3-card);border:1px solid var(--p3-border);border-left:4px solid var(--p3-accent);border-radius:14px;padding:22px;margin-bottom:18px;box-shadow:var(--p3-shadow)}.login-grid{display:grid;grid-template-columns:1fr 1fr auto auto;gap:10px;align-items:end}.field label{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:900;margin-bottom:5px}.field input{width:100%;height:42px;border:1px solid var(--p3-border);border-radius:8px;background:#121d18;color:var(--p3-text);padding:0 11px;font-weight:800}.status{color:var(--p3-muted);font-size:12px;margin-top:10px}
-  .notice{margin-top:18px;background:#121d18;border-left:3px solid var(--p3-accent);border-radius:10px;padding:13px;color:var(--p3-muted);font-size:13px}
-  @media(max-width:760px){.page{padding:20px 14px 60px}.cards,.login-grid{grid-template-columns:1fr}.header{padding:24px 20px}}
+  body{display:grid;place-items:center;padding:28px}
+  .shell{width:min(1040px,100%);display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:stretch}
+  .hero,.login-card{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);border:1px solid rgba(91,200,130,.24);border-radius:18px;box-shadow:var(--p3-shadow)}
+  .hero{padding:38px;display:flex;flex-direction:column;justify-content:space-between;min-height:560px;overflow:hidden;position:relative}
+  .hero::after{content:"";position:absolute;right:-110px;top:-120px;width:360px;height:360px;background:radial-gradient(circle,rgba(91,200,130,.34),transparent 70%);border-radius:50%}
+  .brand{display:flex;align-items:center;gap:14px;position:relative;z-index:1}.logo{width:56px;height:56px;border-radius:12px;border:1px solid var(--p3-accent);display:grid;place-items:center;color:var(--p3-accent);font-size:25px;font-weight:900;background:#0F3D2E}.brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.88}.brand-tag{font-size:11px;color:#c7d7cf;letter-spacing:1px}
+  h1{font-size:38px;line-height:1.08;margin:34px 0 12px;position:relative;z-index:1}.hero p{color:#d4e3dc;line-height:1.6;max-width:620px;position:relative;z-index:1}
+  .scope{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:34px;position:relative;z-index:1}.scope-card{background:rgba(14,24,19,.46);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px}.scope-card strong{display:block;color:#fff;margin-bottom:5px}.scope-card span{font-size:12px;color:#b9cec4;line-height:1.45}
+  .login-card{background:var(--p3-card);padding:28px}.login-card h2{font-size:23px;margin-bottom:6px;color:#fff}.login-card .sub{color:var(--p3-muted);font-size:13px;line-height:1.5;margin-bottom:22px}
+  form{display:grid;gap:14px}.field label{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:900;margin-bottom:6px}.field input{width:100%;height:46px;border:1px solid var(--p3-border);border-radius:9px;background:#101B16;color:var(--p3-text);padding:0 12px;font-weight:800}.field input:focus{outline:none;border-color:var(--p3-accent);box-shadow:0 0 0 3px rgba(91,200,130,.16)}
+  .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.btn{height:44px;border:1px solid var(--p3-accent);background:var(--p3-accent);color:#fff;border-radius:9px;padding:0 18px;font-weight:900;cursor:pointer}.btn.ghost{background:#101B16;border-color:var(--p3-border)}.btn:disabled{opacity:.65;cursor:wait}
+  .status{min-height:20px;color:var(--p3-muted);font-size:12px;margin-top:2px}.status.error{color:#FF958A}.status.ok{color:#8DE8AA}
+  .users{margin-top:24px;border-top:1px solid var(--p3-border);padding-top:18px}.users h3{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--p3-primary);margin-bottom:10px}.user-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px}.user-row span{color:var(--p3-muted)}.pill{border:1px solid rgba(91,200,130,.28);background:rgba(91,200,130,.12);border-radius:999px;padding:4px 8px;color:#dff3e8;font-size:11px;font-weight:900;white-space:nowrap}
+  .notice{margin-top:18px;background:#101B16;border-left:3px solid var(--p3-accent);border-radius:10px;padding:13px;color:var(--p3-muted);font-size:12px;line-height:1.5}
+  @media(max-width:860px){body{padding:16px}.shell{grid-template-columns:1fr}.hero{min-height:auto;padding:28px}.scope{grid-template-columns:1fr}h1{font-size:30px}}
 </style>
 </head>
 <body>
-<div class="page">
-  <div class="header">
-    <div class="brand"><div class="logo">P3</div><div><div class="brand-name">P3 Energy</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div></div>
-    <h1>Acesso UBY Recharge</h1>
-    <p>Entrada por perfil para separar sua operacao interna da visao do engenheiro. Nesta fase o controle e visual; a seguranca real entra quando conectarmos o backend/login da plataforma.</p>
-  </div>
-  <div class="cloud-login">
-    <h2>Login real Supabase</h2>
-    <p>Use o e-mail e senha criados no Supabase Auth. Esse login libera migracao e depois sera usado para perfil admin/engenharia.</p>
-    <div class="login-grid">
-      <div class="field"><label>E-mail</label><input id="supabaseEmail" type="email" placeholder="seu@email.com"></div>
-      <div class="field"><label>Senha</label><input id="supabasePassword" type="password" placeholder="Senha"></div>
-      <button class="btn" onclick="loginSupabase()">Entrar</button>
-      <button class="btn ghost" onclick="logoutSupabase()">Sair</button>
-    </div>
-    <div class="status" id="supabaseLoginStatus">Supabase ainda nao verificado.</div>
-  </div>
-  <div class="cards">
-    <div class="card">
-      <h2>Admin interno</h2>
-      <p>Acesso completo para obras, tarefas, prospeccao, analisadores, documentos, backups e administracao.</p>
-      <div class="list">
-        <div class="item">Painel geral e todos os modulos</div>
-        <div class="item">Criacao e exclusao de obras</div>
-        <div class="item">Backup, restauracao e integrações</div>
+<main class="shell">
+  <section class="hero">
+    <div>
+      <div class="brand">
+        <div class="logo">P3</div>
+        <div>
+          <div class="brand-name">P3 Energy</div>
+          <div class="brand-tag">Engenharia em Energia Solar &amp; Mobilidade El&eacute;trica</div>
+        </div>
       </div>
-      <button class="btn" onclick="UBY_AUTH.set('admin','index.html')">Entrar como admin</button>
+      <h1>Login UBY Recharge</h1>
+      <p>Entrada central para obras EV, engenharia, analisadores, tarefas e documentos. Cada perfil abre somente os m&oacute;dulos definidos para sua fun&ccedil;&atilde;o.</p>
     </div>
-    <div class="card">
-      <h2>Engenheiro</h2>
-      <p>Acesso focado em controle tecnico de obras, prazos, pedidos na concessionaria, estudos, orcamentos e documentos.</p>
-      <div class="list">
-        <div class="item">Portal engenharia e controle tecnico</div>
-        <div class="item">Pedidos de segundo padrao e aumento de carga</div>
-        <div class="item">Planejador, calculadora e analisadores</div>
+    <div class="scope">
+      <div class="scope-card"><strong>Admin</strong><span>Acesso completo para gest&atilde;o, tarefas, backups, documentos, analisadores e administra&ccedil;&atilde;o.</span></div>
+      <div class="scope-card"><strong>Engenharia</strong><span>Acesso focado em obras, concession&aacute;ria, or&ccedil;amentos e analisadores.</span></div>
+    </div>
+  </section>
+
+  <section class="login-card">
+    <h2>Acessar sistema</h2>
+    <p class="sub">Use um dos logins cadastrados inicialmente. A sess&atilde;o fica salva neste navegador at&eacute; sair.</p>
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" autocomplete="username" required placeholder="seu@email.com">
       </div>
-      <button class="btn" onclick="UBY_AUTH.set('engineer','engenharia.html')">Entrar como engenheiro</button>
+      <div class="field">
+        <label for="password">Senha</label>
+        <input id="password" type="password" autocomplete="current-password" required placeholder="Senha">
+      </div>
+      <div class="actions">
+        <button class="btn" id="loginButton" type="submit">Entrar</button>
+        <button class="btn ghost" type="button" id="logoutButton">Sair da sess&atilde;o</button>
+      </div>
+      <div class="status" id="status"></div>
+    </form>
+
+    <div class="users">
+      <h3>Perfis cadastrados</h3>
+      <div class="user-row"><strong>Eduardo</strong><span>Admin completo</span><span class="pill">Admin</span></div>
+      <div class="user-row"><strong>P3 Solar</strong><span>Admin completo</span><span class="pill">Admin</span></div>
+      <div class="user-row"><strong>Alan</strong><span>Portal engenharia</span><span class="pill">Engenharia</span></div>
     </div>
-  </div>
-  <div class="notice">Quando o sistema virar plataforma com backend, este mesmo desenho de perfil sera usado para bloquear rotas e dados no servidor. No HTML estatico ele organiza a experiencia, mas nao substitui login real.</div>
-</div>
+    <div class="notice">Nesta fase est&aacute;tica, o login organiza o acesso no navegador. A blindagem real de dados deve ser feita no backend/Supabase antes de liberar informa&ccedil;&otilde;es sens&iacute;veis.</div>
+  </section>
+</main>
+
 <script src="auth.js"></script>
 <script src="backup_guard.js"></script>
-<script src="supabase_config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_bridge.js"></script>
 <script>
-async function refreshSupabaseLogin(){
-  const el=document.getElementById("supabaseLoginStatus");
-  if(!window.UBY_SUPABASE?.configured()){el.textContent="Supabase ainda nao configurado. Preencha supabase_config.js com URL e anonKey.";return}
-  const user=await window.UBY_SUPABASE.currentUser();
-  el.textContent=user?`Conectado como ${user.email}.`:"Supabase configurado. Informe e-mail e senha para entrar.";
+const form = document.getElementById("loginForm");
+const email = document.getElementById("email");
+const password = document.getElementById("password");
+const statusEl = document.getElementById("status");
+const loginButton = document.getElementById("loginButton");
+const params = new URLSearchParams(location.search);
+const next = params.get("next") || "index.html";
+const current = UBY_AUTH.current();
+
+if (current) {
+  statusEl.className = "status ok";
+  statusEl.textContent = `Sessao ativa: ${current.label}. Entrar novamente troca o perfil.`;
+  email.value = current.email || "";
 }
-async function loginSupabase(){
-  const el=document.getElementById("supabaseLoginStatus");
-  try{
-    el.textContent="Entrando...";
-    await window.UBY_SUPABASE.signIn(document.getElementById("supabaseEmail").value,document.getElementById("supabasePassword").value);
-    await refreshSupabaseLogin();
-  }catch(err){el.textContent="Erro no login: "+err.message}
-}
-async function logoutSupabase(){
-  const el=document.getElementById("supabaseLoginStatus");
-  try{await window.UBY_SUPABASE.signOut();await refreshSupabaseLogin()}catch(err){el.textContent="Erro ao sair: "+err.message}
-}
-refreshSupabaseLogin();
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  loginButton.disabled = true;
+  statusEl.className = "status";
+  statusEl.textContent = "Validando acesso...";
+  try {
+    const session = await UBY_AUTH.login(email.value, password.value);
+    statusEl.className = "status ok";
+    statusEl.textContent = `Acesso liberado: ${session.label}.`;
+    location.href = next;
+  } catch (err) {
+    statusEl.className = "status error";
+    statusEl.textContent = err.message || "Nao foi possivel entrar.";
+  } finally {
+    loginButton.disabled = false;
+  }
+});
+
+document.getElementById("logoutButton").addEventListener("click", () => UBY_AUTH.logout("login.html"));
 </script>
 </body>
 </html>
