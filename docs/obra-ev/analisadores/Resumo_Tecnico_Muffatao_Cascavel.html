@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="p3-report-version" content="muffatao-resumo-cliente-20260521">
+<title>P3 Energy &mdash; Resumo T&eacute;cnico | Muffat&atilde;o Cascavel</title>
+<style>
+  :root{--green:#0F3D2E;--green2:#2EA85C;--ink:#17231D;--muted:#5B6A62;--line:#DDE7E1;--bg:#F5F7F6;--warn:#B96D00;--danger:#B83228}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Arial,sans-serif;font-size:13px;line-height:1.5}
+  .page{max-width:900px;margin:0 auto;padding:28px 24px 56px}
+  .toolbar{display:flex;gap:10px;justify-content:flex-end;margin-bottom:18px}
+  .btn{border:0;border-radius:8px;padding:10px 14px;background:var(--green);color:#fff;font-weight:700;text-decoration:none;cursor:pointer}
+  .btn.alt{background:#fff;color:var(--green);border:1px solid var(--line)}
+  .cover{background:linear-gradient(135deg,#0F3D2E,#1B6A49);color:#fff;border-radius:14px;padding:28px 30px;margin-bottom:18px;box-shadow:0 8px 28px rgba(15,61,46,.16)}
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .logo{width:46px;height:46px;border-radius:10px;background:#2EA85C;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900}
+  .brand-name{letter-spacing:3px;text-transform:uppercase;font-size:12px}
+  .brand-sub{opacity:.78;font-size:11px}
+  h1{font-size:28px;line-height:1.15;margin:0 0 8px}
+  .subtitle{font-size:15px;opacity:.9;margin-bottom:18px}
+  .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+  .meta div{font-size:11px}
+  .meta strong{display:block;font-size:13px;color:#fff;margin-top:3px}
+  section{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:14px;box-shadow:0 2px 10px rgba(15,61,46,.05)}
+  h2{font-size:16px;color:var(--green);margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;margin:14px 0 6px;color:var(--green)}
+  .lead{font-size:15px;font-weight:600;color:var(--green);margin:0}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:12px;background:#FAFCFA}
+  .kpi .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+  .kpi .value{font-size:22px;font-weight:800;color:var(--green);margin-top:4px}
+  .kpi .sub{font-size:11px;color:var(--muted)}
+  .notice{border-left:4px solid var(--warn);background:#FFF6E6;color:#6D4300;padding:12px 14px;border-radius:8px;margin-top:12px}
+  .actions{display:grid;grid-template-columns:1fr;gap:10px}
+  .action{border:1px solid var(--line);border-left:5px solid var(--green2);border-radius:10px;padding:14px 16px;background:#fff}
+  .action.high{border-left-color:var(--danger)}
+  .action.medium{border-left-color:var(--warn)}
+  .action-title{display:flex;justify-content:space-between;gap:10px;font-weight:800;color:var(--green);margin-bottom:6px}
+  .tag{font-size:10px;text-transform:uppercase;letter-spacing:.8px;border-radius:999px;padding:3px 8px;background:#E7F5EC;color:var(--green);white-space:nowrap}
+  .high .tag{background:#FBE7E4;color:var(--danger)}
+  .medium .tag{background:#FFF0D5;color:var(--warn)}
+  ul{margin:8px 0 0;padding-left:18px}
+  li{margin-bottom:5px}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+  th{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);background:#F2F6F4}
+  footer{font-size:11px;color:var(--muted);text-align:center;margin-top:20px}
+  @media print{
+    @page{size:A4;margin:12mm}
+    body{background:#fff;font-size:11.5px}
+    .page{padding:0;max-width:none}
+    .toolbar{display:none}
+    .cover,section{box-shadow:none;break-inside:avoid}
+    .cover{border-radius:0;margin-bottom:10px}
+    section{padding:14px 16px;margin-bottom:9px}
+    h1{font-size:24px}
+    h2{font-size:14px}
+    .kpi .value{font-size:18px}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="toolbar">
+    <a class="btn alt" href="Relatorio_Analise_Carga_Muffatao_Cascavel.html">Voltar ao relat&oacute;rio</a>
+    <button class="btn" onclick="window.print()">Gerar PDF</button>
+  </div>
+
+  <header class="cover">
+    <div class="brand">
+      <div class="logo">P3</div>
+      <div>
+        <div class="brand-name">P3 Energy</div>
+        <div class="brand-sub">Engenharia em Energia Solar &amp; Mobilidade El&eacute;trica</div>
+      </div>
+    </div>
+    <h1>Resumo T&eacute;cnico para Apresenta&ccedil;&atilde;o ao Cliente</h1>
+    <div class="subtitle">Muffat&atilde;o Cascavel &mdash; implanta&ccedil;&atilde;o de carregador EV 60 kW</div>
+    <div class="meta">
+      <div>Cliente<strong>Muffat&atilde;o Cascavel</strong></div>
+      <div>Sistema<strong>127/220 V trif&aacute;sico</strong></div>
+      <div>Medi&ccedil;&atilde;o<strong>13/05/2026 a 19/05/2026</strong></div>
+      <div>Emiss&atilde;o<strong>21/05/2026</strong></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Conclus&atilde;o executiva</h2>
+    <p class="lead">A instala&ccedil;&atilde;o do carregador EV de 60 kW &eacute; tecnicamente vi&aacute;vel, desde que a opera&ccedil;&atilde;o utilize controle din&acirc;mico de carga (DLM) e que sejam corrigidos os pontos el&eacute;tricos indicados antes da energiza&ccedil;&atilde;o final.</p>
+    <div class="notice">O analisador apresentou registros em 5 de 7 dias. Os valores el&eacute;tricos abaixo s&atilde;o medidos; a opera&ccedil;&atilde;o hor&aacute;ria do carregador permanece como pr&eacute;-dimensionamento at&eacute; valida&ccedil;&atilde;o final em campo.</div>
+  </section>
+
+  <section>
+    <h2>Indicadores medidos</h2>
+    <div class="grid">
+      <div class="kpi"><div class="label">Pico ativo</div><div class="value">24,02 kW</div><div class="sub">19/05/2026 10:45</div></div>
+      <div class="kpi"><div class="label">Pico aparente</div><div class="value">32,54 kVA</div><div class="sub">m&eacute;dia 2,26 kVA</div></div>
+      <div class="kpi"><div class="label">FP m&eacute;dio</div><div class="value">0,94</div><div class="sub">m&iacute;nimo registrado 0,66</div></div>
+      <div class="kpi"><div class="label">Energia</div><div class="value">202,80 kWh</div><div class="sub">40,56 kWh/dia</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pontos a corrigir antes da instala&ccedil;&atilde;o</h2>
+    <div class="actions">
+      <div class="action high">
+        <div class="action-title">Balanceamento das fases <span class="tag">Prioridade alta</span></div>
+        <p>O desequil&iacute;brio de corrente chegou a 117,42% no per&iacute;odo medido, indicando distribui&ccedil;&atilde;o irregular de cargas entre as fases.</p>
+        <ul>
+          <li>Redistribuir cargas monof&aacute;sicas no QGBT antes de conectar o carregador.</li>
+          <li>Revisar neutro, barramentos e aperto/conex&otilde;es dos circuitos de maior demanda.</li>
+          <li>Repetir a confer&ecirc;ncia ap&oacute;s o balanceamento para confirmar redu&ccedil;&atilde;o do desequil&iacute;brio.</li>
+        </ul>
+      </div>
+
+      <div class="action high">
+        <div class="action-title">Implantar DLM no carregador <span class="tag">Prioridade alta</span></div>
+        <p>Com carregador de 60 kW, a opera&ccedil;&atilde;o deve limitar automaticamente a pot&ecirc;ncia quando a demanda do posto subir.</p>
+        <ul>
+          <li>Configurar controle din&acirc;mico de carga para preservar a capacidade do padr&atilde;o.</li>
+          <li>Instalar medi&ccedil;&atilde;o/TCs compat&iacute;veis com o carregador para leitura da demanda em tempo real.</li>
+          <li>Definir limite operacional considerando reserva t&eacute;cnica m&iacute;nima.</li>
+        </ul>
+      </div>
+
+      <div class="action medium">
+        <div class="action-title">Validar padr&atilde;o e folga el&eacute;trica <span class="tag">Prioridade m&eacute;dia</span></div>
+        <p>O padr&atilde;o atual de 200 A pode operar com DLM, mas o padr&atilde;o de 250 A oferece maior margem para picos e expans&atilde;o.</p>
+        <ul>
+          <li>Confirmar capacidade do ramal, prote&ccedil;&otilde;es, barramentos e cabos existentes.</li>
+          <li>Adotar 250 A como recomenda&ccedil;&atilde;o preferencial quando houver viabilidade junto &agrave; concession&aacute;ria.</li>
+          <li>Evitar opera&ccedil;&atilde;o sem DLM no cen&aacute;rio de 60 kW.</li>
+        </ul>
+      </div>
+
+      <div class="action medium">
+        <div class="action-title">Conferir qualidade de energia <span class="tag">Prioridade m&eacute;dia</span></div>
+        <p>O fator de pot&ecirc;ncia m&eacute;dio ficou adequado (0,94), por&eacute;m houve m&iacute;nimo registrado de 0,66 em eventos pontuais.</p>
+        <ul>
+          <li>Verificar se existem cargas indutivas ou equipamentos com baixa ocupa&ccedil;&atilde;o afetando o FP em determinados hor&aacute;rios.</li>
+          <li>Confirmar se h&aacute; banco de capacitores existente e se a opera&ccedil;&atilde;o est&aacute; correta.</li>
+          <li>Manter monitoramento ap&oacute;s a instala&ccedil;&atilde;o do carregador.</li>
+        </ul>
+      </div>
+
+      <div class="action">
+        <div class="action-title">Prote&ccedil;&otilde;es e infraestrutura do carregador <span class="tag">Execu&ccedil;&atilde;o</span></div>
+        <p>A instala&ccedil;&atilde;o deve prever circuito dedicado e prote&ccedil;&otilde;es compat&iacute;veis com carregador DC trif&aacute;sico.</p>
+        <ul>
+          <li>Dimensionar disjuntor, cabos, DPS, aterramento e seccionamento conforme projeto executivo.</li>
+          <li>Confirmar queda de tens&atilde;o no trajeto at&eacute; o carregador.</li>
+          <li>Registrar comissionamento e parametriza&ccedil;&atilde;o do DLM na entrega.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Base t&eacute;cnica utilizada</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Valor</th><th>Uso no parecer</th></tr></thead>
+      <tbody>
+        <tr><td>Tens&atilde;o</td><td>127/220 V trif&aacute;sico</td><td>Base para c&aacute;lculo de corrente e capacidade.</td></tr>
+        <tr><td>Corrente m&aacute;xima por fase</td><td>A: 85,61 A &middot; B: 81,92 A &middot; C: 83,32 A</td><td>Valida&ccedil;&atilde;o de carga existente.</td></tr>
+        <tr><td>Energia por fase</td><td>A: 85,47 kWh &middot; B: 69,72 kWh &middot; C: 47,61 kWh</td><td>Indica necessidade de balanceamento.</td></tr>
+        <tr><td>Desequil&iacute;brio de corrente</td><td>M&eacute;dia 50,17% &middot; m&aacute;ximo 117,42%</td><td>Ponto cr&iacute;tico antes do EV.</td></tr>
+        <tr><td>Frequ&ecirc;ncia</td><td>M&eacute;dia 60,01 Hz</td><td>Sem anomalia relevante na frequ&ecirc;ncia.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    P3 Energy &mdash; Documento resumido para apresenta&ccedil;&atilde;o comercial/t&eacute;cnica. N&atilde;o substitui memorial de c&aacute;lculo, ART, projeto executivo ou aprova&ccedil;&atilde;o da concession&aacute;ria.
+  </footer>
+</div>
+<script src="../auth.js"></script>
+<script>UBY_AUTH.require("analyzers");</script>
+</body>
+</html>
