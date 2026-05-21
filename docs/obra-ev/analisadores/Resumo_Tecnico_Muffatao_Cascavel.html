@@ -87,8 +87,8 @@
 
   <section>
     <h2>Conclus&atilde;o executiva</h2>
-    <p class="lead">A instala&ccedil;&atilde;o do carregador EV de 60 kW &eacute; tecnicamente vi&aacute;vel, desde que a opera&ccedil;&atilde;o utilize controle din&acirc;mico de carga (DLM) e que sejam corrigidos os pontos el&eacute;tricos indicados antes da energiza&ccedil;&atilde;o final.</p>
-    <div class="notice">O analisador apresentou registros em 5 de 7 dias. Os valores el&eacute;tricos abaixo s&atilde;o medidos; a opera&ccedil;&atilde;o hor&aacute;ria do carregador permanece como pr&eacute;-dimensionamento at&eacute; valida&ccedil;&atilde;o final em campo.</div>
+    <p class="lead">A medi&ccedil;&atilde;o identificou pontos de aten&ccedil;&atilde;o na instala&ccedil;&atilde;o el&eacute;trica existente, principalmente desequil&iacute;brio entre fases e eventos pontuais de baixo fator de pot&ecirc;ncia. As corre&ccedil;&otilde;es abaixo tratam do que j&aacute; est&aacute; acontecendo hoje no ponto medido.</p>
+    <div class="notice">O analisador apresentou registros em 5 de 7 dias. Os valores abaixo s&atilde;o dados medidos da instala&ccedil;&atilde;o atual; qualquer informa&ccedil;&atilde;o referente ao carregador foi separada em se&ccedil;&atilde;o pr&oacute;pria como condi&ccedil;&atilde;o para futura implanta&ccedil;&atilde;o.</div>
   </section>
 
   <section>
@@ -102,56 +102,75 @@
   </section>
 
   <section>
-    <h2>Pontos a corrigir antes da instala&ccedil;&atilde;o</h2>
+    <h2>Pontos existentes a corrigir</h2>
     <div class="actions">
       <div class="action high">
         <div class="action-title">Balanceamento das fases <span class="tag">Prioridade alta</span></div>
         <p>O desequil&iacute;brio de corrente chegou a 117,42% no per&iacute;odo medido, indicando distribui&ccedil;&atilde;o irregular de cargas entre as fases.</p>
         <ul>
-          <li>Redistribuir cargas monof&aacute;sicas no QGBT antes de conectar o carregador.</li>
+          <li>Redistribuir cargas monof&aacute;sicas no QGBT para reduzir a diferen&ccedil;a de carregamento entre fases.</li>
           <li>Revisar neutro, barramentos e aperto/conex&otilde;es dos circuitos de maior demanda.</li>
           <li>Repetir a confer&ecirc;ncia ap&oacute;s o balanceamento para confirmar redu&ccedil;&atilde;o do desequil&iacute;brio.</li>
         </ul>
       </div>
 
       <div class="action high">
-        <div class="action-title">Implantar DLM no carregador <span class="tag">Prioridade alta</span></div>
-        <p>Com carregador de 60 kW, a opera&ccedil;&atilde;o deve limitar automaticamente a pot&ecirc;ncia quando a demanda do posto subir.</p>
+        <div class="action-title">Revis&atilde;o do neutro e conex&otilde;es do QGBT <span class="tag">Prioridade alta</span></div>
+        <p>O desequil&iacute;brio de carga tamb&eacute;m exige inspe&ccedil;&atilde;o f&iacute;sica dos pontos de conex&atilde;o, especialmente neutro, barramentos, terminais e circuitos com maior corrente.</p>
         <ul>
-          <li>Configurar controle din&acirc;mico de carga para preservar a capacidade do padr&atilde;o.</li>
-          <li>Instalar medi&ccedil;&atilde;o/TCs compat&iacute;veis com o carregador para leitura da demanda em tempo real.</li>
-          <li>Definir limite operacional considerando reserva t&eacute;cnica m&iacute;nima.</li>
+          <li>Verificar aquecimento, folgas mec&acirc;nicas, oxida&ccedil;&atilde;o e aperto dos terminais.</li>
+          <li>Confirmar continuidade e dimensionamento do condutor neutro.</li>
+          <li>Registrar os circuitos realocados para manter hist&oacute;rico da interven&ccedil;&atilde;o.</li>
         </ul>
       </div>
 
       <div class="action medium">
-        <div class="action-title">Validar padr&atilde;o e folga el&eacute;trica <span class="tag">Prioridade m&eacute;dia</span></div>
-        <p>O padr&atilde;o atual de 200 A pode operar com DLM, mas o padr&atilde;o de 250 A oferece maior margem para picos e expans&atilde;o.</p>
-        <ul>
-          <li>Confirmar capacidade do ramal, prote&ccedil;&otilde;es, barramentos e cabos existentes.</li>
-          <li>Adotar 250 A como recomenda&ccedil;&atilde;o preferencial quando houver viabilidade junto &agrave; concession&aacute;ria.</li>
-          <li>Evitar opera&ccedil;&atilde;o sem DLM no cen&aacute;rio de 60 kW.</li>
-        </ul>
-      </div>
-
-      <div class="action medium">
-        <div class="action-title">Conferir qualidade de energia <span class="tag">Prioridade m&eacute;dia</span></div>
+        <div class="action-title">Conferir eventos de baixo fator de pot&ecirc;ncia <span class="tag">Prioridade m&eacute;dia</span></div>
         <p>O fator de pot&ecirc;ncia m&eacute;dio ficou adequado (0,94), por&eacute;m houve m&iacute;nimo registrado de 0,66 em eventos pontuais.</p>
         <ul>
-          <li>Verificar se existem cargas indutivas ou equipamentos com baixa ocupa&ccedil;&atilde;o afetando o FP em determinados hor&aacute;rios.</li>
-          <li>Confirmar se h&aacute; banco de capacitores existente e se a opera&ccedil;&atilde;o est&aacute; correta.</li>
-          <li>Manter monitoramento ap&oacute;s a instala&ccedil;&atilde;o do carregador.</li>
+          <li>Identificar hor&aacute;rios e cargas associadas aos eventos de FP baixo.</li>
+          <li>Verificar se existe banco de capacitores e se a opera&ccedil;&atilde;o est&aacute; correta.</li>
+          <li>Avaliar se h&aacute; cargas indutivas operando com baixa ocupa&ccedil;&atilde;o.</li>
+        </ul>
+      </div>
+
+      <div class="action medium">
+        <div class="action-title">Acompanhar tens&atilde;o e qualidade de energia <span class="tag">Prioridade m&eacute;dia</span></div>
+        <p>As tens&otilde;es medidas permaneceram compat&iacute;veis com sistema 127/220 V, mas devem ser acompanhadas ap&oacute;s o balanceamento para confirmar estabilidade.</p>
+        <ul>
+          <li>Conferir tens&atilde;o fase-neutro e fase-fase em hor&aacute;rios de maior demanda.</li>
+          <li>Verificar queda de tens&atilde;o em circuitos com maior corrente.</li>
+          <li>Manter registro ap&oacute;s as corre&ccedil;&otilde;es para comparar com a medi&ccedil;&atilde;o atual.</li>
         </ul>
       </div>
 
       <div class="action">
-        <div class="action-title">Prote&ccedil;&otilde;es e infraestrutura do carregador <span class="tag">Execu&ccedil;&atilde;o</span></div>
-        <p>A instala&ccedil;&atilde;o deve prever circuito dedicado e prote&ccedil;&otilde;es compat&iacute;veis com carregador DC trif&aacute;sico.</p>
+        <div class="action-title">Atualiza&ccedil;&atilde;o do quadro ap&oacute;s corre&ccedil;&otilde;es <span class="tag">Execu&ccedil;&atilde;o</span></div>
+        <p>As interven&ccedil;&otilde;es devem deixar o quadro identificado e com hist&oacute;rico claro para futuras manuten&ccedil;&otilde;es.</p>
         <ul>
-          <li>Dimensionar disjuntor, cabos, DPS, aterramento e seccionamento conforme projeto executivo.</li>
-          <li>Confirmar queda de tens&atilde;o no trajeto at&eacute; o carregador.</li>
-          <li>Registrar comissionamento e parametriza&ccedil;&atilde;o do DLM na entrega.</li>
+          <li>Atualizar identifica&ccedil;&atilde;o dos circuitos realocados.</li>
+          <li>Registrar fotos do quadro antes e depois da interven&ccedil;&atilde;o.</li>
+          <li>Recomenda-se nova medi&ccedil;&atilde;o curta ap&oacute;s os ajustes para validar o resultado.</li>
         </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Observa&ccedil;&otilde;es separadas para futura implanta&ccedil;&atilde;o do carregador</h2>
+    <p>As informa&ccedil;&otilde;es abaixo n&atilde;o s&atilde;o falhas atuais causadas pelo carregador. Elas s&atilde;o condi&ccedil;&otilde;es de projeto caso o ponto receba um carregador EV de 60 kW.</p>
+    <div class="actions">
+      <div class="action medium">
+        <div class="action-title">Controle din&acirc;mico de carga (DLM) <span class="tag">Projeto EV</span></div>
+        <p>Para preservar a instala&ccedil;&atilde;o, o carregador deve limitar sua pot&ecirc;ncia conforme a demanda instant&acirc;nea do posto.</p>
+      </div>
+      <div class="action medium">
+        <div class="action-title">Padr&atilde;o e folga el&eacute;trica <span class="tag">Projeto EV</span></div>
+        <p>O padr&atilde;o atual de 200 A pode ser estudado com DLM, mas 250 A oferece maior margem operacional e deve ser avaliado na etapa de projeto/concession&aacute;ria.</p>
+      </div>
+      <div class="action medium">
+        <div class="action-title">Circuito dedicado do carregador <span class="tag">Projeto EV</span></div>
+        <p>Disjuntor, cabos, DPS, aterramento, seccionamento e queda de tens&atilde;o devem ser definidos no projeto executivo do carregador.</p>
       </div>
     </div>
   </section>
@@ -164,7 +183,7 @@
         <tr><td>Tens&atilde;o</td><td>127/220 V trif&aacute;sico</td><td>Base para c&aacute;lculo de corrente e capacidade.</td></tr>
         <tr><td>Corrente m&aacute;xima por fase</td><td>A: 85,61 A &middot; B: 81,92 A &middot; C: 83,32 A</td><td>Valida&ccedil;&atilde;o de carga existente.</td></tr>
         <tr><td>Energia por fase</td><td>A: 85,47 kWh &middot; B: 69,72 kWh &middot; C: 47,61 kWh</td><td>Indica necessidade de balanceamento.</td></tr>
-        <tr><td>Desequil&iacute;brio de corrente</td><td>M&eacute;dia 50,17% &middot; m&aacute;ximo 117,42%</td><td>Ponto cr&iacute;tico antes do EV.</td></tr>
+        <tr><td>Desequil&iacute;brio de corrente</td><td>M&eacute;dia 50,17% &middot; m&aacute;ximo 117,42%</td><td>Ponto cr&iacute;tico da instala&ccedil;&atilde;o existente.</td></tr>
         <tr><td>Frequ&ecirc;ncia</td><td>M&eacute;dia 60,01 Hz</td><td>Sem anomalia relevante na frequ&ecirc;ncia.</td></tr>
       </tbody>
     </table>
