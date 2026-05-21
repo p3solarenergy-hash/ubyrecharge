@@ -71,7 +71,6 @@
   .vbtn.eletrico{background:#2E2310;color:#FFE2A3;border-color:#7C5D1B}
   .vbtn.carregador{background:#0E2A1B;color:#9EF0B7;border-color:#1F8A4C}
   .vbtn.resumo{background:#1E2A36;color:#BEE1FF;border-color:#3D6D9B}
-  .vbtn.evproj{background:#2A2338;color:#D8C7FF;border-color:#69528E}
 
   .empty{background:var(--p3-card);border:2px dashed var(--p3-border);border-radius:14px;padding:60px 20px;text-align:center;color:var(--p3-muted)}
   .empty h3{font-size:16px;color:var(--p3-primary);margin-bottom:6px}
@@ -133,7 +132,6 @@
   [data-theme="light"] .vbtn.eletrico{background:#FFF4D8 !important;color:#6B4700 !important;border-color:#D9A536 !important}
   [data-theme="light"] .vbtn.carregador{background:#E2F4E9 !important;color:#0F4824 !important;border-color:#7BC895 !important}
   [data-theme="light"] .vbtn.resumo{background:#E9F4FF !important;color:#17466F !important;border-color:#79A9D6 !important}
-  [data-theme="light"] .vbtn.evproj{background:#F1EAFE !important;color:#4F3179 !important;border-color:#B7A0DA !important}
   [data-theme="light"] .report-card,[data-theme="light"] .compare-section,[data-theme="light"] .stat{background:#FFFFFF !important;color:#1F2A24 !important}
   [data-theme="light"] .report-title,[data-theme="light"] .toolbar h2,[data-theme="light"] .compare-section h2{color:#0F3D2E !important}
   [data-theme="light"] .report-sub,[data-theme="light"] .stat .sub,[data-theme="light"] .mu{color:#4D5F55 !important}
@@ -417,7 +415,6 @@ const RELATORIOS = [
     arquivo_eletrico: 'Relatorio_Eletrico_Muffatao_Cascavel.html',
     arquivo_carregador: 'Relatorio_Carregador_Muffatao_Cascavel.html',
     arquivo_resumo: 'Resumo_Tecnico_Muffatao_Cascavel.html',
-    arquivo_ev_projeto: 'Resumo_Projeto_EV_Muffatao_Cascavel.html',
     status: 'ok',
     statusLabel: 'OK',
     pico_kw: 24.02,
@@ -478,7 +475,6 @@ function renderReports(filter=''){
           <a href="${r.arquivo_eletrico}" class="vbtn eletrico" title="Análise da rede interna — para o dono do imóvel">⚡ Elétrico</a>
           <a href="${r.arquivo_carregador}" class="vbtn carregador" title="Projeto do carregador EV — para apresentação">🔌 Carregador</a>
           ${r.arquivo_resumo ? `<a href="${r.arquivo_resumo}" class="vbtn resumo" title="Diagnóstico da instalação existente para salvar em PDF">PDF Diagnóstico</a>` : ''}
-          ${r.arquivo_ev_projeto ? `<a href="${r.arquivo_ev_projeto}" class="vbtn evproj" title="Premissas separadas do projeto EV">PDF Projeto EV</a>` : ''}
         </div>
       </div>
     `;
