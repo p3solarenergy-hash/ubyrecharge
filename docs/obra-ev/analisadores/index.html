@@ -477,7 +477,7 @@ function renderReports(filter=''){
           <a href="${r.arquivo}" class="vbtn completo" title="Relatório técnico completo (uso interno P3)">📋 Completo</a>
           <a href="${r.arquivo_eletrico}" class="vbtn eletrico" title="Análise da rede interna — para o dono do imóvel">⚡ Elétrico</a>
           <a href="${r.arquivo_carregador}" class="vbtn carregador" title="Projeto do carregador EV — para apresentação">🔌 Carregador</a>
-          ${r.arquivo_resumo ? `<a href="${r.arquivo_resumo}" class="vbtn resumo" title="Diagnóstico da instalação existente para salvar em PDF">PDF Diagnóstico</a>` : ''}
+          ${r.arquivo_resumo ? `<a href="${r.arquivo_resumo}?v=diag-b576564" class="vbtn resumo" title="Diagnóstico da instalação existente para salvar em PDF">PDF Diagnóstico</a>` : ''}
         </div>
       </div>
     `;
