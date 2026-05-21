@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="p3-report-version" content="malassise-rk-diagnostico-20260521">
+<title>P3 Energy &mdash; Diagn&oacute;stico | Malassise Robert Koch</title>
+<style>
+  :root{--green:#0F3D2E;--green2:#2EA85C;--ink:#17231D;--muted:#5B6A62;--line:#DDE7E1;--bg:#F5F7F6;--warn:#B96D00;--danger:#B83228}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Arial,sans-serif;font-size:13px;line-height:1.5}
+  .page{max-width:900px;margin:0 auto;padding:28px 24px 56px}.toolbar{display:flex;justify-content:flex-end;margin-bottom:18px}
+  .btn{border:0;border-radius:8px;padding:10px 14px;background:var(--green);color:#fff;font-weight:700;cursor:pointer}
+  .cover{background:linear-gradient(135deg,#0F3D2E,#1B6A49);color:#fff;border-radius:14px;padding:28px 30px;margin-bottom:18px;box-shadow:0 8px 28px rgba(15,61,46,.16)}
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:22px}.logo{width:46px;height:46px;border-radius:10px;background:#2EA85C;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900}
+  .brand-name{letter-spacing:3px;text-transform:uppercase;font-size:12px}.brand-sub{opacity:.78;font-size:11px}h1{font-size:28px;line-height:1.15;margin:0 0 8px}.subtitle{font-size:15px;opacity:.9;margin-bottom:18px}
+  .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}.meta div{font-size:11px}.meta strong{display:block;font-size:13px;color:#fff;margin-top:3px}
+  section{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:14px;box-shadow:0 2px 10px rgba(15,61,46,.05)}
+  h2{font-size:16px;color:var(--green);margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}.lead{font-size:15px;font-weight:600;color:var(--green);margin:0}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.kpi{border:1px solid var(--line);border-radius:10px;padding:12px;background:#FAFCFA}.kpi .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}.kpi .value{font-size:22px;font-weight:800;color:var(--green);margin-top:4px}.kpi .sub{font-size:11px;color:var(--muted)}
+  .notice{border-left:4px solid var(--warn);background:#FFF6E6;color:#6D4300;padding:12px 14px;border-radius:8px;margin-top:12px}.actions{display:grid;gap:10px}.action{border:1px solid var(--line);border-left:5px solid var(--green2);border-radius:10px;padding:14px 16px;background:#fff}.action.high{border-left-color:var(--danger)}.action.medium{border-left-color:var(--warn)}
+  .action-title{display:flex;justify-content:space-between;gap:10px;font-weight:800;color:var(--green);margin-bottom:6px}.tag{font-size:10px;text-transform:uppercase;letter-spacing:.8px;border-radius:999px;padding:3px 8px;background:#E7F5EC;color:var(--green);white-space:nowrap}.high .tag{background:#FBE7E4;color:var(--danger)}.medium .tag{background:#FFF0D5;color:var(--warn)}
+  ul{margin:8px 0 0;padding-left:18px}li{margin-bottom:5px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}th{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);background:#F2F6F4}footer{font-size:11px;color:var(--muted);text-align:center;margin-top:20px}
+  @media print{@page{size:A4;margin:12mm}body{background:#fff;font-size:11.5px}.page{padding:0;max-width:none}.toolbar{display:none}.cover,section{box-shadow:none;break-inside:avoid}.cover{border-radius:0}.kpi .value{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="toolbar"><button class="btn" onclick="window.print()">Gerar PDF</button></div>
+  <header class="cover">
+    <div class="brand"><div class="logo">P3</div><div><div class="brand-name">P3 Energy</div><div class="brand-sub">Engenharia em Energia Solar &amp; Mobilidade El&eacute;trica</div></div></div>
+    <h1>Diagn&oacute;stico da Instala&ccedil;&atilde;o El&eacute;trica Existente</h1>
+    <div class="subtitle">Malassise Robert Koch &mdash; resumo t&eacute;cnico da medi&ccedil;&atilde;o do analisador de carga</div>
+    <div class="meta"><div>Cliente<strong>Malassise Robert Koch</strong></div><div>Sistema<strong>127/220 V trif&aacute;sico</strong></div><div>Medi&ccedil;&atilde;o<strong>01/02/2026 a 02/05/2026</strong></div><div>Emiss&atilde;o<strong>21/05/2026</strong></div></div>
+  </header>
+  <section><h2>Conclus&atilde;o executiva</h2><p class="lead">A medi&ccedil;&atilde;o identificou fator de pot&ecirc;ncia baixo, desequil&iacute;brio de corrente e corrente elevada no neutro. Esses pontos indicam necessidade de corre&ccedil;&atilde;o na instala&ccedil;&atilde;o atual.</p><div class="notice">A base teve registros em 5 dos 91 dias analisados. O diagn&oacute;stico abaixo usa os dados medidos dispon&iacute;veis e recomenda nova campanha para confirma&ccedil;&atilde;o ap&oacute;s as corre&ccedil;&otilde;es.</div></section>
+  <section><h2>Indicadores medidos</h2><div class="grid"><div class="kpi"><div class="label">Pico ativo</div><div class="value">28,06 kW</div><div class="sub">25/03/2026 12:55</div></div><div class="kpi"><div class="label">Pico aparente</div><div class="value">28,78 kVA</div><div class="sub">m&eacute;dia 11,80 kVA</div></div><div class="kpi"><div class="label">FP m&eacute;dio</div><div class="value">0,79</div><div class="sub">abaixo de 0,92</div></div><div class="kpi"><div class="label">Energia</div><div class="value">438,78 kWh</div><div class="sub">5 dias medidos</div></div></div></section>
+  <section><h2>Pontos existentes a corrigir</h2><div class="actions">
+    <div class="action high"><div class="action-title">Corre&ccedil;&atilde;o do fator de pot&ecirc;ncia <span class="tag">Prioridade alta</span></div><p>O FP m&eacute;dio de 0,79 est&aacute; abaixo da refer&ecirc;ncia m&iacute;nima de 0,92, com comportamento indutivo relevante.</p><ul><li>Avaliar banco autom&aacute;tico de capacitores na faixa de 15 a 20 kVAr.</li><li>Confirmar ajuste por medi&ccedil;&atilde;o ap&oacute;s instala&ccedil;&atilde;o/parametriza&ccedil;&atilde;o.</li><li>Verificar risco de cobran&ccedil;a por excedente reativo.</li></ul></div>
+    <div class="action high"><div class="action-title">Neutro e harm&ocirc;nicas <span class="tag">Prioridade alta</span></div><p>O neutro medido chegou a 110,90 A, acima das correntes de fase em alguns momentos, indicando poss&iacute;vel presen&ccedil;a de terceira harm&ocirc;nica.</p><ul><li>Inspecionar condutor de neutro, conex&otilde;es e aquecimento.</li><li>Verificar cargas eletr&ocirc;nicas, ilumina&ccedil;&atilde;o e fontes chaveadas.</li><li>Medir THD de corrente em nova campanha.</li></ul></div>
+    <div class="action medium"><div class="action-title">Balanceamento de fases <span class="tag">Prioridade m&eacute;dia</span></div><p>O desequil&iacute;brio de corrente por amplitude chegou a 30,82%.</p><ul><li>Redistribuir cargas monof&aacute;sicas entre fases.</li><li>Priorizar transfer&ecirc;ncia de cargas para reduzir diferen&ccedil;a entre fase A/B e fase C.</li><li>Meta recomendada: reduzir o desvio para faixa pr&oacute;xima de 10%.</li></ul></div>
+    <div class="action medium"><div class="action-title">Nova campanha de medi&ccedil;&atilde;o <span class="tag">Prioridade m&eacute;dia</span></div><p>A amostra &uacute;til foi curta frente ao per&iacute;odo total avaliado.</p><ul><li>Reinstalar analisador por 7 a 15 dias completos.</li><li>Usar integraliza&ccedil;&atilde;o de 10 a 15 minutos.</li><li>Comparar FP, neutro, THD e desequil&iacute;brio ap&oacute;s ajustes.</li></ul></div>
+  </div></section>
+  <section><h2>Base t&eacute;cnica utilizada</h2><table><thead><tr><th>Item</th><th>Valor</th><th>Uso no parecer</th></tr></thead><tbody><tr><td>Correntes m&aacute;ximas</td><td>A: 92,81 A &middot; B: 90,04 A &middot; C: 64,90 A</td><td>Verifica&ccedil;&atilde;o de carregamento por fase.</td></tr><tr><td>Neutro medido</td><td>M&aacute;x. 110,90 A &middot; m&eacute;dia 38,88 A</td><td>Indica aten&ccedil;&atilde;o para harm&ocirc;nicas/conex&otilde;es.</td></tr><tr><td>Desequil&iacute;brio de corrente</td><td>30,82%</td><td>Ponto de corre&ccedil;&atilde;o na distribui&ccedil;&atilde;o de cargas.</td></tr><tr><td>Consumo por fase</td><td>A: 190,69 kWh &middot; B: 132,69 kWh &middot; C: 115,40 kWh</td><td>Confirma assimetria de consumo.</td></tr></tbody></table></section>
+  <footer>P3 Energy &mdash; Documento resumido da instala&ccedil;&atilde;o existente. N&atilde;o substitui memorial de c&aacute;lculo, ART ou inspe&ccedil;&atilde;o executiva em campo.</footer>
+</div>
+<script src="../auth.js"></script><script>UBY_AUTH.require("analyzers");</script>
+</body>
+</html>
