@@ -1,8 +1,8 @@
 :root{
   --uby-navy:#071527;
   --uby-navy-soft:#10223A;
-  --uby-green:#00FF85;
-  --uby-cyan:#00E5FF;
+  --uby-green:#57B7FF;
+  --uby-cyan:#38D4FF;
   --uby-white:#FFFFFF;
 }
 
@@ -68,6 +68,6 @@ select{
   width:260px;
   height:260px;
   border-radius:50%;
-  background:radial-gradient(circle,rgba(0,255,133,.22),rgba(0,229,255,.08),transparent 68%);
+  background:radial-gradient(circle,rgba(87,183,255,.22),rgba(0,229,255,.08),transparent 68%);
   filter:blur(2px);
 }

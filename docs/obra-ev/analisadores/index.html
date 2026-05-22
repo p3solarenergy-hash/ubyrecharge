@@ -2,19 +2,19 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>P3 Energy â€” Dashboard de AnÃ¡lises</title>
+<title>P3 Energy - Dashboard de Análises</title>
 <link rel="stylesheet" href="../sidebar.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
-  :root{--p3-primary:#3FB66B;--p3-primary-deep:#0F3D2E;--p3-accent:#5BC882;--p3-accent-2:#FFD66B;--p3-bg:#0E1813;--p3-card:#16221E;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#2A3530;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#3FB66B;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  :root{--p3-primary:#2D7FF9;--p3-primary-deep:#0B2A4A;--p3-accent:#57B7FF;--p3-accent-2:#FFD66B;--p3-bg:#07111F;--p3-card:#0E1B2D;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#24364E;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#2D7FF9;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:var(--p3-bg);color:var(--p3-text);font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh}
   .page{max-width:1200px;margin:0 auto;padding:32px 28px 80px}
 
-  .header{background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%);color:#fff;border-radius:16px;padding:36px 36px;margin-bottom:28px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
-  .header::after{content:"";position:absolute;right:-80px;top:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(46,168,92,.35),transparent 70%);border-radius:50%}
+  .header{background:linear-gradient(135deg,#0B2A4A 0%,#134B7A 100%);color:#fff;border-radius:16px;padding:36px 36px;margin-bottom:28px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
+  .header::after{content:"";position:absolute;right:-80px;top:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(45,127,249,.35),transparent 70%);border-radius:50%}
   .header .brand{display:flex;align-items:center;gap:16px;margin-bottom:20px;position:relative;z-index:1}
-  .logo-mark{width:54px;height:54px;border-radius:12px;background:#0F3D2E;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--p3-accent);font-size:26px;border:1px solid var(--p3-accent);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .logo-mark{width:54px;height:54px;border-radius:12px;background:#0B2A4A;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--p3-accent);font-size:26px;border:1px solid var(--p3-accent);box-shadow:0 2px 8px rgba(0,0,0,.25)}
   .brand-name{font-size:14px;letter-spacing:3px;text-transform:uppercase;opacity:.85}
   .brand-tag{font-size:11px;opacity:.65;letter-spacing:1px}
   .header h1{font-size:32px;font-weight:700;margin-bottom:8px;position:relative;z-index:1}
@@ -34,21 +34,21 @@
   .toolbar h2{flex:1;font-size:18px;font-weight:700;color:var(--p3-primary);display:flex;align-items:center;gap:10px}
   .toolbar h2::before{content:"";width:4px;height:22px;background:var(--p3-accent);border-radius:3px}
   .toolbar .search{flex:0 0 280px;position:relative}
-  .toolbar input{width:100%;padding:9px 12px 9px 34px;border-radius:8px;border:1px solid var(--p3-border);font-size:13px;background:#1A2622;color:var(--p3-text);font-family:inherit}
-  .toolbar input:focus{outline:none;border-color:var(--p3-accent);box-shadow:0 0 0 3px rgba(46,168,92,.15)}
+  .toolbar input{width:100%;padding:9px 12px 9px 34px;border-radius:8px;border:1px solid var(--p3-border);font-size:13px;background:#13243B;color:var(--p3-text);font-family:inherit}
+  .toolbar input:focus{outline:none;border-color:var(--p3-accent);box-shadow:0 0 0 3px rgba(45,127,249,.15)}
   .toolbar .search::before{content:"ðŸ”";position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;opacity:.6}
   .toolbar .new-btn{background:var(--p3-accent);color:#fff;padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
   .toolbar .new-btn:hover{background:#258A4D}
 
   .reports{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px;margin-bottom:32px}
   .report-card{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:22px;box-shadow:var(--p3-shadow);text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:14px;transition:all .2s;position:relative;overflow:hidden}
-  .report-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(15,61,46,.12)}
-  .report-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#0F3D2E,var(--p3-accent))}
+  .report-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(11,42,74,.12)}
+  .report-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#0B2A4A,var(--p3-accent))}
   .report-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
   .report-title{font-size:16px;font-weight:700;color:var(--p3-primary);line-height:1.3}
   .report-sub{font-size:11px;color:var(--p3-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.7px}
   .report-status{font-size:9px;padding:3px 9px;border-radius:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0}
-  .status-ok{background:#0E2A1B;color:#7FE2A0}
+  .status-ok{background:#0B2A4A;color:#9DCEFF}
   .status-warn{background:#2E2310;color:#F2D77F}
   .status-danger{background:#2E1714;color:#FF8B7C}
   .report-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:12px 0;border-top:1px solid var(--p3-border);border-bottom:1px solid var(--p3-border)}
@@ -56,20 +56,20 @@
   .report-meta .item .mv{font-size:14px;font-weight:700;color:var(--p3-primary);margin-top:2px}
   .report-meta .item .mu{font-size:10px;color:var(--p3-muted);font-weight:500}
   .report-flags{display:flex;gap:6px;flex-wrap:wrap}
-  .flag{font-size:10px;padding:3px 8px;border-radius:6px;background:#1F2A26;color:var(--p3-muted);font-weight:600}
+  .flag{font-size:10px;padding:3px 8px;border-radius:6px;background:#172A42;color:var(--p3-muted);font-weight:600}
   .flag.crit{background:#2E1714;color:#FF8B7C}
   .flag.warn{background:#2E2310;color:#F2D77F}
-  .flag.ok{background:#0E2A1B;color:#7FE2A0}
+  .flag.ok{background:#0B2A4A;color:#9DCEFF}
   .report-foot{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--p3-muted);margin-top:auto}
   .report-foot .open{color:var(--p3-accent);font-weight:700}
 
 
   .report-versions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
-  .vbtn{min-width:0;min-height:44px;text-align:center;padding:9px 8px;border-radius:8px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.25px;text-decoration:none;transition:all .15s;border:1px solid var(--p3-border);background:#101B16;color:#fff;line-height:1.15;display:flex;align-items:center;justify-content:center;white-space:normal}
+  .vbtn{min-width:0;min-height:44px;text-align:center;padding:9px 8px;border-radius:8px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.25px;text-decoration:none;transition:all .15s;border:1px solid var(--p3-border);background:#0B1524;color:#fff;line-height:1.15;display:flex;align-items:center;justify-content:center;white-space:normal}
   .vbtn:hover{transform:translateY(-1px);border-color:var(--p3-accent)}
-  .vbtn.completo{background:#0F3D2E;color:#fff;border-color:var(--p3-accent)}
+  .vbtn.completo{background:#0B2A4A;color:#fff;border-color:var(--p3-accent)}
   .vbtn.eletrico{background:#2E2310;color:#FFE2A3;border-color:#7C5D1B}
-  .vbtn.carregador{background:#0E2A1B;color:#9EF0B7;border-color:#1F8A4C}
+  .vbtn.carregador{background:#0B2A4A;color:#9EF0B7;border-color:#1F8A4C}
   .vbtn.resumo{background:#1E2A36;color:#BEE1FF;border-color:#3D6D9B}
 
   .empty{background:var(--p3-card);border:2px dashed var(--p3-border);border-radius:14px;padding:60px 20px;text-align:center;color:var(--p3-muted)}
@@ -98,68 +98,68 @@
   .theme-toggle:active{transform:scale(0.95)}
 
   /* === LIGHT THEME OVERRIDES === */
-  [data-theme="light"]{--p3-primary:#0F3D2E;--p3-primary-deep:#0F3D2E;--p3-accent:#2EA85C;--p3-accent-2:#FFB300;--p3-bg:#F5F7F6;--p3-card:#FFFFFF;--p3-text:#1F2A24;--p3-muted:#5C6B62;--p3-border:#E2E8E4;--p3-danger:#C0392B;--p3-warn:#E08E0B;--p3-ok:#1F8A4C;--p3-shadow:0 1px 3px rgba(15,61,46,.06),0 4px 12px rgba(15,61,46,.05)}
-  [data-theme="light"] .header{background:linear-gradient(135deg,#0F3D2E 0%,#155340 100%)}
-  [data-theme="light"] .logo-mark{background:#2EA85C !important;color:#fff !important;border:none !important}
+  [data-theme="light"]{--p3-primary:#0B2A4A;--p3-primary-deep:#0B2A4A;--p3-accent:#2D7FF9;--p3-accent-2:#FFB300;--p3-bg:#F5F7F6;--p3-card:#FFFFFF;--p3-text:#1F2A24;--p3-muted:#5C6B62;--p3-border:#DDE8F6;--p3-danger:#C0392B;--p3-warn:#E08E0B;--p3-ok:#1F8A4C;--p3-shadow:0 1px 3px rgba(11,42,74,.06),0 4px 12px rgba(11,42,74,.05)}
+  [data-theme="light"] .header{background:linear-gradient(135deg,#0B2A4A 0%,#155340 100%)}
+  [data-theme="light"] .logo-mark{background:#2D7FF9 !important;color:#fff !important;border:none !important}
   [data-theme="light"] .header .bookmark-hint,[data-theme="light"] .nav-back{background:rgba(255,255,255,.15) !important}
   [data-theme="light"] .nav-back:hover{background:rgba(255,255,255,.25) !important}
   [data-theme="light"] .alert{background:#FFF8E6;color:#6B4F0A}
   [data-theme="light"] .alert.danger{background:#FCEDEC;color:#7A1F16}
   [data-theme="light"] .alert.ok{background:#EDF7F0;color:#0F4824}
-  [data-theme="light"] th{background:#F1F5F2 !important;color:#0F3D2E !important}
-  [data-theme="light"] .badge.ok,[data-theme="light"] .tag.ok,[data-theme="light"] .status-ok,[data-theme="light"] .flag.ok{background:#E2F4E9 !important;color:#1F8A4C !important}
+  [data-theme="light"] th{background:#F1F5F2 !important;color:#0B2A4A !important}
+  [data-theme="light"] .badge.ok,[data-theme="light"] .tag.ok,[data-theme="light"] .status-ok,[data-theme="light"] .flag.ok{background:#EAF3FF !important;color:#1F8A4C !important}
   [data-theme="light"] .badge.warn,[data-theme="light"] .tag.warn,[data-theme="light"] .status-warn,[data-theme="light"] .flag.warn{background:#FFF1D6 !important;color:#E08E0B !important}
   [data-theme="light"] .badge.danger,[data-theme="light"] .tag.danger,[data-theme="light"] .status-danger,[data-theme="light"] .flag.danger{background:#FBE3E0 !important;color:#C0392B !important}
   [data-theme="light"] .flag{background:#F1F5F2 !important;color:#5C6B62 !important}
   [data-theme="light"] .controls{background:#F1F5F2 !important}
-  [data-theme="light"] .ctrl select,[data-theme="light"] .toolbar input{background:#fff !important;color:#0F3D2E !important}
+  [data-theme="light"] .ctrl select,[data-theme="light"] .toolbar input{background:#fff !important;color:#0B2A4A !important}
   [data-theme="light"] .toggle .track{background:#CDD4D0 !important}
   [data-theme="light"] .ind-bar,[data-theme="light"] .op-card .op-bar{background:#EAEEEC !important}
   [data-theme="light"] .scenario-row.active,[data-theme="light"] .rec.warn{background:#FFFAEE !important}
-  [data-theme="light"] .rec{background:#FAFCFA !important}
+  [data-theme="light"] .rec{background:#F8FBFF !important}
   [data-theme="light"] .rec.danger{background:#FDF6F5 !important}
   [data-theme="light"] .op-summary{background:linear-gradient(135deg,#F1F5F2,#E9F1EC) !important}
-  [data-theme="light"] .op-card,[data-theme="light"] .band-card{background:#FAFCFA !important}
+  [data-theme="light"] .op-card,[data-theme="light"] .band-card{background:#F8FBFF !important}
   [data-theme="light"] .capacity-bar{background:#fff !important}
   [data-theme="light"] .cap-segment.reserve{background:#7B8A82 !important}
   [data-theme="light"] .band-card.b0{border-bottom-color:#7B8A82 !important}
   [data-theme="light"] .band-card.b1{border-bottom-color:#FFB300 !important}
   [data-theme="light"] .band-card.b2{border-bottom-color:#FFC940 !important}
   [data-theme="light"] .band-card.b3{border-bottom-color:#7DCB97 !important}
-  [data-theme="light"] tr[style*="background:#1F2A26"]{background:#F1F5F2 !important;color:#1F2A24 !important}
-  [data-theme="light"] .vbtn{background:#FFFFFF !important;color:#0F3D2E !important;border-color:#B7D9C4 !important}
-  [data-theme="light"] .vbtn.completo{background:#0F3D2E !important;color:#fff !important;border-color:#0F3D2E !important}
+  [data-theme="light"] tr[style*="background:#172A42"]{background:#F1F5F2 !important;color:#1F2A24 !important}
+  [data-theme="light"] .vbtn{background:#FFFFFF !important;color:#0B2A4A !important;border-color:#B9D7FF !important}
+  [data-theme="light"] .vbtn.completo{background:#0B2A4A !important;color:#fff !important;border-color:#0B2A4A !important}
   [data-theme="light"] .vbtn.eletrico{background:#FFF4D8 !important;color:#6B4700 !important;border-color:#D9A536 !important}
-  [data-theme="light"] .vbtn.carregador{background:#E2F4E9 !important;color:#0F4824 !important;border-color:#7BC895 !important}
+  [data-theme="light"] .vbtn.carregador{background:#EAF3FF !important;color:#0F4824 !important;border-color:#7BC895 !important}
   [data-theme="light"] .vbtn.resumo{background:#E9F4FF !important;color:#17466F !important;border-color:#79A9D6 !important}
   [data-theme="light"] .report-card,[data-theme="light"] .compare-section,[data-theme="light"] .stat{background:#FFFFFF !important;color:#1F2A24 !important}
-  [data-theme="light"] .report-title,[data-theme="light"] .toolbar h2,[data-theme="light"] .compare-section h2{color:#0F3D2E !important}
+  [data-theme="light"] .report-title,[data-theme="light"] .toolbar h2,[data-theme="light"] .compare-section h2{color:#0B2A4A !important}
   [data-theme="light"] .report-sub,[data-theme="light"] .stat .sub,[data-theme="light"] .mu{color:#4D5F55 !important}
 
 
   /* === UBY THEME STANDARD === */
   .ghost-btn,.analyzer-links a,.mini-link,.nav a:not(.main),.tiny-btn{
-    border-color:#345447;
-    background:#101B16;
+    border-color:#2E4D70;
+    background:#0B1524;
     color:#E8EFEB;
   }
   .ghost-btn:hover,.analyzer-links a:hover,.mini-link:hover,.nav a:not(.main):hover,.tiny-btn:hover{
     border-color:var(--p3-accent);
-    background:#14231C;
+    background:#0E1B2D;
   }
   .new-btn,.primary-btn,.primary-link,.analyzer-links a.main,.mini-link.primary,.nav a.main{
-    background:#2EA85C;
-    border-color:#2EA85C;
+    background:#2D7FF9;
+    border-color:#2D7FF9;
     color:#FFFFFF;
   }
   .new-btn:hover,.primary-btn:hover,.primary-link:hover,.analyzer-links a.main:hover,.mini-link.primary:hover,.nav a.main:hover{
-    background:#248F50;
-    border-color:#248F50;
+    background:#1D65D8;
+    border-color:#1D65D8;
   }
   .theme-toggle{
-    background:#16221E;
+    background:#0E1B2D;
     color:#E8EFEB;
-    border-color:#345447;
+    border-color:#2E4D70;
   }
   [data-theme="light"] .ghost-btn,
   [data-theme="light"] .analyzer-links a,
@@ -167,16 +167,16 @@
   [data-theme="light"] .nav a:not(.main),
   [data-theme="light"] .tiny-btn{
     background:#FFFFFF !important;
-    color:#0F3D2E !important;
-    border-color:#B7D9C4 !important;
+    color:#0B2A4A !important;
+    border-color:#B9D7FF !important;
   }
   [data-theme="light"] .ghost-btn:hover,
   [data-theme="light"] .analyzer-links a:hover,
   [data-theme="light"] .mini-link:hover,
   [data-theme="light"] .nav a:not(.main):hover,
   [data-theme="light"] .tiny-btn:hover{
-    background:#EAF6EF !important;
-    border-color:#2EA85C !important;
+    background:#EAF3FF !important;
+    border-color:#2D7FF9 !important;
   }
   [data-theme="light"] .new-btn,
   [data-theme="light"] .primary-btn,
@@ -184,8 +184,8 @@
   [data-theme="light"] .analyzer-links a.main,
   [data-theme="light"] .mini-link.primary,
   [data-theme="light"] .nav a.main{
-    background:#2EA85C !important;
-    border-color:#2EA85C !important;
+    background:#2D7FF9 !important;
+    border-color:#2D7FF9 !important;
     color:#FFFFFF !important;
   }
   [data-theme="light"] .stat,
@@ -199,7 +199,7 @@
   [data-theme="light"] .new-panel{
     background:#FFFFFF !important;
     color:#1F2A24 !important;
-    border-color:#D9E5DE !important;
+    border-color:#D7E6F8 !important;
   }
   [data-theme="light"] .phase-mini,
   [data-theme="light"] .macro-item,
@@ -214,9 +214,9 @@
   [data-theme="light"] .doc-card,
   [data-theme="light"] .agent-item,
   [data-theme="light"] .insight{
-    background:#FAFCFA !important;
+    background:#F8FBFF !important;
     color:#1F2A24 !important;
-    border-color:#D9E5DE !important;
+    border-color:#D7E6F8 !important;
   }
   [data-theme="light"] input,
   [data-theme="light"] select,
@@ -224,24 +224,24 @@
   [data-theme="light"] .note{
     background:#FFFFFF !important;
     color:#1F2A24 !important;
-    border-color:#B7D9C4 !important;
+    border-color:#B9D7FF !important;
   }
   [data-theme="light"] .progress,
   [data-theme="light"] .pipeline-track,
   [data-theme="light"] .mini-track,
   [data-theme="light"] .seg{
-    background:#E7EFEA !important;
+    background:#E6EEF8 !important;
   }
   [data-theme="light"] .theme-toggle{
     background:#FFFFFF !important;
-    color:#0F3D2E !important;
-    border-color:#D9E5DE !important;
+    color:#0B2A4A !important;
+    border-color:#D7E6F8 !important;
   }
 
 </style>
 </head>
 <body>
-<button id="themeToggle" class="theme-toggle" title="Alternar tema (claro/escuro)" aria-label="Toggle theme">â˜€ï¸</button>
+<button id="themeToggle" class="theme-toggle" title="Alternar tema (claro/escuro)" aria-label="Toggle theme">Sol</button>
 <div class="page">
 
   <div class="header">
@@ -250,19 +250,19 @@
       <div class="logo-mark">P3</div>
       <div>
         <div class="brand-name">P3 Energy</div>
-        <div class="brand-tag">Engenharia em Energia Solar &amp; Mobilidade ElÃ©trica</div>
+        <div class="brand-tag">Engenharia em Energia Solar &amp; Mobilidade Elétrica</div>
       </div>
     </div>
-    <h1>Dashboard de AnÃ¡lises de Carga</h1>
-    <div class="subtitle">Central de relatÃ³rios consolidados para projetos de carregadores EV. VisÃ£o geral dos sites medidos, indicadores agregados e acesso rÃ¡pido a cada anÃ¡lise.</div>
+    <h1>Dashboard de Análises de Carga</h1>
+    <div class="subtitle">Central de relatórios consolidados para projetos de carregadores EV. Visão geral dos sites medidos, indicadores agregados e acesso rápido a cada análise.</div>
   </div>
 
-  <!-- EstatÃ­sticas Agregadas -->
+  <!-- Estatísticas Agregadas -->
   <div class="stats">
     <div class="stat">
       <div class="label">Sites analisados</div>
       <div class="value" id="statSites">2</div>
-      <div class="sub">Total de relatÃ³rios gerados</div>
+      <div class="sub">Total de relatórios gerados</div>
     </div>
     <div class="stat">
       <div class="label">Medi&ccedil;&otilde;es completas</div>
@@ -290,18 +290,18 @@
     </div>
   </div>
 
-  <!-- Lista de RelatÃ³rios -->
+  <!-- Lista de Relatórios -->
   <div class="toolbar">
-    <h2>RelatÃ³rios</h2>
+    <h2>Relatórios</h2>
     <div class="search"><input type="text" id="searchInput" placeholder="Buscar por cliente, cidade ou data..."></div>
-    <button class="new-btn" onclick="alert('Para gerar um novo relatÃ³rio:\\n\\n1. Anexe o PDF do analisador na conversa do Claude\\n2. Informe nome do cliente e potÃªncia do EV\\n3. SerÃ£o gerados 3 arquivos:\\n   â€¢ Completo (uso interno)\\n   â€¢ ElÃ©trico (para dono do imÃ³vel)\\n   â€¢ Carregador (para cliente do EV)\\n4. O dashboard serÃ¡ atualizado automaticamente.')">+ Nova AnÃ¡lise</button>
+    <button class="new-btn" onclick="alert('Para gerar um novo relatório:\\n\\n1. Anexe o PDF do analisador na conversa do Claude\\n2. Informe nome do cliente e potência do EV\\n3. Serão gerados 3 arquivos:\\n   - Completo (uso interno)\\n   - Elétrico (para dono do imóvel)\\n   - Carregador (para cliente do EV)\\n4. O dashboard será atualizado automaticamente.')">+ Nova Análise</button>
   </div>
 
   <div class="reports" id="reportsGrid"></div>
 
   <footer>
-    <strong>P3 Energy</strong> â€” Engenharia em Energia Solar e Mobilidade ElÃ©trica<br>
-    Dashboard atualizado em 02/05/2026 â€¢ RelatÃ³rios baseados em mediÃ§Ãµes DMI P1000R Black Box (Datalog ISSO Telecom)
+    <strong>P3 Energy</strong> - Engenharia em Energia Solar e Mobilidade Elétrica<br>
+    Dashboard atualizado em 02/05/2026 - Relatórios baseados em medições DMI P1000R Black Box (Datalog ISSO Telecom)
   </footer>
 </div>
 
@@ -314,8 +314,8 @@
   const btn = document.getElementById('themeToggle');
   const apply = (t) => {
     root.setAttribute('data-theme', t);
-    if (window.Chart) { Chart.defaults.color = t === 'light' ? '#4D5F55' : '#B7CBC1'; Chart.defaults.borderColor = t === 'light' ? '#D9E5DE' : '#2A3530'; }
-    if(btn) btn.textContent = t === 'light' ? 'ðŸŒ™' : 'â˜€ï¸';
+    if (window.Chart) { Chart.defaults.color = t === 'light' ? '#4D5F55' : '#B7CBC1'; Chart.defaults.borderColor = t === 'light' ? '#D7E6F8' : '#24364E'; }
+    if(btn) btn.textContent = t === 'light' ? 'Lua' : 'Sol';
     if(btn) btn.title = 'Mudar para tema ' + (t === 'light' ? 'escuro' : 'claro');
   };
   let saved = 'dark';
@@ -330,27 +330,27 @@
 })();
 
 const P3 = (document.documentElement.getAttribute('data-theme') === 'light')
-  ? { primary:'#0F3D2E', accent:'#2EA85C', danger:'#C0392B', warn:'#E08E0B', muted:'#5C6B62' }
-  : { primary:'#3FB66B', accent:'#5BC882', danger:'#E55545', warn:'#F2A93D', muted:'#B7CBC1' };
+  ? { primary:'#0B2A4A', accent:'#2D7FF9', danger:'#C0392B', warn:'#E08E0B', muted:'#5C6B62' }
+  : { primary:'#2D7FF9', accent:'#57B7FF', danger:'#E55545', warn:'#F2A93D', muted:'#B7CBC1' };
 Chart.defaults.font.family = "'Inter','Segoe UI',Arial,sans-serif";
 Chart.defaults.color = document.documentElement.getAttribute('data-theme') === 'light' ? '#4D5F55' : '#B7CBC1';
-Chart.defaults.borderColor = document.documentElement.getAttribute('data-theme') === 'light' ? '#D9E5DE' : '#2A3530';
+Chart.defaults.borderColor = document.documentElement.getAttribute('data-theme') === 'light' ? '#D7E6F8' : '#24364E';
 
-// === CADASTRO DE RELATÃ“RIOS ===
-// Para adicionar um novo relatÃ³rio, basta colocar uma entrada aqui:
+// === CADASTRO DE RELATÓRIOS ===
+// Para adicionar um novo relatório, basta colocar uma entrada aqui:
 const RELATORIOS = [
   {
     id: 'malassise-rk',
     title: 'Posto Malassise R.K.',
     cliente: 'Malassise Robert Koch',
-    cidade: 'MaringÃ¡ - PR',
+    cidade: 'Maringá - PR',
     data: '02/05/2026',
     arquivo: 'Relatorio_Analise_Carga_Malassise_RK.html',
     arquivo_eletrico: 'Relatorio_Eletrico_Malassise_RK.html',
     arquivo_carregador: 'Relatorio_Carregador_Malassise_RK.html',
     arquivo_resumo: 'Resumo_Tecnico_Malassise_RK.html',
     status: 'warn',           // ok | warn | danger (status geral do site)
-    statusLabel: 'AtenÃ§Ã£o',
+    statusLabel: 'Atenção',
     pico_kw: 28.06,
     pico_kva: 28.78,
     fp: 0.79,
@@ -360,13 +360,13 @@ const RELATORIOS = [
     padrao_atual: 150,
     padrao_proposto: 200,
     ev_kw: 60,
-    flags: ['FP baixo', 'DesequilÃ­brio', '3Âª harmÃ´nica']
+    flags: ['FP baixo', 'Desequilíbrio', '3ª harmônica']
   },
   {
     id: 'malassise-araguaia',
     title: 'Posto Malassise Araguaia',
     cliente: 'Malassise Araguaia',
-    cidade: 'MaringÃ¡ - PR',
+    cidade: 'Maringá - PR',
     data: '02/05/2026',
     arquivo: 'Relatorio_Analise_Carga_Araguaia.html',
     arquivo_eletrico: 'Relatorio_Eletrico_Araguaia.html',
@@ -383,20 +383,20 @@ const RELATORIOS = [
     padrao_atual: 150,
     padrao_proposto: 200,
     ev_kw: 60,
-    flags: ['GeraÃ§Ã£o FV provÃ¡vel', 'Demanda elevada']
+    flags: ['Geração FV provável', 'Demanda elevada']
   },
   {
     id: 'avmaringa',
-    title: 'Posto Duim Av. MaringÃ¡',
+    title: 'Posto Duim Av. Maringá',
     cliente: 'Posto Duim',
-    cidade: 'MaringÃ¡ - PR',
+    cidade: 'Maringá - PR',
     data: '14/05/2026',
     arquivo: 'Relatorio_Analise_Carga_AvMaringa.html',
     arquivo_eletrico: 'Relatorio_Eletrico_AvMaringa.html',
     arquivo_carregador: 'Relatorio_Carregador_AvMaringa.html',
     arquivo_resumo: 'Resumo_Tecnico_AvMaringa.html',
     status: 'warn',
-    statusLabel: 'AtenÃ§Ã£o',
+    statusLabel: 'Atenção',
     pico_kw: 39,
     pico_kva: 47.0,
     fp: 0.83,
@@ -406,7 +406,7 @@ const RELATORIOS = [
     padrao_atual: 200,
     padrao_proposto: 250,
     ev_kw: 60,
-    flags: ['FP estimado', 'DesequilÃ­brio Fase B', 'Dados parciais', '220/380 V']
+    flags: ['FP estimado', 'Desequilíbrio Fase B', 'Dados parciais', '220/380 V']
   },
   {
     id: 'muffatao-cascavel',
@@ -444,7 +444,7 @@ function renderReports(filter=''){
   );
 
   if (filtered.length === 0) {
-    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><h3>Nenhum relatÃ³rio encontrado</h3><p>Tente outro termo de busca</p></div>`;
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><h3>Nenhum relatório encontrado</h3><p>Tente outro termo de busca</p></div>`;
     return;
   }
 
@@ -455,29 +455,29 @@ function renderReports(filter=''){
         <div class="report-head">
           <div>
             <div class="report-title">${r.title}</div>
-            <div class="report-sub">${r.cidade} â€¢ ${r.data}</div>
+            <div class="report-sub">${r.cidade} - ${r.data}</div>
           </div>
           <span class="report-status status-${r.status}">${r.statusLabel}</span>
         </div>
         <div class="report-meta">
           <div class="item"><div class="ml">Pico</div><div class="mv">${fmt(r.pico_kw)}<span class="mu"> kW</span></div></div>
-          <div class="item"><div class="ml">FP mÃ©dio</div><div class="mv">${r.fp.toFixed(2)}<span class="mu">${r.fp >= 0.92 ? ' OK' : ' baixo'}</span></div></div>
-          <div class="item"><div class="ml">Cons./mÃªs</div><div class="mv">${consumoMensal}<span class="mu"> MWh</span></div></div>
+          <div class="item"><div class="ml">FP médio</div><div class="mv">${r.fp.toFixed(2)}<span class="mu">${r.fp >= 0.92 ? ' OK' : ' baixo'}</span></div></div>
+          <div class="item"><div class="ml">Cons./mês</div><div class="mv">${consumoMensal}<span class="mu"> MWh</span></div></div>
         </div>
         <div class="report-flags">
           ${r.flags.map(flag => {
-            const cls = flag.toLowerCase().includes('baixo') || flag.toLowerCase().includes('crÃ­tico') ? 'crit' : flag.toLowerCase().includes('elevad') || flag.toLowerCase().includes('atenÃ§Ã£o') || flag.toLowerCase().includes('desequilÃ­b') ? 'warn' : '';
+            const cls = flag.toLowerCase().includes('baixo') || flag.toLowerCase().includes('crítico') ? 'crit' : flag.toLowerCase().includes('elevad') || flag.toLowerCase().includes('atenção') || flag.toLowerCase().includes('desequilíb') ? 'warn' : '';
             return `<span class="flag ${cls}">${flag}</span>`;
           }).join('')}
         </div>
         <div class="report-foot">
-          <span>PadrÃ£o ${r.padrao_atual} A â†’ ${r.padrao_proposto} A â€¢ EV ${r.ev_kw} kW</span>
+          <span>Padrão ${r.padrao_atual} A -> ${r.padrao_proposto} A - EV ${r.ev_kw} kW</span>
         </div>
         <div class="report-versions">
-          <a href="${r.arquivo}" class="vbtn completo" title="RelatÃ³rio tÃ©cnico completo (uso interno P3)">Completo</a>
-          <a href="${r.arquivo_eletrico}" class="vbtn eletrico" title="AnÃ¡lise da rede interna â€” para o dono do imÃ³vel">ElÃ©trico</a>
-          <a href="${r.arquivo_carregador}" class="vbtn carregador" title="Projeto do carregador EV â€” para apresentaÃ§Ã£o">Carregador</a>
-          ${r.arquivo_resumo ? `<a href="${r.arquivo_resumo}?v=diag-ui-aesthetic" class="vbtn resumo" title="DiagnÃ³stico da instalaÃ§Ã£o existente para salvar em PDF">DiagnÃ³stico PDF</a>` : ''}
+          <a href="${r.arquivo}" class="vbtn completo" title="Relatório técnico completo (uso interno P3)">Completo</a>
+          <a href="${r.arquivo_eletrico}" class="vbtn eletrico" title="Análise da rede interna - para o dono do imóvel">Elétrico</a>
+          <a href="${r.arquivo_carregador}" class="vbtn carregador" title="Projeto do carregador EV - para apresentação">Carregador</a>
+          ${r.arquivo_resumo ? `<a href="${r.arquivo_resumo}?v=diag-ui-aesthetic" class="vbtn resumo" title="Diagnóstico da instalação existente para salvar em PDF">Diagnóstico PDF</a>` : ''}
         </div>
       </div>
     `;
@@ -502,17 +502,17 @@ function renderComparison(){
     type:'bar',
     data:{labels, datasets:[
       {label:'Pico Ativa (kW)', data:RELATORIOS.map(r=>r.pico_kw), backgroundColor:P3.primary, borderRadius:6},
-      {label:'Demanda diÃ¡ria (kW)', data:RELATORIOS.map(r=>r.demanda_kw), backgroundColor:P3.accent, borderRadius:6}
+      {label:'Demanda diária (kW)', data:RELATORIOS.map(r=>r.demanda_kw), backgroundColor:P3.accent, borderRadius:6}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Pico e demanda base por ponto'}},scales:{x:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color}},y:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color},title:{display:true,text:'PotÃªncia (kW)',color:Chart.defaults.color},beginAtZero:true}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Pico e demanda base por ponto'}},scales:{x:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color}},y:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color},title:{display:true,text:'Potência (kW)',color:Chart.defaults.color},beginAtZero:true}}}
   });
 
   new Chart(document.getElementById('chartCompareFP'), {
     type:'bar',
     data:{labels, datasets:[
-      {label:'Fator de PotÃªncia mÃ©dio', data:RELATORIOS.map(r=>r.fp), backgroundColor:RELATORIOS.map(r=>r.fp >= 0.92 ? P3.accent : P3.danger), borderRadius:6}
+      {label:'Fator de Potência médio', data:RELATORIOS.map(r=>r.fp), backgroundColor:RELATORIOS.map(r=>r.fp >= 0.92 ? P3.accent : P3.danger), borderRadius:6}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'FP MÃ©dio (mÃ­n. NBR = 0,92)'},annotation:{}},scales:{x:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color}},y:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color},min:0,max:1,title:{display:true,text:'FP',color:Chart.defaults.color}}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'FP Médio (mín. NBR = 0,92)'},annotation:{}},scales:{x:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color}},y:{grid:{color:Chart.defaults.borderColor},ticks:{color:Chart.defaults.color},min:0,max:1,title:{display:true,text:'FP',color:Chart.defaults.color}}}}
   });
 }
 

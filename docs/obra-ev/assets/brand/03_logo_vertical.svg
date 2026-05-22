@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 560" width="480" height="560">
   <defs>
     <linearGradient id="boltV" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00FF85"/>
-      <stop offset="100%" stop-color="#00E5FF"/>
+      <stop offset="0%" stop-color="#57B7FF"/>
+      <stop offset="100%" stop-color="#38D4FF"/>
     </linearGradient>
     <linearGradient id="hexV" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0A1628"/>
@@ -19,7 +19,7 @@
   <g transform="translate(0,260)">
     <text x="240" y="150" font-family="Poppins, Arial, sans-serif" font-weight="700"
           font-size="160" fill="#0A1628" letter-spacing="-6" text-anchor="middle">uby</text>
-    <rect x="118" y="208" width="244" height="5" rx="2.5" fill="#00FF85"/>
+    <rect x="118" y="208" width="244" height="5" rx="2.5" fill="#57B7FF"/>
     <text x="240" y="252" font-family="Poppins, Arial, sans-serif" font-weight="500"
           font-size="28" fill="#0A1628" letter-spacing="14" text-anchor="middle">RECHARGE</text>
   </g>

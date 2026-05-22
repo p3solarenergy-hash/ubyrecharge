@@ -12,16 +12,16 @@
   <style>
     /* ── Design system UBY (original) ── */
     :root {
-      --p3-primary:     #3FB66B;
-      --p3-primary-deep:#0F3D2E;
-      --p3-accent:      #5BC882;
+      --p3-primary:     #2D7FF9;
+      --p3-primary-deep:#0B2A4A;
+      --p3-accent:      #57B7FF;
       --p3-accent-2:    #FFD66B;
-      --p3-bg:          #0E1813;
-      --p3-card:        #16221E;
-      --p3-card-soft:   #1A2622;
+      --p3-bg:          #07111F;
+      --p3-card:        #0E1B2D;
+      --p3-card-soft:   #13243B;
       --p3-text:        #E8EFEB;
       --p3-muted:       #8FA39A;
-      --p3-border:      #2A3530;
+      --p3-border:      #24364E;
       --p3-warn:        #F2A93D;
       --p3-shadow:      0 1px 3px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.5);
     }
@@ -30,8 +30,8 @@
     .wrap { max-width:1540px; margin:0 auto; padding:32px 36px 80px; }
 
     /* Hero */
-    .hero { background:linear-gradient(135deg,#0F3D2E 0%,#1A5C42 100%); color:#fff; border-radius:14px; padding:28px 32px; display:grid; grid-template-columns:1.35fr .85fr; gap:22px; align-items:end; box-shadow:var(--p3-shadow); position:relative; overflow:hidden; }
-    .hero::after { content:""; position:absolute; right:-70px; top:-70px; width:260px; height:260px; background:radial-gradient(circle,rgba(46,168,92,.36),transparent 70%); border-radius:50%; }
+    .hero { background:linear-gradient(135deg,#0B2A4A 0%,#134B7A 100%); color:#fff; border-radius:14px; padding:28px 32px; display:grid; grid-template-columns:1.35fr .85fr; gap:22px; align-items:end; box-shadow:var(--p3-shadow); position:relative; overflow:hidden; }
+    .hero::after { content:""; position:absolute; right:-70px; top:-70px; width:260px; height:260px; background:radial-gradient(circle,rgba(45,127,249,.36),transparent 70%); border-radius:50%; }
     .hero > * { position:relative; z-index:1; }
     .brand { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
     .logo-mark { width:54px; height:54px; border-radius:12px; background:#071527; display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,.22); }
@@ -59,26 +59,26 @@
     /* Tabelas */
     table { width:100%; border-collapse:collapse; font-size:13px; }
     th,td { padding:10px; border-bottom:1px solid var(--p3-border); text-align:left; vertical-align:top; }
-    th { background:#1F2A26; color:var(--p3-primary); font-size:11px; text-transform:uppercase; letter-spacing:.7px; }
+    th { background:#172A42; color:var(--p3-primary); font-size:11px; text-transform:uppercase; letter-spacing:.7px; }
     td { color:var(--p3-text); }
 
     /* Nota / alerta */
     .note { border-left:4px solid var(--p3-warn); background:#2E2310; padding:14px 18px; border-radius:8px; font-size:13px; color:#F2D77F; line-height:1.55; }
 
     /* Barra de ocupação */
-    .bar       { height:9px; background:#26332e; border-radius:999px; overflow:hidden; margin-top:10px; }
+    .bar       { height:9px; background:#1C314A; border-radius:999px; overflow:hidden; margin-top:10px; }
     .bar span  { display:block; height:100%; background:var(--p3-primary); }
 
     /* Barras de usuário */
     .user-bars { display:grid; gap:12px; }
     .user-row  { display:grid; grid-template-columns:100px 1fr 96px; align-items:center; gap:12px; color:var(--p3-muted); font-size:12px; }
     .user-row strong { color:var(--p3-text); text-align:right; }
-    .track   { height:20px; background:#26332e; border-radius:6px; overflow:hidden; }
-    .track i { display:block; height:100%; background:linear-gradient(90deg,#2EA85C,#5BC882); border-radius:6px; }
+    .track   { height:20px; background:#1C314A; border-radius:6px; overflow:hidden; }
+    .track i { display:block; height:100%; background:linear-gradient(90deg,#2D7FF9,#57B7FF); border-radius:6px; }
 
     /* Chips de pagamento */
     .pay-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px; }
-    .pay-chip { background:#121d18; border:1px solid var(--p3-border); border-left:3px solid var(--p3-primary); border-radius:8px; padding:11px 12px; }
+    .pay-chip { background:#0B1524; border:1px solid var(--p3-border); border-left:3px solid var(--p3-primary); border-radius:8px; padding:11px 12px; }
     .pay-chip strong { display:block; color:var(--p3-text); font-size:12px; }
     .pay-chip span   { color:var(--p3-muted); font-size:11px; }
 
@@ -447,7 +447,7 @@ let allCharges  = [];
 let loadedFiles = [];
 let charts      = {};
 
-const COLORS = ['#5BC882','#246BFE','#FFD66B','#00E5FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
+const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 
 // ── Prevenção de drop fora da zona ────────────────────────
 document.addEventListener('dragover', e => e.preventDefault());
@@ -725,7 +725,7 @@ function renderHero(charges, mk) {
     `<strong>Ocupação real</strong><br>
      kWh carregados ÷ (potência × horas do período)<br>
      ${fmtKWh(occ.energy)} ÷ (${occ.power.toFixed(1)} kW × ${occ.hours.toFixed(1)} h)<br>
-     <strong style="color:#5BC882">= ${fmtPct(occ.pct)}</strong>`;
+     <strong style="color:#57B7FF">= ${fmtPct(occ.pct)}</strong>`;
 }
 
 function renderKPIs(charges, mk) {
@@ -787,14 +787,14 @@ function renderDailyChart(charges) {
     type: 'bar',
     data: {
       labels: keys,
-      datasets: [{ label: 'Receita (R$)', data: keys.map(k => +byDay[k].toFixed(2)), backgroundColor: '#5BC882', borderRadius: 4, yAxisID: 'y' }]
+      datasets: [{ label: 'Receita (R$)', data: keys.map(k => +byDay[k].toFixed(2)), backgroundColor: '#57B7FF', borderRadius: 4, yAxisID: 'y' }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom', labels: { color: '#8FA39A' } } },
       scales: {
-        y: { beginAtZero: true, ticks: { color: '#8FA39A' }, grid: { color: '#2A3530' } },
-        x: { ticks: { color: '#8FA39A', autoSkip: false, maxRotation: 45 }, grid: { color: '#2A3530' } }
+        y: { beginAtZero: true, ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } },
+        x: { ticks: { color: '#8FA39A', autoSkip: false, maxRotation: 45 }, grid: { color: '#24364E' } }
       }
     }
   });
@@ -813,7 +813,7 @@ function renderPaymentChart(charges) {
     type: 'doughnut',
     data: {
       labels: entries.map(([k]) => k),
-      datasets: [{ data: entries.map(([,v]) => v), backgroundColor: COLORS, borderColor: '#16221E', borderWidth: 3 }]
+      datasets: [{ data: entries.map(([,v]) => v), backgroundColor: COLORS, borderColor: '#0E1B2D', borderWidth: 3 }]
     },
     options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { color: '#8FA39A', font:{size:11} } } } }
   });
@@ -835,7 +835,7 @@ function renderUserPieChart(charges) {
     type: 'doughnut',
     data: {
       labels: entries.map(([n]) => (n||'Cliente').split(' ')[0]),
-      datasets: [{ data: entries.map(([,v]) => +v.toFixed(2)), backgroundColor: COLORS, borderColor: '#16221E', borderWidth: 3 }]
+      datasets: [{ data: entries.map(([,v]) => +v.toFixed(2)), backgroundColor: COLORS, borderColor: '#0E1B2D', borderWidth: 3 }]
     },
     options: { responsive: true, maintainAspectRatio: false, cutout: '58%', plugins: { legend: { position: 'bottom', labels: { color: '#8FA39A', font:{size:11} } } } }
   });
@@ -1031,8 +1031,8 @@ function renderAcumulado() {
 
   // Gráficos simples
   const axBase = {
-    x: { ticks:{color:'#8FA39A',font:{size:11}}, grid:{color:'#2A3530'} },
-    y: { beginAtZero:true, ticks:{color:'#8FA39A',font:{size:11}}, grid:{color:'#2A3530'} }
+    x: { ticks:{color:'#8FA39A',font:{size:11}}, grid:{color:'#24364E'} },
+    y: { beginAtZero:true, ticks:{color:'#8FA39A',font:{size:11}}, grid:{color:'#24364E'} }
   };
 
   function mkBarChart(id, labels, values, unit, color) {
@@ -1053,7 +1053,7 @@ function renderAcumulado() {
     });
   }
 
-  mkBarChart('chartRevMonth',    md.map(d=>d.label), md.map(d=>d.rev),    'R$',  '#5BC882');
+  mkBarChart('chartRevMonth',    md.map(d=>d.label), md.map(d=>d.rev),    'R$',  '#57B7FF');
   mkBarChart('chartEnergyMonth', md.map(d=>d.label), md.map(d=>d.energy), ' kWh','#246BFE');
   mkBarChart('chartCountMonth',  md.map(d=>d.label), md.map(d=>d.count),  '',    '#FFD66B');
 
@@ -1067,7 +1067,7 @@ function renderAcumulado() {
         labels: md.map(d => d.label),
         datasets: [{
           data: md.map(d => +d.occF.toFixed(2)),
-          backgroundColor: md.map(d => d.occF>=30?'#5BC882':d.occF>=12?'#FFD66B':'#EF6C6C'),
+          backgroundColor: md.map(d => d.occF>=30?'#57B7FF':d.occF>=12?'#FFD66B':'#EF6C6C'),
           borderRadius: 4,
           label: '%'
         }]
