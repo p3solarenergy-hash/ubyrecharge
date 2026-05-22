@@ -4,6 +4,7 @@
   const ACTIVITY_KEY = "uby-activity-v1";
   const MESSAGE_KEY = "uby-messages-v1";
   const MARKET_KEY = "uby-mercado-v1";
+  const CORE_WORK_IDS = new Set(["rio", "malassise", "prospect-1", "prospect-29"]);
 
   function available() {
     return Boolean(window.UBY_SUPABASE?.configured?.() && window.UBY_SUPABASE?.client?.());
@@ -257,6 +258,9 @@
   }
 
   async function deleteWork(id) {
+    if (CORE_WORK_IDS.has(String(id))) {
+      throw new Error("Esta obra faz parte da base principal e nao pode ser excluida.");
+    }
     writeLocal(WORKS_KEY, readLocal(WORKS_KEY, []).filter(item => item.id !== id));
     const user = await requireUser();
     if (!user) return { cloud: false };

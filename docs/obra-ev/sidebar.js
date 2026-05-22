@@ -10,12 +10,14 @@
   const engineeringHref = inPrototypes ? "../../docs/obra-ev/engenharia.html" : base + "engenharia.html";
   const analyzersHref = inPrototypes ? "../../docs/obra-ev/analisadores/dashboard.html" : base + "analisadores/dashboard.html";
   const marketHref = inPrototypes ? "../../docs/obra-ev/mercado.html" : base + "mercado.html";
+  const recargasHref = inPrototypes ? "../../docs/obra-ev/recargas.html" : base + "recargas.html";
   const tasksHref = inAnalyzers ? "../../tarefas/" : inTasks ? "./" : inRoot ? "tarefas/" : "../tarefas/";
   const loginHref = inAnalyzers ? "../login.html" : inPrototypes ? "../../docs/obra-ev/login.html" : inTasks ? "../obra-ev/login.html" : inRoot ? "obra-ev/login.html" : "login.html";
   const current = location.pathname.split("/").pop() || "index.html";
   const isDetail = current === "gestao_obra_ev_detalhe.html";
   const isEngineering = current === "engenharia.html";
   const isMarket = current === "mercado.html";
+  const isRecargas = current === "recargas.html";
   const isLogin = current === "login.html";
   const isAnalyzer = inAnalyzers;
   const isDashboard = (current === "index.html" && inObras && !inAnalyzers) || current === "gestao_obra_ev.html";
@@ -34,10 +36,11 @@
   }
 
   function allowed(module) {
+    if (module === "recargas" && ["admin", "engineering"].includes(profile?.role)) return true;
     return isAdmin || module === "login" || (profile?.modules || []).includes(module);
   }
 
-  const currentModule = isLogin ? "login" : isTasks ? "tasks" : isAnalyzer ? "analyzers" : isEngineering ? "engineering" : isMarket ? "market" : isDetail ? "detail" : isDashboard ? "dashboard" : isHome ? "home" : "home";
+  const currentModule = isLogin ? "login" : isTasks ? "tasks" : isAnalyzer ? "analyzers" : isEngineering ? "engineering" : isMarket ? "market" : isRecargas ? "recargas" : isDetail ? "detail" : isDashboard ? "dashboard" : isHome ? "home" : "home";
   if (!profile && currentModule !== "login") {
     const next = encodeURIComponent(`${location.pathname}${location.search}${location.hash}`);
     location.href = `${loginHref}?next=${next}`;
@@ -55,6 +58,7 @@
         ["Pagina inicial", home, "P", isHome, "home"],
         ["Dashboard obras", dashboardHref, "O", isDashboard && !isHome, "dashboard"],
         ["Mercado", marketHref, "M", isMarket, "market"],
+        ["Recargas", recargasHref, "G", isRecargas, "recargas"],
         ["Portal engenharia", engineeringHref, "E", isEngineering, "engineering"]
       ]
     },
@@ -64,6 +68,7 @@
         ["Controle de obras", dashboardHref, "C", isDashboard && !isHome, "dashboard"],
         ["Concessionaria", engineeringHref, "K", isEngineering, "utility"],
         ["Orcamentos", dashboardHref + "#obras", "R", false, "budgets"],
+        ["Operacao de recargas", recargasHref, "G", isRecargas, "recargas"],
         ["Analisadores", analyzersHref, "A", isAnalyzer, "analyzers"]
       ]
     },

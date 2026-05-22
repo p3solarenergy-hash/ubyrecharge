@@ -1,0 +1,226 @@
+{
+  "generated_at": "22/05/2026 09:57",
+  "station": "RIO BEACH EV 7 KW",
+  "charger_kw": 7.0,
+  "start": "06/05/2026 16:38",
+  "end": "21/05/2026 20:06",
+  "period_hours": 363.46666666666664,
+  "month_elapsed_hours": 500.1,
+  "full_month_hours": 744.0,
+  "full_power_kwh": 2544.2666666666664,
+  "total": {
+    "sessions": 14,
+    "users": 6,
+    "kwh": 153.81900000000002,
+    "revenue": 265.50928,
+    "avg_ticket": 18.96494857142857,
+    "avg_kwh": 10.98707142857143,
+    "revenue_per_kwh": 1.726114979293845,
+    "connected_hours": 30.63138888888889,
+    "avg_duration_hours": 2.1879563492063494,
+    "idle_minutes": 417.95,
+    "real_avg_kw": 5.021613631623335,
+    "real_median_kw": 6.493868212324588,
+    "real_peak_kw": 6.669270197705638,
+    "charger_delivery_ratio": 71.73733759461908,
+    "equivalent_full_power_hours": 21.97414285714286,
+    "revenue_per_connected_hour": 8.667882509771204,
+    "sessions_per_day": 0.9244314013206163,
+    "projected_month_revenue": 394.99880887822434,
+    "projected_month_kwh": 228.83690461907622,
+    "occupancy_export_period": 6.04571061733571,
+    "occupancy_month_to_date": 4.393949781472277,
+    "occupancy_full_month": 2.953513824884793
+  },
+  "monthly": [
+    {
+      "mes": "2026-05",
+      "recargas": 14,
+      "clientes": 6,
+      "kwh": 153.81900000000002,
+      "receita": 265.50928,
+      "ticket": 18.96494857142857,
+      "ocupacao_mtd": 4.393949781472277,
+      "ocupacao_mes_cheio": 2.953513824884793,
+      "horas_base_mtd": 500.1,
+      "horas_base_mes": 744.0
+    }
+  ],
+  "daily": [
+    {
+      "dia": "2026-05-06",
+      "recargas": 1,
+      "kwh": 10.103,
+      "receita": 17.56,
+      "conectado_h": 1.538888888888889
+    },
+    {
+      "dia": "2026-05-07",
+      "recargas": 1,
+      "kwh": 0.051,
+      "receita": 1.58109,
+      "conectado_h": 0.03194444444444444
+    },
+    {
+      "dia": "2026-05-08",
+      "recargas": 3,
+      "kwh": 46.306,
+      "receita": 78.11,
+      "conectado_h": 13.502222222222223
+    },
+    {
+      "dia": "2026-05-14",
+      "recargas": 1,
+      "kwh": 11.848,
+      "receita": 20.33,
+      "conectado_h": 1.8211111111111111
+    },
+    {
+      "dia": "2026-05-15",
+      "recargas": 3,
+      "kwh": 31.217,
+      "receita": 54.12,
+      "conectado_h": 4.706111111111111
+    },
+    {
+      "dia": "2026-05-16",
+      "recargas": 1,
+      "kwh": 4.991,
+      "receita": 9.435690000000001,
+      "conectado_h": 0.77
+    },
+    {
+      "dia": "2026-05-19",
+      "recargas": 1,
+      "kwh": 13.427,
+      "receita": 22.84,
+      "conectado_h": 2.060277777777778
+    },
+    {
+      "dia": "2026-05-20",
+      "recargas": 2,
+      "kwh": 18.593,
+      "receita": 32.5625,
+      "conectado_h": 3.2119444444444447
+    },
+    {
+      "dia": "2026-05-21",
+      "recargas": 1,
+      "kwh": 17.283,
+      "receita": 28.97,
+      "conectado_h": 2.988888888888889
+    }
+  ],
+  "users": [
+    {
+      "usuario": "alana nunes lemes barbosa",
+      "recargas": 6,
+      "kwh": 69.041,
+      "receita": 118.74,
+      "ultima": "2026-05-21 17:07:00"
+    },
+    {
+      "usuario": "Rafael Dias da Cruz",
+      "recargas": 4,
+      "kwh": 54.806,
+      "receita": 93.11999999999999,
+      "ultima": "2026-05-15 21:17:00"
+    },
+    {
+      "usuario": "Eduardo Berger Prochet",
+      "recargas": 1,
+      "kwh": 15.18,
+      "receita": 25.63,
+      "ultima": "2026-05-15 15:22:00"
+    },
+    {
+      "usuario": "Douglas Giangarelli",
+      "recargas": 1,
+      "kwh": 9.75,
+      "receita": 17.0025,
+      "ultima": "2026-05-20 19:48:00"
+    },
+    {
+      "usuario": "Rafael Benato",
+      "recargas": 1,
+      "kwh": 4.991,
+      "receita": 9.435690000000001,
+      "ultima": "2026-05-16 18:46:00"
+    },
+    {
+      "usuario": "Fábio Rodrigues",
+      "recargas": 1,
+      "kwh": 0.051,
+      "receita": 1.58109,
+      "ultima": "2026-05-07 12:48:00"
+    }
+  ],
+  "idle": [
+    {
+      "Recarga(ID)": 986805,
+      "usuario": "Rafael Dias da Cruz",
+      "inicio": "2026-05-08 19:32:00",
+      "energia": 36.927,
+      "receita": 60.21,
+      "ociosidade_min": 390.31666666666666
+    },
+    {
+      "Recarga(ID)": 1012452,
+      "usuario": "Douglas Giangarelli",
+      "inicio": "2026-05-20 19:48:00",
+      "energia": 9.75,
+      "receita": 17.0025,
+      "ociosidade_min": 21.083333333333332
+    },
+    {
+      "Recarga(ID)": 1001846,
+      "usuario": "Rafael Dias da Cruz",
+      "inicio": "2026-05-15 19:17:00",
+      "energia": 3.316,
+      "receita": 6.77,
+      "ociosidade_min": 4.583333333333333
+    },
+    {
+      "Recarga(ID)": 1014352,
+      "usuario": "alana nunes lemes barbosa",
+      "inicio": "2026-05-21 17:07:00",
+      "energia": 17.283,
+      "receita": 28.97,
+      "ociosidade_min": 1.5
+    },
+    {
+      "Recarga(ID)": 1004028,
+      "usuario": "Rafael Benato",
+      "inicio": "2026-05-16 18:46:00",
+      "energia": 4.991,
+      "receita": 9.435690000000001,
+      "ociosidade_min": 0.4666666666666667
+    },
+    {
+      "Recarga(ID)": 1012089,
+      "usuario": "alana nunes lemes barbosa",
+      "inicio": "2026-05-20 16:47:00",
+      "energia": 8.843,
+      "receita": 15.56,
+      "ociosidade_min": 0.0
+    }
+  ],
+  "payments": [
+    {
+      "tipo": "PAGBANK_CARD",
+      "status": "approved",
+      "qtd": 11,
+      "pct": 78.57142857142857
+    },
+    {
+      "tipo": "WALLET",
+      "status": "approved",
+      "qtd": 3,
+      "pct": 21.428571428571427
+    }
+  ],
+  "ratings": {
+    "Sem avaliação": 10,
+    "5 estrelas": 4
+  }
+}
