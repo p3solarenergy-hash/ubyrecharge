@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -9,7 +9,7 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Arial,sans-serif;font-size:13px;line-height:1.5}
   .page{max-width:900px;margin:0 auto;padding:28px 24px 56px}
-  .toolbar{display:flex;gap:10px;justify-content:flex-end;margin-bottom:18px}
+  .toolbar{display:flex;gap:10px;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}.toolbar-left{display:flex;gap:10px;flex-wrap:wrap}
   .btn{border:0;border-radius:8px;padding:10px 14px;background:var(--green);color:#fff;font-weight:700;text-decoration:none;cursor:pointer}
   .btn.alt{background:#fff;color:var(--green);border:1px solid var(--line)}
   .cover{background:linear-gradient(135deg,#0F3D2E,#1B6A49);color:#fff;border-radius:14px;padding:28px 30px;margin-bottom:18px;box-shadow:0 8px 28px rgba(15,61,46,.16)}
@@ -50,7 +50,7 @@
     @page{size:A4;margin:12mm}
     body{background:#fff;font-size:11.5px}
     .page{padding:0;max-width:none}
-    .toolbar{display:none}
+    .toolbar{display:none}.toolbar-left{display:flex;gap:10px;flex-wrap:wrap}
     .cover,section{box-shadow:none;break-inside:avoid}
     .cover{border-radius:0;margin-bottom:10px}
     section{padding:14px 16px;margin-bottom:9px}
@@ -62,10 +62,7 @@
 </head>
 <body>
 <div class="page">
-  <div class="toolbar">
-    <button class="btn" onclick="window.print()">Gerar PDF</button>
-  </div>
-
+  <div class="toolbar"><div class="toolbar-left"><a class="btn alt" href="dashboard.html">Dashboard</a><a class="btn alt" href="Relatorio_Analise_Carga_Muffatao_Cascavel.html">Relat&oacute;rio completo</a></div><button class="btn" onclick="window.print()">Gerar PDF</button></div>
   <header class="cover">
     <div class="brand">
       <div class="logo">P3</div>
@@ -177,3 +174,4 @@
 <script>UBY_AUTH.require("analyzers");</script>
 </body>
 </html>
+
