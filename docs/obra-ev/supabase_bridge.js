@@ -312,6 +312,27 @@
     return { cloud: true, files: files.length, charges: charges.length };
   }
 
+  async function clearRechargeBase(workId) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre no Supabase antes de excluir recargas.");
+    const { error } = await sb.from("obra_recargas_base").upsert({
+      obra_id: String(workId || "geral"),
+      arquivos: [],
+      recargas: [],
+      resumo: {
+        workId: String(workId || "geral"),
+        charges: 0,
+        files: 0,
+        clearedAt: new Date().toISOString()
+      },
+      updated_at: new Date().toISOString()
+    }, { onConflict: "obra_id" });
+    if (error) throw error;
+    return { cloud: true, files: 0, charges: 0 };
+  }
+
   async function loadRechargeBase(workId) {
     const sb = client();
     if (!sb) return null;
@@ -348,6 +369,7 @@
     upsertProspects,
     uploadDocumentFile,
     saveRechargeBase,
+    clearRechargeBase,
     loadRechargeBase
   };
 })();

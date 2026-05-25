@@ -190,10 +190,22 @@
       transition:all .15s;
     }
     .btn-recalc:hover { background:rgba(63,182,107,.26); }
+    .btn-danger {
+      background:rgba(242,169,61,.12);
+      color:var(--p3-warn);
+      border:1px solid rgba(242,169,61,.38);
+      border-radius:8px;
+      padding:7px 12px;
+      font-size:12px;
+      font-family:inherit;
+      cursor:pointer;
+      transition:all .15s;
+    }
+    .btn-danger:hover { background:rgba(242,169,61,.22); }
 
     .project-bar {
       display:grid;
-      grid-template-columns:minmax(220px,420px) 1fr;
+      grid-template-columns:minmax(220px,420px) minmax(160px,220px) 1fr;
       gap:12px;
       align-items:end;
       margin-bottom:18px;
@@ -204,7 +216,8 @@
       box-shadow:var(--p3-shadow);
     }
     .project-field label { display:block; color:var(--p3-muted); font-size:11px; text-transform:uppercase; font-weight:700; letter-spacing:.8px; margin-bottom:6px; }
-    .project-field select { width:100%; background:#0B1524; color:var(--p3-text); border:1px solid var(--p3-border); border-radius:8px; padding:9px 10px; font-family:inherit; font-size:13px; }
+    .project-field select,
+    .project-field input { width:100%; background:#0B1524; color:var(--p3-text); border:1px solid var(--p3-border); border-radius:8px; padding:9px 10px; font-family:inherit; font-size:13px; }
     .project-state { color:var(--p3-muted); font-size:12px; line-height:1.45; }
     .project-state strong { color:var(--p3-text); }
 
@@ -239,7 +252,14 @@
       <label>Projeto / obra da base de recargas</label>
       <select id="workSelector"></select>
     </div>
-    <div class="project-state" id="storageState">Escolha a obra antes de anexar a planilha.</div>
+    <div class="project-field">
+      <label>Mês da planilha</label>
+      <input id="importMonth" type="month">
+    </div>
+    <div>
+      <div class="project-state" id="storageState">Escolha a obra antes de anexar a planilha.</div>
+      <button type="button" class="btn-danger" id="clearRechargeBaseBtn" style="display:none;margin-top:8px">Excluir base salva desta obra</button>
+    </div>
   </div>
 
   <!-- ════════════════════════════════════════
@@ -249,7 +269,7 @@
     <span class="up-icon">📂</span>
     <p>Arraste a planilha <strong>.xlsx</strong> exportada da plataforma ou <strong>clique para selecionar</strong></p>
     <p class="up-hint" style="font-size:11px;color:#4a6058;margin-top:3px">
-      Carregue múltiplos arquivos para acumular meses — dados combinados automaticamente
+      Escolha o mês acima antes de subir. Uma nova planilha do mesmo mês substitui a anterior.
     </p>
     <input type="file" id="fileInput" accept=".xlsx,.xls" multiple>
     <div class="file-chips" id="fileChips"></div>
@@ -556,6 +576,12 @@ function hydrateCharge(charge) {
   };
 }
 
+function chargeDateKey(charge) {
+  const date = charge?.startDate || parseDate(charge?.startStr || '');
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 10);
+}
+
 function localRechargeDb() {
   return readJson(RECARGAS_LOCAL_KEY, {});
 }
@@ -583,6 +609,11 @@ function rechargeSummary() {
 
 function saveLocalRechargeBase() {
   const db = localRechargeDb();
+  if (!allCharges.length && !loadedFiles.length) {
+    delete db[currentWorkId];
+    writeJson(RECARGAS_LOCAL_KEY, db);
+    return;
+  }
   db[currentWorkId] = {
     workId: currentWorkId,
     workName: currentWorkName,
@@ -590,6 +621,7 @@ function saveLocalRechargeBase() {
       name: file.name,
       size: file.size || 0,
       lastModified: file.lastModified || 0,
+      month: file.month || '',
       importedAt: file.importedAt || new Date().toISOString(),
       rows: allCharges.filter(charge => charge._file === file.name).length
     })),
@@ -598,6 +630,12 @@ function saveLocalRechargeBase() {
     updatedAt: new Date().toISOString()
   };
   writeJson(RECARGAS_LOCAL_KEY, db);
+}
+
+async function clearCloudRechargeBase() {
+  if (!window.UBY_SUPABASE?.clearRechargeBase) return false;
+  await window.UBY_SUPABASE.clearRechargeBase(currentWorkId);
+  return true;
 }
 
 async function saveRechargeBase() {
@@ -625,6 +663,7 @@ function applyRechargeRecord(record, sourceLabel) {
     name: file.name,
     size: file.size || 0,
     lastModified: file.lastModified || 0,
+    month: file.month || '',
     importedAt: file.importedAt || record.updatedAt || new Date().toISOString()
   }));
   if (!allCharges.length) {
@@ -633,11 +672,13 @@ function applyRechargeRecord(record, sourceLabel) {
     document.getElementById('emptyState').style.display = 'block';
     hideAllTabs();
     updateChips();
+    document.getElementById('clearRechargeBaseBtn').style.display = 'none';
     setStorageState(`Sem planilha salva para <strong>${currentWorkName}</strong>.`);
     return;
   }
   uploadZone.classList.add('compact');
   updateChips();
+  document.getElementById('clearRechargeBaseBtn').style.display = 'inline-flex';
   document.getElementById('tabsBar').style.display = 'flex';
   document.getElementById('emptyState').style.display = 'none';
   renderAll();
@@ -714,13 +755,18 @@ fileInput.addEventListener('change', e => {
 });
 
 function handleFiles(files) {
+  const selectedMonth = document.getElementById('importMonth')?.value || '';
+  if (!selectedMonth) {
+    setFeedback('Escolha o mes da planilha antes de subir o arquivo.', 'up-error');
+    return;
+  }
   Array.from(files || [])
     .filter(f => f?.name && /\.(xlsx|xls)$/i.test(String(f.name)))
     .forEach(f => {
-      if (!loadedFiles.find(lf => lf?.name === f.name)) {
-        loadedFiles.push(f);
-        readFile(f);
-      }
+      loadedFiles = loadedFiles.filter(lf => !(lf?.name === f.name && lf?.month === selectedMonth));
+      f.month = selectedMonth;
+      loadedFiles.push(f);
+      readFile(f);
     });
 }
 
@@ -732,18 +778,40 @@ function removeFile(name) {
     uploadZone.classList.remove('compact');
     document.getElementById('tabsBar').style.display    = 'none';
     document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('clearRechargeBaseBtn').style.display = 'none';
     hideAllTabs();
   } else {
+    document.getElementById('clearRechargeBaseBtn').style.display = 'inline-flex';
     renderAll();
   }
   saveRechargeBase();
+}
+
+async function clearRechargeBase() {
+  if (!confirm(`Excluir a base de recargas salva para ${currentWorkName}?`)) return;
+  allCharges = [];
+  loadedFiles = [];
+  saveLocalRechargeBase();
+  try {
+    await clearCloudRechargeBase();
+    setStorageState(`Base de recargas excluida para <strong>${currentWorkName}</strong>.`);
+  } catch (err) {
+    setStorageState(`Base excluida neste navegador. Supabase pendente: ${err.message}`, true);
+  }
+  uploadZone.classList.remove('compact');
+  document.getElementById('tabsBar').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('clearRechargeBaseBtn').style.display = 'none';
+  updateChips();
+  hideAllTabs();
 }
 
 function updateChips() {
   loadedFiles = loadedFiles.filter(f => f?.name);
   document.getElementById('fileChips').innerHTML = loadedFiles.map(f => {
     const name = safeText(f.name);
-    return `<div class="file-chip">📄 ${name}
+    const month = f.month ? ` · ${monthLabel(f.month)}` : '';
+    return `<div class="file-chip">📄 ${name}<span>${month}</span>
        <button class="file-chip-remove"
          onclick="event.preventDefault();removeFile('${escapeAttr(name)}')">×</button>
      </div>`;
@@ -774,6 +842,8 @@ function readFile(file) {
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
       if (rows.length < 2) throw new Error('Planilha sem dados de recargas.');
 
+      const selectedMonth = file.month || document.getElementById('importMonth')?.value || '';
+      const importedCharges = [];
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
         if (!r || r[0] == null) continue;
@@ -781,7 +851,7 @@ function readFile(file) {
         const sides = raw.split(' - ');
         const startStr = (sides[0] || '').trim();
         const endStr   = (sides[1] || '').trim();
-        allCharges.push({
+        importedCharges.push({
           workId:        currentWorkId,
           workName:      currentWorkName,
           _file:         file.name,
@@ -803,15 +873,37 @@ function readFile(file) {
           rating:        String(r[27] || '').trim()
         });
       }
+      if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
+
+      importedCharges.forEach(charge => { charge._month = selectedMonth || monthKey(charge.startDate); });
+      const importedDates = new Set(importedCharges.map(chargeDateKey).filter(Boolean));
+      const importedIds = new Set(importedCharges.map(charge => String(charge.id || '').trim()).filter(Boolean));
+      const importedMonths = new Set(importedCharges.map(charge => charge._month || monthKey(charge.startDate)).filter(Boolean));
+      const beforeCount = allCharges.length;
+      allCharges = allCharges.filter(charge => {
+        const sameDate = importedDates.has(chargeDateKey(charge));
+        const sameId = importedIds.has(String(charge.id || '').trim());
+        const sameMonth = importedMonths.has(charge._month || monthKey(charge.startDate));
+        return !sameMonth && !sameDate && !sameId;
+      });
+      allCharges.push(...importedCharges);
+      loadedFiles = loadedFiles.filter(fileItem =>
+        fileItem?.name === file.name || allCharges.some(charge => charge._file === fileItem?.name)
+      );
+      const replacedCount = beforeCount - allCharges.filter(charge => charge._file !== file.name).length;
 
       setFeedback('', '');
       uploadZone.classList.add('compact');
-      loadedFiles = loadedFiles.map(item => item.name === file.name ? { ...item, importedAt: new Date().toISOString() } : item);
+      loadedFiles = loadedFiles.map(item => item.name === file.name ? { ...item, month: selectedMonth, importedAt: new Date().toISOString() } : item);
       updateChips();
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('clearRechargeBaseBtn').style.display = 'inline-flex';
       renderAll();
       saveRechargeBase();
+      if (replacedCount > 0) {
+        setFeedback(`${replacedCount} recarga(s) das mesmas datas foram substituidas.`, 'up-loading');
+      }
 
     } catch (err) {
       setFeedback('❌ ' + err.message, 'up-error');
@@ -1394,6 +1486,8 @@ function switchTab(name, btn) {
 }
 
 initWorkSelector();
+document.getElementById('importMonth').value = new Date().toISOString().slice(0, 7);
+document.getElementById('clearRechargeBaseBtn').addEventListener('click', clearRechargeBase);
 loadRechargeBase();
 </script>
 </body>
