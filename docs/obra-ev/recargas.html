@@ -530,6 +530,14 @@ function setStorageState(message, isError = false) {
   el.innerHTML = message;
 }
 
+function safeText(value) {
+  return String(value ?? '');
+}
+
+function escapeAttr(value) {
+  return safeText(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 function serializeCharge(charge) {
   return {
     ...charge,
@@ -706,10 +714,10 @@ fileInput.addEventListener('change', e => {
 });
 
 function handleFiles(files) {
-  files
-    .filter(f => /\.(xlsx|xls)$/i.test(f.name))
+  Array.from(files || [])
+    .filter(f => f?.name && /\.(xlsx|xls)$/i.test(String(f.name)))
     .forEach(f => {
-      if (!loadedFiles.find(lf => lf.name === f.name)) {
+      if (!loadedFiles.find(lf => lf?.name === f.name)) {
         loadedFiles.push(f);
         readFile(f);
       }
@@ -717,7 +725,7 @@ function handleFiles(files) {
 }
 
 function removeFile(name) {
-  loadedFiles = loadedFiles.filter(f => f.name !== name);
+  loadedFiles = loadedFiles.filter(f => f?.name !== name);
   allCharges  = allCharges.filter(c => c._file !== name);
   updateChips();
   if (!allCharges.length) {
@@ -732,12 +740,14 @@ function removeFile(name) {
 }
 
 function updateChips() {
-  document.getElementById('fileChips').innerHTML = loadedFiles.filter(f => f && f.name).map(f =>
-    `<div class="file-chip">📄 ${f.name}
+  loadedFiles = loadedFiles.filter(f => f?.name);
+  document.getElementById('fileChips').innerHTML = loadedFiles.map(f => {
+    const name = safeText(f.name);
+    return `<div class="file-chip">📄 ${name}
        <button class="file-chip-remove"
-         onclick="event.preventDefault();removeFile('${f.name.replace(/'/g,"\\'")}')">×</button>
-     </div>`
-  ).join('');
+         onclick="event.preventDefault();removeFile('${escapeAttr(name)}')">×</button>
+     </div>`;
+  }).join('');
 }
 
 function setFeedback(msg, cls) {
@@ -1372,4 +1382,19 @@ function showTab(name) {
   document.getElementById('tabDetalhes').style.display  = name === 'detalhes'  ? 'block' : 'none';
   document.getElementById('ctrlMensal').style.display   = name === 'mensal'    ? 'flex'  : 'none';
   document.getElementById('ctrlAcc').style.display      = name === 'acumulado' ? 'flex'  : 'none';
-}
+}
+
+function hideAllTabs() { showTab('none'); }
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  showTab(name);
+  if (name === 'detalhes') renderDetalhes();
+}
+
+initWorkSelector();
+loadRechargeBase();
+</script>
+</body>
+</html>
