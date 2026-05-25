@@ -613,7 +613,7 @@ async function saveRechargeBase() {
 
 function applyRechargeRecord(record, sourceLabel) {
   allCharges = (record?.charges || []).map(hydrateCharge);
-  loadedFiles = (record?.files || []).map(file => ({
+  loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
     name: file.name,
     size: file.size || 0,
     lastModified: file.lastModified || 0,
@@ -732,7 +732,7 @@ function removeFile(name) {
 }
 
 function updateChips() {
-  document.getElementById('fileChips').innerHTML = loadedFiles.map(f =>
+  document.getElementById('fileChips').innerHTML = loadedFiles.filter(f => f && f.name).map(f =>
     `<div class="file-chip">📄 ${f.name}
        <button class="file-chip-remove"
          onclick="event.preventDefault();removeFile('${f.name.replace(/'/g,"\\'")}')">×</button>
@@ -1372,19 +1372,4 @@ function showTab(name) {
   document.getElementById('tabDetalhes').style.display  = name === 'detalhes'  ? 'block' : 'none';
   document.getElementById('ctrlMensal').style.display   = name === 'mensal'    ? 'flex'  : 'none';
   document.getElementById('ctrlAcc').style.display      = name === 'acumulado' ? 'flex'  : 'none';
-}
-
-function hideAllTabs() { showTab('none'); }
-
-function switchTab(name, btn) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  showTab(name);
-  if (name === 'detalhes') renderDetalhes();
-}
-
-initWorkSelector();
-loadRechargeBase();
-</script>
-</body>
-</html>
+}
