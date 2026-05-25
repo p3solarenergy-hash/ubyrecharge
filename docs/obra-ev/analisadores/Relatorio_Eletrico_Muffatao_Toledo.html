@@ -634,7 +634,7 @@ new Chart(document.getElementById('chartDemanda'), {
 
 new Chart(document.getElementById('chartConsumo'), {
   type:'doughnut',
-  data:{labels:['Fase A 56,48 kWh (42,1%)','Fase B 49,24 kWh (34,4%)','Fase C 39,11 kWh (23,5%)'],
+  data:{labels:['Fase A 56,48 kWh (39,0%)','Fase B 49,24 kWh (34,0%)','Fase C 39,11 kWh (27,0%)'],
     datasets:[{data:[56.48,49.24,39.11], backgroundColor:[P3.primary,P3.warn,P3.accent], borderColor:'#fff', borderWidth:3}]},
   options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
     plugins:{legend:{position:'bottom'},title:{display:true,text:'Energia por fase - 5 dias (kWh)'}}}
@@ -908,6 +908,7 @@ calcular();
 <script>UBY_AUTH.require("analyzers");</script>
 </body>
 </html>
+
 
 
 
