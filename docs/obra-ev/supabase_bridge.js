@@ -293,6 +293,46 @@
     return { link, storagePath: path, fileName: file.name };
   }
 
+  async function saveRechargeBase(workId, payload) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre no Supabase antes de salvar recargas.");
+    const files = Array.isArray(payload?.files) ? payload.files : [];
+    const charges = Array.isArray(payload?.charges) ? payload.charges : [];
+    const summary = payload?.summary || {};
+    const { error } = await sb.from("obra_recargas_base").upsert({
+      obra_id: String(workId || "geral"),
+      arquivos: files,
+      recargas: charges,
+      resumo: summary,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "obra_id" });
+    if (error) throw error;
+    return { cloud: true, files: files.length, charges: charges.length };
+  }
+
+  async function loadRechargeBase(workId) {
+    const sb = client();
+    if (!sb) return null;
+    const user = await currentUser();
+    if (!user) return null;
+    const { data, error } = await sb
+      .from("obra_recargas_base")
+      .select("obra_id,arquivos,recargas,resumo,updated_at")
+      .eq("obra_id", String(workId || "geral"))
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return {
+      workId: data.obra_id,
+      files: data.arquivos || [],
+      charges: data.recargas || [],
+      summary: data.resumo || {},
+      updatedAt: data.updated_at
+    };
+  }
+
   window.UBY_SUPABASE = {
     configured,
     client,
@@ -306,6 +346,8 @@
     currentProfile,
     ensureCoreWorks,
     upsertProspects,
-    uploadDocumentFile
+    uploadDocumentFile,
+    saveRechargeBase,
+    loadRechargeBase
   };
 })();

@@ -6,7 +6,7 @@ No Supabase, abra `SQL Editor` e rode o arquivo:
 
 `docs/obra-ev/supabase_schema.sql`
 
-Esse arquivo agora tambem cria as tabelas `operational_tasks`, `obra_atividade` e `obra_mensagens`. Elas fazem as tarefas, historico de alteracoes e mensagens virarem banco real.
+Esse arquivo agora tambem cria as tabelas `operational_tasks`, `obra_atividade`, `obra_mensagens` e `obra_recargas_base`. Elas fazem tarefas, historico, mensagens e planilhas de recargas por obra virarem banco real.
 
 Se voce ja rodou o schema antigo e quer aplicar apenas a mudanca nova, rode:
 
@@ -23,6 +23,10 @@ Para liberar upload real de documentos da obra, rode tambem:
 Para ativar a nova pagina de Mercado com banco real, rode tambem:
 
 `docs/obra-ev/supabase_market_patch.sql`
+
+Para salvar a ultima planilha de recargas por obra/projeto, rode tambem:
+
+`docs/obra-ev/supabase_recargas_patch.sql`
 
 Para garantir que a base principal apareca igual para todos os perfis, rode:
 

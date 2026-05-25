@@ -157,6 +157,15 @@ create table if not exists public.obra_mensagens (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.obra_recargas_base (
+  obra_id text primary key references public.obras(id) on delete cascade,
+  arquivos jsonb not null default '[]'::jsonb,
+  recargas jsonb not null default '[]'::jsonb,
+  resumo jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.obra_snapshots (
   id uuid primary key default gen_random_uuid(),
   origin text,
@@ -194,6 +203,7 @@ alter table public.prospeccao_areas enable row level security;
 alter table public.operational_tasks enable row level security;
 alter table public.obra_atividade enable row level security;
 alter table public.obra_mensagens enable row level security;
+alter table public.obra_recargas_base enable row level security;
 alter table public.obra_snapshots enable row level security;
 alter table public.mercado_items enable row level security;
 
@@ -208,6 +218,7 @@ drop policy if exists "admin all prospeccao" on public.prospeccao_areas;
 drop policy if exists "admin all operational tasks" on public.operational_tasks;
 drop policy if exists "obra app all atividade" on public.obra_atividade;
 drop policy if exists "obra app all mensagens" on public.obra_mensagens;
+drop policy if exists "obra app all recargas" on public.obra_recargas_base;
 drop policy if exists "admin all snapshots" on public.obra_snapshots;
 drop policy if exists "obra app all mercado" on public.mercado_items;
 
@@ -248,6 +259,7 @@ create policy "admin all prospeccao" on public.prospeccao_areas for all to authe
 create policy "admin all operational tasks" on public.operational_tasks for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "obra app all atividade" on public.obra_atividade for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
 create policy "obra app all mensagens" on public.obra_mensagens for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
+create policy "obra app all recargas" on public.obra_recargas_base for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
 create policy "admin all snapshots" on public.obra_snapshots for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "obra app all mercado" on public.mercado_items for all to authenticated using (public.can_access_obra_app()) with check (public.can_access_obra_app());
 

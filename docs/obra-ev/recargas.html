@@ -191,6 +191,23 @@
     }
     .btn-recalc:hover { background:rgba(63,182,107,.26); }
 
+    .project-bar {
+      display:grid;
+      grid-template-columns:minmax(220px,420px) 1fr;
+      gap:12px;
+      align-items:end;
+      margin-bottom:18px;
+      background:var(--p3-card);
+      border:1px solid var(--p3-border);
+      border-radius:12px;
+      padding:14px 16px;
+      box-shadow:var(--p3-shadow);
+    }
+    .project-field label { display:block; color:var(--p3-muted); font-size:11px; text-transform:uppercase; font-weight:700; letter-spacing:.8px; margin-bottom:6px; }
+    .project-field select { width:100%; background:#0B1524; color:var(--p3-text); border:1px solid var(--p3-border); border-radius:8px; padding:9px 10px; font-family:inherit; font-size:13px; }
+    .project-state { color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .project-state strong { color:var(--p3-text); }
+
     /* ── NOVO: Acumulado grid ── */
     .acc-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px; }
 
@@ -206,6 +223,7 @@
     }
     @media (max-width:960px) {
       .hero,.section,.kpis { grid-template-columns:1fr; }
+      .project-bar { grid-template-columns:1fr; }
       .wrap { padding:16px; }
       .value { white-space:normal; }
       .user-row { grid-template-columns:80px 1fr; }
@@ -215,6 +233,14 @@
 </head>
 <body>
 <main class="wrap">
+
+  <div class="project-bar">
+    <div class="project-field">
+      <label>Projeto / obra da base de recargas</label>
+      <select id="workSelector"></select>
+    </div>
+    <div class="project-state" id="storageState">Escolha a obra antes de anexar a planilha.</div>
+  </div>
 
   <!-- ════════════════════════════════════════
        UPLOAD ZONE
@@ -436,6 +462,10 @@
 
 <script src="sidebar.js"></script>
 <script src="backup_guard.js"></script>
+<script src="supabase_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_bridge.js"></script>
+<script src="app_data.js"></script>
 <script>
 /* ============================================================
    UBY Recharge — Painel de Recargas v2.0
@@ -448,6 +478,207 @@ let loadedFiles = [];
 let charts      = {};
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
+const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
+const appData = window.UBY_APP_DATA || {};
+let currentWorkId = new URLSearchParams(location.search).get('obra') || localStorage.getItem('uby-recargas-current-work') || 'rio';
+let currentWorkName = '';
+
+function readJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }
+  catch { return fallback; }
+}
+
+function writeJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function workOptions() {
+  const byId = new Map();
+  (appData.baseObras || []).forEach(work => byId.set(work.id, work));
+  readJson('uby-obras-dashboard-v1', []).forEach(work => {
+    if (work?.id) byId.set(work.id, { ...(byId.get(work.id) || {}), ...work });
+  });
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('uby-obra-detalhe-')) continue;
+    const id = key.replace('uby-obra-detalhe-', '');
+    const detail = readJson(key, null);
+    if (detail?.project) {
+      byId.set(id, {
+        ...(byId.get(id) || {}),
+        id,
+        nome: detail.project.obraNome || id,
+        cliente: detail.project.cliente || '',
+        kw: Number(detail.project.qtdCarregadores || 1) * Number(detail.project.potenciaCarregador || 60)
+      });
+    }
+  }
+  if (!byId.has('malassise')) {
+    byId.set('malassise', { id: 'malassise', nome: 'Posto Robert Koch R.K.', cliente: 'Malassise Robert Koch', kw: 60 });
+  }
+  return [...byId.values()].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || '')));
+}
+
+function currentWork() {
+  return workOptions().find(work => work.id === currentWorkId) || workOptions()[0] || { id: 'rio', nome: 'Rio Beach EV', kw: 7 };
+}
+
+function setStorageState(message, isError = false) {
+  const el = document.getElementById('storageState');
+  if (!el) return;
+  el.style.color = isError ? 'var(--p3-warn)' : 'var(--p3-muted)';
+  el.innerHTML = message;
+}
+
+function serializeCharge(charge) {
+  return {
+    ...charge,
+    startIso: charge.startDate ? charge.startDate.toISOString() : '',
+    endIso: charge.endDate ? charge.endDate.toISOString() : '',
+    startDate: undefined,
+    endDate: undefined
+  };
+}
+
+function hydrateCharge(charge) {
+  return {
+    ...charge,
+    startDate: charge.startIso ? new Date(charge.startIso) : parseDate(charge.startStr),
+    endDate: charge.endIso ? new Date(charge.endIso) : parseDate(charge.endStr)
+  };
+}
+
+function localRechargeDb() {
+  return readJson(RECARGAS_LOCAL_KEY, {});
+}
+
+function localRecord() {
+  return localRechargeDb()[currentWorkId] || null;
+}
+
+function rechargeSummary() {
+  const energy = allCharges.reduce((sum, charge) => sum + charge.energyKWh, 0);
+  const revenue = allCharges.reduce((sum, charge) => sum + charge.revenue, 0);
+  const dates = allCharges.map(charge => charge.startDate).filter(Boolean);
+  return {
+    workId: currentWorkId,
+    workName: currentWorkName,
+    charges: allCharges.length,
+    files: loadedFiles.length,
+    energyKWh: energy,
+    revenue,
+    firstDate: dates.length ? new Date(Math.min(...dates)).toISOString() : '',
+    lastDate: dates.length ? new Date(Math.max(...dates)).toISOString() : '',
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function saveLocalRechargeBase() {
+  const db = localRechargeDb();
+  db[currentWorkId] = {
+    workId: currentWorkId,
+    workName: currentWorkName,
+    files: loadedFiles.map(file => ({
+      name: file.name,
+      size: file.size || 0,
+      lastModified: file.lastModified || 0,
+      importedAt: file.importedAt || new Date().toISOString(),
+      rows: allCharges.filter(charge => charge._file === file.name).length
+    })),
+    charges: allCharges.map(serializeCharge),
+    summary: rechargeSummary(),
+    updatedAt: new Date().toISOString()
+  };
+  writeJson(RECARGAS_LOCAL_KEY, db);
+}
+
+async function saveRechargeBase() {
+  saveLocalRechargeBase();
+  const record = localRecord();
+  if (!record) return;
+  if (!window.UBY_SUPABASE?.saveRechargeBase) {
+    setStorageState(`Salvo neste navegador para <strong>${currentWorkName}</strong>. Banco ainda nao carregado.`);
+    return;
+  }
+  try {
+    if (window.UBY_SUPABASE.ensureCoreWorks && appData.baseObras?.length) {
+      await window.UBY_SUPABASE.ensureCoreWorks(appData.baseObras);
+    }
+    const result = await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
+    setStorageState(`Banco atualizado para <strong>${currentWorkName}</strong>: ${result.files} arquivo(s), ${result.charges} recarga(s).`);
+  } catch (err) {
+    setStorageState(`Salvo neste navegador para <strong>${currentWorkName}</strong>. Supabase pendente: ${err.message}`, true);
+  }
+}
+
+function applyRechargeRecord(record, sourceLabel) {
+  allCharges = (record?.charges || []).map(hydrateCharge);
+  loadedFiles = (record?.files || []).map(file => ({
+    name: file.name,
+    size: file.size || 0,
+    lastModified: file.lastModified || 0,
+    importedAt: file.importedAt || record.updatedAt || new Date().toISOString()
+  }));
+  if (!allCharges.length) {
+    uploadZone.classList.remove('compact');
+    document.getElementById('tabsBar').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+    hideAllTabs();
+    updateChips();
+    setStorageState(`Sem planilha salva para <strong>${currentWorkName}</strong>.`);
+    return;
+  }
+  uploadZone.classList.add('compact');
+  updateChips();
+  document.getElementById('tabsBar').style.display = 'flex';
+  document.getElementById('emptyState').style.display = 'none';
+  renderAll();
+  const updated = record.updatedAt ? new Date(record.updatedAt).toLocaleString('pt-BR') : 'agora';
+  setStorageState(`Carregado de ${sourceLabel} para <strong>${currentWorkName}</strong>: ${loadedFiles.length} arquivo(s), ${allCharges.length} recarga(s). Ultima atualizacao: ${updated}.`);
+}
+
+async function loadRechargeBase() {
+  const local = localRecord();
+  if (local) applyRechargeRecord(local, 'base local');
+  else applyRechargeRecord(null, 'base local');
+  if (!window.UBY_SUPABASE?.loadRechargeBase) return;
+  try {
+    const cloud = await window.UBY_SUPABASE.loadRechargeBase(currentWorkId);
+    if (cloud?.charges?.length) {
+      const db = localRechargeDb();
+      db[currentWorkId] = cloud;
+      writeJson(RECARGAS_LOCAL_KEY, db);
+      applyRechargeRecord(cloud, 'Supabase');
+    }
+  } catch (err) {
+    setStorageState(`Base local preservada para <strong>${currentWorkName}</strong>. Supabase pendente: ${err.message}`, true);
+  }
+}
+
+function initWorkSelector() {
+  const selector = document.getElementById('workSelector');
+  const works = workOptions();
+  if (!works.some(work => work.id === currentWorkId)) currentWorkId = works[0]?.id || 'rio';
+  selector.innerHTML = works.map(work => `<option value="${work.id}">${work.nome || work.id}${work.cliente ? ' - ' + work.cliente : ''}</option>`).join('');
+  selector.value = currentWorkId;
+  currentWorkName = currentWork().nome || currentWorkId;
+  const power = Number(currentWork().kw || 0);
+  if (power > 0) {
+    document.getElementById('chargerPower').value = power;
+    document.getElementById('chargerPowerAcc').value = power;
+  }
+  selector.addEventListener('change', () => {
+    currentWorkId = selector.value;
+    localStorage.setItem('uby-recargas-current-work', currentWorkId);
+    currentWorkName = currentWork().nome || currentWorkId;
+    const nextPower = Number(currentWork().kw || 0);
+    if (nextPower > 0) {
+      document.getElementById('chargerPower').value = nextPower;
+      document.getElementById('chargerPowerAcc').value = nextPower;
+    }
+    loadRechargeBase();
+  });
+}
 
 // ── Prevenção de drop fora da zona ────────────────────────
 document.addEventListener('dragover', e => e.preventDefault());
@@ -497,6 +728,7 @@ function removeFile(name) {
   } else {
     renderAll();
   }
+  saveRechargeBase();
 }
 
 function updateChips() {
@@ -540,6 +772,8 @@ function readFile(file) {
         const startStr = (sides[0] || '').trim();
         const endStr   = (sides[1] || '').trim();
         allCharges.push({
+          workId:        currentWorkId,
+          workName:      currentWorkName,
           _file:         file.name,
           id:            r[0],
           station:       String(r[1] || '').trim(),
@@ -562,10 +796,12 @@ function readFile(file) {
 
       setFeedback('', '');
       uploadZone.classList.add('compact');
+      loadedFiles = loadedFiles.map(item => item.name === file.name ? { ...item, importedAt: new Date().toISOString() } : item);
       updateChips();
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
       renderAll();
+      saveRechargeBase();
 
     } catch (err) {
       setFeedback('❌ ' + err.message, 'up-error');
@@ -1146,6 +1382,9 @@ function switchTab(name, btn) {
   showTab(name);
   if (name === 'detalhes') renderDetalhes();
 }
+
+initWorkSelector();
+loadRechargeBase();
 </script>
 </body>
 </html>
