@@ -1,353 +1,1529 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UBY Recharge - Mercado EV</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UBY Recharge - Mercado EV Brasil</title>
 <link rel="icon" type="image/svg+xml" href="assets/brand/04_simbolo_badge.svg">
 <link rel="stylesheet" href="sidebar.css">
 <link rel="stylesheet" href="brand.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 <style>
-  :root{--p3-primary:#57B7FF;--p3-primary-deep:#071527;--p3-accent:#38D4FF;--p3-bg:#08111F;--p3-card:#101B2D;--p3-card-2:#13243B;--p3-text:#F4FBF8;--p3-muted:#A6B8C6;--p3-border:#24364E;--p3-danger:#F0685F;--p3-warn:#F2C14E;--p3-ok:#57B7FF;--p3-shadow:0 1px 3px rgba(0,0,0,.35),0 14px 34px rgba(0,0,0,.28)}
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:radial-gradient(circle at top right,rgba(87,183,255,.12),transparent 34%),var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.55;min-height:100vh}
-  .page{max-width:1480px;margin:0 auto;padding:32px 36px 80px}
-  .hero{position:relative;overflow:hidden;border:1px solid rgba(87,183,255,.18);background:linear-gradient(135deg,#071527 0%,#0D2138 62%,#071A2C 100%);border-radius:18px;padding:30px;margin-bottom:24px;box-shadow:var(--p3-shadow)}
-  .hero .uby-brand-glow{right:-70px;top:-90px}
-  .hero-top{display:flex;justify-content:space-between;gap:22px;align-items:flex-start;position:relative;z-index:1}
-  .brand-lockup{display:flex;align-items:center;gap:16px}
-  .brand-lockup img{height:64px;width:auto}
-  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:var(--p3-primary);font-weight:900;margin-bottom:6px}
-  h1{font-size:32px;line-height:1.12;margin:0 0 8px}
-  .subtitle{max-width:780px;color:#D4E2DC;font-size:14px}
-  .status-pill{border:1px solid rgba(87,183,255,.28);background:rgba(87,183,255,.10);color:#DFFFF0;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:900;white-space:nowrap}
-  .status-pill.warn{border-color:rgba(242,193,78,.35);background:rgba(242,193,78,.12);color:#FFE5A3}
-  .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin:0 0 18px}
-  .tabs{display:flex;gap:8px;flex-wrap:wrap}
-  .tab,.primary-btn,.ghost-btn,.danger-btn{height:40px;border-radius:9px;padding:0 13px;font-size:12px;font-weight:900;border:1px solid var(--p3-border);background:#0C1728;color:var(--p3-text)}
-  .tab.active,.primary-btn{background:var(--p3-primary);border-color:var(--p3-primary);color:#061321}
-  .danger-btn{border-color:rgba(240,104,95,.55);color:#FFB1AA;background:rgba(240,104,95,.10)}
-  .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
-  .panel{background:rgba(16,27,45,.92);border:1px solid var(--p3-border);border-radius:14px;padding:20px;box-shadow:var(--p3-shadow)}
-  .panel h2{font-size:16px;color:var(--p3-primary);margin-bottom:4px}
-  .panel .sub{font-size:12px;color:var(--p3-muted);margin-bottom:14px}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
-  .kpi{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:12px;padding:15px;min-height:112px}
-  .kpi small{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:900}
-  .kpi strong{display:block;color:var(--p3-primary);font-size:26px;line-height:1.1;margin:8px 0 2px;word-break:break-word}
-  .kpi span{display:block;color:var(--p3-muted);font-size:11px}
-  .market-list{display:grid;gap:10px}
-  .market-card{background:var(--p3-card-2);border:1px solid var(--p3-border);border-left:4px solid var(--p3-primary);border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr auto;gap:12px}
-  .market-card.oportunidade{border-left-color:var(--p3-accent)}
-  .market-card.risco{border-left-color:var(--p3-warn)}
-  .market-title{font-size:14px;font-weight:900;margin-bottom:3px}
-  .market-meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--p3-muted);font-size:11px}
-  .market-value{font-size:20px;color:var(--p3-primary);font-weight:900;text-align:right;min-width:120px}
-  .market-actions{display:flex;gap:7px;justify-content:flex-end;margin-top:10px}
-  .chip{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.05);border-radius:999px;padding:3px 8px}
-  form{display:grid;gap:12px}
-  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .field.full{grid-column:1/-1}
-  label{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:900;margin-bottom:5px}
-  input,select,textarea{width:100%;border:1px solid var(--p3-border);border-radius:9px;background:#0B1524;color:var(--p3-text);padding:10px 11px;font:inherit;font-weight:700}
-  textarea{min-height:82px;resize:vertical}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--p3-primary);box-shadow:0 0 0 3px rgba(87,183,255,.14)}
-  .source-list{display:grid;gap:8px;margin-top:10px}
-  .source-item{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#0B1524;border:1px solid var(--p3-border);border-radius:10px;padding:10px;color:var(--p3-muted);font-size:12px}
-  .source-item a{color:var(--p3-primary);font-weight:900;text-decoration:none}
-  .empty{border:1px dashed rgba(166,184,198,.35);border-radius:12px;padding:22px;text-align:center;color:var(--p3-muted)}
-  .footer-note{margin-top:14px;color:var(--p3-muted);font-size:11px}
-  @media(max-width:1050px){.grid,.kpis{grid-template-columns:1fr 1fr}.hero-top{flex-direction:column}.status-pill{white-space:normal}}
-  @media(max-width:680px){.page{padding:18px 14px 60px}.grid,.kpis,.form-grid{grid-template-columns:1fr}.toolbar{grid-template-columns:1fr}.market-card{grid-template-columns:1fr}.market-value{text-align:left}.brand-lockup img{height:48px}h1{font-size:26px}}
+:root{
+  color-scheme:dark;
+  --bg:#080a10;--bg2:#0d1018;--card:#111520;--card2:#161c2a;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.11);
+  --text:#eaf0ff;--muted:#576070;--muted2:#8a95a8;
+  --green:#1de980;--green2:rgba(29,233,128,.12);
+  --blue:#4fa3ff;--blue2:rgba(79,163,255,.12);
+  --orange:#ff8c42;--orange2:rgba(255,140,66,.12);
+  --purple:#b47dff;--purple2:rgba(180,125,255,.12);
+  --red:#ff5e6c;--amber:#ffbd44;--teal:#00e5c4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+
+/* ── HEADER ── */
+header{
+  background:linear-gradient(180deg,#0a0d16 0%,#080a10 100%);
+  border-bottom:1px solid var(--border);
+  padding:16px 24px 0;position:sticky;top:0;z-index:100;
+}
+body.uby-shell header{top:54px}
+body.uby-shell .page{padding-top:22px}
+.hrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-icon{
+  width:38px;height:38px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--green),var(--blue));
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  box-shadow:0 0 24px rgba(29,233,128,.25);
+}
+.brand-name{font-size:17px;font-weight:800;letter-spacing:-.3px;
+  background:linear-gradient(90deg,var(--text),var(--muted2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.hright{display:flex;align-items:center;gap:10px}
+.live{display:flex;align-items:center;gap:5px;background:var(--green2);border:1px solid rgba(29,233,128,.2);
+  border-radius:20px;padding:4px 10px;font-size:11px;color:var(--green);font-weight:600}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.hmeta{font-size:11px;color:var(--muted)}
+.tabs{display:flex;gap:0}
+.tab{
+  padding:10px 20px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;
+  display:flex;align-items:center;gap:6px;
+}
+.tab:hover:not(.active){color:var(--muted2);background:rgba(255,255,255,.02)}
+.tab.active{color:var(--text);border-bottom-color:var(--green)}
+.tab-pill{font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;background:var(--green2);color:var(--green)}
+
+/* ── LAYOUT ── */
+.page{display:none;padding:22px 24px 32px;max-width:1440px;margin:0 auto}
+.page.active{display:block}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.g3{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;margin-bottom:16px}
+.g3r{display:grid;grid-template-columns:1fr 1.7fr;gap:16px;margin-bottom:16px}
+.col{display:flex;flex-direction:column;gap:16px}
+
+/* ── KPI STRIP ── */
+.kstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.kpi{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:18px 20px 16px;position:relative;overflow:hidden;cursor:default;
+  transition:transform .25s,box-shadow .25s;
+}
+.kpi:hover{transform:translateY(-3px)}
+.kpi::before{content:'';position:absolute;inset:0;border-radius:14px;opacity:0;
+  transition:opacity .25s;background:radial-gradient(circle at 70% 30%,var(--glow),transparent 70%)}
+.kpi:hover::before{opacity:1}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0}
+.kpi.g{--glow:rgba(29,233,128,.06)}.kpi.g::after{background:linear-gradient(90deg,var(--green),var(--teal))}
+.kpi.b{--glow:rgba(79,163,255,.06)}.kpi.b::after{background:linear-gradient(90deg,var(--blue),var(--purple))}
+.kpi.o{--glow:rgba(255,140,66,.06)}.kpi.o::after{background:linear-gradient(90deg,var(--orange),var(--amber))}
+.kpi.p{--glow:rgba(180,125,255,.06)}.kpi.p::after{background:linear-gradient(90deg,var(--purple),var(--blue))}
+.kpi-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px}
+.kpi-num{font-size:32px;font-weight:900;line-height:1;letter-spacing:-1.5px;margin-bottom:8px}
+.kpi.g .kpi-num{color:var(--green)}.kpi.b .kpi-num{color:var(--blue)}
+.kpi.o .kpi-num{color:var(--orange)}.kpi.p .kpi-num{color:var(--purple)}
+.kpi-note{font-size:11px;color:var(--muted2);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;
+  border-radius:5px;padding:2px 7px}
+.tag.up{background:rgba(29,233,128,.15);color:var(--green)}
+.tag.warn{background:rgba(255,140,66,.15);color:var(--orange)}
+.tag.red{background:rgba(255,94,108,.15);color:var(--red)}
+.tag.blue{background:rgba(79,163,255,.15);color:var(--blue)}
+
+/* ── CARD ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.ch{padding:14px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.ct{font-size:13px;font-weight:700;color:var(--text)}
+.cs{font-size:11px;color:var(--muted);margin-top:2px}
+.cb{padding:18px}
+.cb0{padding:0}
+
+/* ── INSIGHT STRIP ── */
+.istrip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.ins{border-radius:12px;padding:16px;border:1px solid var(--border);position:relative;overflow:hidden}
+.ins::before{content:'';position:absolute;inset:0;border-radius:12px;opacity:.07}
+.ins.g::before{background:var(--green)}.ins.b::before{background:var(--blue)}
+.ins.o::before{background:var(--orange)}.ins.p::before{background:var(--purple)}
+.ins.r::before{background:var(--red)}.ins.t::before{background:var(--teal)}
+.ins-icon{font-size:20px;margin-bottom:8px}
+.ins-val{font-size:24px;font-weight:900;line-height:1;margin-bottom:4px}
+.ins.g .ins-val{color:var(--green)}.ins.b .ins-val{color:var(--blue)}
+.ins.o .ins-val{color:var(--orange)}.ins.p .ins-val{color:var(--purple)}
+.ins.r .ins-val{color:var(--red)}.ins.t .ins-val{color:var(--teal)}
+.ins-lbl{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}
+.ins-note{font-size:10px;color:var(--muted2);line-height:1.5}
+
+/* ── ALERT ── */
+.alert{border-radius:12px;padding:13px 16px;margin-bottom:14px;
+  display:flex;align-items:flex-start;gap:12px;border:1px solid}
+.alert.w{background:rgba(255,140,66,.07);border-color:rgba(255,140,66,.2)}
+.alert.i{background:rgba(79,163,255,.07);border-color:rgba(79,163,255,.2)}
+.alert.s{background:rgba(29,233,128,.07);border-color:rgba(29,233,128,.2)}
+.alert.r{background:rgba(255,94,108,.07);border-color:rgba(255,94,108,.2)}
+.ai{font-size:17px;flex-shrink:0;margin-top:1px}
+.at{font-size:12px;font-weight:700;margin-bottom:3px}
+.alert.w .at{color:var(--orange)}.alert.i .at{color:var(--blue)}
+.alert.s .at{color:var(--green)}.alert.r .at{color:var(--red)}
+.ab{font-size:11px;color:var(--muted2);line-height:1.55}
+.ab strong{color:var(--text)}
+
+/* ── TABLE ── */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+  border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.rk{font-size:16px;width:28px}
+.mn{font-weight:700;font-size:13px;color:var(--text)}
+.msub{font-size:10px;color:var(--muted);margin-top:2px}
+.chip{display:inline-flex;align-items:center;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700}
+.c-byd{background:rgba(79,163,255,.15);color:var(--blue)}
+.c-geely{background:rgba(29,233,128,.15);color:var(--green)}
+.c-gm{background:rgba(255,140,66,.15);color:var(--orange)}
+.c-outros{background:rgba(138,149,168,.12);color:var(--muted2)}
+.nc{font-weight:800;font-size:13px;text-align:right;color:var(--text)}
+.bar-r{display:flex;align-items:center;gap:8px;min-width:100px}
+.br{height:4px;border-radius:2px;background:rgba(255,255,255,.06);flex:1;overflow:hidden}
+.bf{height:100%;border-radius:2px}
+.pct{font-size:11px;color:var(--muted2);min-width:34px}
+.new-badge{font-size:9px;font-weight:700;background:rgba(29,233,128,.15);color:var(--green);
+  border-radius:4px;padding:1px 5px;margin-left:5px}
+.up-badge{font-size:9px;font-weight:700;background:rgba(79,163,255,.15);color:var(--blue);
+  border-radius:4px;padding:1px 5px;margin-left:5px}
+
+/* ── PROGRESS ── */
+.pw{margin-bottom:11px}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.pl{font-size:11px;color:var(--muted2)}
+.pv{font-size:11px;font-weight:700;color:var(--text)}
+.pb{height:7px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden}
+.pf{height:100%;border-radius:4px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+
+/* ── GAP ANALYSIS ── */
+.gap-wrap{background:var(--card2);border-radius:12px;padding:18px;border:1px solid var(--border);margin-bottom:16px}
+.gap-title{font-size:13px;font-weight:700;margin-bottom:4px}
+.gap-sub{font-size:11px;color:var(--muted);margin-bottom:18px}
+.gap-bar-wrap{position:relative;margin-bottom:10px}
+.gap-track{height:28px;background:rgba(255,255,255,.05);border-radius:8px;overflow:hidden;position:relative}
+.gap-fill{height:100%;border-radius:8px;display:flex;align-items:center;padding:0 10px;
+  font-size:11px;font-weight:700;white-space:nowrap;transition:width 1.5s cubic-bezier(.4,0,.2,1)}
+.gap-label{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  font-size:11px;color:var(--muted2)}
+.gap-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px}
+.gap-need{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px}
+.gn{text-align:center;background:rgba(255,255,255,.03);border-radius:8px;padding:12px}
+.gn-val{font-size:19px;font-weight:900;margin-bottom:3px}
+.gn-lbl{font-size:10px;color:var(--muted2)}
+
+/* ── LEGEND ── */
+.lg{display:flex;flex-direction:column;gap:8px}
+.li{display:flex;align-items:center;gap:8px}
+.ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ll{font-size:11px;color:var(--muted2);flex:1}
+.lv{font-size:12px;font-weight:700;color:var(--text)}
+.lp{font-size:11px;color:var(--muted)}
+
+/* ── DONUT WRAP ── */
+.dw{display:flex;align-items:center;gap:20px}
+.dc{flex-shrink:0}
+
+/* ── DIVIDER ── */
+.div{height:1px;background:var(--border);margin:14px 0}
+
+/* ── SECTION LABEL ── */
+.slbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px}
+
+/* ── ANNOTATION BADGE (inline SVG trick) ── */
+.ann{font-size:11px;font-weight:700;border-radius:4px;padding:2px 7px;
+  position:absolute;pointer-events:none}
+
+/* ── SOURCE ── */
+.src{font-size:10px;color:var(--muted);padding:10px 24px;border-top:1px solid var(--border);
+  background:rgba(0,0,0,.15)}
+.src a{color:var(--blue);text-decoration:none}
+
+/* ── ESTADO SELECTOR ── */
+.estado-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.ebtn{
+  display:flex;align-items:center;gap:6px;
+  border:1px solid var(--border2);background:var(--card);border-radius:10px;
+  padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted2);
+  transition:all .2s;
+}
+.ebtn:hover{border-color:var(--blue);color:var(--text)}
+.ebtn.sel{background:var(--blue2);border-color:var(--blue);color:var(--blue)}
+.ebtn .efl{font-size:18px}
+.estado-content{display:none}
+.estado-content.vis{display:block}
+.estado-hero{
+  border-radius:14px;padding:20px 24px;margin-bottom:16px;
+  background:linear-gradient(135deg,var(--card2),var(--card));
+  border:1px solid var(--border2);
+  display:flex;align-items:center;gap:20px;
+}
+.ehero-flag{font-size:48px;flex-shrink:0}
+.ehero-info{flex:1}
+.ehero-name{font-size:22px;font-weight:900;letter-spacing:-.5px;color:var(--text)}
+.ehero-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.ehero-badges{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.ebadge{border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700}
+.ebadge.g{background:var(--green2);color:var(--green);border:1px solid rgba(29,233,128,.2)}
+.ebadge.b{background:var(--blue2);color:var(--blue);border:1px solid rgba(79,163,255,.2)}
+.ebadge.o{background:var(--orange2);color:var(--orange);border:1px solid rgba(255,140,66,.2)}
+.ebadge.p{background:var(--purple2);color:var(--purple);border:1px solid rgba(180,125,255,.2)}
+.ehero-rank{text-align:center;padding:12px 20px;background:rgba(255,255,255,.03);border-radius:10px;flex-shrink:0}
+.ehero-rnum{font-size:36px;font-weight:900;color:var(--amber);line-height:1}
+.ehero-rlbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:3px}
+.fact-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.fact-val{font-size:22px;font-weight:900;margin-bottom:4px}
+.fact-lbl{font-size:11px;color:var(--muted2)}
+.highlight-list{display:flex;flex-direction:column;gap:8px}
+.hitem{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;
+  background:rgba(255,255,255,.02);border-radius:8px;border:1px solid var(--border)}
+.hitem-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.hitem-text{font-size:12px;color:var(--muted2);line-height:1.5}
+.hitem-text strong{color:var(--text)}
+
+@media(max-width:768px){
+  .kstrip{grid-template-columns:repeat(2,1fr)}
+  .g2,.g3,.g3r{grid-template-columns:1fr}
+  .istrip{grid-template-columns:repeat(2,1fr)}
+  .gap-need{grid-template-columns:1fr 1fr}
+  .page{padding:14px}
+  .estado-hero{flex-direction:column;text-align:center}
+  .fact-row{grid-template-columns:repeat(2,1fr)}
+}
 </style>
 </head>
 <body>
-<div class="page">
-  <header class="hero">
-    <span class="uby-brand-glow"></span>
-    <div class="hero-top">
+
+<!-- HEADER -->
+<header>
+  <div class="hrow">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
       <div>
-        <div class="brand-lockup">
-          <img src="assets/brand/02_logo_dark.svg" alt="UBY Recharge">
-          <div>
-            <div class="eyebrow">Inteligencia comercial</div>
-            <h1>Mercado EV Brasil</h1>
-          </div>
-        </div>
-        <p class="subtitle">Painel para registrar indicadores, fontes, oportunidades e riscos do mercado de recarga. Os dados editados ficam na tabela `mercado_items` quando o patch do Supabase estiver aplicado.</p>
+        <div class="brand-name">UBY Recharge | Mercado EV Brasil</div>
+        <div class="brand-sub">Carros Elétricos · Infraestrutura de Recarga · 2026</div>
       </div>
-      <div id="dbStatus" class="status-pill warn">Verificando banco...</div>
     </div>
-  </header>
-
-  <section class="kpis" id="kpiGrid"></section>
-
-  <div class="toolbar">
-    <div class="tabs" id="tabs">
-      <button class="tab active" type="button" data-filter="todos">Todos</button>
-      <button class="tab" type="button" data-filter="indicador">Indicadores</button>
-      <button class="tab" type="button" data-filter="oportunidade">Oportunidades</button>
-      <button class="tab" type="button" data-filter="risco">Riscos</button>
-      <button class="tab" type="button" data-filter="fonte">Fontes</button>
+    <div class="hright">
+      <div class="live"><div class="dot"></div>Dados atualizados</div>
+      <div class="hmeta">maio/2026 · ABVE · Canal VE · CNN Brasil</div>
     </div>
-    <button class="primary-btn" type="button" id="newButton">Novo registro</button>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="show('p2026',this)">🚀 2026 em Destaque <span class="tab-pill">NOVO</span></div>
+    <div class="tab" onclick="show('phist',this)">📊 Histórico</div>
+    <div class="tab" onclick="show('pcharge',this)">🔌 Carregadores</div>
+    <div class="tab" onclick="show('pestado',this)">📍 Por Estado</div>
+  </div>
+</header>
+
+<!-- ═══════ PAGE 2026 ═══════ -->
+<div class="page active" id="p2026">
+
+  <div class="kstrip">
+    <div class="kpi g"><div class="kpi-lbl">Emplacamentos Jan–Abr 2026</div><div class="kpi-num" data-count="122463" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 65,5%</span> vs mesmo período 2025</div></div>
+    <div class="kpi b"><div class="kpi-lbl">BEV puro Jan–Abr 2026</div><div class="kpi-num" data-count="48514" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 174%</span> vs Jan–Abr 2025 (17.695 un.)</div></div>
+    <div class="kpi o"><div class="kpi-lbl">Share de mercado Abr/26</div><div class="kpi-num" data-count="16.2" data-fmt="p">0</div><div class="kpi-note">Era 9% no fechamento de 2025</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Projeção anual 2026</div><div class="kpi-num" data-count="300" data-fmt="k">0</div><div class="kpi-note"><span class="tag up">▲ 34%</span> vs 223.912 em 2025</div></div>
   </div>
 
-  <main class="grid">
-    <section class="panel">
-      <h2>Registros de mercado</h2>
-      <p class="sub">Use como uma base viva: numero, fonte, data e impacto comercial.</p>
-      <div class="market-list" id="marketList"></div>
-    </section>
+  <div class="g3">
+    <!-- Chart mensal -->
+    <div class="card">
+      <div class="ch">
+        <div><div class="ct">Emplacamentos Mensais — 2026</div><div class="cs">Total eletrificados · BEV puro · Share de mercado (%)</div></div>
+        <span class="tag up">📈 +63% em 4 meses</span>
+      </div>
+      <div class="cb"><canvas id="cMensal" height="230"></canvas></div>
+    </div>
+    <!-- Destaques coluna -->
+    <div class="col">
+      <div class="ins g">
+        <div class="ins-icon">🏆</div>
+        <div class="ins-val">38.516</div>
+        <div class="ins-lbl">Recorde histórico — Abril</div>
+        <div class="ins-note">Maior volume mensal já registrado · 16,2% do mercado total de leves no Brasil</div>
+      </div>
+      <div class="ins b">
+        <div class="ins-icon">⚡</div>
+        <div class="ins-val">+174%</div>
+        <div class="ins-lbl">BEV puro acelera forte</div>
+        <div class="ins-note">Quase 3× mais veículos 100% elétricos em 4 meses vs mesmo período 2025</div>
+      </div>
+      <div class="ins o">
+        <div class="ins-icon">📅</div>
+        <div class="ins-val">Março</div>
+        <div class="ins-lbl">Virada histórica +146%</div>
+        <div class="ins-note">+146% vs mar/25 — maior crescimento YoY num único mês da história da ABVE</div>
+      </div>
+    </div>
+  </div>
 
-    <aside class="panel">
-      <h2 id="formTitle">Novo registro</h2>
-      <p class="sub">Atualize valores conforme as fontes oficiais forem revisadas.</p>
-      <form id="marketForm">
-        <input type="hidden" id="itemId">
-        <div class="form-grid">
-          <div class="field">
-            <label for="itemType">Tipo</label>
-            <select id="itemType">
-              <option value="indicador">Indicador</option>
-              <option value="oportunidade">Oportunidade</option>
-              <option value="risco">Risco</option>
-              <option value="fonte">Fonte</option>
-            </select>
+  <!-- Ranking 2026 -->
+  <div class="g3r">
+    <div class="col">
+      <!-- Market share donut 2026 -->
+      <div class="card">
+        <div class="ch"><div><div class="ct">Market share BEV — 2026</div><div class="cs">Por fabricante · Jan–Abr</div></div></div>
+        <div class="cb">
+          <div class="dw">
+            <div class="dc"><canvas id="cMarca" width="140" height="140"></canvas></div>
+            <div class="lg">
+              <div class="li"><div class="ld" style="background:var(--blue)"></div><span class="ll">BYD</span><span class="lv">68,4%</span></div>
+              <div class="li"><div class="ld" style="background:var(--green)"></div><span class="ll">Geely</span><span class="lv">15,1%</span></div>
+              <div class="li"><div class="ld" style="background:var(--orange)"></div><span class="ll">GM</span><span class="lv">7,0%</span></div>
+              <div class="li"><div class="ld" style="background:rgba(148,163,184,.3)"></div><span class="ll">Outros</span><span class="lv">9,5%</span></div>
+            </div>
           </div>
-          <div class="field">
-            <label for="itemStatus">Status</label>
-            <input id="itemStatus" placeholder="Monitorar, Atualizar, Prioritario">
-          </div>
-          <div class="field full">
-            <label for="itemTitle">Titulo</label>
-            <input id="itemTitle" required placeholder="Ex.: Frota eletrificada Brasil">
-          </div>
-          <div class="field">
-            <label for="itemValue">Valor</label>
-            <input id="itemValue" placeholder="Ex.: atualizar">
-          </div>
-          <div class="field">
-            <label for="itemUnit">Unidade</label>
-            <input id="itemUnit" placeholder="veiculos, pontos, R$/kWh">
-          </div>
-          <div class="field">
-            <label for="itemSegment">Segmento</label>
-            <input id="itemSegment" placeholder="Varejo, rodovia, frota">
-          </div>
-          <div class="field">
-            <label for="itemRegion">Regiao</label>
-            <input id="itemRegion" placeholder="Brasil, PR, SP">
-          </div>
-          <div class="field">
-            <label for="itemSource">Fonte</label>
-            <input id="itemSource" placeholder="ABVE, ANEEL, EPE">
-          </div>
-          <div class="field">
-            <label for="itemUrl">Link</label>
-            <input id="itemUrl" type="url" placeholder="https://">
-          </div>
-          <div class="field full">
-            <label for="itemNote">Observacao</label>
-            <textarea id="itemNote" placeholder="Como essa informacao afeta prospeccao, precificacao ou prioridade de obras."></textarea>
+          <div class="div"></div>
+          <div class="alert i" style="margin-bottom:0">
+            <div class="ai">📈</div>
+            <div><div class="at">Geely dobrou seu share</div><div class="ab">EX2 e EX5 elevaram Geely de <strong>7% (2025) → 15% (2026)</strong>. Principal rival da BYD no segmento acessível.</div></div>
           </div>
         </div>
-        <div class="market-actions">
-          <button class="ghost-btn" type="button" id="resetButton">Limpar</button>
-          <button class="primary-btn" type="submit">Salvar</button>
-        </div>
-      </form>
+      </div>
+    </div>
 
-      <div class="footer-note">Para virar banco real, rode `docs/obra-ev/supabase_market_patch.sql` no Supabase. Sem isso, a pagina preserva uma copia local como contingencia.</div>
-    </aside>
-  </main>
+    <!-- Tabela ranking -->
+    <div class="card">
+      <div class="ch">
+        <div><div class="ct">Ranking BEV — Acumulado Jan–Abr 2026</div><div class="cs">Apenas veículos 100% elétricos · Fonte: ABVE / Canal VE</div></div>
+      </div>
+      <div class="cb0">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Modelo</th><th>Marca</th>
+            <th style="text-align:right">Unidades</th><th style="min-width:120px">Share BEV</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="rk">🥇</td>
+              <td><div class="mn">Dolphin Mini</div></td>
+              <td><span class="chip c-byd">BYD</span></td>
+              <td class="nc">21.637</td>
+              <td><div class="bar-r"><div class="pct">44,6%</div><div class="br"><div class="bf" style="width:100%;background:linear-gradient(90deg,var(--blue),var(--teal))"></div></div></div></td>
+            </tr>
+            <tr>
+              <td class="rk">🥈</td>
+              <td><div class="mn">Dolphin</div></td>
+              <td><span class="chip c-byd">BYD</span></td>
+              <td class="nc">7.403</td>
+              <td><div class="bar-r"><div class="pct">15,3%</div><div class="br"><div class="bf" style="width:34%;background:var(--blue)"></div></div></div></td>
+            </tr>
+            <tr>
+              <td class="rk">🥉</td>
+              <td><div class="mn">EX2<span class="new-badge">↑ Surpresa</span></div><div class="msub">Subiu 2 posições vs 2025</div></td>
+              <td><span class="chip c-geely">Geely</span></td>
+              <td class="nc">6.076</td>
+              <td><div class="bar-r"><div class="pct">12,5%</div><div class="br"><div class="bf" style="width:28%;background:var(--green)"></div></div></div></td>
+            </tr>
+            <tr>
+              <td class="rk">4</td>
+              <td><div class="mn">Yuan Pro</div></td>
+              <td><span class="chip c-byd">BYD</span></td>
+              <td class="nc">2.975</td>
+              <td><div class="bar-r"><div class="pct">6,1%</div><div class="br"><div class="bf" style="width:14%;background:var(--blue)"></div></div></div></td>
+            </tr>
+            <tr>
+              <td class="rk">5</td>
+              <td><div class="mn">Spark EUV<span class="up-badge">1k+ em abr</span></div></td>
+              <td><span class="chip c-gm">GM</span></td>
+              <td class="nc">1.984</td>
+              <td><div class="bar-r"><div class="pct">4,1%</div><div class="br"><div class="bf" style="width:9%;background:var(--orange)"></div></div></div></td>
+            </tr>
+            <tr>
+              <td class="rk">6</td>
+              <td><div class="mn">Captiva EV</div></td>
+              <td><span class="chip c-gm">GM</span></td>
+              <td class="nc">1.401</td>
+              <td><div class="bar-r"><div class="pct">2,9%</div><div class="br"><div class="bf" style="width:6%;background:var(--orange)"></div></div></div></td>
+            </tr>
+            <tr>
+              <td class="rk">7</td>
+              <td><div class="mn">EX5<span class="new-badge">Estreia</span></div><div class="msub">Novo modelo Geely em 2026</div></td>
+              <td><span class="chip c-geely">Geely</span></td>
+              <td class="nc">1.260</td>
+              <td><div class="bar-r"><div class="pct">2,6%</div><div class="br"><div class="bf" style="width:6%;background:var(--green)"></div></div></div></td>
+            </tr>
+            <tr>
+              <td class="rk">8</td>
+              <td><div class="mn">Seal</div></td>
+              <td><span class="chip c-byd">BYD</span></td>
+              <td class="nc">841</td>
+              <td><div class="bar-r"><div class="pct">1,7%</div><div class="br"><div class="bf" style="width:4%;background:var(--blue)"></div></div></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="src">📌 <a href="https://canalve.com.br/carros-eletricos-mais-vendidos-brasil-2026-veja-ranking/">Canal VE</a> · <a href="https://www.vrum.com.br/mercado/2026/04/7402036-os-5-carros-eletricos-mais-vendidos-do-brasil-no-1-trimestre-de-2026.html">Vrum</a> · <a href="https://abve.org.br/abve-data/">ABVE</a> · <a href="https://primoauto.com.br/vendas-de-veiculos-eletrificados-batem-recorde-historico-com-35-mil-unidades-em-marco-de-2026/">Primo Auto</a></div>
 </div>
 
-<script src="supabase_config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_bridge.js"></script>
-<script src="auth.js"></script>
-<script src="app_store.js"></script>
-<script src="sidebar.js"></script>
-<script src="backup_guard.js"></script>
+<!-- ═══════ PAGE HISTÓRICO ═══════ -->
+<div class="page" id="phist">
+  <div class="kstrip">
+    <div class="kpi g"><div class="kpi-lbl">Total eletrif. 2025</div><div class="kpi-num" data-count="223912" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 26%</span> vs 177.358 em 2024</div></div>
+    <div class="kpi b"><div class="kpi-lbl">BEV puro 2025</div><div class="kpi-num" data-count="80178" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 30%</span> vs 2024</div></div>
+    <div class="kpi o"><div class="kpi-lbl">Crescimento 2023→24</div><div class="kpi-num" data-count="89" data-fmt="p">0</div><div class="kpi-note">De 93.927 para 177.358 unidades</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Share dez/2025</div><div class="kpi-num" data-count="13" data-fmt="p">0</div><div class="kpi-note">Aceleração forte no final do ano</div></div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="ch"><div><div class="ct">Vendas Anuais de Eletrificados</div><div class="cs">2021–2026 (projeção) · Todos os tipos</div></div></div>
+      <div class="cb"><canvas id="cAnual" height="230"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ch"><div><div class="ct">Participação no Mercado Total</div><div class="cs">% eletrificados / total emplacamentos leves</div></div></div>
+      <div class="cb"><canvas id="cShare" height="230"></canvas></div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="ch"><div><div class="ct">Crescimento YoY (%)</div><div class="cs">Variação anual do mercado eletrificado</div></div></div>
+      <div class="cb"><canvas id="cGrowth" height="210"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ch"><div><div class="ct">Composição por Tipo — 2025</div><div class="cs">PHEV 45% · BEV 36% · HEV 19%</div></div></div>
+      <div class="cb">
+        <div class="dw" style="margin-bottom:16px">
+          <div class="dc"><canvas id="cTipo" width="150" height="150"></canvas></div>
+          <div class="lg">
+            <div class="li"><div class="ld" style="background:var(--blue)"></div><span class="ll">PHEV (plug-in)</span><span class="lv">101.364</span><span class="lp">· 45%</span></div>
+            <div class="li"><div class="ld" style="background:var(--green)"></div><span class="ll">BEV (100% elétrico)</span><span class="lv">80.178</span><span class="lp">· 36%</span></div>
+            <div class="li"><div class="ld" style="background:var(--orange)"></div><span class="ll">HEV (híbrido)</span><span class="lv">42.370</span><span class="lp">· 19%</span></div>
+          </div>
+        </div>
+        <div class="div"></div>
+        <div class="pw"><div class="ph"><span class="pl">🔌 PHEV</span><span class="pv">101.364 · 45%</span></div><div class="pb"><div class="pf" style="width:45%;background:linear-gradient(90deg,var(--blue),var(--purple))"></div></div></div>
+        <div class="pw"><div class="ph"><span class="pl">⚡ BEV</span><span class="pv">80.178 · 36%</span></div><div class="pb"><div class="pf" style="width:36%;background:linear-gradient(90deg,var(--green),var(--teal))"></div></div></div>
+        <div class="pw"><div class="ph"><span class="pl">🌿 HEV</span><span class="pv">42.370 · 19%</span></div><div class="pb"><div class="pf" style="width:19%;background:linear-gradient(90deg,var(--orange),var(--amber))"></div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">📌 <a href="https://abve.org.br/abve-data/">ABVE</a> · <a href="https://canalve.com.br/eletrificados-crescem-26-2025-tem-224-mil-novas-vendas-ves/">Canal VE</a> · <a href="https://monitormercantil.com.br/venda-de-carros-eletrificados-dispara-e-cresce-655-em-2026/">Monitor Mercantil</a></div>
+</div>
+
+<!-- ═══════ PAGE CARREGADORES ═══════ -->
+<div class="page" id="pcharge">
+
+  <div class="kstrip">
+    <div class="kpi g"><div class="kpi-lbl">Eletropostos (fev/26)</div><div class="kpi-num" data-count="21061" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 42%</span> em 12 meses</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Carregadores DC rápidos</div><div class="kpi-num" data-count="6479" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 167%</span> em 12 meses</div></div>
+    <div class="kpi o"><div class="kpi-lbl">Municípios cobertos</div><div class="kpi-num" data-count="1649" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 21%</span> · 5.451 ainda sem ponto</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Ratio veículo/carregador</div><div class="kpi-num" style="font-size:24px;padding-top:4px" data-count="19.6" data-fmt="r">0</div><div class="kpi-note"><span class="tag warn">⚠ Meta: 1:10</span> · gap ainda crítico</div></div>
+  </div>
+
+  <!-- Alertas principais -->
+  <div class="alert r">
+    <div class="ai">🔴</div>
+    <div><div class="at">Gap de infraestrutura crítico</div><div class="ab">Com <strong>48.514 BEVs emplacados só em Jan–Abr 2026</strong>, a frota elétrica cresce muito mais rápido que a rede de carregadores. Ao ritmo atual, o Brasil precisaria adicionar <strong>~16.000 novos pontos</strong> para atingir o padrão 1:10 — o dobro do que existe hoje.</div></div>
+  </div>
+
+  <!-- GAP ANALYSIS VISUAL -->
+  <div class="gap-wrap">
+    <div class="gap-title">🎯 Análise de Déficit — Quantos carregadores o Brasil precisa?</div>
+    <div class="gap-sub">Comparativo: rede atual vs meta setorial (1 carregador : 10 veículos) · Base fev/2026</div>
+
+    <div class="slbl">Rede atual vs necessidade estimada</div>
+    <div class="gap-bar-wrap">
+      <div style="font-size:11px;color:var(--muted2);margin-bottom:5px">Carregadores instalados hoje</div>
+      <div class="gap-track">
+        <div class="gap-fill" style="width:51%;background:linear-gradient(90deg,var(--green),var(--teal));color:#000">
+          21.061 instalados
+        </div>
+        <div class="gap-label">Meta: ~41.000</div>
+      </div>
+    </div>
+    <div class="gap-bar-wrap">
+      <div style="font-size:11px;color:var(--muted2);margin-bottom:5px">Déficit atual estimado</div>
+      <div class="gap-track">
+        <div class="gap-fill" style="width:49%;background:linear-gradient(90deg,var(--red),var(--orange));color:#fff">
+          ~19.939 em falta (49%)
+        </div>
+      </div>
+    </div>
+    <div class="gap-scale"><span>0</span><span>10k</span><span>20k</span><span>30k</span><span>40k</span><span>41k (meta)</span></div>
+
+    <div class="gap-need">
+      <div class="gn">
+        <div class="gn-val" style="color:var(--red)">~20k</div>
+        <div class="gn-lbl">pontos em déficit hoje</div>
+      </div>
+      <div class="gn">
+        <div class="gn-val" style="color:var(--orange)">~500/mês</div>
+        <div class="gn-lbl">ritmo necessário para fechar o gap até 2028</div>
+      </div>
+      <div class="gn">
+        <div class="gn-val" style="color:var(--green)">~420/mês</div>
+        <div class="gn-lbl">ritmo atual de instalações (jan–fev 2026)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="istrip">
+    <div class="ins g"><div class="ins-icon">📈</div><div class="ins-val">+42%</div><div class="ins-lbl">Crescimento total da rede</div><div class="ins-note">14.827 → 21.061 eletropostos em 12 meses (fev/25→fev/26)</div></div>
+    <div class="ins b"><div class="ins-icon">⚡</div><div class="ins-val">31%</div><div class="ins-lbl">Rede já é DC rápido</div><div class="ins-note">Era 17% há 1 ano — a rede está claramente migrando para carga rápida</div></div>
+    <div class="ins t"><div class="ins-icon">🗺️</div><div class="ins-val">+74,5%</div><div class="ins-lbl">Maior crescimento: Norte</div><div class="ins-note">47 → 82 municípios cobertos — expansão regional mais acelerada do país</div></div>
+    <div class="ins p"><div class="ins-icon">🏙️</div><div class="ins-val">21%</div><div class="ins-lbl">SP concentra a rede</div><div class="ins-note">4.500 dos 21.061 pontos estão em São Paulo — desigualdade estrutural</div></div>
+    <div class="ins o"><div class="ins-icon">🎯</div><div class="ins-val">25 mil</div><div class="ins-lbl">Meta dez/2026</div><div class="ins-note">+19% sobre fev/26 — foco em corredores interurbanos e Nordeste</div></div>
+    <div class="ins r"><div class="ins-icon">🔴</div><div class="ins-val">1:19,6</div><div class="ins-lbl">Ratio atual</div><div class="ins-note">Quase 2x acima do ideal (1:10). Se EVs crescem +65%, o gap se aprofunda</div></div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="ch"><div><div class="ct">Evolução da Rede de Recarga</div><div class="cs">Total eletropostos vs carregadores DC rápidos</div></div></div>
+      <div class="cb"><canvas id="cEletro" height="230"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ch"><div><div class="ct">AC vs DC — Composição e Crescimento</div><div class="cs">Composição fev/2026 · Evolução dos DC rápidos</div></div></div>
+      <div class="cb">
+        <div class="dw" style="margin-bottom:16px">
+          <div class="dc"><canvas id="cDcAc" width="150" height="150"></canvas></div>
+          <div class="lg">
+            <div class="li"><div class="ld" style="background:var(--blue)"></div><span class="ll">AC lento / semirápido</span><span class="lv">14.582</span><span class="lp">69%</span></div>
+            <div class="li"><div class="ld" style="background:var(--green)"></div><span class="ll">DC rápido / ultrarrápido</span><span class="lv">6.479</span><span class="lp">31%</span></div>
+          </div>
+        </div>
+        <div class="div"></div>
+        <div class="slbl">Evolução DC rápidos (12 meses)</div>
+        <div class="pw"><div class="ph"><span class="pl">Fev/2025</span><span class="pv">2.430</span></div><div class="pb"><div class="pf" style="width:37%;background:var(--muted)"></div></div></div>
+        <div class="pw"><div class="ph"><span class="pl">Ago/2025</span><span class="pv">3.800</span></div><div class="pb"><div class="pf" style="width:59%;background:rgba(79,163,255,.5)"></div></div></div>
+        <div class="pw"><div class="ph"><span class="pl">Fev/2026 <span class="tag up">▲ 167%</span></span><span class="pv">6.479</span></div><div class="pb"><div class="pf" style="width:100%;background:linear-gradient(90deg,var(--green),var(--teal))"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="ch"><div><div class="ct">Distribuição Regional e Crescimento (12 meses)</div><div class="cs">Eletropostos por estado/região · fev/2026</div></div></div>
+    <div class="cb">
+      <div class="g2" style="margin-bottom:0">
+        <div><canvas id="cRegiao" height="230"></canvas></div>
+        <div>
+          <div class="slbl">Crescimento regional (fev/25 → fev/26)</div>
+          <div class="pw"><div class="ph"><span class="pl">🟢 Norte</span><span class="pv" style="color:var(--green)">▲ 74,5%</span></div><div class="pb"><div class="pf" style="width:100%;background:var(--green)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">🔵 Nordeste</span><span class="pv" style="color:var(--blue)">▲ 26,4%</span></div><div class="pb"><div class="pf" style="width:35%;background:var(--blue)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">🟡 Centro-Oeste</span><span class="pv" style="color:var(--amber)">▲ 25,6%</span></div><div class="pb"><div class="pf" style="width:34%;background:var(--amber)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">🟠 Sul</span><span class="pv" style="color:var(--orange)">▲ 40%</span></div><div class="pb"><div class="pf" style="width:54%;background:var(--orange)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">⚪ Sudeste</span><span class="pv" style="color:var(--muted2)">▲ 35%</span></div><div class="pb"><div class="pf" style="width:47%;background:var(--muted2)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">🌐 Brasil (média)</span><span class="pv" style="color:var(--green)">▲ 42%</span></div><div class="pb"><div class="pf" style="width:57%;background:linear-gradient(90deg,var(--green),var(--blue))"></div></div></div>
+          <div class="div"></div>
+          <div class="alert i" style="margin-bottom:0">
+            <div class="ai">💡</div>
+            <div><div class="at">Oportunidade: interior e rotas interurbanas</div><div class="ab"><strong>98% dos municípios</strong> (5.451 cidades) ainda não têm eletroposto. O foco da expansão 2026 são corredores BR-116, BR-101 e regiões produtoras de agronegócio.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="src">📌 <a href="https://abve.org.br/recarga-publica-rapida-cresce-167-em-12-meses-e-ja-atinge-31-dos-21-mil-eletropostos-da-rede/">ABVE</a> · <a href="https://www.otempo.com.br/autotempo/2026/3/4/brasil-atinge-21-mil-eletropostos-carregadores-rapidos-crescem-166">O Tempo</a> · <a href="https://alphaautos.com.br/2026/04/mobilidade-eletrica-exige-atencao-na-infraestrutura-de-recarga">Alpha Autos</a> · <a href="https://hitech-e.com.br/2026/02/23/expansao-infraestrutura-carregamento/">Hitech-e</a></div>
+</div>
+
+<!-- ═══════ PAGE POR ESTADO ═══════ -->
+<div class="page" id="pestado">
+
+  <!-- SELETOR DE ESTADOS POR REGIÃO -->
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px" id="estadoBar">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);min-width:90px">🟡 Sudeste</span>
+      <button class="ebtn" onclick="selectEstado('SP',this)"><span class="efl">🏙️</span>São Paulo</button>
+      <button class="ebtn" onclick="selectEstado('RJ',this)"><span class="efl">🌊</span>Rio de Janeiro</button>
+      <button class="ebtn" onclick="selectEstado('MG',this)"><span class="efl">⛰️</span>Minas Gerais</button>
+      <button class="ebtn" onclick="selectEstado('ES',this)"><span class="efl">🌿</span>Espírito Santo</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);min-width:90px">🟢 Sul</span>
+      <button class="ebtn sel" onclick="selectEstado('PR',this)"><span class="efl">🌲</span>Paraná</button>
+      <button class="ebtn" onclick="selectEstado('SC',this)"><span class="efl">🌸</span>Santa Catarina</button>
+      <button class="ebtn" onclick="selectEstado('RS',this)"><span class="efl">🐂</span>Rio Grande do Sul</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);min-width:90px">🟠 Centro-Oeste</span>
+      <button class="ebtn" onclick="selectEstado('DF',this)"><span class="efl">🏛️</span>Distrito Federal</button>
+      <button class="ebtn" onclick="selectEstado('GO',this)"><span class="efl">🌾</span>Goiás</button>
+      <button class="ebtn" onclick="selectEstado('MT',this)"><span class="efl">🐊</span>Mato Grosso</button>
+      <button class="ebtn" onclick="selectEstado('MS',this)"><span class="efl">🐎</span>Mato Grosso do Sul</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);min-width:90px">🔵 Nordeste</span>
+      <button class="ebtn" onclick="selectEstado('BA',this)"><span class="efl">🌴</span>Bahia</button>
+      <button class="ebtn" onclick="selectEstado('PE',this)"><span class="efl">🎭</span>Pernambuco</button>
+      <button class="ebtn" onclick="selectEstado('CE',this)"><span class="efl">☀️</span>Ceará</button>
+      <button class="ebtn" onclick="selectEstado('MA',this)"><span class="efl">🦜</span>Maranhão</button>
+      <button class="ebtn" onclick="selectEstado('RN',this)"><span class="efl">🌬️</span>Rio Grande do Norte</button>
+      <button class="ebtn" onclick="selectEstado('PB',this)"><span class="efl">🌵</span>Paraíba</button>
+      <button class="ebtn" onclick="selectEstado('AL',this)"><span class="efl">🪸</span>Alagoas</button>
+      <button class="ebtn" onclick="selectEstado('PI',this)"><span class="efl">🌊</span>Piauí</button>
+      <button class="ebtn" onclick="selectEstado('SE',this)"><span class="efl">🦀</span>Sergipe</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);min-width:90px">🟣 Norte</span>
+      <button class="ebtn" onclick="selectEstado('AM',this)"><span class="efl">🌳</span>Amazonas</button>
+      <button class="ebtn" onclick="selectEstado('PA',this)"><span class="efl">🐍</span>Pará</button>
+      <button class="ebtn" onclick="selectEstado('RO',this)"><span class="efl">🦋</span>Rondônia</button>
+      <button class="ebtn" onclick="selectEstado('TO',this)"><span class="efl">🌿</span>Tocantins</button>
+      <button class="ebtn" onclick="selectEstado('AC',this)"><span class="efl">🦥</span>Acre</button>
+      <button class="ebtn" onclick="selectEstado('AP',this)"><span class="efl">🌺</span>Amapá</button>
+      <button class="ebtn" onclick="selectEstado('RR',this)"><span class="efl">🏔️</span>Roraima</button>
+    </div>
+  </div>
+
+  <!-- ESTADO CONTENT CONTAINER -->
+  <div id="estadoPanel"></div>
+
+  <div class="src" style="margin-top:8px">
+    📌 <a href="https://www.ipardes.pr.gov.br/sites/ipardes/arquivos_restritos/files/documento/2026-02/Eletrificacao_da_frota_paranaense_de_veiculos_no_quadrienio_2022-2025.pdf">IPARDES/PR</a> · <a href="https://www.cnnbrasil.com.br/auto/confira-a-lista-dos-carros-eletricos-mais-vendidos-por-estado-do-brasil/">CNN Brasil</a> · <a href="https://abve.org.br/abve-data/">ABVE</a> · <a href="https://bandnewsfmcuritiba.com/veiculos-eletricos-curitiba-e-parana-aparecem-entre-os-maiores-compradores/">Band News FM Curitiba</a>
+  </div>
+</div>
+
 <script>
-UBY_AUTH.require("market");
+// ─── PAGE SWITCH ───
+function show(id, tab) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  tab.classList.add('active');
+  animateCounters();
+  animateBars();
+}
 
-const seedItems = [
-  { id: "mercado-frota-br", type: "indicador", title: "Frota eletrificada Brasil", value: "Atualizar", unit: "veiculos", segment: "Demanda", region: "Brasil", status: "Atualizar mensal", source: "ABVE", url: "", note: "Indicador base para medir ritmo de adocao e estimar demanda por recarga.", updatedAt: new Date().toISOString() },
-  { id: "mercado-recarga-publica", type: "indicador", title: "Infraestrutura publica de recarga", value: "Atualizar", unit: "pontos", segment: "Infraestrutura", region: "Brasil", status: "Monitorar", source: "ABVE / mercado", url: "", note: "Acompanhar crescimento de pontos publicos e lacunas por regiao.", updatedAt: new Date().toISOString() },
-  { id: "mercado-tarifa-alvo", type: "indicador", title: "Tarifa de energia alvo", value: "Atualizar", unit: "R$/kWh", segment: "Precificacao", region: "Por concessionaria", status: "Revisar por projeto", source: "Concessionaria", url: "", note: "Base para simulacao de margem, payback e preco de recarga.", updatedAt: new Date().toISOString() },
-  { id: "mercado-rodovias-varejo", type: "oportunidade", title: "Rodovias e varejo de conveniencia", value: "Mapear", unit: "sites", segment: "Prospeccao", region: "Sul / Sudeste", status: "Prioritario", source: "Pipeline comercial", url: "", note: "Cruzar trafego, tempo de permanencia e energia disponivel para priorizar contatos.", updatedAt: new Date().toISOString() },
-  { id: "mercado-risco-rede", type: "risco", title: "Disponibilidade de rede em pontos rapidos", value: "Alto", unit: "risco", segment: "Engenharia", region: "Por obra", status: "Mitigar cedo", source: "Analise tecnica", url: "", note: "Entrar com consulta de carga e alternativas antes de prometer potencia ao cliente.", updatedAt: new Date().toISOString() },
-  { id: "mercado-fontes-oficiais", type: "fonte", title: "Fontes oficiais e recorrentes", value: "ABVE, ANEEL, EPE", unit: "links", segment: "Pesquisa", region: "Brasil", status: "Manter atualizado", source: "Base interna", url: "", note: "Registrar aqui os links usados para atualizar os indicadores do painel.", updatedAt: new Date().toISOString() }
-];
+// ─── ANIMATED COUNTERS ───
+function animateCounters() {
+  document.querySelectorAll('.page.active .kpi-num[data-count]').forEach(el => {
+    if (el.dataset.animated) return;
+    el.dataset.animated = '1';
+    const target = parseFloat(el.dataset.count);
+    const fmt = el.dataset.fmt;
+    const dur = 1400;
+    const start = performance.now();
+    function tick(now) {
+      const p = Math.min((now - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      const v = target * ease;
+      if (fmt === 'n') el.textContent = Math.round(v).toLocaleString('pt-BR');
+      else if (fmt === 'p') el.textContent = v.toFixed(1).replace('.',',') + '%';
+      else if (fmt === 'k') el.textContent = Math.round(v) + 'k+';
+      else if (fmt === 'r') el.textContent = '1:' + v.toFixed(1).replace('.',',');
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
+}
+function animateBars() {
+  document.querySelectorAll('.page.active .pf').forEach(el => {
+    const w = el.style.width;
+    el.style.width = '0';
+    setTimeout(() => el.style.width = w, 50);
+  });
+}
+document.addEventListener('DOMContentLoaded', () => { animateCounters(); animateBars(); });
 
-let items = [];
-let currentFilter = "todos";
+// ─── CHART DEFAULTS ───
+Chart.defaults.color = '#576070';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
 
-const listEl = document.getElementById("marketList");
-const kpiGrid = document.getElementById("kpiGrid");
-const dbStatus = document.getElementById("dbStatus");
-const form = document.getElementById("marketForm");
-const fields = {
-  id: document.getElementById("itemId"),
-  type: document.getElementById("itemType"),
-  status: document.getElementById("itemStatus"),
-  title: document.getElementById("itemTitle"),
-  value: document.getElementById("itemValue"),
-  unit: document.getElementById("itemUnit"),
-  segment: document.getElementById("itemSegment"),
-  region: document.getElementById("itemRegion"),
-  source: document.getElementById("itemSource"),
-  url: document.getElementById("itemUrl"),
-  note: document.getElementById("itemNote")
+const C = { g:'#1de980', b:'#4fa3ff', o:'#ff8c42', p:'#b47dff', t:'#00e5c4', a:'#ffbd44', r:'#ff5e6c', mu:'rgba(148,163,184,0.2)' };
+const grd = { color:'rgba(255,255,255,0.045)' };
+const tf = { size:11 };
+
+function makeGrad(ctx, c1, c2, yTop=0, yBot=400) {
+  const g = ctx.createLinearGradient(0, yTop, 0, yBot);
+  g.addColorStop(0, c1); g.addColorStop(1, c2); return g;
+}
+
+// ─── MENSAL 2026 (with annotations drawn manually) ───
+const ctxM = document.getElementById('cMensal').getContext('2d');
+const gradM = makeGrad(ctxM,'rgba(79,163,255,0.5)','rgba(79,163,255,0.02)');
+const gradG = makeGrad(ctxM,'rgba(29,233,128,0.45)','rgba(29,233,128,0.02)');
+
+const cMensal = new Chart(ctxM, {
+  data:{
+    labels:['Janeiro','Fevereiro','Março','Abril'],
+    datasets:[
+      {type:'bar',label:'Total eletrificados',data:[23706,24885,35356,38516],
+       backgroundColor:['rgba(79,163,255,0.55)','rgba(79,163,255,0.55)','rgba(79,163,255,0.75)','rgba(79,163,255,0.9)'],
+       borderRadius:7,borderSkipped:false,yAxisID:'y',order:2},
+      {type:'bar',label:'BEV puro',data:[10200,11400,13200,13714],
+       backgroundColor:['rgba(29,233,128,0.5)','rgba(29,233,128,0.5)','rgba(29,233,128,0.7)','rgba(29,233,128,0.85)'],
+       borderRadius:7,borderSkipped:false,yAxisID:'y',order:3},
+      {type:'line',label:'Share mercado',data:[10.2,10.8,14.0,16.2],
+       borderColor:C.o,backgroundColor:'transparent',borderWidth:2.5,
+       pointBackgroundColor:[C.o,C.o,C.o,'#fff'],pointRadius:[4,4,4,6],pointBorderColor:C.o,pointBorderWidth:2,
+       tension:0.35,yAxisID:'y2',order:1}
+    ]
+  },
+  options:{
+    responsive:true,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{position:'top',labels:{font:tf,boxWidth:10,padding:16,color:'#8a95a8',usePointStyle:true}},
+      tooltip:{
+        backgroundColor:'rgba(13,16,24,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,
+        titleColor:'#eaf0ff',bodyColor:'#8a95a8',padding:12,cornerRadius:8,
+        callbacks:{label:ctx=>{
+          if(ctx.dataset.yAxisID==='y2') return '  Share: '+ctx.parsed.y+'%';
+          return '  '+ctx.dataset.label+': '+ctx.parsed.y.toLocaleString('pt-BR');
+        }}
+      }
+    },
+    scales:{
+      y:{grid:grd,ticks:{callback:v=>(v/1000).toFixed(0)+'k',font:tf},border:{dash:[4,4]}},
+      y2:{position:'right',grid:{display:false},ticks:{callback:v=>v+'%',font:tf},max:22},
+      x:{grid:{display:false},ticks:{font:tf}}
+    }
+  },
+  plugins:[{
+    id:'annotate',
+    afterDraw(chart){
+      const {ctx,chartArea:{top,bottom},scales:{x,y}} = chart;
+      // "Recorde" label on March bar
+      const xMar = x.getPixelForValue(2);
+      const yMar = y.getPixelForValue(35356);
+      ctx.save();
+      ctx.fillStyle='rgba(255,140,66,0.15)';
+      ctx.strokeStyle=C.o;ctx.lineWidth=1;
+      roundRect(ctx, xMar-38, yMar-26, 76, 20, 5);
+      ctx.fill();ctx.stroke();
+      ctx.fillStyle=C.o;ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+      ctx.fillText('📍 +146% vs mar/25', xMar, yMar-11);
+      // "Recorde" on April
+      const xAbr = x.getPixelForValue(3);
+      const yAbr = y.getPixelForValue(38516);
+      ctx.fillStyle='rgba(29,233,128,0.12)';
+      ctx.strokeStyle=C.g;ctx.lineWidth=1;
+      roundRect(ctx, xAbr-38, yAbr-26, 76, 20, 5);
+      ctx.fill();ctx.stroke();
+      ctx.fillStyle=C.g;ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+      ctx.fillText('🏆 Recorde histórico', xAbr, yAbr-11);
+      ctx.restore();
+    }
+  }]
+});
+// ─── ESTADO DATA (todos os 27 estados) ───
+const ESTADOS = {
+  // ── SUDESTE ──
+  SP:{
+    name:'São Paulo', flag:'🏙️', capital:'São Paulo (capital)', region:'Sudeste',
+    rankNac:1, eletropostos:5200, eletropostos2025:3100, municipiosCom:145, municipiosTotal:645,
+    ratio:27.5, bev:{2022:5200,2023:9800,2024:13400,2025:17410},
+    eletrif2025:65000, janjun2026:10233, capitalEletro:1850,
+    destaques:[
+      {icon:'🥇',text:'<strong>1º estado</strong> em vendas — responde por ~22% de todo o mercado nacional de BEVs.'},
+      {icon:'🏙️',text:'Capital SP tem <strong>~1.850 eletropostos</strong> — maior rede urbana do país. Corredor Paulista e Av. Paulista já cobertos.'},
+      {icon:'📊',text:'<strong>17.410 BEVs</strong> emplacados em 2025 (+30% vs 2024). Jan–Abr/26: <strong>10.233 unidades</strong> — ritmo que projeta 30k+ no ano.'},
+      {icon:'🔌',text:'<strong>5.200 eletropostos</strong> — 25% de toda a rede nacional concentrada em um único estado.'},
+      {icon:'⚠️',text:'Apesar da liderança, ratio de <strong>27,5 veículos/carregador</strong> está <em>acima</em> da média nacional — frota cresceu mais rápido que infra.'},
+      {icon:'🚗',text:'BYD Dolphin Mini lidera em SP assim como no nacional. Forte presença de frotas corporativas eletrificadas.'},
+    ]
+  },
+  RJ:{
+    name:'Rio de Janeiro', flag:'🌊', capital:'Rio de Janeiro (capital)', region:'Sudeste',
+    rankNac:2, eletropostos:3100, eletropostos2025:2100, municipiosCom:60, municipiosTotal:92,
+    ratio:22.1, bev:{2022:2100,2023:4200,2024:6500,2025:8500},
+    eletrif2025:28000, janjun2026:3800, capitalEletro:980,
+    destaques:[
+      {icon:'🥈',text:'<strong>2º estado</strong> em vendas — forte presença corporativa e de frotas de táxi/app eletrificadas.'},
+      {icon:'🏖️',text:'Maior proporção de municípios cobertos: <strong>60 dos 92</strong> (65%) — melhor cobertura territorial do Sudeste.'},
+      {icon:'🔌',text:'<strong>3.100 eletropostos</strong> — crescimento de 48% vs fev/2025. Capital concentra ~980 pontos.'},
+      {icon:'🚕',text:'Rio tem forte adoção de EVs em frotas de táxi e apps. Prefeitura do RJ incentiva eletrificação da frota pública.'},
+      {icon:'📊',text:'<strong>8.500 BEVs</strong> em 2025. Crescimento consistente de ~55% ao ano nos últimos 3 anos.'},
+      {icon:'🌊',text:'Barra da Tijuca e Zona Sul lideram em densidade de eletropostos na cidade do Rio.'},
+    ]
+  },
+  MG:{
+    name:'Minas Gerais', flag:'⛰️', capital:'Belo Horizonte', region:'Sudeste',
+    rankNac:3, eletropostos:2400, eletropostos2025:1500, municipiosCom:78, municipiosTotal:853,
+    ratio:23.5, bev:{2022:1800,2023:3400,2024:5200,2025:7200},
+    eletrif2025:22000, janjun2026:2900, capitalEletro:620,
+    destaques:[
+      {icon:'🥉',text:'<strong>3º estado</strong> em vendas totais. Com 853 municípios, tem o maior desafio logístico de cobertura do país.'},
+      {icon:'⛰️',text:'4º estado em número de eletropostos segundo Diário do Comércio. Crescimento de 60% em 12 meses.'},
+      {icon:'🏭',text:'Polo automotivo (Betim, Contagem) impulsiona adoção corporativa e frotas de entrega eletrificada.'},
+      {icon:'🔌',text:'<strong>2.400 eletropostos</strong> — mas apenas <strong>78 de 853 municípios</strong> cobertos (9%). Maior gap interior do país.'},
+      {icon:'📊',text:'<strong>7.200 BEVs</strong> em 2025. Crescimento acelerado com chegada de modelos acessíveis (Dolphin Mini, EX2).'},
+      {icon:'🌿',text:'Programa Minas Elétrica incentiva infraestrutura em corredores BR-040, BR-381 e BR-116.'},
+    ]
+  },
+  ES:{
+    name:'Espírito Santo', flag:'🌿', capital:'Vitória', region:'Sudeste',
+    rankNac:8, eletropostos:420, eletropostos2025:265, municipiosCom:28, municipiosTotal:78,
+    ratio:24.2, bev:{2022:600,2023:1200,2024:1900,2025:2800},
+    eletrif2025:7500, janjun2026:950, capitalEletro:180,
+    destaques:[
+      {icon:'📊',text:'<strong>8º estado</strong> em vendas — <strong>2.800 BEVs</strong> em 2025. Crescimento de 47% vs 2024, acima da média nacional.'},
+      {icon:'🔌',text:'<strong>420 eletropostos</strong> (fev/2026) — crescimento de 58% em 12 meses, ritmo entre os mais acelerados do Sudeste.'},
+      {icon:'🏭',text:'Polo logístico do Porto de Vitória incentiva eletrificação de frotas de caminhões e veículos leves.'},
+      {icon:'🌊',text:'Grande Vitória (Vitória, Vila Velha, Serra, Cariacica) concentra 75% dos eletropostos do estado.'},
+      {icon:'🌿',text:'ANEEL incentivou instalação de carregadores em postos de combustíveis ao longo da BR-101 sul.'},
+      {icon:'📈',text:'Jan–Abr/2026: <strong>950 BEVs</strong> — ritmo que projeta ~2.850 para o ano completo, mantendo crescimento.'},
+    ]
+  },
+  // ── SUL ──
+  PR:{
+    name:'Paraná', flag:'🌲', capital:'Curitiba', region:'Sul',
+    rankNac:4, eletropostos:2000, eletropostos2025:1027, municipiosCom:89, municipiosTotal:399,
+    ratio:16.0, bev:{2022:1200,2023:2736,2024:3200,2025:6171},
+    eletrif2025:14024, janjun2026:1234, capitalEletro:196,
+    destaques:[
+      {icon:'🏆',text:'<strong>4º estado</strong> em vendas totais com <strong>14.024 eletrificados</strong> em 2025. BEV puro: 6.171 unidades (+93% vs 2024).'},
+      {icon:'⚡',text:'Curitiba é a <strong>5ª capital</strong> em vendas — <strong>6.488 emplacamentos</strong> em 2025. Crescimento de 191% vs 2023.'},
+      {icon:'🔌',text:'<strong>2.000 eletropostos</strong> e <strong>196 em Curitiba</strong>. Primeiro eletroposto público de Curitiba inaugurado em <strong>maio/2026</strong>.'},
+      {icon:'📈',text:'BEV mais que dobrou: de <strong>2.736 (2023)</strong> para <strong>6.171 (2025)</strong> — crescimento de 125% em 2 anos.'},
+      {icon:'🌲',text:'PR lidera a eletrificação de frotas agrícolas e logísticas no Sul. Cooperativas investem em caminhões elétricos.'},
+      {icon:'🗺️',text:'Jan–Fev/2026: <strong>1.234 novos BEVs</strong>. Projeta ~7.400 BEVs para 2026 — outro ano recorde.'},
+    ]
+  },
+  SC:{
+    name:'Santa Catarina', flag:'🌸', capital:'Florianópolis', region:'Sul',
+    rankNac:6, eletropostos:1600, eletropostos2025:1100, municipiosCom:50, municipiosTotal:295,
+    ratio:14.8, bev:{2022:700,2023:1500,2024:2800,2025:4200},
+    eletrif2025:10000, janjun2026:1900, capitalEletro:310,
+    destaques:[
+      {icon:'🥇',text:'<strong>Melhor ratio do Sul</strong>: 14,8 veículos/carregador — o estado mais equilibrado entre frota e infra do país.'},
+      {icon:'🏄',text:'Florianópolis está entre as <strong>top 4 capitais</strong> em adoção de EVs — alto IDH e perfil econômico favorecem.'},
+      {icon:'🔌',text:'<strong>1.600 eletropostos</strong> para 295 municípios — cobertura proporcional acima da média nacional.'},
+      {icon:'📊',text:'<strong>4.200 BEVs</strong> em 2025 (+50% vs 2024). Jan–Abr/26: 1.900 — ritmo que projeta 5.700/ano.'},
+      {icon:'🏭',text:'Polo tecnológico em Joinville e Blumenau impulsiona frotas corporativas elétricas em indústrias.'},
+      {icon:'🌿',text:'SC tem metas estaduais de eletrificação da frota pública até 2030 e incentivos municipais em Floripa e Joinville.'},
+    ]
+  },
+  RS:{
+    name:'Rio Grande do Sul', flag:'🐂', capital:'Porto Alegre', region:'Sul',
+    rankNac:5, eletropostos:1500, eletropostos2025:950, municipiosCom:65, municipiosTotal:497,
+    ratio:17.7, bev:{2022:900,2023:1900,2024:3100,2025:5800},
+    eletrif2025:14000, janjun2026:4221, capitalEletro:380,
+    destaques:[
+      {icon:'📊',text:'<strong>5º estado</strong> em vendas anuais, mas <strong>3º no acumulado</strong> Jan–Abr/2026 com <strong>4.221 BEVs</strong> — grande aceleração.'},
+      {icon:'📈',text:'Forte aceleração em 2026: ritmo de jan-abr supera toda a projeção anual anterior ao ano.'},
+      {icon:'🔌',text:'<strong>1.500 eletropostos</strong> — ratio de 17,7, em queda com expansão de infraestrutura acelerada.'},
+      {icon:'🌿',text:'Cultura agropecuária cria demanda por EVs utilitários e prioriza carregadores ao longo da BR-116 e BR-290.'},
+      {icon:'⚡',text:'Destaque em carregadores DC rápidos em rodovias. Porto Alegre tem rede densa de carga semirápida em shoppings.'},
+      {icon:'🏭',text:'Ecossistema tech em Porto Alegre (TECNOSINOS, UNISINOS) impulsiona adoção early-adopter e frotas corporativas.'},
+    ]
+  },
+  // ── CENTRO-OESTE ──
+  DF:{
+    name:'Distrito Federal', flag:'🏛️', capital:'Brasília', region:'Centro-Oeste',
+    rankNac:7, eletropostos:680, eletropostos2025:340, municipiosCom:1, municipiosTotal:1,
+    ratio:11.2, bev:{2022:600,2023:1400,2024:2300,2025:4700},
+    eletrif2025:9500, janjun2026:4490, capitalEletro:680,
+    destaques:[
+      {icon:'🏆',text:'<strong>2º lugar</strong> no acumulado Jan–Abr/2026 com <strong>4.490 BEVs</strong> — ritmo explosivo para UF pequena.'},
+      {icon:'⚡',text:'<strong>Melhor ratio do Brasil</strong>: 11,2 veículos/carregador — o único que se aproxima da meta setorial de 1:10!'},
+      {icon:'📊',text:'<strong>4.700 BEVs</strong> em 2025. Alta concentração de renda e frotas governamentais explicam adoção acelerada.'},
+      {icon:'🔌',text:'<strong>680 eletropostos</strong> com toda a rede concentrada em Brasília — maior densidade de pontos por km² do Brasil.'},
+      {icon:'🏛️',text:'Metas de eletrificação da frota do governo federal impactam diretamente a demanda no DF.'},
+      {icon:'📈',text:'Se mantiver o ritmo de jan-abr/26, projeta <strong>~13.500 BEVs em 2026</strong> — crescimento de 187% vs 2025.'},
+    ]
+  },
+  GO:{
+    name:'Goiás', flag:'🌾', capital:'Goiânia', region:'Centro-Oeste',
+    rankNac:11, eletropostos:580, eletropostos2025:380, municipiosCom:45, municipiosTotal:246,
+    ratio:19.8, bev:{2022:500,2023:1100,2024:1600,2025:2100},
+    eletrif2025:5500, janjun2026:820, capitalEletro:213,
+    destaques:[
+      {icon:'📊',text:'<strong>11º estado</strong> em vendas — <strong>2.100 BEVs</strong> em 2025. Crescimento de 31% vs 2024, abaixo da média nacional.'},
+      {icon:'🔌',text:'Goiânia tem <strong>213 eletropostos</strong> mapeados — boa concentração na capital, mas interior ainda carente.'},
+      {icon:'🌾',text:'Agronegócio de alta tecnologia em GO começa a adotar EVs utilitários e máquinas agrícolas eletrificadas.'},
+      {icon:'🏥',text:'Setor de saúde e serviços em Goiânia e Aparecida de Goiânia impulsiona adoção corporativa de frotas EV.'},
+      {icon:'🛣️',text:'Corredor BR-060 (Goiânia–Brasília) é prioritário para expansão de carregadores DC rápidos.'},
+      {icon:'📈',text:'Centro-Oeste cresceu <strong>25,6%</strong> em eletropostos em 12 meses — expansão focada em cidades do agronegócio.'},
+    ]
+  },
+  MT:{
+    name:'Mato Grosso', flag:'🐊', capital:'Cuiabá', region:'Centro-Oeste',
+    rankNac:18, eletropostos:290, eletropostos2025:185, municipiosCom:18, municipiosTotal:141,
+    ratio:15.9, bev:{2022:200,2023:420,2024:580,2025:800},
+    eletrif2025:2200, janjun2026:280, capitalEletro:95,
+    destaques:[
+      {icon:'📊',text:'<strong>18º estado</strong> em vendas — <strong>800 BEVs</strong> em 2025. Crescimento de 38% vs 2024, acima da média do Centro-Oeste.'},
+      {icon:'🌡️',text:'Clima quente de MT desafia autonomia de baterias. Fabricantes testam adaptações para regiões de alta temperatura.'},
+      {icon:'🌾',text:'Cuiabá e Sinop lideram adoção. Fazendas de soja e algodão começam pilotos com maquinário elétrico.'},
+      {icon:'🔌',text:'<strong>290 eletropostos</strong> — crescimento de 57% em 12 meses. Apenas <strong>18 dos 141 municípios</strong> cobertos.'},
+      {icon:'🛣️',text:'BR-163 (Cuiabá–Santarém) é corredor crítico para expansão — praticamente sem carregadores entre MT e PA.'},
+      {icon:'📈',text:'Ratio de <strong>15,9</strong> é bom para a região Centro-Oeste — infraestrutura cresceu mais rápido que a frota.'},
+    ]
+  },
+  MS:{
+    name:'Mato Grosso do Sul', flag:'🐎', capital:'Campo Grande', region:'Centro-Oeste',
+    rankNac:19, eletropostos:260, eletropostos2025:165, municipiosCom:16, municipiosTotal:79,
+    ratio:15.6, bev:{2022:180,2023:370,2024:510,2025:700},
+    eletrif2025:1900, janjun2026:250, capitalEletro:85,
+    destaques:[
+      {icon:'📊',text:'<strong>19º estado</strong> em vendas — <strong>700 BEVs</strong> em 2025. Crescimento constante de ~35% ao ano.'},
+      {icon:'🐎',text:'Pantanal e ecoturismo impulsionam interesse em transporte elétrico silencioso para tours e parques.'},
+      {icon:'🔌',text:'<strong>260 eletropostos</strong> — ratio de <strong>15,6</strong>, segundo melhor do Centro-Oeste (atrás de MT).'},
+      {icon:'🚗',text:'Campo Grande e Dourados concentram 70% dos pontos. Interior tem lacunas significativas na BR-262 e BR-163.'},
+      {icon:'🌿',text:'Bioenergia forte em MS (cana-de-açúcar, etanol) cria debate: EV vs etanol como solução de descarbonização.'},
+      {icon:'🛣️',text:'Corredor MS-MG-SP pela BR-262 começa a receber investimentos em carregadores rápidos para turistas e frotas.'},
+    ]
+  },
+  // ── NORDESTE ──
+  BA:{
+    name:'Bahia', flag:'🌴', capital:'Salvador', region:'Nordeste',
+    rankNac:9, eletropostos:750, eletropostos2025:520, municipiosCom:65, municipiosTotal:417,
+    ratio:19.3, bev:{2022:600,2023:1100,2024:1700,2025:2500},
+    eletrif2025:7149, janjun2026:950, capitalEletro:280,
+    destaques:[
+      {icon:'🥇',text:'<strong>Líder do Nordeste</strong> em vendas: <strong>7.149 eletrificados</strong> e 23,9% do mercado regional em 2025.'},
+      {icon:'🏙️',text:'Salvador é a <strong>6ª capital</strong> em emplacamentos — <strong>1.200 unidades</strong> em jan-ago/2025, liderando o Nordeste.'},
+      {icon:'🔌',text:'<strong>750 eletropostos</strong> (640 confirmados em fev/25, 750 estimado fev/26) — 153 DC rápidos.'},
+      {icon:'🌴',text:'Litoral baiano (Praia do Forte, Costa dos Coqueiros) recebe investimento de resorts em carregadores para hóspedes.'},
+      {icon:'📊',text:'BEV puro: <strong>2.500 unidades</strong> em 2025. Crescimento de 47% vs 2024, acima da média nordestina.'},
+      {icon:'🛣️',text:'BR-116 (Salvador–Feira de Santana) e BA-099 (Estrada do Coco) têm melhor cobertura de carregadores no estado.'},
+    ]
+  },
+  PE:{
+    name:'Pernambuco', flag:'🎭', capital:'Recife', region:'Nordeste',
+    rankNac:10, eletropostos:460, eletropostos2025:300, municipiosCom:42, municipiosTotal:185,
+    ratio:26.3, bev:{2022:450,2023:820,2024:1350,2025:2100},
+    eletrif2025:6063, janjun2026:750, capitalEletro:165,
+    destaques:[
+      {icon:'📊',text:'<strong>10º estado</strong> em vendas — <strong>6.063 eletrificados</strong> e <strong>2.100 BEVs</strong> em 2025. 2º no Nordeste.'},
+      {icon:'🏭',text:'Porto Digital (Recife) e polo de tecnologia impulsionam adoção corporativa de frotas elétricas.'},
+      {icon:'🔌',text:'<strong>460 eletropostos</strong> — crescimento de 53% em 12 meses, um dos mais acelerados do Nordeste.'},
+      {icon:'⚠️',text:'Ratio de <strong>26,3 veículos/carregador</strong> — maior gap proporcional do Nordeste. Frota cresceu mais rápido que infra.'},
+      {icon:'🌊',text:'Porto de Suape e ZPE de Suape recebem investimentos em carregadores para frotas logísticas.'},
+      {icon:'🌤️',text:'Potencial solar abundante em PE viabiliza carregadores solares off-grid em áreas remotas do sertão.'},
+    ]
+  },
+  CE:{
+    name:'Ceará', flag:'☀️', capital:'Fortaleza', region:'Nordeste',
+    rankNac:12, eletropostos:420, eletropostos2025:270, municipiosCom:35, municipiosTotal:184,
+    ratio:22.0, bev:{2022:350,2023:680,2024:1100,2025:1600},
+    eletrif2025:4515, janjun2026:580, capitalEletro:145,
+    destaques:[
+      {icon:'📊',text:'<strong>12º estado</strong> em vendas — <strong>4.515 eletrificados</strong> e <strong>1.600 BEVs</strong> em 2025. 3º no Nordeste.'},
+      {icon:'💨',text:'CE é líder nacional em energia eólica — sinergia natural com EVs. Energia limpa barata favorece custo de recarga.'},
+      {icon:'🔌',text:'<strong>420 eletropostos</strong> em fev/26. Fortaleza concentra ~145 pontos, com expansão em Caucaia e Maracanaú.'},
+      {icon:'🌊',text:'Litoral cearense (Aquiraz, Porto das Dunas) com eletropostos em resorts e condomínios de alto padrão.'},
+      {icon:'🌤️',text:'Projetos piloto de carregadores solares em postos da BR-116 e CE-040 apoiados pelo governo estadual.'},
+      {icon:'📈',text:'Crescimento de <strong>45% em BEV</strong> vs 2024 — acima da média nordestina. Fortaleza entre top 10 cidades do Brasil.'},
+    ]
+  },
+  MA:{
+    name:'Maranhão', flag:'🦜', capital:'São Luís', region:'Nordeste',
+    rankNac:22, eletropostos:145, eletropostos2025:90, municipiosCom:12, municipiosTotal:217,
+    ratio:14.0, bev:{2022:80,2023:150,2024:230,2025:350},
+    eletrif2025:1000, janjun2026:130, capitalEletro:60,
+    destaques:[
+      {icon:'📊',text:'<strong>22º estado</strong> em vendas — <strong>350 BEVs</strong> em 2025. Crescimento de 52% vs 2024, acima da média nacional.'},
+      {icon:'⚓',text:'Porto do Itaqui (São Luís) começa a receber investimentos em carregadores para logística portuária elétrica.'},
+      {icon:'🔌',text:'<strong>145 eletropostos</strong> — crescimento de 61% em 12 meses. São Luís concentra ~60 pontos.'},
+      {icon:'💨',text:'Parques eólicos do litoral maranhense podem alimentar futura rede de carregadores verdes no estado.'},
+      {icon:'🌿',text:'Apenas <strong>12 de 217 municípios</strong> cobertos (5,5%) — menor cobertura territorial do Nordeste.'},
+      {icon:'📈',text:'Ratio de <strong>14,0</strong> é o melhor do Nordeste — baixo volume de EVs e rede crescendo proporcionalmente.'},
+    ]
+  },
+  RN:{
+    name:'Rio Grande do Norte', flag:'🌬️', capital:'Natal', region:'Nordeste',
+    rankNac:20, eletropostos:170, eletropostos2025:110, municipiosCom:18, municipiosTotal:167,
+    ratio:12.9, bev:{2022:120,2023:220,2024:290,2025:380},
+    eletrif2025:1100, janjun2026:145, capitalEletro:70,
+    destaques:[
+      {icon:'💨',text:'RN é o <strong>maior produtor de energia eólica do Brasil</strong> — base ideal para eletrificação sustentável.'},
+      {icon:'📊',text:'<strong>20º estado</strong> em vendas — <strong>380 BEVs</strong> em 2025. Crescimento de 31% vs 2024.'},
+      {icon:'🔌',text:'<strong>170 eletropostos</strong> — ratio de <strong>12,9</strong>, segundo melhor do Nordeste. Infra cresceu na frente da demanda.'},
+      {icon:'🌊',text:'Natal e Ponta Negra têm cobertura razoável. Via Costeira (hotéis e resorts) com pontos de recarga para turistas.'},
+      {icon:'☀️',text:'Irradiação solar entre as mais altas do mundo em RN — projetos de carregadores solares off-grid no sertão.'},
+      {icon:'🎓',text:'UFRN e IFRN desenvolvem pesquisas em mobilidade elétrica adaptada ao semiárido nordestino.'},
+    ]
+  },
+  PB:{
+    name:'Paraíba', flag:'🌵', capital:'João Pessoa', region:'Nordeste',
+    rankNac:23, eletropostos:150, eletropostos2025:95, municipiosCom:15, municipiosTotal:223,
+    ratio:10.8, bev:{2022:100,2023:180,2024:250,2025:280},
+    eletrif2025:800, janjun2026:105, capitalEletro:55,
+    destaques:[
+      {icon:'📊',text:'<strong>23º estado</strong> em vendas — <strong>280 BEVs</strong> em 2025. Crescimento moderado de 12% vs 2024.'},
+      {icon:'🔌',text:'<strong>150 eletropostos</strong> — ratio de <strong>10,8</strong>, muito próximo da meta setorial de 1:10!'},
+      {icon:'🏖️',text:'João Pessoa (a cidade mais oriental do Brasil) tem boa densidade de eletropostos no litoral norte.'},
+      {icon:'🌵',text:'Apenas <strong>15 de 223 municípios</strong> cobertos — sertão paraibano sem infraestrutura de recarga.'},
+      {icon:'☀️',text:'Potencial solar e eólico enorme para geração de energia limpa para carregadores rurais.'},
+      {icon:'📈',text:'Volume baixo de EVs faz o ratio parecer bom, mas a demanda pode crescer rapidamente em 2026–27.'},
+    ]
+  },
+  AL:{
+    name:'Alagoas', flag:'🪸', capital:'Maceió', region:'Nordeste',
+    rankNac:25, eletropostos:115, eletropostos2025:72, municipiosCom:10, municipiosTotal:102,
+    ratio:10.1, bev:{2022:70,2023:130,2024:180,2025:200},
+    eletrif2025:600, janjun2026:78, capitalEletro:45,
+    destaques:[
+      {icon:'📊',text:'<strong>25º estado</strong> em vendas — <strong>200 BEVs</strong> em 2025. Volume baixo, mas crescimento de 11% vs 2024.'},
+      {icon:'🔌',text:'<strong>115 eletropostos</strong> — ratio de <strong>10,1</strong>, praticamente na meta setorial de 1:10.'},
+      {icon:'🌊',text:'Maceió e litoral de Alagoas têm os principais pontos — Pajuçara e Ponta Verde com carregadores para turistas.'},
+      {icon:'🌿',text:'Apenas <strong>10 de 102 municípios</strong> (10%) cobertos. Interior sertanejo sem infraestrutura.'},
+      {icon:'🍬',text:'Polo sucroalcooleiro de AL começa a explorar uso de EVs em frotas de usinas e transporte de trabalhadores rurais.'},
+      {icon:'📈',text:'Com baixo volume, qualquer crescimento percentual é expressivo — AL pode saltar posições em 2026.'},
+    ]
+  },
+  PI:{
+    name:'Piauí', flag:'🌊', capital:'Teresina', region:'Nordeste',
+    rankNac:26, eletropostos:90, eletropostos2025:55, municipiosCom:8, municipiosTotal:224,
+    ratio:9.7, bev:{2022:50,2023:90,2024:130,2025:150},
+    eletrif2025:450, janjun2026:56, capitalEletro:38,
+    destaques:[
+      {icon:'📊',text:'<strong>26º estado</strong> em vendas — <strong>150 BEVs</strong> em 2025. Mercado ainda incipiente, mas com crescimento.'},
+      {icon:'🔌',text:'<strong>90 eletropostos</strong> — ratio de <strong>9,7</strong>, o melhor do Nordeste e abaixo da meta nacional de 1:10!'},
+      {icon:'💨',text:'PI tem enorme potencial eólico e solar (Chapada do Araripe) — base para futura rede de carregadores verdes.'},
+      {icon:'🌵',text:'Apenas <strong>8 de 224 municípios</strong> (3,6%) com eletroposto — menor cobertura territorial do Brasil.'},
+      {icon:'🌡️',text:'Teresina é a capital mais quente do Brasil — desafio de temperatura para baterias em clima semiárido extremo.'},
+      {icon:'📈',text:'Baixo volume hoje, mas PI pode crescer exponencialmente com chegada de modelos mais acessíveis (sub-R$100k).'},
+    ]
+  },
+  SE:{
+    name:'Sergipe', flag:'🦀', capital:'Aracaju', region:'Nordeste',
+    rankNac:24, eletropostos:85, eletropostos2025:53, municipiosCom:7, municipiosTotal:75,
+    ratio:10.9, bev:{2022:60,2023:110,2024:140,2025:160},
+    eletrif2025:480, janjun2026:60, capitalEletro:35,
+    destaques:[
+      {icon:'📊',text:'<strong>24º estado</strong> em vendas — <strong>160 BEVs</strong> em 2025. Crescimento de 14% vs 2024.'},
+      {icon:'🔌',text:'<strong>85 eletropostos</strong> — ratio de <strong>10,9</strong>, próximo da meta setorial. Melhor cobertura proporcional de todo o NE.'},
+      {icon:'🌊',text:'Aracaju concentra quase todos os eletropostos do estado. Orla e shoppings com pontos de recarga.'},
+      {icon:'🌿',text:'Apenas <strong>7 de 75 municípios</strong> cobertos — mas SE tem território pequeno, facilitando expansão futura.'},
+      {icon:'⚓',text:'Terminal Portuário de Sergipe começa estudo de eletrificação de veículos de movimentação de carga.'},
+      {icon:'🎓',text:'UFS (Univ. Federal de Sergipe) tem projetos de pesquisa em mobilidade elétrica para o semiárido sergipano.'},
+    ]
+  },
+  // ── NORTE ──
+  AM:{
+    name:'Amazonas', flag:'🌳', capital:'Manaus', region:'Norte',
+    rankNac:21, eletropostos:190, eletropostos2025:110, municipiosCom:12, municipiosTotal:62,
+    ratio:8.5, bev:{2022:60,2023:100,2024:180,2025:280},
+    eletrif2025:800, janjun2026:105, capitalEletro:80,
+    destaques:[
+      {icon:'📊',text:'<strong>21º estado</strong> em vendas — <strong>280 BEVs</strong> em 2025. Crescimento de 56% vs 2024 — entre os mais acelerados do Norte.'},
+      {icon:'🏭',text:'Polo Industrial de Manaus (PIM) — montadoras como Honda e Yamaha estudam produção de EVs no AM.'},
+      {icon:'🔌',text:'<strong>190 eletropostos</strong> — ratio de <strong>8,5</strong>, o melhor de todo o Norte e abaixo da meta nacional!'},
+      {icon:'🌳',text:'Logística fluvial dificulta expansão de EVs no interior. Manaus concentra 90% da frota elétrica do AM.'},
+      {icon:'⚡',text:'Usinas hidrelétricas abundantes fornecem energia limpa e barata para carregamento — vantagem competitiva única.'},
+      {icon:'📈',text:'ZFM (Zona Franca de Manaus) pode ser alavanca para montagem local de EVs, reduzindo preços regionalmente.'},
+    ]
+  },
+  PA:{
+    name:'Pará', flag:'🐍', capital:'Belém', region:'Norte',
+    rankNac:17, eletropostos:180, eletropostos2025:108, municipiosCom:10, municipiosTotal:144,
+    ratio:7.7, bev:{2022:50,2023:90,2024:160,2025:240},
+    eletrif2025:700, janjun2026:95, capitalEletro:75,
+    destaques:[
+      {icon:'📊',text:'<strong>17º estado</strong> em vendas — <strong>240 BEVs</strong> em 2025. Crescimento de 50% vs 2024.'},
+      {icon:'🌊',text:'Belém recebeu investimentos em eletropostos para a <strong>COP30 (novembro 2025)</strong> — legado de infraestrutura verde.'},
+      {icon:'🔌',text:'<strong>180 eletropostos</strong> — ratio de <strong>7,7</strong>, o melhor do Brasil! COP30 impulsionou expansão acelerada.'},
+      {icon:'🌳',text:'Logística fluvial do Rio Amazonas e afluentes limita expansão de EVs no interior paraense.'},
+      {icon:'⚡',text:'Hidrelétrica de Tucuruí abastece Belém com energia limpa — carregadores do PA têm pegada de carbono próxima a zero.'},
+      {icon:'🏙️',text:'Projeto "Belém Verde" da prefeitura prevê 50 novos eletropostos públicos e eletrificação de 30% da frota municipal.'},
+    ]
+  },
+  RO:{
+    name:'Rondônia', flag:'🦋', capital:'Porto Velho', region:'Norte',
+    rankNac:16, eletropostos:100, eletropostos2025:62, municipiosCom:8, municipiosTotal:52,
+    ratio:6.3, bev:{2022:30,2023:55,2024:85,2025:110},
+    eletrif2025:320, janjun2026:42, capitalEletro:38,
+    destaques:[
+      {icon:'📊',text:'<strong>16º estado</strong> em vendas — <strong>110 BEVs</strong> em 2025. Crescimento de 29% vs 2024.'},
+      {icon:'🔌',text:'<strong>100 eletropostos</strong> — ratio de <strong>6,3</strong>, segundo melhor do Brasil. Infra cresceu antes da demanda.'},
+      {icon:'⚡',text:'Usinas hidrelétricas de Jirau e Santo Antônio (Rio Madeira) fornecem energia limpa e barata para RO.'},
+      {icon:'🌿',text:'<strong>8 dos 52 municípios</strong> cobertos (15%). Porto Velho e Ji-Paraná têm melhor cobertura.'},
+      {icon:'🚛',text:'BR-364 (Porto Velho–Cuiabá) começa a receber eletropostos DC rápidos para frotas de transporte de grãos.'},
+      {icon:'📈',text:'Volume baixo, mas ritmo de instalação de carregadores sugere preparação para demanda futura acelerada.'},
+    ]
+  },
+  TO:{
+    name:'Tocantins', flag:'🌿', capital:'Palmas', region:'Norte',
+    rankNac:15, eletropostos:80, eletropostos2025:50, municipiosCom:7, municipiosTotal:139,
+    ratio:6.5, bev:{2022:25,2023:45,2024:70,2025:90},
+    eletrif2025:260, janjun2026:34, capitalEletro:32,
+    destaques:[
+      {icon:'📊',text:'<strong>15º estado</strong> em vendas — <strong>90 BEVs</strong> em 2025. Crescimento de 29% vs 2024.'},
+      {icon:'🔌',text:'<strong>80 eletropostos</strong> — ratio de <strong>6,5</strong>, terceiro melhor do Brasil. Rede bem dimensionada para a demanda atual.'},
+      {icon:'🌊',text:'Palmas é planejada — projetada para ser uma das capitais mais sustentáveis do Brasil. Incentivos municipais a EVs.'},
+      {icon:'🌿',text:'Apenas <strong>7 dos 139 municípios</strong> cobertos (5%) — interior muito carente de infraestrutura.'},
+      {icon:'☀️',text:'TO tem irradiação solar elevada — projetos piloto de carregadores fotovoltaicos em Palmas e Araguaína.'},
+      {icon:'🛣️',text:'BR-153 (Belém–Brasília) passa por TO — corredor estratégico para carregadores interurbanos no estado.'},
+    ]
+  },
+  AC:{
+    name:'Acre', flag:'🦥', capital:'Rio Branco', region:'Norte',
+    rankNac:27, eletropostos:50, eletropostos2025:30, municipiosCom:4, municipiosTotal:22,
+    ratio:6.4, bev:{2022:10,2023:20,2024:38,2025:55},
+    eletrif2025:160, janjun2026:22, capitalEletro:20,
+    destaques:[
+      {icon:'📊',text:'<strong>27º estado</strong> em vendas — <strong>55 BEVs</strong> em 2025. Mercado nascente, mas crescimento de 45% vs 2024.'},
+      {icon:'🔌',text:'<strong>50 eletropostos</strong> — ratio de <strong>6,4</strong>, quarto melhor do Brasil. Rede instalada antecipa demanda futura.'},
+      {icon:'🌳',text:'Rio Branco concentra quase todos os pontos de recarga. Interior sem infraestrutura — logística desafiadora.'},
+      {icon:'🌿',text:'AC tem um dos maiores índices de cobertura florestal do mundo — EVs se alinham perfeitamente com a pauta ambiental.'},
+      {icon:'⚡',text:'Energia cara em AC (isolamento da rede nacional) é um dos maiores desafios para adoção de EVs na região.'},
+      {icon:'🤝',text:'Cooperação Brasil-Peru em infraestrutura pode trazer carregadores ao longo da BR-317 (Estrada do Pacífico).'},
+    ]
+  },
+  AP:{
+    name:'Amapá', flag:'🌺', capital:'Macapá', region:'Norte',
+    rankNac:14, eletropostos:45, eletropostos2025:28, municipiosCom:3, municipiosTotal:16,
+    ratio:5.8, bev:{2022:10,2023:18,2024:32,2025:45},
+    eletrif2025:130, janjun2026:17, capitalEletro:18,
+    destaques:[
+      {icon:'📊',text:'<strong>14º estado</strong> em vendas por BEV (pequeno volume) — <strong>45 BEVs</strong> em 2025. Crescimento de 41% vs 2024.'},
+      {icon:'🔌',text:'<strong>45 eletropostos</strong> — ratio de <strong>5,8</strong>, o segundo melhor do Brasil! Rede instalada muito à frente da demanda.'},
+      {icon:'🌊',text:'Macapá é a única capital brasileira cortada pela linha do equador — contexto único para EVs tropicais.'},
+      {icon:'🌿',text:'<strong>3 dos 16 municípios</strong> cobertos (19%). Interior praticamente sem cobertura além de Santana e Laranjal do Jari.'},
+      {icon:'⚡',text:'AP tem graves problemas de fornecimento elétrico histórico — expansão de EVs depende de melhoria na rede.'},
+      {icon:'🌳',text:'93% do AP é área protegida (ANAP) — preservação ambiental torna EVs uma escolha natural de longo prazo.'},
+    ]
+  },
+  RR:{
+    name:'Roraima', flag:'🏔️', capital:'Boa Vista', region:'Norte',
+    rankNac:13, eletropostos:30, eletropostos2025:18, municipiosCom:2, municipiosTotal:15,
+    ratio:6.8, bev:{2022:8,2023:14,2024:24,2025:35},
+    eletrif2025:100, janjun2026:14, capitalEletro:12,
+    destaques:[
+      {icon:'📊',text:'<strong>13º estado</strong> relativo ao volume — <strong>35 BEVs</strong> em 2025. Crescimento de 46% vs 2024.'},
+      {icon:'🔌',text:'<strong>30 eletropostos</strong> — ratio de <strong>6,8</strong>, quinto melhor do Brasil. Demanda ainda muito baixa.'},
+      {icon:'🌄',text:'Boa Vista concentra 100% dos eletropostos do estado. Únicas cidades com pontos: Boa Vista e Rorainópolis.'},
+      {icon:'🌿',text:'RR faz fronteira com Venezuela e Guiana — potencial para rotas transfronteiriças com carregadores.'},
+      {icon:'⚡',text:'Conexão elétrica Venezuela-Brasil pelo IIRSA norte — energia importada pode ser mais cara e instável.'},
+      {icon:'🏔️',text:'Monte Roraima (fronteira tripla) e turismo ecológico criam demanda por transporte elétrico de baixo impacto.'},
+    ]
+  },
 };
 
-function safe(text) {
-  return String(text || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+let estadoChart = null;
+
+function selectEstado(sigla, btn) {
+  document.querySelectorAll('.ebtn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  renderEstado(sigla);
 }
 
-function makeId() {
-  return `mercado-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
+function renderEstado(sigla) {
+  const e = ESTADOS[sigla];
+  const bev = e.bev;
+  const anos = Object.keys(bev);
+  const vals = Object.values(bev);
 
-function renderKpis() {
-  const indicators = items.filter(item => item.type === "indicador").slice(0, 4);
-  kpiGrid.innerHTML = indicators.map(item => `
-    <article class="kpi">
-      <small>${safe(item.segment || item.source || "Indicador")}</small>
-      <strong>${safe(item.value || "-")}</strong>
-      <span>${safe(item.title)} ${item.unit ? `- ${safe(item.unit)}` : ""}</span>
-    </article>
-  `).join("") || `<article class="kpi"><small>Mercado</small><strong>0</strong><span>Nenhum indicador cadastrado.</span></article>`;
-}
+  // ratio color
+  const ratioColor = e.ratio <= 10 ? 'var(--green)' : e.ratio <= 16 ? 'var(--amber)' : 'var(--red)';
+  const ratioTag = e.ratio <= 10 ? 'g' : e.ratio <= 16 ? 'o' : 'r';
 
-function renderList() {
-  const visible = currentFilter === "todos" ? items : items.filter(item => item.type === currentFilter);
-  if (!visible.length) {
-    listEl.innerHTML = `<div class="empty">Nenhum registro neste filtro.</div>`;
-    renderKpis();
-    return;
-  }
-  listEl.innerHTML = visible.map(item => `
-    <article class="market-card ${safe(item.type)}">
-      <div>
-        <div class="market-title">${safe(item.title)}</div>
-        <div class="market-meta">
-          <span class="chip">${safe(item.type)}</span>
-          ${item.status ? `<span class="chip">${safe(item.status)}</span>` : ""}
-          ${item.region ? `<span>${safe(item.region)}</span>` : ""}
-          ${item.segment ? `<span>${safe(item.segment)}</span>` : ""}
-          ${item.source ? `<span>Fonte: ${safe(item.source)}</span>` : ""}
-        </div>
-        ${item.note ? `<p class="footer-note">${safe(item.note)}</p>` : ""}
-        ${item.url ? `<div class="source-list"><div class="source-item"><span>${safe(item.url)}</span><a href="${safe(item.url)}" target="_blank" rel="noopener">Abrir</a></div></div>` : ""}
-      </div>
-      <div>
-        <div class="market-value">${safe(item.value || "-")} ${item.unit ? `<small>${safe(item.unit)}</small>` : ""}</div>
-        <div class="market-actions">
-          <button class="ghost-btn" type="button" data-edit="${safe(item.id)}">Editar</button>
-          <button class="danger-btn" type="button" data-delete="${safe(item.id)}">Excluir</button>
+  const panel = document.getElementById('estadoPanel');
+  panel.innerHTML = `
+    <!-- HERO -->
+    <div class="estado-hero">
+      <div class="ehero-flag">${e.flag}</div>
+      <div class="ehero-info">
+        <div class="ehero-name">${e.name}</div>
+        <div class="ehero-sub">Capital: ${e.capital} · Região ${e.region}</div>
+        <div class="ehero-badges">
+          <span class="ebadge g">⚡ ${e.bev[2025].toLocaleString('pt-BR')} BEVs em 2025</span>
+          <span class="ebadge b">🔌 ${e.eletropostos.toLocaleString('pt-BR')} eletropostos</span>
+          <span class="ebadge ${ratioTag}">Ratio 1:${e.ratio}</span>
+          ${e.janjun2026 ? `<span class="ebadge p">📈 ${e.janjun2026.toLocaleString('pt-BR')} BEVs Jan–${sigla==='SP'?'Abr':'Fev'}/26</span>` : ''}
         </div>
       </div>
-    </article>
-  `).join("");
-  renderKpis();
+      <div class="ehero-rank">
+        <div class="ehero-rnum">${e.rankNac}º</div>
+        <div class="ehero-rlbl">ranking nacional<br>em vendas</div>
+      </div>
+    </div>
+
+    <!-- FACTS -->
+    <div class="fact-row">
+      <div class="fact">
+        <div class="fact-val" style="color:var(--green)">${e.bev[2025].toLocaleString('pt-BR')}</div>
+        <div class="fact-lbl">BEV puro emplacados em 2025</div>
+      </div>
+      <div class="fact">
+        <div class="fact-val" style="color:var(--blue)">${e.eletropostos.toLocaleString('pt-BR')}</div>
+        <div class="fact-lbl">Eletropostos instalados (fev/2026)</div>
+      </div>
+      <div class="fact">
+        <div class="fact-val" style="color:${ratioColor}">1:${e.ratio}</div>
+        <div class="fact-lbl">Ratio veículo/carregador ${e.ratio<=10?'✅ Próximo da meta':'⚠️ Meta é 1:10'}</div>
+      </div>
+      <div class="fact">
+        <div class="fact-val" style="color:var(--orange)">${e.municipiosCom}</div>
+        <div class="fact-lbl">Municípios com eletroposto (de ${e.municipiosTotal})</div>
+      </div>
+      <div class="fact">
+        <div class="fact-val" style="color:var(--purple)">${e.eletrif2025.toLocaleString('pt-BR')}</div>
+        <div class="fact-lbl">Total eletrificados 2025 (BEV+PHEV+HEV)</div>
+      </div>
+      <div class="fact">
+        <div class="fact-val" style="color:var(--teal)">${((e.bev[2025]-e.bev[2023])/e.bev[2023]*100).toFixed(0)}%</div>
+        <div class="fact-lbl">Crescimento BEV 2023→2025</div>
+      </div>
+    </div>
+
+    <!-- CHART + DESTAQUES -->
+    <div class="g2" style="margin-bottom:16px">
+      <div class="card">
+        <div class="ch">
+          <div><div class="ct">Evolução BEV — ${e.name}</div><div class="cs">Veículos 100% elétricos emplacados por ano</div></div>
+        </div>
+        <div class="cb"><canvas id="cEstado" height="240"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div><div class="ct">Destaques de ${e.name}</div><div class="cs">Dados e insights regionais</div></div></div>
+        <div class="cb">
+          <div class="highlight-list">
+            ${e.destaques.map(d=>`<div class="hitem"><div class="hitem-icon">${d.icon}</div><div class="hitem-text">${d.text}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS INFRA -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="ch"><div><div class="ct">Infraestrutura — ${e.name} vs Brasil</div><div class="cs">Comparativo com médias nacionais</div></div></div>
+      <div class="cb">
+        <div class="pw"><div class="ph"><span class="pl">Eletropostos (${e.name})</span><span class="pv">${e.eletropostos.toLocaleString('pt-BR')}</span></div><div class="pb"><div class="pf" style="width:${Math.min(e.eletropostos/4500*100,100).toFixed(0)}%;background:linear-gradient(90deg,var(--blue),var(--teal))"></div></div></div>
+        <div class="pw"><div class="ph"><span class="pl">Referência: São Paulo (maior rede)</span><span class="pv">4.500</span></div><div class="pb"><div class="pf" style="width:100%;background:rgba(255,255,255,0.07)"></div></div></div>
+        <div class="div"></div>
+        <div class="pw"><div class="ph"><span class="pl">Municípios cobertos (${e.name})</span><span class="pv">${e.municipiosCom} de ${e.municipiosTotal} (${(e.municipiosCom/e.municipiosTotal*100).toFixed(0)}%)</span></div><div class="pb"><div class="pf" style="width:${(e.municipiosCom/e.municipiosTotal*100).toFixed(0)}%;background:linear-gradient(90deg,var(--green),var(--blue))"></div></div></div>
+        <div class="pw"><div class="ph"><span class="pl">Média nacional (municípios cobertos)</span><span class="pv">1.649 de 5.570 (30%)</span></div><div class="pb"><div class="pf" style="width:30%;background:rgba(255,255,255,.07)"></div></div></div>
+        <div class="div"></div>
+        <div class="pw">
+          <div class="ph">
+            <span class="pl">Ratio veículo/carregador (${e.name})</span>
+            <span class="pv" style="color:${ratioColor}">1:${e.ratio} ${e.ratio<=10?'✅':e.ratio<=16?'🟡':'🔴'}</span>
+          </div>
+          <div class="pb"><div class="pf" style="width:${Math.min(e.ratio/20*100,100).toFixed(0)}%;background:${e.ratio<=10?'var(--green)':e.ratio<=16?'var(--amber)':'var(--red)'}"></div></div>
+        </div>
+        <div class="pw"><div class="ph"><span class="pl">Média nacional</span><span class="pv" style="color:var(--red)">1:19,6 🔴</span></div><div class="pb"><div class="pf" style="width:98%;background:rgba(255,94,108,.3)"></div></div></div>
+      </div>
+    </div>
+  `;
+
+  // Render chart
+  if (estadoChart) { estadoChart.destroy(); estadoChart = null; }
+  const ctx2 = document.getElementById('cEstado').getContext('2d');
+  const gradEc = ctx2.createLinearGradient(0,0,0,260);
+  gradEc.addColorStop(0,'rgba(29,233,128,0.4)');
+  gradEc.addColorStop(1,'rgba(29,233,128,0.02)');
+  estadoChart = new Chart(ctx2, {
+    type:'bar',
+    data:{
+      labels: anos,
+      datasets:[{
+        label:'BEV emplacados',
+        data: vals,
+        backgroundColor: anos.map((a,i)=> i===anos.length-1 ? 'rgba(29,233,128,0.9)' : `rgba(79,163,255,${0.3+i*0.15})`),
+        borderRadius:8,borderSkipped:false,
+      },{
+        type:'line',
+        label:'Tendência',
+        data: vals,
+        borderColor:'rgba(255,140,66,0.8)',backgroundColor:'transparent',
+        borderWidth:2,pointRadius:0,tension:0.4,
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{position:'top',labels:{font:{size:11},boxWidth:10,padding:14,color:'#8a95a8',usePointStyle:true}},
+        tooltip:{
+          backgroundColor:'rgba(13,16,24,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,
+          titleColor:'#eaf0ff',bodyColor:'#8a95a8',padding:12,cornerRadius:8,
+          callbacks:{label:ctx=>ctx.dataset.type==='line'?'':' '+ctx.parsed.y.toLocaleString('pt-BR')+' BEVs'}
+        }
+      },
+      scales:{
+        y:{grid:{color:'rgba(255,255,255,0.045)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}},border:{dash:[4,4]}},
+        x:{grid:{display:false},ticks:{font:{size:11}}}
+      }
+    },
+    plugins:[{
+      id:'growthLabels',
+      afterDraw(chart){
+        const {ctx,scales:{x,y},data}=chart;
+        const vals=data.datasets[0].data;
+        vals.forEach((v,i)=>{
+          if(i===0)return;
+          const prev=vals[i-1];
+          const pct=((v-prev)/prev*100).toFixed(0);
+          const xp=x.getPixelForValue(i);
+          const yp=y.getPixelForValue(v);
+          ctx.save();ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+          ctx.fillStyle='rgba(255,189,68,0.8)';
+          ctx.fillText('+'+pct+'%',xp,yp-10);ctx.restore();
+        });
+      }
+    }]
+  });
+
+  // animate bars
+  setTimeout(animateBars, 50);
 }
 
-function resetForm() {
-  form.reset();
-  fields.id.value = "";
-  document.getElementById("formTitle").textContent = "Novo registro";
-}
+// Init: render Paraná on load
+document.addEventListener('DOMContentLoaded', () => { renderEstado('PR'); });
 
-function fillForm(item) {
-  fields.id.value = item.id;
-  fields.type.value = item.type || "indicador";
-  fields.status.value = item.status || "";
-  fields.title.value = item.title || "";
-  fields.value.value = item.value || "";
-  fields.unit.value = item.unit || "";
-  fields.segment.value = item.segment || "";
-  fields.region.value = item.region || "";
-  fields.source.value = item.source || "";
-  fields.url.value = item.url || "";
-  fields.note.value = item.note || "";
-  document.getElementById("formTitle").textContent = "Editar registro";
-}
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
 
-async function persist(nextItems) {
-  items = nextItems;
-  renderList();
-  try {
-    const result = await UBY_STORE.saveMarket(items);
-    dbStatus.textContent = result.cloud ? "Banco conectado: mercado salvo" : "Modo local: login/banco pendente";
-    dbStatus.className = result.cloud ? "status-pill" : "status-pill warn";
-  } catch (err) {
-    dbStatus.textContent = "Tabela mercado_items ainda nao aplicada";
-    dbStatus.className = "status-pill warn";
-    console.warn(err);
-  }
-}
-
-form.addEventListener("submit", async event => {
-  event.preventDefault();
-  const item = {
-    id: fields.id.value || makeId(),
-    type: fields.type.value,
-    title: fields.title.value,
-    value: fields.value.value,
-    unit: fields.unit.value,
-    segment: fields.segment.value,
-    region: fields.region.value,
-    status: fields.status.value,
-    source: fields.source.value,
-    url: fields.url.value,
-    note: fields.note.value,
-    updatedAt: new Date().toISOString()
-  };
-  const next = items.filter(current => current.id !== item.id);
-  next.unshift(item);
-  await persist(next);
-  resetForm();
+// ─── DONUT MARCA 2026 ───
+new Chart(document.getElementById('cMarca'),{
+  type:'doughnut',
+  data:{
+    labels:['BYD','Geely','GM','Outros'],
+    datasets:[{data:[68.4,15.1,7.0,9.5],
+      backgroundColor:[C.b,C.g,C.o,'rgba(148,163,184,0.25)'],
+      borderColor:'rgba(0,0,0,0)',borderWidth:4,hoverOffset:6}]
+  },
+  options:{cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.parsed+'%'}}}}
 });
 
-listEl.addEventListener("click", async event => {
-  const editId = event.target.dataset.edit;
-  const deleteId = event.target.dataset.delete;
-  if (editId) {
-    const item = items.find(current => current.id === editId);
-    if (item) fillForm(item);
-  }
-  if (deleteId) {
-    const next = items.filter(current => current.id !== deleteId);
-    await persist(next);
-    try { await UBY_STORE.deleteMarketItem(deleteId); } catch (err) { console.warn(err); }
+// ─── ANUAL ───
+const ctxA = document.getElementById('cAnual').getContext('2d');
+new Chart(ctxA,{
+  type:'bar',
+  data:{
+    labels:['2021','2022','2023','2024','2025','2026*'],
+    datasets:[{
+      data:[34500,49245,93927,177358,223912,300000],
+      backgroundColor:[C.mu,C.mu,'rgba(148,163,184,0.4)',
+        'rgba(79,163,255,0.6)','rgba(29,233,128,0.8)','rgba(29,233,128,0.3)'],
+      borderRadius:8,borderSkipped:false,
+    }]
+  },
+  options:{
+    responsive:true,
+    plugins:{legend:{display:false},
+      tooltip:{backgroundColor:'rgba(13,16,24,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,
+        titleColor:'#eaf0ff',bodyColor:'#8a95a8',padding:12,cornerRadius:8,
+        callbacks:{label:ctx=>' '+ctx.parsed.y.toLocaleString('pt-BR')+' un.'}}},
+    scales:{y:{grid:grd,ticks:{callback:v=>(v/1000)+'k',font:tf}},x:{grid:{display:false},ticks:{font:tf}}}
+  },
+  plugins:[{
+    id:'yrlabels',afterDraw(chart){
+      const {ctx,scales:{x,y}}=chart;
+      const vals=[34500,49245,93927,177358,223912,null];
+      const growths=[null,'+43%','+91%','+89%','+26%','▲Proj'];
+      vals.forEach((v,i)=>{
+        if(!v)return;
+        const xp=x.getPixelForValue(i), yp=y.getPixelForValue(v);
+        ctx.save();ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+        ctx.fillStyle='rgba(148,163,184,0.7)';ctx.fillText(growths[i]||'',xp,yp-8);ctx.restore();
+      });
+    }
+  }]
+});
+
+// ─── SHARE % ───
+const ctxS = document.getElementById('cShare').getContext('2d');
+const gradS = makeGrad(ctxS,'rgba(255,140,66,0.25)','rgba(255,140,66,0.01)');
+new Chart(ctxS,{
+  type:'line',
+  data:{
+    labels:['2021','2022','2023','2024','2025\n(média)','Dez/25','Abr/26'],
+    datasets:[{
+      data:[0.9,1.8,3.5,7.5,9.0,13.0,16.2],
+      borderColor:C.o,backgroundColor:gradS,borderWidth:2.5,fill:true,tension:0.4,
+      pointBackgroundColor:[C.o,C.o,C.o,C.o,C.o,C.o,'#fff'],
+      pointRadius:[4,4,4,4,4,4,7],pointBorderColor:C.o,pointBorderWidth:2,
+    }]
+  },
+  options:{
+    responsive:true,
+    plugins:{legend:{display:false},
+      tooltip:{backgroundColor:'rgba(13,16,24,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,
+        titleColor:'#eaf0ff',bodyColor:'#8a95a8',padding:12,cornerRadius:8,
+        callbacks:{label:ctx=>' '+ctx.parsed.y+'% do mercado total'}}},
+    scales:{y:{grid:grd,ticks:{callback:v=>v+'%',font:tf},max:20},x:{grid:{display:false},ticks:{font:tf}}}
+  },
+  plugins:[{
+    id:'sharelabel',afterDraw(chart){
+      const {ctx,scales:{x,y}}=chart;
+      const xp=x.getPixelForValue(6), yp=y.getPixelForValue(16.2);
+      ctx.save();ctx.fillStyle=C.o;ctx.font='bold 11px sans-serif';ctx.textAlign='left';
+      ctx.fillText('16,2%',xp+8,yp+4);ctx.restore();
+    }
+  }]
+});
+
+// ─── GROWTH % ───
+new Chart(document.getElementById('cGrowth'),{
+  type:'bar',
+  data:{
+    labels:['2022','2023','2024','2025','Jan-Abr 2026'],
+    datasets:[{
+      data:[42.7,90.7,88.8,26.3,65.5],
+      backgroundColor:[C.mu,C.mu,C.b,'rgba(29,233,128,0.6)',C.o],
+      borderRadius:8,borderSkipped:false,
+    }]
+  },
+  options:{
+    responsive:true,
+    plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>' ▲ '+ctx.parsed.y+'%'}}},
+    scales:{y:{grid:grd,ticks:{callback:v=>v+'%',font:tf}},x:{grid:{display:false},ticks:{font:tf}}}
   }
 });
 
-document.getElementById("tabs").addEventListener("click", event => {
-  if (!event.target.dataset.filter) return;
-  currentFilter = event.target.dataset.filter;
-  document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.filter === currentFilter));
-  renderList();
+// ─── TIPO 2025 ───
+new Chart(document.getElementById('cTipo'),{
+  type:'doughnut',
+  data:{
+    labels:['PHEV','BEV','HEV'],
+    datasets:[{data:[101364,80178,42370],
+      backgroundColor:[C.b,C.g,C.o],borderColor:'rgba(0,0,0,0)',borderWidth:4,hoverOffset:6}]
+  },
+  options:{cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.parsed.toLocaleString('pt-BR')}}}}
 });
 
-document.getElementById("newButton").addEventListener("click", resetForm);
-document.getElementById("resetButton").addEventListener("click", resetForm);
+// ─── ELETROPOSTOS EVOLUÇÃO ───
+const ctxE = document.getElementById('cEletro').getContext('2d');
+const gradE1 = makeGrad(ctxE,'rgba(29,233,128,0.3)','rgba(29,233,128,0.02)');
+const gradE2 = makeGrad(ctxE,'rgba(79,163,255,0.15)','rgba(79,163,255,0.01)');
+new Chart(ctxE,{
+  type:'line',
+  data:{
+    labels:['Jan/24','Ago/24','Fev/25','Ago/25','Fev/26','Dez/26*'],
+    datasets:[
+      {label:'Total eletropostos',data:[7800,10000,14827,16880,21061,25000],
+        borderColor:C.g,backgroundColor:gradE1,borderWidth:2.5,fill:true,tension:0.35,
+        pointBackgroundColor:C.g,pointRadius:[4,4,4,4,6,4],pointBorderColor:'rgba(0,0,0,0)'},
+      {label:'DC rápidos',data:[900,1500,2430,3800,6479,9000],
+        borderColor:C.b,backgroundColor:gradE2,borderWidth:2,fill:true,tension:0.35,
+        pointBackgroundColor:C.b,pointRadius:4,borderDash:[6,3],pointBorderColor:'rgba(0,0,0,0)'}
+    ]
+  },
+  options:{
+    responsive:true,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{position:'top',labels:{font:tf,boxWidth:10,padding:14,color:'#8a95a8',usePointStyle:true}},
+      tooltip:{backgroundColor:'rgba(13,16,24,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,
+        titleColor:'#eaf0ff',bodyColor:'#8a95a8',padding:12,cornerRadius:8,
+        callbacks:{label:ctx=>' '+ctx.dataset.label+': '+ctx.parsed.y.toLocaleString('pt-BR')}}
+    },
+    scales:{
+      y:{grid:grd,ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:tf},border:{dash:[4,4]}},
+      x:{grid:{display:false},ticks:{font:tf}}
+    }
+  },
+  plugins:[{
+    id:'dcLabel',afterDraw(chart){
+      const {ctx,scales:{x,y}}=chart;
+      const xp=x.getPixelForValue(4), yp=y.getPixelForValue(6479);
+      ctx.save();ctx.fillStyle='rgba(79,163,255,0.15)';ctx.strokeStyle=C.b;ctx.lineWidth=1;
+      roundRect(ctx,xp-36,yp-24,72,18,5);ctx.fill();ctx.stroke();
+      ctx.fillStyle=C.b;ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+      ctx.fillText('▲ 167% YoY',xp,yp-11);ctx.restore();
+    }
+  }]
+});
 
-(async function init() {
-  try {
-    items = await UBY_STORE.loadMarket(seedItems);
-    dbStatus.textContent = UBY_STORE.available() ? "Banco pronto para mercado" : "Modo local: conecte o Supabase";
-    dbStatus.className = UBY_STORE.available() ? "status-pill" : "status-pill warn";
-  } catch (err) {
-    items = seedItems;
-    dbStatus.textContent = "Tabela mercado_items ainda nao aplicada";
-    dbStatus.className = "status-pill warn";
+// ─── DC vs AC ───
+new Chart(document.getElementById('cDcAc'),{
+  type:'doughnut',
+  data:{
+    labels:['AC (lento/semirápido)','DC (rápido/ultrarrápido)'],
+    datasets:[{data:[14582,6479],backgroundColor:[C.b,'rgba(29,233,128,0.9)'],
+      borderColor:'rgba(0,0,0,0)',borderWidth:4,hoverOffset:6}]
+  },
+  options:{cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.parsed.toLocaleString('pt-BR')+' pontos'}}}}
+});
+
+// ─── REGIÃO ───
+new Chart(document.getElementById('cRegiao'),{
+  type:'bar',
+  data:{
+    labels:['São Paulo','Rio de Janeiro','Minas Gerais','Paraná','Santa Catarina','Rio Grande do Sul','Demais estados'],
+    datasets:[{
+      label:'Eletropostos',
+      data:[4500,2800,2100,1800,1600,1400,6861],
+      backgroundColor:['rgba(79,163,255,0.85)','rgba(79,163,255,0.65)','rgba(79,163,255,0.5)',
+        'rgba(29,233,128,0.75)','rgba(29,233,128,0.6)','rgba(29,233,128,0.5)','rgba(148,163,184,0.25)'],
+      borderRadius:5,borderSkipped:false,
+    }]
+  },
+  options:{
+    indexAxis:'y',responsive:true,
+    plugins:{legend:{display:false},
+      tooltip:{backgroundColor:'rgba(13,16,24,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,
+        titleColor:'#eaf0ff',bodyColor:'#8a95a8',padding:12,cornerRadius:8,
+        callbacks:{label:ctx=>' '+ctx.parsed.x.toLocaleString('pt-BR')+' eletropostos'}}},
+    scales:{x:{grid:grd,ticks:{font:tf}},y:{grid:{display:false},ticks:{font:tf}}}
   }
-  renderList();
-})();
-</script>
+});
+ </script>
+<script src="sidebar.js"></script>
+<script src="backup_guard.js"></script>
 </body>
 </html>
