@@ -58,6 +58,7 @@
       carregadores: row.carregadores || raw.carregadores || "",
       crit: Number(row.criticas || 0),
       flags: raw.flags || [],
+      archived: Boolean(raw.archived || /arquivad/i.test(row.status_exec || "")),
       link: raw.link || (row.id === "rio" ? "gestao_obra_ev_detalhe.html" : `gestao_obra_ev_detalhe.html?obra=${row.id}`)
     };
   }
@@ -219,7 +220,7 @@
     try {
       const rows = await cloudSelect("obras");
       if (!rows) return fallback;
-      const works = rows.map(rowToWork);
+      const works = rows.map(rowToWork).filter(item => !item.archived);
       const merged = mergeWorks(fallback, works);
       if (merged.length) writeLocal(WORKS_KEY, merged);
       return merged.length ? merged : fallback;
