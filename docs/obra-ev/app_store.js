@@ -4,6 +4,7 @@
   const ACTIVITY_KEY = "uby-activity-v1";
   const MESSAGE_KEY = "uby-messages-v1";
   const MARKET_KEY = "uby-mercado-v1";
+  const DELETED_WORKS_KEY = "uby-obras-dashboard-deleted-v1";
   const CORE_WORK_IDS = new Set(["rio", "malassise", "prospect-1", "prospect-29"]);
 
   function available() {
@@ -220,7 +221,13 @@
     try {
       const rows = await cloudSelect("obras");
       if (!rows) return fallback;
-      const works = rows.map(rowToWork).filter(item => !item.archived);
+      const mapped = rows.map(rowToWork);
+      const archivedIds = mapped.filter(item => item.archived).map(item => item.id);
+      if (archivedIds.length) {
+        writeLocal(DELETED_WORKS_KEY, [...new Set([...readLocal(DELETED_WORKS_KEY, []), ...archivedIds])]);
+      }
+      const archived = new Set([...readLocal(DELETED_WORKS_KEY, []), ...archivedIds]);
+      const works = mapped.filter(item => !item.archived && !archived.has(item.id));
       const merged = mergeWorks(fallback, works);
       if (merged.length) writeLocal(WORKS_KEY, merged);
       return merged.length ? merged : fallback;
@@ -232,11 +239,12 @@
 
   function mergeWorks(localItems = [], cloudItems = []) {
     const byId = new Map();
+    const archived = new Set(readLocal(DELETED_WORKS_KEY, []));
     localItems.forEach(item => {
-      if (item?.id) byId.set(item.id, item);
+      if (item?.id && !archived.has(item.id) && !item.archived) byId.set(item.id, item);
     });
     cloudItems.forEach(item => {
-      if (item?.id) byId.set(item.id, { ...(byId.get(item.id) || {}), ...item });
+      if (item?.id && !archived.has(item.id) && !item.archived) byId.set(item.id, { ...(byId.get(item.id) || {}), ...item });
     });
     return [...byId.values()];
   }
