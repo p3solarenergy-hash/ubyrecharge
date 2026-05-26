@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -352,17 +352,17 @@ malassise:{title:"Analise de Carga - Malassise R.K.",url:"analisadores/Relatorio
 shopping:{title:"Analise de carga nao vinculada",url:"#",peak:"-",consumption:"-",ev:"90 kW",status:"Aguardando relatorio",utility:"-",action:"Vincular HTML do analisador quando existir"}
 };
 const availableReports=[
-{name:"Dashboard geral dos analisadores",kind:"Dashboard",url:"analisadores/dashboard.html",peak:"-",consumption:"-",ev:"-",status:"Dashboard geral vinculado",utility:"Usar apenas como consulta geral",action:"Abrir dashboard para escolher um relatório dedicado"},
-{name:"Index dos relatorios",kind:"Dashboard",url:"analisadores/index.html",peak:"-",consumption:"-",ev:"-",status:"Index vinculado",utility:"Usar apenas como navegação",action:"Abrir index para escolher um relatório dedicado"},
+{name:"Dashboard geral dos analisadores",kind:"Dashboard",url:"analisadores/dashboard.html",peak:"-",consumption:"-",ev:"-",status:"Dashboard geral vinculado",utility:"Usar apenas como consulta geral",action:"Abrir dashboard para escolher um relatÃ³rio dedicado"},
+{name:"Index dos relatorios",kind:"Dashboard",url:"analisadores/index.html",peak:"-",consumption:"-",ev:"-",status:"Index vinculado",utility:"Usar apenas como navegaÃ§Ã£o",action:"Abrir index para escolher um relatÃ³rio dedicado"},
 {name:"Analise de Carga - Araguaia",kind:"Analise de carga",url:"analisadores/Relatorio_Analise_Carga_Araguaia.html",peak:"44,18 kW",consumption:"10,3 MWh/mes",ev:"60 kW",status:"Boa amostra: 9 dias medidos",utility:"DLM obrigatorio; avaliar migracao Grupo A4 e demanda contratada",action:"Confirmar FV existente, reequilibrar fases e refletir DLM no projeto"},
 {name:"Analise de Carga - Malassise R.K.",kind:"Analise de carga",url:"analisadores/Relatorio_Analise_Carga_Malassise_RK.html",peak:"28,06 kW",consumption:"2,6 MWh/mes",ev:"60 kW",status:"Base parcial: 5 de 91 dias",utility:"Reinstalar analisador 7 a 15 dias antes de fechar carga",action:"Validar aumento de carga, DLM e nova medicao antes da contratacao"},
 {name:"Analise de Carga - Posto Duim Av. Maringa",kind:"Analise de carga",url:"analisadores/Relatorio_Analise_Carga_AvMaringa.html",peak:"39,0 kW",consumption:"7,6 MWh/mes",ev:"60 kW",status:"Base parcial: 5 dias medidos",utility:"Validar fator de potencia, desequilibrio e novo padrao antes de fechar carga",action:"Confirmar padrao proposto, corrigir FP/desequilibrio e validar DLM no projeto"},
-{name:"Relatorio Carregador - Araguaia",kind:"Carregador",url:"analisadores/Relatorio_Carregador_Araguaia.html",peak:"-",consumption:"-",ev:"60 kW",status:"Relatorio do carregador vinculado",utility:"Conferir compatibilidade do carregador com a obra",action:"Validar configuração e premissas do equipamento"},
-{name:"Relatorio Carregador - Malassise R.K.",kind:"Carregador",url:"analisadores/Relatorio_Carregador_Malassise_RK.html",peak:"-",consumption:"-",ev:"60 kW",status:"Relatorio do carregador vinculado",utility:"Conferir compatibilidade do carregador com a obra",action:"Validar configuração e premissas do equipamento"},
+{name:"Relatorio Carregador - Araguaia",kind:"Carregador",url:"analisadores/Relatorio_Carregador_Araguaia.html",peak:"-",consumption:"-",ev:"60 kW",status:"Relatorio do carregador vinculado",utility:"Conferir compatibilidade do carregador com a obra",action:"Validar configuraÃ§Ã£o e premissas do equipamento"},
+{name:"Relatorio Carregador - Malassise R.K.",kind:"Carregador",url:"analisadores/Relatorio_Carregador_Malassise_RK.html",peak:"-",consumption:"-",ev:"60 kW",status:"Relatorio do carregador vinculado",utility:"Conferir compatibilidade do carregador com a obra",action:"Validar configuraÃ§Ã£o e premissas do equipamento"},
 {name:"Relatorio Eletrico - Araguaia",kind:"Eletrico",url:"analisadores/Relatorio_Eletrico_Araguaia.html",peak:"44,18 kW",consumption:"10,3 MWh/mes",ev:"60 kW",status:"Relatorio eletrico vinculado",utility:"Usar para validar DLM, QGBT, protecoes e demanda",action:"Refletir exigencias tecnicas em projeto e obra eletrica"},
 {name:"Relatorio Eletrico - Malassise R.K.",kind:"Eletrico",url:"analisadores/Relatorio_Eletrico_Malassise_RK.html",peak:"28,06 kW",consumption:"2,6 MWh/mes",ev:"60 kW",status:"Relatorio eletrico vinculado",utility:"Usar para validar aumento de carga, DLM e nova medicao",action:"Refletir exigencias tecnicas em projeto e obra eletrica"},
-{name:"Analise de Carga - Muffatao Toledo",kind:"Analise de carga",url:"analisadores/Relatorio_Analise_Carga_Muffatao_Toledo.html",peak:"24,92 kW",consumption:"0,87 MWh/mes",ev:"60 kW",status:"Base parcial: 5 dias medidos",utility:"Corrigir FP/desequilibrio e usar DLM no EV",action:"Balancear fases, revisar neutro/QGBT e validar padrao 250 A com DLM"},
-{name:"Relatorio Eletrico - Muffatao Toledo",kind:"Eletrico",url:"analisadores/Relatorio_Eletrico_Muffatao_Toledo.html",peak:"24,92 kW",consumption:"0,87 MWh/mes",ev:"60 kW",status:"Relatorio eletrico vinculado",utility:"Usar para validar padrao, DLM e correcoes da rede",action:"Refletir exigencias tecnicas em projeto e obra eletrica"},
+{name:"Analise de Carga - Muffatao Toledo",kind:"Analise de carga",url:"analisadores/Relatorio_Analise_Carga_Muffatao_Toledo.html",peak:"24,92 kW",consumption:"0,89 MWh/mes",ev:"60 kW",status:"Base atualizada: 6 dias medidos",utility:"Corrigir FP/desequilibrio de corrente/tensao e usar DLM no EV",action:"Balancear fases, revisar neutro/QGBT e validar padrao 250 A com DLM"},
+{name:"Relatorio Eletrico - Muffatao Toledo",kind:"Eletrico",url:"analisadores/Relatorio_Eletrico_Muffatao_Toledo.html",peak:"24,92 kW",consumption:"0,89 MWh/mes",ev:"60 kW",status:"Relatorio eletrico vinculado",utility:"Usar para validar padrao, DLM e correcoes da rede",action:"Refletir exigencias tecnicas em projeto e obra eletrica"},
 {name:"Relatorio Carregador - Muffatao Toledo",kind:"Carregador",url:"analisadores/Relatorio_Carregador_Muffatao_Toledo.html",peak:"-",consumption:"-",ev:"60 kW",status:"Relatorio do carregador vinculado",utility:"Conferir operacao do EV com DLM",action:"Configurar limites de potencia e reserva tecnica"}
 ];
 let analysis=analysisMap[obraParam]||analysisMap.rio;
@@ -388,3 +388,4 @@ window.UBY_ACTIVITY?.refresh?.().then(renderProjectActivity).catch(err=>console.
 </script>
 </body>
 </html>
+

@@ -119,7 +119,7 @@ RELATORIOS = [
         "title": "Muffatão Toledo",
         "cliente": "Muffatão Toledo",
         "cidade": "Toledo - PR",
-        "data": "25/05/2026",
+        "data": "26/05/2026",
         "arquivo":           "Relatorio_Analise_Carga_Muffatao_Toledo.html",
         "arquivo_eletrico":  "Relatorio_Eletrico_Muffatao_Toledo.html",
         "arquivo_carregador":"Relatorio_Carregador_Muffatao_Toledo.html",
@@ -128,13 +128,13 @@ RELATORIOS = [
         "pico_kw": 24.92,
         "pico_kva": 31.89,
         "fp": 0.85,
-        "demanda_kw": 28.97,
-        "consumo_kwh": 144.83,
-        "consumo_dias": 5,
+        "demanda_kw": 29.71,
+        "consumo_kwh": 178.25,
+        "consumo_dias": 6,
         "padrao_atual": 200,
         "padrao_proposto": 250,
         "ev_kw": 60,
-        "flags": ["FP abaixo de 0,92", "Desequilíbrio corrente", "127/220 V"],
+        "flags": ["FP abaixo de 0,92", "Desequilíbrio corrente", "Desequilíbrio tensão", "127/220 V"],
     }
 ]
 
