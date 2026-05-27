@@ -687,6 +687,17 @@ function localRechargeDb() {
   return readJson(RECARGAS_LOCAL_KEY, {});
 }
 
+function updatedAtMs(record) {
+  const raw = record?.updatedAt || record?.summary?.updatedAt || record?.updated_at || '';
+  const time = raw ? new Date(raw).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function isCloudRecordNewer(local, cloud) {
+  if (!local) return true;
+  return updatedAtMs(cloud) >= updatedAtMs(local);
+}
+
 function syncGeneralRecordsFromLocal() {
   const db = localRechargeDb();
   allRechargeRecords = {};
@@ -709,6 +720,7 @@ function mergeCloudRechargeRecords(records) {
   records.forEach(record => {
     const workId = String(record?.workId || record?.summary?.workId || '').trim();
     if (!workId) return;
+    if (db[workId] && !isCloudRecordNewer(db[workId], record)) return;
     const normalized = {
       ...record,
       workId,
@@ -837,6 +849,11 @@ async function loadRechargeBase() {
   try {
     const cloud = await window.UBY_SUPABASE.loadRechargeBase(currentWorkId);
     if (cloud?.charges?.length) {
+      const currentLocal = localRecord();
+      if (currentLocal && !isCloudRecordNewer(currentLocal, cloud)) {
+        setStorageState(`Base local mais recente preservada para <strong>${currentWorkName}</strong>. Reenvie a planilha para atualizar o banco, se necessario.`);
+        return;
+      }
       const db = localRechargeDb();
       db[currentWorkId] = { ...cloud, workName: cloud.summary?.workName || currentWorkName };
       writeJson(RECARGAS_LOCAL_KEY, db);
