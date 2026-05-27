@@ -294,6 +294,16 @@
     <div class="controls" id="ctrlMensal">
       <span>Mês:</span>
       <select class="ctl-select" id="monthSelector" onchange="renderMensal()"></select>
+      <span style="margin-left:8px">Visao:</span>
+      <select class="ctl-select" id="periodMode" onchange="renderAll()">
+        <option value="mtd">Mes ate a planilha</option>
+        <option value="1">Ultimo 1 dia</option>
+        <option value="3">Ultimos 3 dias</option>
+        <option value="7">Ultimos 7 dias</option>
+        <option value="15">Ultimos 15 dias</option>
+        <option value="30">Ultimos 30 dias</option>
+        <option value="closed">Mes fechado</option>
+      </select>
       <span style="margin-left:8px">Potência:</span>
       <input  class="ctl-input"  id="chargerPower" type="number" value="7" min="1" max="360" step="0.1">
       <span>kW</span>
@@ -1218,16 +1228,85 @@ function getPower() {
 }
 
 // ── Cálculo de ocupação ───────────────────────────────────
-function occByInterval(charges) {
+function fileDate(file) {
+  if (!file) return null;
+  if (Number(file.lastModified) > 0) return new Date(Number(file.lastModified));
+  if (file.importedAt) {
+    const imported = new Date(file.importedAt);
+    if (!Number.isNaN(imported.getTime())) return imported;
+  }
+  return null;
+}
+
+function reportEndForCharges(charges) {
   const dates = charges.map(c => c.startDate).filter(Boolean);
-  if (!dates.length) return { pct: 0, hours: 0, maxKWh: 0, energy: 0, power: getPower() };
-  const power  = getPower();
-  const minD   = new Date(Math.min(...dates));
-  const maxD   = new Date(Math.max(...dates));
-  const start  = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate());
   const endDates = charges.map(c => c.endDate).filter(Boolean);
-  const lastEnd  = endDates.length ? new Date(Math.max(...endDates)) : maxD;
-  const hours  = (lastEnd - start) / 3_600_000;
+  const lastChargeEnd = endDates.length ? new Date(Math.max(...endDates)) : (dates.length ? new Date(Math.max(...dates)) : null);
+  const files = new Set(charges.map(c => c._file).filter(Boolean));
+  const fileDates = loadedFiles
+    .filter(file => files.has(file?.name))
+    .map(fileDate)
+    .filter(Boolean);
+  const reportEnd = fileDates.length ? new Date(Math.max(...fileDates)) : lastChargeEnd;
+  if (lastChargeEnd && reportEnd && reportEnd < lastChargeEnd) return lastChargeEnd;
+  return reportEnd || lastChargeEnd;
+}
+
+function periodBounds(charges) {
+  const dates = charges.map(c => c.startDate).filter(Boolean);
+  if (!dates.length) return { start: null, end: null, hours: 0 };
+  const minD = new Date(Math.min(...dates));
+  const start = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate());
+  const end = reportEndForCharges(charges);
+  const hours = end ? Math.max((end - start) / 3_600_000, 0) : 0;
+  return { start, end, hours };
+}
+
+function selectedPeriodMode() {
+  return document.getElementById('periodMode')?.value || 'mtd';
+}
+
+function monthStartDate(mk) {
+  const [y, m] = mk.split('-').map(Number);
+  return new Date(y, m - 1, 1, 0, 0, 0);
+}
+
+function monthEndDate(mk) {
+  const [y, m] = mk.split('-').map(Number);
+  return new Date(y, m, 0, 23, 59, 59);
+}
+
+function periodWindow(monthCharges, mk, mode = selectedPeriodMode()) {
+  const monthStart = monthStartDate(mk);
+  const monthEnd = monthEndDate(mk);
+  let end = mode === 'closed' ? monthEnd : (reportEndForCharges(monthCharges) || monthEnd);
+  if (end > monthEnd) end = monthEnd;
+  let start = monthStart;
+  const days = Number(mode);
+  if (Number.isFinite(days) && days > 0) {
+    start = new Date(end.getTime() - days * 86_400_000);
+    if (start < monthStart) start = monthStart;
+  }
+  const hours = Math.max((end - start) / 3_600_000, 0);
+  return { start, end, hours, mode };
+}
+
+function filterChargesByWindow(charges, window) {
+  if (!window?.start || !window?.end) return charges;
+  return charges.filter(charge => charge.startDate && charge.startDate >= window.start && charge.startDate <= window.end);
+}
+
+function periodModeLabel(mode = selectedPeriodMode()) {
+  if (mode === 'closed') return 'mes fechado';
+  if (mode === 'mtd') return 'mes ate a planilha';
+  return `ultimos ${mode} dia${String(mode) === '1' ? '' : 's'}`;
+}
+
+function occByInterval(charges, powerOverride, boundsOverride) {
+  const power = Number.isFinite(Number(powerOverride)) ? Number(powerOverride) : getPower();
+  const bounds = boundsOverride || periodBounds(charges);
+  if (!bounds.start || !bounds.end || !bounds.hours) return { pct: 0, hours: 0, maxKWh: 0, energy: 0, power };
+  const hours = bounds.hours;
   const maxKWh = power * hours;
   const energy = charges.reduce((s, c) => s + c.energyKWh, 0);
   return { pct: maxKWh > 0 ? energy / maxKWh * 100 : 0, hours, maxKWh, energy, power };
@@ -1352,10 +1431,9 @@ function renderGeral() {
   let totalMaxKWh = 0;
   unitData.forEach(unit => {
     months.forEach(mk => {
-      const hasMonth = unit.charges.some(charge => monthKey(charge.startDate) === mk);
-      if (!hasMonth) return;
-      const [y, m] = mk.split('-');
-      totalMaxKWh += daysInMonth(y, m) * 24 * workPowerById(unit.workId);
+      const monthCharges = unit.charges.filter(charge => monthKey(charge.startDate) === mk);
+      if (!monthCharges.length) return;
+      totalMaxKWh += occByInterval(monthCharges, workPowerById(unit.workId)).maxKWh;
     });
   });
   const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
@@ -1484,30 +1562,33 @@ function renderAll() {
 function renderMensal() {
   const mk      = document.getElementById('monthSelector').value;
   if (!mk) return;
-  const charges = allCharges.filter(c => monthKey(c.startDate) === mk);
-  if (!charges.length) return;
+  const monthCharges = allCharges.filter(c => monthKey(c.startDate) === mk);
+  const window = periodWindow(monthCharges, mk);
+  const charges = filterChargesByWindow(monthCharges, window);
+  if (!charges.length) {
+    setStorageState(`Sem recargas em ${periodModeLabel(window.mode)} para <strong>${currentWorkName}</strong>.`);
+    return;
+  }
 
-  renderHero(charges, mk);
-  renderKPIs(charges, mk);
+  renderHero(charges, mk, window);
+  renderKPIs(charges, mk, window);
   renderDailyChart(charges);
   renderPaymentChart(charges);
   renderUserPieChart(charges);
   renderUserBars(charges, 'userBars');
   renderFinancialNote(charges);
   renderMonthlyTable();
-  renderBaseTable(charges, mk);
+  renderBaseTable(charges, mk, window);
   renderClientsTable(charges);
   renderIdleAlerts(charges);
   renderTechDiagnostic(charges);
 }
 
-function renderHero(charges, mk) {
+function renderHero(charges, mk, window) {
   const stations = [...new Set(charges.map(c => c.station).filter(Boolean))];
-  const dates    = charges.map(c => c.startDate).filter(Boolean);
-  const minDate  = new Date(Math.min(...dates));
-  const endDates = charges.map(c => c.endDate).filter(Boolean);
-  const lastEnd  = endDates.length ? new Date(Math.max(...endDates)) : new Date(Math.max(...dates));
-  const occ      = occByInterval(charges);
+  const minDate  = window.start;
+  const lastEnd  = window.end;
+  const occ      = occByInterval(charges, undefined, window);
 
   document.getElementById('heroMeta').innerHTML =
     `Estação: <strong>${stations.join(' · ') || '—'}</strong><br>
@@ -1521,19 +1602,16 @@ function renderHero(charges, mk) {
      <strong style="color:#57B7FF">= ${fmtPct(occ.pct)}</strong>`;
 }
 
-function renderKPIs(charges, mk) {
+function renderKPIs(charges, mk, window) {
   const energy  = charges.reduce((s, c) => s + c.energyKWh, 0);
   const rev     = charges.reduce((s, c) => s + c.revenue, 0);
   const avgTkt  = charges.length ? rev / charges.length : 0;
   const avgKwh  = charges.length ? energy / charges.length : 0;
   const revKwh  = energy > 0 ? rev / energy : 0;
   const clients = new Set(charges.map(c => c.userEmail || c.userName)).size;
-  const occ     = occByInterval(charges);
+  const occ     = occByInterval(charges, undefined, window);
   const occFull = occByFullMonth(charges, mk);
-  const dates   = charges.map(c => c.startDate).filter(Boolean);
-  const minD    = new Date(Math.min(...dates));
-  const maxD    = new Date(Math.max(...dates));
-  const days    = Math.max((maxD - minD) / 86_400_000, 1);
+  const days    = Math.max(window.hours / 24, 1);
   const dMonth  = daysInMonth(mk.split('-')[0], mk.split('-')[1]);
   const proj    = dMonth / Math.max(days, 1);
 
@@ -1666,12 +1744,14 @@ function renderFinancialNote(charges) {
 
 function renderMonthlyTable() {
   document.getElementById('monthlyTable').innerHTML = getMonths().map(mk => {
-    const ch      = allCharges.filter(c => monthKey(c.startDate) === mk);
+    const monthCharges = allCharges.filter(c => monthKey(c.startDate) === mk);
+    const window = periodWindow(monthCharges, mk);
+    const ch      = filterChargesByWindow(monthCharges, window);
     const energy  = ch.reduce((s,c) => s+c.energyKWh, 0);
     const rev     = ch.reduce((s,c) => s+c.revenue, 0);
     const clients = new Set(ch.map(c => c.userEmail||c.userName)).size;
     const avgTkt  = ch.length ? rev/ch.length : 0;
-    const occ     = occByInterval(ch);
+    const occ     = occByInterval(ch, undefined, window);
     const occFull = occByFullMonth(ch, mk);
     return `<tr>
       <td>${mk}</td><td>${ch.length}</td><td>${clients}</td>
@@ -1682,13 +1762,11 @@ function renderMonthlyTable() {
   }).join('');
 }
 
-function renderBaseTable(charges, mk) {
+function renderBaseTable(charges, mk, window) {
   const stations = [...new Set(charges.map(c => c.station).filter(Boolean))];
-  const dates    = charges.map(c => c.startDate).filter(Boolean);
-  const minDate  = new Date(Math.min(...dates));
-  const endDates = charges.map(c => c.endDate).filter(Boolean);
-  const lastEnd  = endDates.length ? new Date(Math.max(...endDates)) : new Date(Math.max(...dates));
-  const hours    = (lastEnd - minDate) / 3_600_000;
+  const minDate  = window.start;
+  const lastEnd  = window.end;
+  const hours    = window.hours;
   const power    = getPower();
 
   document.getElementById('baseTable').innerHTML = `
@@ -1790,8 +1868,8 @@ function renderAcumulado() {
   const clients = new Set(allCharges.map(c => c.userEmail||c.userName)).size;
   let totalMaxKWh = 0;
   months.forEach(mk => {
-    const [y,m] = mk.split('-');
-    totalMaxKWh += daysInMonth(y,m)*24*power;
+    const ch = allCharges.filter(c => monthKey(c.startDate) === mk);
+    totalMaxKWh += occByInterval(ch, power, periodWindow(ch, mk, 'closed')).maxKWh;
   });
   const totalOcc = totalMaxKWh > 0 ? energy/totalMaxKWh*100 : 0;
 
@@ -1816,7 +1894,7 @@ function renderAcumulado() {
     const ch      = allCharges.filter(c => monthKey(c.startDate) === mk);
     const revM    = ch.reduce((s,c) => s+c.revenue, 0);
     const enerM   = ch.reduce((s,c) => s+c.energyKWh, 0);
-    const occI    = occByInterval(ch);
+    const occI    = occByInterval(ch, power, periodWindow(ch, mk, 'closed'));
     const occF    = occByFullMonth(ch, mk);
     const cln     = new Set(ch.map(c => c.userEmail||c.userName)).size;
     return { label: monthLabel(mk), mk, rev: revM, energy: enerM, occI: occI.pct, occF: occF.pct, count: ch.length, clients: cln, avgTkt: ch.length ? revM/ch.length : 0 };
