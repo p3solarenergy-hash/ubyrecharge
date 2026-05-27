@@ -278,13 +278,18 @@
   <div class="tabs-bar" id="tabsBar" style="display:none">
     <div class="tabs">
       <button class="tab active" onclick="switchTab('geral',this)">Geral</button>
-      <button class="tab"        onclick="switchTab('mensal',this)">📅 Mensal</button>
-      <button class="tab"        onclick="switchTab('acumulado',this)">📈 Acumulado</button>
-      <button class="tab"        onclick="switchTab('detalhes',this)">📋 Detalhes</button>
     </div>
     <div class="controls" id="ctrlGeral">
-      <span id="generalSourceLabel">Escolha uma unidade abaixo para abrir o relatório detalhado</span>
+      <span id="generalSourceLabel">Escolha uma estação abaixo para abrir o relatório detalhado</span>
       <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar geral</button>
+    </div>
+  </div>
+
+  <div class="tabs-bar" id="workReportTabs" style="display:none">
+    <div class="tabs">
+      <button class="tab report-tab active" onclick="switchTab('mensal',this)">📅 Mensal</button>
+      <button class="tab report-tab"        onclick="switchTab('acumulado',this)">📈 Acumulado</button>
+      <button class="tab report-tab"        onclick="switchTab('detalhes',this)">📋 Detalhes</button>
     </div>
     <div class="controls" id="ctrlMensal">
       <span>Mês:</span>
@@ -385,7 +390,7 @@
         <h2>Resumo por unidade</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Unidade</th><th>Arquivos</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket medio</th><th>Ultima recarga</th><th>Abrir</th></tr></thead>
+            <thead><tr><th>Estação</th><th>Obra</th><th>Arquivos</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket medio</th><th>Ultima recarga</th><th>Abrir</th></tr></thead>
             <tbody id="generalUnitTable"></tbody>
           </table>
         </div>
@@ -877,8 +882,8 @@ async function openWorkReport(workId, target = 'mensal') {
     document.getElementById('chargerPowerAcc').value = nextPower;
   }
   await loadRechargeBase();
-  const buttons = [...document.querySelectorAll('.tab')];
-  buttons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${target}'`)));
+  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.report-tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${target}'`)));
   showTab(target);
   if (target === 'detalhes') renderDetalhes();
 }
@@ -1169,9 +1174,12 @@ function getGeneralUnitData() {
       const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
       const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
       const dates = charges.map(charge => charge.startDate).filter(Boolean);
+      const stations = [...new Set(charges.map(charge => charge.station).filter(Boolean))];
       return {
         workId: record.workId,
         workName: record.workName || workNameById(record.workId),
+        stationName: stations[0] || record.workName || workNameById(record.workId),
+        stations,
         files: record.files || [],
         charges,
         count: charges.length,
@@ -1254,7 +1262,7 @@ function renderGeral() {
     ? `<strong>Visao geral</strong><br>${fmtBRL(revenue)} em receita<br>${fmtKWh(energy)} entregues<br><strong style="color:#57B7FF">${totalCharges} recargas em ${units} unidade(s)</strong>`
     : 'Suba a planilha em cada unidade para o painel geral acumular tudo.';
   document.getElementById('generalSourceLabel').textContent = totalCharges
-    ? `${units} unidade(s) com base salva - escolha uma para abrir`
+    ? `${units} estação(ões) com base salva - escolha uma para abrir`
     : 'Sem bases salvas para consolidar';
 
   document.getElementById('kpiGeneral').innerHTML = `
@@ -1268,19 +1276,19 @@ function renderGeral() {
 
   document.getElementById('generalUnitRank').innerHTML = unitData.length ? unitData.slice(0, 8).map(unit => `
     <div class="unit-card">
-      <div><strong>${unit.workName}</strong><span>${unit.files.length} arquivo(s) - ${unit.clients} cliente(s)</span></div>
+      <div><strong>${unit.stationName}</strong><span>Obra: ${unit.workName} - ${unit.files.length} arquivo(s) - ${unit.clients} cliente(s)</span></div>
       <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
       <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">ticket ${fmtBRL(unit.avgTicket)}</div></div>
-      <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal')">Abrir relatório</button></div>
+      <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal')">Abrir estação</button></div>
     </div>
   `).join('') : '<div class="note">Nenhuma base de recargas salva para consolidar.</div>';
 
   document.getElementById('generalUnitTable').innerHTML = unitData.length ? unitData.map(unit => `
     <tr>
-      <td>${unit.workName}</td><td>${unit.files.length}</td><td>${unit.count}</td><td>${unit.clients}</td>
+      <td>${unit.stationName}</td><td>${unit.workName}</td><td>${unit.files.length}</td><td>${unit.count}</td><td>${unit.clients}</td>
       <td>${unit.energy.toFixed(2).replace('.', ',')}</td><td>${fmtBRL(unit.revenue)}</td><td>${fmtBRL(unit.avgTicket)}</td><td>${fmtDT(unit.lastDate)}</td><td><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal')">Abrir</button></td>
     </tr>
-  `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:20px">Sem dados gerais</td></tr>';
+  `).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem dados gerais</td></tr>';
 
   function simpleBar(id, labels, values, label, color) {
     destroyChart(id);
@@ -1339,6 +1347,12 @@ function renderGeral() {
 
 // ── Render All ────────────────────────────────────────────
 function renderAll() {
+  const visibleTab =
+    document.getElementById('tabMensal').style.display === 'block' ? 'mensal' :
+    document.getElementById('tabAcumulado').style.display === 'block' ? 'acumulado' :
+    document.getElementById('tabDetalhes').style.display === 'block' ? 'detalhes' :
+    'geral';
+
   // Sincroniza inputs de potência
   getPower();
 
@@ -1354,9 +1368,9 @@ function renderAll() {
   renderAcumulado();
   renderGeral();
 
-  // Garante tab ativa = geral
-  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
-  showTab('geral');
+  document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${visibleTab}'`)));
+  showTab(visibleTab);
+  if (visibleTab === 'detalhes') renderDetalhes();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1806,6 +1820,7 @@ function renderDetalhes() {
 // ── Navegação de abas ─────────────────────────────────────
 function showTab(name) {
   const isGeneral = name === 'geral';
+  const isWorkReport = !isGeneral && name !== 'none';
   document.getElementById('tabGeral').style.display     = name === 'geral'     ? 'block' : 'none';
   document.getElementById('tabMensal').style.display    = name === 'mensal'    ? 'block' : 'none';
   document.getElementById('tabAcumulado').style.display = name === 'acumulado' ? 'block' : 'none';
@@ -1813,6 +1828,7 @@ function showTab(name) {
   document.getElementById('ctrlGeral').style.display    = name === 'geral'     ? 'flex'  : 'none';
   document.getElementById('ctrlMensal').style.display   = name === 'mensal'    ? 'flex'  : 'none';
   document.getElementById('ctrlAcc').style.display      = name === 'acumulado' ? 'flex'  : 'none';
+  document.getElementById('workReportTabs').style.display = isWorkReport ? 'flex' : 'none';
   document.querySelector('.project-bar').style.display   = isGeneral ? 'none' : '';
   document.getElementById('uploadZone').style.display    = isGeneral ? 'none' : '';
 }
