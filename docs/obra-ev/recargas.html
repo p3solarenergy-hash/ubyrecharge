@@ -81,6 +81,15 @@
     .pay-chip { background:#0B1524; border:1px solid var(--p3-border); border-left:3px solid var(--p3-primary); border-radius:8px; padding:11px 12px; }
     .pay-chip strong { display:block; color:var(--p3-text); font-size:12px; }
     .pay-chip span   { color:var(--p3-muted); font-size:11px; }
+    .general-hero { margin-top:0; align-items:center; }
+    .general-hero .value { color:#fff; font-size:clamp(30px,4vw,48px); }
+    .general-split { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
+    .unit-rank { display:grid; gap:12px; }
+    .unit-card { display:grid; grid-template-columns:minmax(180px,1fr) minmax(120px,.45fr) minmax(120px,.45fr); gap:12px; align-items:center; background:#0B1524; border:1px solid var(--p3-border); border-radius:10px; padding:12px 14px; }
+    .unit-card strong { display:block; color:var(--p3-text); font-size:13px; }
+    .unit-card span { color:var(--p3-muted); font-size:11px; }
+    .unit-card .unit-value { color:var(--p3-primary); font-weight:700; text-align:right; white-space:nowrap; }
+    .unit-card .unit-sub { color:var(--p3-muted); font-size:11px; text-align:right; }
 
     /* Canvas */
     .pie-card canvas { min-height:260px; max-height:300px; }
@@ -233,6 +242,7 @@
       .kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
       .section-3 { grid-template-columns:1fr; }
       .acc-grid { grid-template-columns:1fr; }
+      .general-split { grid-template-columns:1fr; }
     }
     @media (max-width:960px) {
       .hero,.section,.kpis { grid-template-columns:1fr; }
@@ -241,6 +251,8 @@
       .value { white-space:normal; }
       .user-row { grid-template-columns:80px 1fr; }
       .user-row strong { grid-column:2; text-align:left; }
+      .unit-card { grid-template-columns:1fr; }
+      .unit-card .unit-value,.unit-card .unit-sub { text-align:left; }
     }
   </style>
 </head>
@@ -281,9 +293,14 @@
   ════════════════════════════════════════ -->
   <div class="tabs-bar" id="tabsBar" style="display:none">
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('mensal',this)">📅 Mensal</button>
+      <button class="tab active" onclick="switchTab('geral',this)">Geral</button>
+      <button class="tab"        onclick="switchTab('mensal',this)">📅 Mensal</button>
       <button class="tab"        onclick="switchTab('acumulado',this)">📈 Acumulado</button>
       <button class="tab"        onclick="switchTab('detalhes',this)">📋 Detalhes</button>
+    </div>
+    <div class="controls" id="ctrlGeral">
+      <span id="generalSourceLabel">Consolidado das bases salvas</span>
+      <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar geral</button>
     </div>
     <div class="controls" id="ctrlMensal">
       <span>Mês:</span>
@@ -308,6 +325,59 @@
     <div class="ei">⚡</div>
     <p style="font-size:15px;font-weight:600;color:var(--p3-text);margin:0 0 8px">Nenhuma planilha carregada</p>
     <p style="font-size:13px">Arraste o arquivo .xlsx exportado da plataforma para visualizar o painel</p>
+  </div>
+
+  <div id="tabGeral" style="display:none">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/04_simbolo_badge.svg" alt="UBY"></div>
+          <div>
+            <div class="brand-name">UBY Recharge</div>
+            <div class="brand-tag">Todas as unidades</div>
+          </div>
+        </div>
+        <h1>Painel Geral de Recargas</h1>
+        <div class="meta" id="generalHeroMeta">Consolidado das bases salvas por unidade.</div>
+      </div>
+      <div class="formula" id="generalHeroFormula">Atualize as bases individuais para refletir o painel geral.</div>
+    </section>
+
+    <section class="grid kpis" id="kpiGeneral"></section>
+
+    <section class="general-split">
+      <div class="card">
+        <h2>Receita por unidade</h2>
+        <canvas id="chartGeneralRevenueUnit" aria-label="Receita por unidade"></canvas>
+      </div>
+      <div class="card">
+        <h2>Energia por unidade</h2>
+        <canvas id="chartGeneralEnergyUnit" aria-label="Energia por unidade"></canvas>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Ranking de unidades</h2>
+        <div class="unit-rank" id="generalUnitRank"></div>
+      </div>
+      <div class="card">
+        <h2>Evolucao mensal geral</h2>
+        <canvas id="chartGeneralMonth" aria-label="Evolucao mensal geral"></canvas>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Resumo por unidade</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Unidade</th><th>Arquivos</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket medio</th><th>Ultima recarga</th></tr></thead>
+            <tbody id="generalUnitTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </div>
 
   <!-- ════════════════════════════════════════
@@ -496,6 +566,7 @@
 let allCharges  = [];
 let loadedFiles = [];
 let charts      = {};
+let allRechargeRecords = {};
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -543,6 +614,17 @@ function currentWork() {
   return workOptions().find(work => work.id === currentWorkId) || workOptions()[0] || { id: 'rio', nome: 'Rio Beach EV', kw: 7 };
 }
 
+function workNameById(workId, fallback = '') {
+  const work = workOptions().find(item => item.id === workId);
+  return work?.nome || fallback || workId || 'Unidade';
+}
+
+function workPowerById(workId) {
+  const work = workOptions().find(item => item.id === workId);
+  const power = Number(work?.kw || 0);
+  return power > 0 ? power : 7;
+}
+
 function setStorageState(message, isError = false) {
   const el = document.getElementById('storageState');
   if (!el) return;
@@ -586,6 +668,42 @@ function localRechargeDb() {
   return readJson(RECARGAS_LOCAL_KEY, {});
 }
 
+function syncGeneralRecordsFromLocal() {
+  const db = localRechargeDb();
+  allRechargeRecords = {};
+  Object.entries(db).forEach(([workId, record]) => {
+    if (!record) return;
+    allRechargeRecords[workId] = {
+      ...record,
+      workId,
+      workName: record.workName || workNameById(workId),
+      files: Array.isArray(record.files) ? record.files : [],
+      charges: Array.isArray(record.charges) ? record.charges.map(hydrateCharge) : [],
+      updatedAt: record.updatedAt || record.summary?.updatedAt || ''
+    };
+  });
+}
+
+function mergeCloudRechargeRecords(records) {
+  if (!Array.isArray(records) || !records.length) return;
+  const db = localRechargeDb();
+  records.forEach(record => {
+    const workId = String(record?.workId || record?.summary?.workId || '').trim();
+    if (!workId) return;
+    const normalized = {
+      ...record,
+      workId,
+      workName: record.summary?.workName || record.workName || workNameById(workId),
+      files: Array.isArray(record.files) ? record.files : [],
+      charges: Array.isArray(record.charges) ? record.charges : [],
+      updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
+    };
+    db[workId] = normalized;
+  });
+  writeJson(RECARGAS_LOCAL_KEY, db);
+  syncGeneralRecordsFromLocal();
+}
+
 function localRecord() {
   return localRechargeDb()[currentWorkId] || null;
 }
@@ -612,6 +730,7 @@ function saveLocalRechargeBase() {
   if (!allCharges.length && !loadedFiles.length) {
     delete db[currentWorkId];
     writeJson(RECARGAS_LOCAL_KEY, db);
+    syncGeneralRecordsFromLocal();
     return;
   }
   db[currentWorkId] = {
@@ -630,6 +749,7 @@ function saveLocalRechargeBase() {
     updatedAt: new Date().toISOString()
   };
   writeJson(RECARGAS_LOCAL_KEY, db);
+  syncGeneralRecordsFromLocal();
 }
 
 async function clearCloudRechargeBase() {
@@ -658,6 +778,7 @@ async function saveRechargeBase() {
 }
 
 function applyRechargeRecord(record, sourceLabel) {
+  syncGeneralRecordsFromLocal();
   allCharges = (record?.charges || []).map(hydrateCharge);
   loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
     name: file.name,
@@ -668,12 +789,14 @@ function applyRechargeRecord(record, sourceLabel) {
   }));
   if (!allCharges.length) {
     uploadZone.classList.remove('compact');
-    document.getElementById('tabsBar').style.display = 'none';
-    document.getElementById('emptyState').style.display = 'block';
-    hideAllTabs();
     updateChips();
     document.getElementById('clearRechargeBaseBtn').style.display = 'none';
-    setStorageState(`Sem planilha salva para <strong>${currentWorkName}</strong>.`);
+    document.getElementById('tabsBar').style.display = 'flex';
+    document.getElementById('emptyState').style.display = 'none';
+    setStorageState(`Sem planilha salva para <strong>${currentWorkName}</strong>. O Painel Geral continua disponivel.`);
+    renderGeral();
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+    showTab('geral');
     return;
   }
   uploadZone.classList.add('compact');
@@ -695,7 +818,7 @@ async function loadRechargeBase() {
     const cloud = await window.UBY_SUPABASE.loadRechargeBase(currentWorkId);
     if (cloud?.charges?.length) {
       const db = localRechargeDb();
-      db[currentWorkId] = cloud;
+      db[currentWorkId] = { ...cloud, workName: cloud.summary?.workName || currentWorkName };
       writeJson(RECARGAS_LOCAL_KEY, db);
       applyRechargeRecord(cloud, 'Supabase');
     }
@@ -776,10 +899,12 @@ function removeFile(name) {
   updateChips();
   if (!allCharges.length) {
     uploadZone.classList.remove('compact');
-    document.getElementById('tabsBar').style.display    = 'none';
-    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('tabsBar').style.display    = 'flex';
+    document.getElementById('emptyState').style.display = 'none';
     document.getElementById('clearRechargeBaseBtn').style.display = 'none';
-    hideAllTabs();
+    renderGeral();
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+    showTab('geral');
   } else {
     document.getElementById('clearRechargeBaseBtn').style.display = 'inline-flex';
     renderAll();
@@ -799,11 +924,13 @@ async function clearRechargeBase() {
     setStorageState(`Base excluida neste navegador. Supabase pendente: ${err.message}`, true);
   }
   uploadZone.classList.remove('compact');
-  document.getElementById('tabsBar').style.display = 'none';
-  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('tabsBar').style.display = 'flex';
+  document.getElementById('emptyState').style.display = 'none';
   document.getElementById('clearRechargeBaseBtn').style.display = 'none';
   updateChips();
-  hideAllTabs();
+  renderGeral();
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+  showTab('geral');
 }
 
 function updateChips() {
@@ -1002,6 +1129,182 @@ function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
 }
 
+function getGeneralUnitData() {
+  syncGeneralRecordsFromLocal();
+  return Object.values(allRechargeRecords)
+    .map(record => {
+      const charges = (record.charges || []).map(hydrateCharge);
+      const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
+      const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
+      const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+      const dates = charges.map(charge => charge.startDate).filter(Boolean);
+      return {
+        workId: record.workId,
+        workName: record.workName || workNameById(record.workId),
+        files: record.files || [],
+        charges,
+        count: charges.length,
+        energy,
+        revenue,
+        clients,
+        avgTicket: charges.length ? revenue / charges.length : 0,
+        lastDate: dates.length ? new Date(Math.max(...dates)) : null,
+        updatedAt: record.updatedAt || ''
+      };
+    })
+    .filter(unit => unit.count > 0)
+    .sort((a, b) => b.revenue - a.revenue);
+}
+
+function getAllGeneralCharges(unitData) {
+  return unitData.flatMap(unit => unit.charges.map(charge => ({
+    ...charge,
+    workId: charge.workId || unit.workId,
+    workName: charge.workName || unit.workName
+  })));
+}
+
+function showGeneralWhenCurrentWorkIsEmpty() {
+  if (allCharges.length) return;
+  document.getElementById('tabsBar').style.display = 'flex';
+  document.getElementById('emptyState').style.display = 'none';
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+  showTab('geral');
+}
+
+async function refreshGeneralRechargeBases(forceCloud = false) {
+  syncGeneralRecordsFromLocal();
+  renderGeral();
+  showGeneralWhenCurrentWorkIsEmpty();
+  if (!window.UBY_SUPABASE?.loadAllRechargeBases) return;
+  try {
+    const records = await window.UBY_SUPABASE.loadAllRechargeBases();
+    if (records?.length) {
+      mergeCloudRechargeRecords(records);
+      renderGeral();
+      showGeneralWhenCurrentWorkIsEmpty();
+      if (forceCloud) setStorageState(`Painel geral atualizado com ${records.length} base(s) do Supabase.`);
+    } else if (forceCloud) {
+      setStorageState('Painel geral atualizado com as bases locais. Entre no Supabase para buscar o banco compartilhado.');
+    }
+  } catch (err) {
+    if (forceCloud) setStorageState(`Painel geral local preservado. Supabase pendente: ${err.message}`, true);
+  }
+}
+
+function renderGeral() {
+  const unitData = getGeneralUnitData();
+  const charges = getAllGeneralCharges(unitData);
+  const units = unitData.length;
+  const totalCharges = charges.length;
+  const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
+  const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
+  const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  const months = [...new Set(charges.map(charge => monthKey(charge.startDate)).filter(key => key !== 'unknown'))].sort();
+  const dates = charges.map(charge => charge.startDate).filter(Boolean);
+  const firstDate = dates.length ? new Date(Math.min(...dates)) : null;
+  const lastDate = dates.length ? new Date(Math.max(...dates)) : null;
+  const avgTicket = totalCharges ? revenue / totalCharges : 0;
+  let totalMaxKWh = 0;
+  unitData.forEach(unit => {
+    months.forEach(mk => {
+      const hasMonth = unit.charges.some(charge => monthKey(charge.startDate) === mk);
+      if (!hasMonth) return;
+      const [y, m] = mk.split('-');
+      totalMaxKWh += daysInMonth(y, m) * 24 * workPowerById(unit.workId);
+    });
+  });
+  const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
+
+  document.getElementById('generalHeroMeta').innerHTML = totalCharges
+    ? `Unidades com base: <strong>${units}</strong><br>Periodo: <strong>${fmtDT(firstDate)}</strong> ate <strong>${fmtDT(lastDate)}</strong><br>Meses consolidados: <strong>${months.length}</strong>`
+    : 'Nenhuma unidade com base de recargas salva ainda.';
+  document.getElementById('generalHeroFormula').innerHTML = totalCharges
+    ? `<strong>Visao geral</strong><br>${fmtBRL(revenue)} em receita<br>${fmtKWh(energy)} entregues<br><strong style="color:#57B7FF">${totalCharges} recargas em ${units} unidade(s)</strong>`
+    : 'Suba a planilha em cada unidade para o painel geral acumular tudo.';
+  document.getElementById('generalSourceLabel').textContent = totalCharges
+    ? `${units} unidade(s) com base salva`
+    : 'Sem bases salvas para consolidar';
+
+  document.getElementById('kpiGeneral').innerHTML = `
+    <div class="card"><div class="label">Receita total</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${units} unidade(s)</div></div>
+    <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div></div>
+    <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${totalCharges ? (energy / totalCharges).toFixed(1).replace('.', ',') : '0,0'} kWh/sessao</div></div>
+    <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
+    <div class="card"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">base por potencia de cada unidade</div></div>
+    <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${unitData[0]?.workName || '-'}</div><div class="sub">${unitData[0] ? fmtBRL(unitData[0].revenue) : 'sem dados'}</div></div>
+  `;
+
+  document.getElementById('generalUnitRank').innerHTML = unitData.length ? unitData.slice(0, 8).map(unit => `
+    <div class="unit-card">
+      <div><strong>${unit.workName}</strong><span>${unit.files.length} arquivo(s) - ${unit.clients} cliente(s)</span></div>
+      <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
+      <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">ticket ${fmtBRL(unit.avgTicket)}</div></div>
+    </div>
+  `).join('') : '<div class="note">Nenhuma base de recargas salva para consolidar.</div>';
+
+  document.getElementById('generalUnitTable').innerHTML = unitData.length ? unitData.map(unit => `
+    <tr>
+      <td>${unit.workName}</td><td>${unit.files.length}</td><td>${unit.count}</td><td>${unit.clients}</td>
+      <td>${unit.energy.toFixed(2).replace('.', ',')}</td><td>${fmtBRL(unit.revenue)}</td><td>${fmtBRL(unit.avgTicket)}</td><td>${fmtDT(unit.lastDate)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="8" style="color:var(--p3-muted);text-align:center;padding:20px">Sem dados gerais</td></tr>';
+
+  function simpleBar(id, labels, values, label, color) {
+    destroyChart(id);
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    charts[id] = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label, data: values.map(value => +value.toFixed(2)), backgroundColor: color, borderRadius: 4 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } },
+          x: { ticks: { color: '#8FA39A', font: { size: 11 } }, grid: { color: '#24364E' } }
+        }
+      }
+    });
+  }
+
+  const unitLabels = unitData.map(unit => unit.workName.length > 18 ? unit.workName.slice(0, 18) + '...' : unit.workName);
+  simpleBar('chartGeneralRevenueUnit', unitLabels, unitData.map(unit => unit.revenue), 'Receita', '#57B7FF');
+  simpleBar('chartGeneralEnergyUnit', unitLabels, unitData.map(unit => unit.energy), 'kWh', '#246BFE');
+
+  const monthData = months.map(mk => {
+    const monthCharges = charges.filter(charge => monthKey(charge.startDate) === mk);
+    return {
+      label: monthLabel(mk),
+      revenue: monthCharges.reduce((sum, charge) => sum + charge.revenue, 0),
+      energy: monthCharges.reduce((sum, charge) => sum + charge.energyKWh, 0)
+    };
+  });
+  destroyChart('chartGeneralMonth');
+  const monthCtx = document.getElementById('chartGeneralMonth');
+  if (monthCtx) {
+    charts['chartGeneralMonth'] = new Chart(monthCtx, {
+      type: 'line',
+      data: {
+        labels: monthData.map(item => item.label),
+        datasets: [
+          { label: 'Receita', data: monthData.map(item => +item.revenue.toFixed(2)), borderColor: '#57B7FF', backgroundColor: 'rgba(87,183,255,.12)', tension: .25, fill: true },
+          { label: 'kWh', data: monthData.map(item => +item.energy.toFixed(2)), borderColor: '#FFD66B', backgroundColor: 'rgba(255,214,107,.10)', tension: .25, fill: true, yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#8FA39A' } } },
+        scales: {
+          y: { beginAtZero: true, ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } },
+          y1: { beginAtZero: true, position: 'right', ticks: { color: '#8FA39A' }, grid: { drawOnChartArea: false } },
+          x: { ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } }
+        }
+      }
+    });
+  }
+}
+
 // ── Render All ────────────────────────────────────────────
 function renderAll() {
   // Sincroniza inputs de potência
@@ -1017,10 +1320,11 @@ function renderAll() {
 
   renderMensal();
   renderAcumulado();
+  renderGeral();
 
-  // Garante tab ativa = mensal
+  // Garante tab ativa = geral
   document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
-  showTab('mensal');
+  showTab('geral');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1469,9 +1773,11 @@ function renderDetalhes() {
 
 // ── Navegação de abas ─────────────────────────────────────
 function showTab(name) {
+  document.getElementById('tabGeral').style.display     = name === 'geral'     ? 'block' : 'none';
   document.getElementById('tabMensal').style.display    = name === 'mensal'    ? 'block' : 'none';
   document.getElementById('tabAcumulado').style.display = name === 'acumulado' ? 'block' : 'none';
   document.getElementById('tabDetalhes').style.display  = name === 'detalhes'  ? 'block' : 'none';
+  document.getElementById('ctrlGeral').style.display    = name === 'geral'     ? 'flex'  : 'none';
   document.getElementById('ctrlMensal').style.display   = name === 'mensal'    ? 'flex'  : 'none';
   document.getElementById('ctrlAcc').style.display      = name === 'acumulado' ? 'flex'  : 'none';
 }
@@ -1482,6 +1788,7 @@ function switchTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   showTab(name);
+  if (name === 'geral') renderGeral();
   if (name === 'detalhes') renderDetalhes();
 }
 
@@ -1489,6 +1796,7 @@ initWorkSelector();
 document.getElementById('importMonth').value = new Date().toISOString().slice(0, 7);
 document.getElementById('clearRechargeBaseBtn').addEventListener('click', clearRechargeBase);
 loadRechargeBase();
+refreshGeneralRechargeBases();
 </script>
 </body>
 </html>
