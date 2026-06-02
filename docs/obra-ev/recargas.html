@@ -425,7 +425,7 @@
         <h2>Resumo por unidade</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Estação</th><th>Obra</th><th>Arquivos</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket medio</th><th>Ultima recarga</th><th>Abrir</th></tr></thead>
+            <thead><tr><th>Estação</th><th>Obra</th><th>Arquivos</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Total AC</th><th>Total DC</th><th>Carreg. AC</th><th>Carreg. DC</th><th>Ticket medio</th><th>Ultima recarga</th><th>Abrir</th></tr></thead>
             <tbody id="generalUnitTable"></tbody>
           </table>
         </div>
@@ -1750,6 +1750,67 @@ function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
 }
 
+function chargerKind(charge = {}) {
+  const raw = `${charge.connType || ''} ${charge.station || ''}`.toUpperCase();
+  const normalized = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const powerMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*KW/);
+  const power = powerMatch ? Number(powerMatch[1].replace(',', '.')) : NaN;
+  if (/\bDC\b|\bCCS\b|CHADEMO|FAST|RAPID|RAPID[OA]/.test(normalized)) return 'dc';
+  if (/\bAC\b|TYPE\s*2|TIPO\s*2/.test(normalized)) return 'ac';
+  if (Number.isFinite(power)) return power > 30 ? 'dc' : 'ac';
+  return 'unknown';
+}
+
+function chargerKey(charge = {}) {
+  const key = `${charge.station || ''}|${charge.connType || ''}`.trim().toLowerCase();
+  return key || `${charge.workId || ''}|sem-identificacao`;
+}
+
+function generalAcDcStats(charges = []) {
+  const stats = {
+    acCharges: 0,
+    dcCharges: 0,
+    unknownCharges: 0,
+    acEnergy: 0,
+    dcEnergy: 0,
+    unknownEnergy: 0,
+    acRevenue: 0,
+    dcRevenue: 0,
+    unknownRevenue: 0,
+    acChargers: 0,
+    dcChargers: 0
+  };
+  const acKeys = new Set();
+  const dcKeys = new Set();
+
+  charges.forEach(charge => {
+    const kind = chargerKind(charge);
+    const energy = Number(charge.energyKWh || 0);
+    const revenue = Number(charge.revenue || 0);
+    if (kind === 'dc') {
+      stats.dcCharges += 1;
+      stats.dcEnergy += energy;
+      stats.dcRevenue += revenue;
+      dcKeys.add(chargerKey(charge));
+      return;
+    }
+    if (kind === 'ac') {
+      stats.acCharges += 1;
+      stats.acEnergy += energy;
+      stats.acRevenue += revenue;
+      acKeys.add(chargerKey(charge));
+      return;
+    }
+    stats.unknownCharges += 1;
+    stats.unknownEnergy += energy;
+    stats.unknownRevenue += revenue;
+  });
+
+  stats.acChargers = acKeys.size || (stats.acCharges ? 1 : 0);
+  stats.dcChargers = dcKeys.size || (stats.dcCharges ? 1 : 0);
+  return stats;
+}
+
 function getGeneralUnitData() {
   syncGeneralRecordsFromLocal();
   return Object.values(allRechargeRecords)
@@ -1760,6 +1821,7 @@ function getGeneralUnitData() {
       const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
       const dates = charges.map(charge => charge.startDate).filter(Boolean);
       const stations = [...new Set(charges.map(charge => charge.station).filter(Boolean))];
+      const acdc = generalAcDcStats(charges);
       return {
         workId: record.workId,
         workName: record.workName || workNameById(record.workId),
@@ -1773,6 +1835,7 @@ function getGeneralUnitData() {
         clients,
         avgTicket: charges.length ? revenue / charges.length : 0,
         lastDate: dates.length ? new Date(Math.max(...dates)) : null,
+        acdc,
         updatedAt: record.updatedAt || ''
       };
     })
@@ -1806,6 +1869,7 @@ function getGeneralStationRows(unitData) {
       clients: 0,
       avgTicket: 0,
       lastDate: null,
+      acdc: generalAcDcStats([]),
       updatedAt: ''
     };
   }).sort((a, b) => (b.count > 0) - (a.count > 0) || String(a.stationName).localeCompare(String(b.stationName)));
@@ -1843,6 +1907,7 @@ function renderGeral() {
   const unitData = getGeneralUnitData();
   const stationRows = getGeneralStationRows(unitData);
   const charges = getAllGeneralCharges(unitData);
+  const acdc = generalAcDcStats(charges);
   const units = unitData.length;
   const totalCharges = charges.length;
   const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
@@ -1872,7 +1937,7 @@ function renderGeral() {
     ? `Unidades com base: <strong>${units}</strong><br>Periodo: <strong>${fmtDT(firstPeriod)}</strong> ate <strong>${fmtDT(lastPeriod)}</strong><br>Meses consolidados: <strong>${months.length}</strong>`
     : 'Nenhuma unidade com base de recargas salva ainda.';
   document.getElementById('generalHeroFormula').innerHTML = totalCharges
-    ? `<strong>Visao geral</strong><br>${fmtBRL(revenue)} em receita<br>${fmtKWh(energy)} entregues<br><strong style="color:#57B7FF">${totalCharges} recargas em ${units} unidade(s)</strong>`
+    ? `<strong>Visao geral</strong><br>${fmtBRL(revenue)} em receita<br>${fmtKWh(energy)} entregues<br><strong style="color:#57B7FF">${totalCharges} recargas em ${units} unidade(s)</strong><br>AC: ${acdc.acCharges} recargas / DC: ${acdc.dcCharges} recargas`
     : 'Suba a planilha em cada unidade para o painel geral acumular tudo.';
   document.getElementById('generalSourceLabel').textContent = totalCharges
     ? `${units} estação(ões) com base salva - escolha uma para abrir`
@@ -1885,6 +1950,10 @@ function renderGeral() {
     <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
     <div class="card"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">mes ate a planilha, igual ao mensal</div></div>
     <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${unitData[0]?.workName || '-'}</div><div class="sub">${unitData[0] ? fmtBRL(unitData[0].revenue) : 'sem dados'}</div></div>
+    <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
+    <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
+    <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
+    <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
   `;
   renderGeneralFinance(unitData);
 
@@ -1892,7 +1961,7 @@ function renderGeral() {
     <div class="unit-card">
       <div><strong>${unit.stationName}</strong><span>Obra: ${unit.workName} - ${unit.files.length} arquivo(s) - ${unit.clients} cliente(s)</span></div>
       <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
-      <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">ticket ${fmtBRL(unit.avgTicket)}</div></div>
+      <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">AC ${unit.acdc.acCharges} / DC ${unit.acdc.dcCharges}</div></div>
       <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal')">Abrir estação</button></div>
     </div>
   `).join('') : '<div class="note">Nenhuma obra cadastrada para abrir.</div>';
@@ -1900,9 +1969,9 @@ function renderGeral() {
   document.getElementById('generalUnitTable').innerHTML = stationRows.length ? stationRows.map(unit => `
     <tr>
       <td>${unit.stationName}</td><td>${unit.workName}</td><td>${unit.files.length}</td><td>${unit.count}</td><td>${unit.clients}</td>
-      <td>${unit.energy.toFixed(2).replace('.', ',')}</td><td>${fmtBRL(unit.revenue)}</td><td>${fmtBRL(unit.avgTicket)}</td><td>${fmtDT(unit.lastDate)}</td><td><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal')">Abrir</button></td>
+      <td>${unit.energy.toFixed(2).replace('.', ',')}</td><td>${fmtBRL(unit.revenue)}</td><td>${unit.acdc.acCharges}</td><td>${unit.acdc.dcCharges}</td><td>${unit.acdc.acChargers}</td><td>${unit.acdc.dcChargers}</td><td>${fmtBRL(unit.avgTicket)}</td><td>${fmtDT(unit.lastDate)}</td><td><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal')">Abrir</button></td>
     </tr>
-  `).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem obras para abrir</td></tr>';
+  `).join('') : '<tr><td colspan="14" style="color:var(--p3-muted);text-align:center;padding:20px">Sem obras para abrir</td></tr>';
 
   function simpleBar(id, labels, values, label, color) {
     destroyChart(id);
