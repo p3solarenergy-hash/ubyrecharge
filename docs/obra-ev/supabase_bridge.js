@@ -302,7 +302,8 @@
     const charges = Array.isArray(payload?.charges) ? payload.charges : [];
     const summary = {
       ...(payload?.summary || {}),
-      monthlyClosings: payload?.monthlyClosings || payload?.summary?.monthlyClosings || {}
+      monthlyClosings: payload?.monthlyClosings || payload?.summary?.monthlyClosings || {},
+      financialSettings: payload?.financialSettings || payload?.summary?.financialSettings || {}
     };
     const { error } = await sb.from("obra_recargas_base").upsert({
       obra_id: String(workId || "geral"),
@@ -353,6 +354,7 @@
       files: data.arquivos || [],
       charges: data.recargas || [],
       monthlyClosings: data.resumo?.monthlyClosings || {},
+      financialSettings: data.resumo?.financialSettings || {},
       summary: data.resumo || {},
       updatedAt: data.updated_at
     };
@@ -373,6 +375,7 @@
       files: row.arquivos || [],
       charges: row.recargas || [],
       monthlyClosings: row.resumo?.monthlyClosings || {},
+      financialSettings: row.resumo?.financialSettings || {},
       summary: row.resumo || {},
       updatedAt: row.updated_at
     }));

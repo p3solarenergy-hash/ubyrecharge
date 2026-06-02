@@ -289,6 +289,7 @@
     <div class="tabs">
       <button class="tab report-tab active" onclick="switchTab('mensal',this)">📅 Mensal</button>
       <button class="tab report-tab"        onclick="switchTab('acumulado',this)">📈 Acumulado</button>
+      <button class="tab report-tab"        onclick="switchTab('financeiro',this)">Financeiro</button>
       <button class="tab report-tab"        onclick="switchTab('detalhes',this)">📋 Detalhes</button>
     </div>
     <div class="controls" id="ctrlMensal">
@@ -315,6 +316,11 @@
       <input  class="ctl-input"  id="chargerPowerAcc" type="number" value="7" min="1" max="360" step="0.1">
       <span>kW</span>
       <button class="btn-recalc" onclick="renderAll()">↺ Recalcular</button>
+    </div>
+    <div class="controls" id="ctrlFinanceiro" style="display:none">
+      <span>Mes:</span>
+      <select class="ctl-select" id="financeMonthSelector" onchange="renderFinanceiro()"></select>
+      <button class="btn-recalc" onclick="saveFinancialSettings()">Salvar financeiro</button>
     </div>
   </div>
 
@@ -571,6 +577,52 @@
   <!-- ════════════════════════════════════════
        TAB: DETALHES
   ════════════════════════════════════════ -->
+  <div id="tabFinanceiro" style="display:none">
+    <section class="hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/04_simbolo_badge.svg" alt="UBY"></div>
+          <div>
+            <div class="brand-name">UBY Recharge</div>
+            <div class="brand-tag">Painel financeiro por ponto</div>
+          </div>
+        </div>
+        <h1>Financeiro de Recargas</h1>
+        <div class="meta" id="financeHeroMeta">Configure percentuais e custos do ponto.</div>
+      </div>
+      <div class="formula" id="financeFormula">Resultado liquido = gestao + plataforma - custos.</div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <h2>Parametros do ponto</h2>
+        <table><tbody>
+          <tr><td>% gestao UBY</td><td><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="renderFinanceiro(false)"></td></tr>
+          <tr><td>% plataforma</td><td><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false)"></td></tr>
+          <tr><td>Custo energia R$/kWh</td><td><input class="ctl-input" id="financeEnergyCost" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false)"></td></tr>
+          <tr><td>Outros custos do ponto</td><td><input class="ctl-input" id="financeOtherCosts" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false)"></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <h2>Distribuicao da receita</h2>
+        <table><tbody id="financeDistributionTable"></tbody></table>
+      </div>
+    </section>
+
+    <section class="grid kpis" id="financeKpis"></section>
+
+    <section class="section">
+      <div class="card">
+        <h2>Resultado financeiro</h2>
+        <table><tbody id="financeResultTable"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Leitura</h2>
+        <div class="note" id="financeNote"></div>
+      </div>
+    </section>
+  </div><!-- /tabFinanceiro -->
+
   <div id="tabDetalhes" style="display:none">
     <div class="card" style="margin-top:0">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
@@ -613,6 +665,7 @@ let charts      = {};
 let allRechargeRecords = {};
 let openingWorkReport = false;
 let monthlyClosings = {};
+let financialSettings = {};
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -776,6 +829,7 @@ function rechargeSummary() {
     charges: allCharges.length,
     files: loadedFiles.length,
     monthlyClosings,
+    financialSettings,
     energyKWh: energy,
     revenue,
     firstDate: dates.length ? new Date(Math.min(...dates)).toISOString() : '',
@@ -805,6 +859,7 @@ function saveLocalRechargeBase() {
     })),
     charges: allCharges.map(serializeCharge),
     monthlyClosings,
+    financialSettings,
     summary: rechargeSummary(),
     updatedAt: new Date().toISOString()
   };
@@ -841,6 +896,7 @@ function applyRechargeRecord(record, sourceLabel) {
   syncGeneralRecordsFromLocal();
   allCharges = (record?.charges || []).map(hydrateCharge);
   monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
+  financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
   loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
     name: file.name,
     size: file.size || 0,
@@ -1016,6 +1072,7 @@ async function clearRechargeBase() {
   allCharges = [];
   loadedFiles = [];
   monthlyClosings = {};
+  financialSettings = {};
   saveLocalRechargeBase();
   try {
     await clearCloudRechargeBase();
@@ -1304,6 +1361,119 @@ async function closeSelectedMonth() {
   monthlyClosings = { ...monthlyClosings, [mk]: closing };
   renderMonthClosing(mk);
   setFeedback(`Fechamento de ${monthLabel(mk)} salvo.`, 'up-loading');
+  await saveRechargeBase();
+}
+
+function numberInputValue(id, fallback = 0) {
+  const value = parseFloat(document.getElementById(id)?.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function defaultFinanceSettings() {
+  return {
+    managementPct: 5,
+    platformPct: 0,
+    energyCostPerKWh: 0,
+    otherCosts: 0
+  };
+}
+
+function currentFinanceSettingsFromInputs() {
+  return {
+    managementPct: numberInputValue('financeMgmtPct', 5),
+    platformPct: numberInputValue('financePlatformPct', 0),
+    energyCostPerKWh: numberInputValue('financeEnergyCost', 0),
+    otherCosts: numberInputValue('financeOtherCosts', 0)
+  };
+}
+
+function applyFinanceSettingsToInputs(settings = {}) {
+  const merged = { ...defaultFinanceSettings(), ...settings };
+  const fields = {
+    financeMgmtPct: merged.managementPct,
+    financePlatformPct: merged.platformPct,
+    financeEnergyCost: merged.energyCostPerKWh,
+    financeOtherCosts: merged.otherCosts
+  };
+  Object.entries(fields).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = Number(value || 0);
+  });
+}
+
+function financeMonthKey() {
+  return document.getElementById('financeMonthSelector')?.value || document.getElementById('monthSelector')?.value || getMonths().at(-1) || '';
+}
+
+function renderFinanceiro(applySaved = true) {
+  const months = getMonths();
+  const selector = document.getElementById('financeMonthSelector');
+  if (selector) {
+    const current = selector.value || document.getElementById('monthSelector')?.value || months.at(-1) || '';
+    selector.innerHTML = months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+    selector.value = months.includes(current) ? current : (months.at(-1) || '');
+  }
+  const mk = financeMonthKey();
+  if (!mk) return;
+  if (applySaved) applyFinanceSettingsToInputs(financialSettings[mk] || financialSettings.default || defaultFinanceSettings());
+  const settings = currentFinanceSettingsFromInputs();
+  const charges = allCharges.filter(c => monthKey(c.startDate) === mk);
+  const revenue = charges.reduce((sum, c) => sum + c.revenue, 0);
+  const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
+  const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
+  const management = revenue * settings.managementPct / 100;
+  const platform = revenue * settings.platformPct / 100;
+  const ownerShare = Math.max(revenue - management - platform, 0);
+  const energyCost = energy * settings.energyCostPerKWh;
+  const otherCosts = settings.otherCosts;
+  const ubyGross = management + platform;
+  const ubyNet = ubyGross - energyCost - otherCosts;
+  const margin = revenue ? ubyNet / revenue * 100 : 0;
+  const ubyTakePct = revenue ? ubyGross / revenue * 100 : 0;
+
+  document.getElementById('financeHeroMeta').innerHTML =
+    `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}`;
+  document.getElementById('financeFormula').innerHTML =
+    `<strong>Modelo configurado</strong><br>Gestao ${settings.managementPct}% + plataforma ${settings.platformPct}%<br>Custos: energia ${fmtBRL(energyCost)} + outros ${fmtBRL(otherCosts)}<br><strong style="color:#57B7FF">Lucro liquido UBY: ${fmtBRL(ubyNet)}</strong>`;
+
+  document.getElementById('financeKpis').innerHTML = `
+    <div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>
+    <div class="card"><div class="label">Gestao UBY</div><div class="value">${fmtBRL(management)}</div><div class="sub">${settings.managementPct}% da receita</div></div>
+    <div class="card"><div class="label">Plataforma</div><div class="value">${fmtBRL(platform)}</div><div class="sub">${settings.platformPct}% da receita</div></div>
+    <div class="card"><div class="label">Repasse dono</div><div class="value">${fmtBRL(ownerShare)}</div><div class="sub">receita - gestao - plataforma</div></div>
+    <div class="card"><div class="label">Lucro liquido UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos custos configurados</div></div>
+    <div class="card"><div class="label">Margem liquida</div><div class="value">${fmtPct(margin)}</div><div class="bar"><span style="width:${Math.min(Math.max(margin,0),100).toFixed(1)}%"></span></div><div class="sub">lucro / receita</div></div>
+  `;
+  document.getElementById('financeDistributionTable').innerHTML = `
+    <tr><td>Receita total</td><td>${fmtBRL(revenue)}</td></tr>
+    <tr><td>Gestao UBY (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>
+    <tr><td>Plataforma (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>
+    <tr><td>Repasse estimado ao dono</td><td>${fmtBRL(ownerShare)}</td></tr>
+    <tr><td>Percentual UBY bruto</td><td>${fmtPct(ubyTakePct)}</td></tr>
+  `;
+  document.getElementById('financeResultTable').innerHTML = `
+    <tr><td>Receita UBY bruta</td><td>${fmtBRL(ubyGross)}</td></tr>
+    <tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>
+    <tr><td>Outros custos</td><td>${fmtBRL(otherCosts)}</td></tr>
+    <tr><td>Resultado liquido UBY</td><td>${fmtBRL(ubyNet)}</td></tr>
+    <tr><td>Margem liquida</td><td>${fmtPct(margin)}</td></tr>
+  `;
+  document.getElementById('financeNote').innerHTML =
+    ubyNet >= 0
+      ? `Com os parametros atuais, este ponto gera ${fmtBRL(ubyNet)} liquidos para a UBY no mes. O dono do ponto fica com ${fmtBRL(ownerShare)} antes de custos proprios dele.`
+      : `Com os parametros atuais, este ponto fica negativo em ${fmtBRL(Math.abs(ubyNet))}. Revise custo de energia, outros custos ou percentual de gestao/plataforma.`;
+}
+
+async function saveFinancialSettings() {
+  const mk = financeMonthKey();
+  if (!mk) return;
+  financialSettings = {
+    ...financialSettings,
+    [mk]: currentFinanceSettingsFromInputs(),
+    default: currentFinanceSettingsFromInputs()
+  };
+  renderFinanceiro(false);
+  setFeedback(`Financeiro de ${monthLabel(mk)} salvo para ${currentWorkName}.`, 'up-loading');
   await saveRechargeBase();
 }
 
@@ -1628,6 +1798,7 @@ function renderAll() {
   const visibleTab =
     document.getElementById('tabMensal').style.display === 'block' ? 'mensal' :
     document.getElementById('tabAcumulado').style.display === 'block' ? 'acumulado' :
+    document.getElementById('tabFinanceiro').style.display === 'block' ? 'financeiro' :
     document.getElementById('tabDetalhes').style.display === 'block' ? 'detalhes' :
     'geral';
 
@@ -1644,11 +1815,13 @@ function renderAll() {
 
   renderMensal();
   renderAcumulado();
+  renderFinanceiro();
   renderGeral();
 
   document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${visibleTab}'`)));
   showTab(visibleTab);
   if (visibleTab === 'detalhes') renderDetalhes();
+  if (visibleTab === 'financeiro') renderFinanceiro();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2104,10 +2277,12 @@ function showTab(name) {
   document.getElementById('tabGeral').style.display     = name === 'geral'     ? 'block' : 'none';
   document.getElementById('tabMensal').style.display    = name === 'mensal'    ? 'block' : 'none';
   document.getElementById('tabAcumulado').style.display = name === 'acumulado' ? 'block' : 'none';
+  document.getElementById('tabFinanceiro').style.display = name === 'financeiro' ? 'block' : 'none';
   document.getElementById('tabDetalhes').style.display  = name === 'detalhes'  ? 'block' : 'none';
   document.getElementById('ctrlGeral').style.display    = name === 'geral'     ? 'flex'  : 'none';
   document.getElementById('ctrlMensal').style.display   = name === 'mensal'    ? 'flex'  : 'none';
   document.getElementById('ctrlAcc').style.display      = name === 'acumulado' ? 'flex'  : 'none';
+  document.getElementById('ctrlFinanceiro').style.display = name === 'financeiro' ? 'flex' : 'none';
   document.getElementById('workReportTabs').style.display = isWorkReport ? 'flex' : 'none';
   document.querySelector('.project-bar').style.display   = isGeneral ? 'none' : '';
   document.getElementById('uploadZone').style.display    = isGeneral ? 'none' : '';
@@ -2121,6 +2296,7 @@ function switchTab(name, btn) {
   showTab(name);
   if (name === 'geral') renderGeral();
   if (name === 'detalhes') renderDetalhes();
+  if (name === 'financeiro') renderFinanceiro();
 }
 
 initWorkSelector();
