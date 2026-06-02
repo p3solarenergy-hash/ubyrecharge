@@ -11,13 +11,14 @@
   const analyzersHref = inPrototypes ? "../../docs/obra-ev/analisadores/dashboard.html" : base + "analisadores/dashboard.html";
   const marketHref = inPrototypes ? "../../docs/obra-ev/mercado.html" : base + "mercado.html";
   const recargasHref = inPrototypes ? "../../docs/obra-ev/recargas.html" : base + "recargas.html";
+  const recargasFinanceiroHref = inPrototypes ? "../../docs/obra-ev/recargas-financeiro.html" : base + "recargas-financeiro.html";
   const tasksHref = inAnalyzers ? "../../tarefas/" : inTasks ? "./" : inRoot ? "tarefas/" : "../tarefas/";
   const loginHref = inAnalyzers ? "../login.html" : inPrototypes ? "../../docs/obra-ev/login.html" : inTasks ? "../obra-ev/login.html" : inRoot ? "obra-ev/login.html" : "login.html";
   const current = location.pathname.split("/").pop() || "index.html";
   const isDetail = current === "gestao_obra_ev_detalhe.html";
   const isEngineering = current === "engenharia.html";
   const isMarket = current === "mercado.html";
-  const isRecargas = current === "recargas.html";
+  const isRecargas = current === "recargas.html" || current === "recargas-financeiro.html";
   const isLogin = current === "login.html";
   const isAnalyzer = inAnalyzers;
   const isDashboard = (current === "index.html" && inObras && !inAnalyzers) || current === "gestao_obra_ev.html";
@@ -59,6 +60,7 @@
         ["Dashboard obras", dashboardHref, "O", isDashboard && !isHome, "dashboard"],
         ["Mercado", marketHref, "M", isMarket, "market"],
         ["Recargas", recargasHref, "G", isRecargas, "recargas"],
+        ["Financeiro recargas", recargasFinanceiroHref, "F", current === "recargas-financeiro.html", "recargas"],
         ["Portal engenharia", engineeringHref, "E", isEngineering, "engineering"]
       ]
     },
@@ -69,6 +71,7 @@
         ["Concessionaria", engineeringHref, "K", isEngineering, "utility"],
         ["Orcamentos", dashboardHref + "#obras", "R", false, "budgets"],
         ["Operacao de recargas", recargasHref, "G", isRecargas, "recargas"],
+        ["Financeiro recargas", recargasFinanceiroHref, "F", current === "recargas-financeiro.html", "recargas"],
         ["Analisadores", analyzersHref, "A", isAnalyzer, "analyzers"]
       ]
     },

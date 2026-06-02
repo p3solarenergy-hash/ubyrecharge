@@ -380,6 +380,8 @@
 
     <section class="grid kpis" id="kpiGeneral"></section>
 
+    <section class="grid kpis" id="kpiGeneralFinance"></section>
+
     <section class="general-split">
       <div class="card">
         <h2>Receita por unidade</h2>
@@ -388,6 +390,22 @@
       <div class="card">
         <h2>Energia por unidade</h2>
         <canvas id="chartGeneralEnergyUnit" aria-label="Energia por unidade"></canvas>
+      </div>
+    </section>
+
+    <section class="section" id="generalFinanceSection" style="margin-top:18px">
+      <div class="card">
+        <h2>Financeiro consolidado</h2>
+        <table><tbody id="generalFinanceTable"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Financeiro por unidade</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Unidade</th><th>Receita</th><th>Gestao</th><th>Plataforma</th><th>Repasse dono</th><th>Custos</th><th>Lucro UBY</th><th>Margem</th></tr></thead>
+            <tbody id="generalFinanceUnitTable"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -789,6 +807,7 @@ function syncGeneralRecordsFromLocal() {
       workName: record.workName || workNameById(workId),
       files: Array.isArray(record.files) ? record.files : [],
       charges: Array.isArray(record.charges) ? record.charges.map(hydrateCharge) : [],
+      financialSettings: record.financialSettings || record.summary?.financialSettings || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || ''
     };
   });
@@ -807,6 +826,7 @@ function mergeCloudRechargeRecords(records) {
       workName: record.summary?.workName || record.workName || workNameById(workId),
       files: Array.isArray(record.files) ? record.files : [],
       charges: Array.isArray(record.charges) ? record.charges : [],
+      financialSettings: record.financialSettings || record.summary?.financialSettings || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
     db[workId] = normalized;
@@ -1477,6 +1497,81 @@ async function saveFinancialSettings() {
   await saveRechargeBase();
 }
 
+function financeForCharges(charges, settings = {}) {
+  const cfg = { ...defaultFinanceSettings(), ...settings };
+  const revenue = charges.reduce((sum, c) => sum + c.revenue, 0);
+  const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
+  const management = revenue * cfg.managementPct / 100;
+  const platform = revenue * cfg.platformPct / 100;
+  const ownerShare = Math.max(revenue - management - platform, 0);
+  const energyCost = energy * cfg.energyCostPerKWh;
+  const otherCosts = cfg.otherCosts;
+  const costs = energyCost + otherCosts;
+  const ubyGross = management + platform;
+  const ubyNet = ubyGross - costs;
+  const margin = revenue ? ubyNet / revenue * 100 : 0;
+  return { revenue, energy, management, platform, ownerShare, energyCost, otherCosts, costs, ubyGross, ubyNet, margin };
+}
+
+function generalFinanceByUnit(unitData) {
+  return unitData.map(unit => {
+    const byMonth = {};
+    unit.charges.forEach(charge => {
+      const mk = monthKey(charge.startDate);
+      if (mk === 'unknown') return;
+      (byMonth[mk] ||= []).push(charge);
+    });
+    const settings = allRechargeRecords[unit.workId]?.financialSettings || {};
+    const total = Object.entries(byMonth).reduce((acc, [mk, charges]) => {
+      const result = financeForCharges(charges, settings[mk] || settings.default || defaultFinanceSettings());
+      Object.keys(result).forEach(key => acc[key] = (acc[key] || 0) + result[key]);
+      return acc;
+    }, {});
+    total.margin = total.revenue ? total.ubyNet / total.revenue * 100 : 0;
+    return { ...unit, finance: total };
+  });
+}
+
+function renderGeneralFinance(unitData) {
+  const rows = generalFinanceByUnit(unitData);
+  const total = rows.reduce((acc, row) => {
+    Object.entries(row.finance || {}).forEach(([key, value]) => {
+      if (key !== 'margin') acc[key] = (acc[key] || 0) + Number(value || 0);
+    });
+    return acc;
+  }, {});
+  total.margin = total.revenue ? total.ubyNet / total.revenue * 100 : 0;
+  const best = [...rows].sort((a, b) => (b.finance?.ubyNet || 0) - (a.finance?.ubyNet || 0))[0];
+  document.getElementById('kpiGeneralFinance').innerHTML = `
+    <div class="card"><div class="label">Receita financeira</div><div class="value">${fmtBRL(total.revenue || 0)}</div><div class="sub">base das recargas</div></div>
+    <div class="card"><div class="label">Gestao UBY</div><div class="value">${fmtBRL(total.management || 0)}</div><div class="sub">percentuais por ponto</div></div>
+    <div class="card"><div class="label">Plataforma</div><div class="value">${fmtBRL(total.platform || 0)}</div><div class="sub">percentuais por ponto</div></div>
+    <div class="card"><div class="label">Repasse donos</div><div class="value">${fmtBRL(total.ownerShare || 0)}</div><div class="sub">estimado</div></div>
+    <div class="card"><div class="label">Lucro UBY</div><div class="value">${fmtBRL(total.ubyNet || 0)}</div><div class="sub">apos custos</div></div>
+    <div class="card"><div class="label">Margem UBY</div><div class="value">${fmtPct(total.margin || 0)}</div><div class="bar"><span style="width:${Math.min(Math.max(total.margin || 0,0),100).toFixed(1)}%"></span></div><div class="sub">lucro / receita</div></div>
+  `;
+  document.getElementById('generalFinanceTable').innerHTML = `
+    <tr><td>Receita total das recargas</td><td>${fmtBRL(total.revenue || 0)}</td></tr>
+    <tr><td>Receita UBY bruta</td><td>${fmtBRL((total.management || 0) + (total.platform || 0))}</td></tr>
+    <tr><td>Custos configurados</td><td>${fmtBRL(total.costs || 0)}</td></tr>
+    <tr><td>Resultado liquido UBY</td><td>${fmtBRL(total.ubyNet || 0)}</td></tr>
+    <tr><td>Margem liquida UBY</td><td>${fmtPct(total.margin || 0)}</td></tr>
+    <tr><td>Melhor unidade financeira</td><td>${best ? `${best.workName} - ${fmtBRL(best.finance.ubyNet || 0)}` : '-'}</td></tr>
+  `;
+  document.getElementById('generalFinanceUnitTable').innerHTML = rows.length ? rows.map(row => `
+    <tr>
+      <td>${row.workName}</td>
+      <td>${fmtBRL(row.finance.revenue || 0)}</td>
+      <td>${fmtBRL(row.finance.management || 0)}</td>
+      <td>${fmtBRL(row.finance.platform || 0)}</td>
+      <td>${fmtBRL(row.finance.ownerShare || 0)}</td>
+      <td>${fmtBRL(row.finance.costs || 0)}</td>
+      <td>${fmtBRL(row.finance.ubyNet || 0)}</td>
+      <td>${fmtPct(row.finance.margin || 0)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="8" style="color:var(--p3-muted);text-align:center;padding:20px">Sem bases financeiras para consolidar</td></tr>';
+}
+
 // ── Potência ──────────────────────────────────────────────
 function getPower() {
   const v = parseFloat(document.getElementById('chargerPower').value);
@@ -1721,6 +1816,7 @@ function renderGeral() {
     <div class="card"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">mes ate a planilha, igual ao mensal</div></div>
     <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${unitData[0]?.workName || '-'}</div><div class="sub">${unitData[0] ? fmtBRL(unitData[0].revenue) : 'sem dados'}</div></div>
   `;
+  renderGeneralFinance(unitData);
 
   document.getElementById('generalUnitRank').innerHTML = stationRows.length ? stationRows.slice(0, 12).map(unit => `
     <div class="unit-card">
@@ -2299,11 +2395,20 @@ function switchTab(name, btn) {
   if (name === 'financeiro') renderFinanceiro();
 }
 
+function openGeneralFinanceView() {
+  if (new URLSearchParams(location.search).get('view') !== 'financeiro') return;
+  document.getElementById('tabsBar').style.display = 'flex';
+  document.getElementById('emptyState').style.display = 'none';
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+  showTab('geral');
+  renderGeral();
+  setTimeout(() => document.getElementById('generalFinanceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+}
+
 initWorkSelector();
 document.getElementById('importMonth').value = new Date().toISOString().slice(0, 7);
 document.getElementById('clearRechargeBaseBtn').addEventListener('click', clearRechargeBase);
-loadRechargeBase();
-refreshGeneralRechargeBases();
+Promise.all([loadRechargeBase(), refreshGeneralRechargeBases()]).then(openGeneralFinanceView);
 </script>
 </body>
 </html>
