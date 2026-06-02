@@ -1519,17 +1519,22 @@ function renderGeral() {
   const lastDate = dates.length ? new Date(Math.max(...dates)) : null;
   const avgTicket = totalCharges ? revenue / totalCharges : 0;
   let totalMaxKWh = 0;
+  const generalWindows = [];
   unitData.forEach(unit => {
     months.forEach(mk => {
       const monthCharges = unit.charges.filter(charge => monthKey(charge.startDate) === mk);
       if (!monthCharges.length) return;
-      totalMaxKWh += occByInterval(monthCharges, workPowerById(unit.workId)).maxKWh;
+      const window = periodWindow(monthCharges, mk, 'mtd');
+      generalWindows.push(window);
+      totalMaxKWh += occByInterval(monthCharges, workPowerById(unit.workId), window).maxKWh;
     });
   });
   const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
+  const firstPeriod = generalWindows.length ? new Date(Math.min(...generalWindows.map(window => window.start).filter(Boolean))) : firstDate;
+  const lastPeriod = generalWindows.length ? new Date(Math.max(...generalWindows.map(window => window.end).filter(Boolean))) : lastDate;
 
   document.getElementById('generalHeroMeta').innerHTML = totalCharges
-    ? `Unidades com base: <strong>${units}</strong><br>Periodo: <strong>${fmtDT(firstDate)}</strong> ate <strong>${fmtDT(lastDate)}</strong><br>Meses consolidados: <strong>${months.length}</strong>`
+    ? `Unidades com base: <strong>${units}</strong><br>Periodo: <strong>${fmtDT(firstPeriod)}</strong> ate <strong>${fmtDT(lastPeriod)}</strong><br>Meses consolidados: <strong>${months.length}</strong>`
     : 'Nenhuma unidade com base de recargas salva ainda.';
   document.getElementById('generalHeroFormula').innerHTML = totalCharges
     ? `<strong>Visao geral</strong><br>${fmtBRL(revenue)} em receita<br>${fmtKWh(energy)} entregues<br><strong style="color:#57B7FF">${totalCharges} recargas em ${units} unidade(s)</strong>`
@@ -1543,7 +1548,7 @@ function renderGeral() {
     <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div></div>
     <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${totalCharges ? (energy / totalCharges).toFixed(1).replace('.', ',') : '0,0'} kWh/sessao</div></div>
     <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
-    <div class="card"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">base por potencia de cada unidade</div></div>
+    <div class="card"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">mes ate a planilha, igual ao mensal</div></div>
     <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${unitData[0]?.workName || '-'}</div><div class="sub">${unitData[0] ? fmtBRL(unitData[0].revenue) : 'sem dados'}</div></div>
   `;
 
