@@ -294,6 +294,7 @@
     <div class="controls" id="ctrlMensal">
       <span>Mês:</span>
       <select class="ctl-select" id="monthSelector" onchange="renderMensal()"></select>
+      <button class="btn-recalc" onclick="closeSelectedMonth()">Fechar mes</button>
       <span style="margin-left:8px">Visao:</span>
       <select class="ctl-select" id="periodMode" onchange="renderAll()">
         <option value="mtd">Mes ate a planilha</option>
@@ -478,6 +479,21 @@
       </div>
     </section>
 
+    <section class="section">
+      <div class="card" style="grid-column:1/-1">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap">
+          <h2 style="margin:0;border:none;padding:0">Fechamento mensal salvo</h2>
+          <span id="monthClosingStatus" style="color:var(--p3-muted);font-size:12px"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Mes</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket medio</th><th>Primeira</th><th>Ultima</th><th>Fechado em</th></tr></thead>
+            <tbody id="monthClosingTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- Clientes | Ociosidade -->
     <section class="section">
       <div class="card">
@@ -596,6 +612,7 @@ let loadedFiles = [];
 let charts      = {};
 let allRechargeRecords = {};
 let openingWorkReport = false;
+let monthlyClosings = {};
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -758,6 +775,7 @@ function rechargeSummary() {
     workName: currentWorkName,
     charges: allCharges.length,
     files: loadedFiles.length,
+    monthlyClosings,
     energyKWh: energy,
     revenue,
     firstDate: dates.length ? new Date(Math.min(...dates)).toISOString() : '',
@@ -786,6 +804,7 @@ function saveLocalRechargeBase() {
       rows: allCharges.filter(charge => charge._file === file.name).length
     })),
     charges: allCharges.map(serializeCharge),
+    monthlyClosings,
     summary: rechargeSummary(),
     updatedAt: new Date().toISOString()
   };
@@ -821,6 +840,7 @@ async function saveRechargeBase() {
 function applyRechargeRecord(record, sourceLabel) {
   syncGeneralRecordsFromLocal();
   allCharges = (record?.charges || []).map(hydrateCharge);
+  monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
   loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
     name: file.name,
     size: file.size || 0,
@@ -995,6 +1015,7 @@ async function clearRechargeBase() {
   if (!confirm(`Excluir a base de recargas salva para ${currentWorkName}?`)) return;
   allCharges = [];
   loadedFiles = [];
+  monthlyClosings = {};
   saveLocalRechargeBase();
   try {
     await clearCloudRechargeBase();
@@ -1215,6 +1236,75 @@ function fmtPct(v)  { return (+v).toFixed(2).replace('.', ',') + '%'; }
 function fmtDT(d) {
   if (!d) return '—';
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function fmtDateOnly(value) {
+  const d = value instanceof Date ? value : (value ? new Date(value) : null);
+  if (!d || Number.isNaN(d.getTime())) return '-';
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function buildMonthClosing(mk) {
+  const charges = allCharges.filter(c => monthKey(c.startDate) === mk);
+  if (!charges.length) return null;
+  const users = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean));
+  const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
+  const revenue = charges.reduce((sum, c) => sum + c.revenue, 0);
+  const dates = charges.map(c => c.startDate).filter(Boolean).sort((a, b) => a - b);
+  const files = [...new Set(charges.map(c => c._file).filter(Boolean))];
+  return {
+    month: mk,
+    workId: currentWorkId,
+    workName: currentWorkName,
+    closedAt: new Date().toISOString(),
+    charges: charges.length,
+    clients: users.size,
+    energyKWh: energy,
+    revenue,
+    averageTicket: charges.length ? revenue / charges.length : 0,
+    firstDate: dates[0] ? dates[0].toISOString() : '',
+    lastDate: dates[dates.length - 1] ? dates[dates.length - 1].toISOString() : '',
+    files
+  };
+}
+
+function renderMonthClosing(mk) {
+  const closing = monthlyClosings?.[mk];
+  const status = document.getElementById('monthClosingStatus');
+  const table = document.getElementById('monthClosingTable');
+  if (!status || !table) return;
+  if (!closing) {
+    status.textContent = `Ainda nao fechado para ${monthLabel(mk)}.`;
+    table.innerHTML = `<tr><td colspan="9" style="color:var(--p3-muted)">Clique em Fechar mes para salvar o fechamento de ${monthLabel(mk)}.</td></tr>`;
+    return;
+  }
+  status.textContent = `Fechamento salvo para ${monthLabel(mk)}.`;
+  table.innerHTML = `<tr>
+    <td>${monthLabel(closing.month)}</td>
+    <td>${closing.charges}</td>
+    <td>${closing.clients}</td>
+    <td>${fmtKWh(closing.energyKWh)}</td>
+    <td>${fmtBRL(closing.revenue)}</td>
+    <td>${fmtBRL(closing.averageTicket)}</td>
+    <td>${fmtDateOnly(closing.firstDate)}</td>
+    <td>${fmtDateOnly(closing.lastDate)}</td>
+    <td>${new Date(closing.closedAt).toLocaleString('pt-BR')}</td>
+  </tr>`;
+}
+
+async function closeSelectedMonth() {
+  const mk = document.getElementById('monthSelector').value;
+  if (!mk) return;
+  const closing = buildMonthClosing(mk);
+  if (!closing) {
+    setFeedback(`Nao ha recargas em ${monthLabel(mk)} para fechar.`, 'up-error');
+    return;
+  }
+  if (monthlyClosings[mk] && !confirm(`Substituir o fechamento ja salvo de ${monthLabel(mk)}?`)) return;
+  monthlyClosings = { ...monthlyClosings, [mk]: closing };
+  renderMonthClosing(mk);
+  setFeedback(`Fechamento de ${monthLabel(mk)} salvo.`, 'up-loading');
+  await saveRechargeBase();
 }
 
 // ── Potência ──────────────────────────────────────────────
@@ -1567,6 +1657,7 @@ function renderMensal() {
   const charges = filterChargesByWindow(monthCharges, window);
   if (!charges.length) {
     setStorageState(`Sem recargas em ${periodModeLabel(window.mode)} para <strong>${currentWorkName}</strong>.`);
+    renderMonthClosing(mk);
     return;
   }
 
@@ -1579,6 +1670,7 @@ function renderMensal() {
   renderFinancialNote(charges);
   renderMonthlyTable();
   renderBaseTable(charges, mk, window);
+  renderMonthClosing(mk);
   renderClientsTable(charges);
   renderIdleAlerts(charges);
   renderTechDiagnostic(charges);

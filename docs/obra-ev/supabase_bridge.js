@@ -300,7 +300,10 @@
     if (!user) throw new Error("Entre no Supabase antes de salvar recargas.");
     const files = Array.isArray(payload?.files) ? payload.files : [];
     const charges = Array.isArray(payload?.charges) ? payload.charges : [];
-    const summary = payload?.summary || {};
+    const summary = {
+      ...(payload?.summary || {}),
+      monthlyClosings: payload?.monthlyClosings || payload?.summary?.monthlyClosings || {}
+    };
     const { error } = await sb.from("obra_recargas_base").upsert({
       obra_id: String(workId || "geral"),
       arquivos: files,
@@ -349,6 +352,7 @@
       workId: data.obra_id,
       files: data.arquivos || [],
       charges: data.recargas || [],
+      monthlyClosings: data.resumo?.monthlyClosings || {},
       summary: data.resumo || {},
       updatedAt: data.updated_at
     };
@@ -368,6 +372,7 @@
       workId: row.obra_id,
       files: row.arquivos || [],
       charges: row.recargas || [],
+      monthlyClosings: row.resumo?.monthlyClosings || {},
       summary: row.resumo || {},
       updatedAt: row.updated_at
     }));
