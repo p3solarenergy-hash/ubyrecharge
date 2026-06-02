@@ -278,10 +278,15 @@
   <div class="tabs-bar" id="tabsBar" style="display:none">
     <div class="tabs">
       <button class="tab active" onclick="switchTab('geral',this)">Geral</button>
+      <button class="tab" onclick="switchTab('financeiroGeral',this)">Financeiro geral</button>
     </div>
     <div class="controls" id="ctrlGeral">
       <span id="generalSourceLabel">Escolha uma estação abaixo para abrir o relatório detalhado</span>
       <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar geral</button>
+    </div>
+    <div class="controls" id="ctrlFinanceiroGeral" style="display:none">
+      <span>Consolidado financeiro das bases salvas</span>
+      <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar financeiro</button>
     </div>
   </div>
 
@@ -380,8 +385,6 @@
 
     <section class="grid kpis" id="kpiGeneral"></section>
 
-    <section class="grid kpis" id="kpiGeneralFinance"></section>
-
     <section class="general-split">
       <div class="card">
         <h2>Receita por unidade</h2>
@@ -390,22 +393,6 @@
       <div class="card">
         <h2>Energia por unidade</h2>
         <canvas id="chartGeneralEnergyUnit" aria-label="Energia por unidade"></canvas>
-      </div>
-    </section>
-
-    <section class="section" id="generalFinanceSection" style="margin-top:18px">
-      <div class="card">
-        <h2>Financeiro consolidado</h2>
-        <table><tbody id="generalFinanceTable"></tbody></table>
-      </div>
-      <div class="card">
-        <h2>Financeiro por unidade</h2>
-        <div style="overflow-x:auto">
-          <table>
-            <thead><tr><th>Unidade</th><th>Receita</th><th>Gestao P3</th><th>Plataforma</th><th>Receitas extras</th><th>Repasse dono</th><th>Custos</th><th>Lucro P3</th><th>Margem</th></tr></thead>
-            <tbody id="generalFinanceUnitTable"></tbody>
-          </table>
-        </div>
       </div>
     </section>
 
@@ -436,6 +423,41 @@
   <!-- ════════════════════════════════════════
        TAB: MENSAL
   ════════════════════════════════════════ -->
+  <div id="tabFinanceiroGeral" style="display:none">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/04_simbolo_badge.svg" alt="UBY"></div>
+          <div>
+            <div class="brand-name">UBY Recharge</div>
+            <div class="brand-tag">P3 gestao, UBY ativos e investidores</div>
+          </div>
+        </div>
+        <h1>Financeiro Geral de Recargas</h1>
+        <div class="meta" id="generalFinanceHeroMeta">Consolidado financeiro das unidades com base salva.</div>
+      </div>
+      <div class="formula" id="generalFinanceHeroFormula">A P3 cobra gestao sobre o faturamento; a UBY recebe o resultado operacional dos carregadores e repassa aos investidores conforme cotas.</div>
+    </section>
+
+    <section class="grid kpis" id="kpiGeneralFinance"></section>
+
+    <section class="section" id="generalFinanceSection" style="margin-top:18px">
+      <div class="card">
+        <h2>Financeiro consolidado</h2>
+        <table><tbody id="generalFinanceTable"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Financeiro por unidade</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Unidade</th><th>Receita</th><th>Gestao P3</th><th>UBY liquido</th><th>Investidores</th><th>Retido UBY</th><th>Payback</th><th>ROI mensal</th><th>Margem</th></tr></thead>
+            <tbody id="generalFinanceUnitTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <div id="tabMensal" style="display:none">
 
     <!-- Hero -->
@@ -615,9 +637,12 @@
       <div class="card">
         <h2>Parametros do ponto</h2>
         <table><tbody>
-          <tr><td>% gestao P3</td><td><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="renderFinanceiro(false)"></td></tr>
-          <tr><td>% plataforma</td><td><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false)"></td></tr>
-          <tr><td>Custo energia R$/kWh</td><td><input class="ctl-input" id="financeEnergyCost" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false)"></td></tr>
+          <tr><td>% gestao P3</td><td><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr><td>% sociedade P3 em AC</td><td><input class="ctl-input" id="financeP3AcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr><td>% plataforma</td><td><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr><td>Custo energia R$/kWh</td><td><input class="ctl-input" id="financeEnergyCost" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr><td>Investimento no ponto (R$)</td><td><input class="ctl-input" id="financeInvestmentValue" type="number" min="0" step="100" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr><td>% cotas investidores</td><td><input class="ctl-input" id="financeInvestorQuotaPct" type="number" min="0" max="100" step="0.1" value="100" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
         </tbody></table>
       </div>
       <div class="card">
@@ -694,6 +719,7 @@ let allRechargeRecords = {};
 let openingWorkReport = false;
 let monthlyClosings = {};
 let financialSettings = {};
+let financeSaveTimer = null;
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -1427,8 +1453,11 @@ function numberInputValue(id, fallback = 0) {
 function defaultFinanceSettings() {
   return {
     managementPct: 5,
+    p3AcEquityPct: 0,
     platformPct: 0,
     energyCostPerKWh: 0,
+    investmentValue: 0,
+    investorQuotaPct: 100,
     costItems: {},
     revenueItems: {}
   };
@@ -1450,8 +1479,11 @@ function sumFinanceItems(values = {}) {
 function currentFinanceSettingsFromInputs() {
   return {
     managementPct: numberInputValue('financeMgmtPct', 5),
+    p3AcEquityPct: numberInputValue('financeP3AcEquityPct', 0),
     platformPct: numberInputValue('financePlatformPct', 0),
     energyCostPerKWh: numberInputValue('financeEnergyCost', 0),
+    investmentValue: numberInputValue('financeInvestmentValue', 0),
+    investorQuotaPct: numberInputValue('financeInvestorQuotaPct', 100),
     costItems: financeItemValues(FINANCE_COST_ITEMS, 'finance-cost'),
     revenueItems: financeItemValues(FINANCE_EXTRA_REVENUE_ITEMS, 'finance-revenue')
   };
@@ -1463,7 +1495,7 @@ function renderFinanceItemInputs(containerId, items, values, prefix) {
   container.innerHTML = items.map(([key, label]) => `
     <tr>
       <td>${label}</td>
-      <td><input class="ctl-input" id="${prefix}-${key}" type="number" min="0" step="0.01" value="${Number(values?.[key] || 0)}" oninput="renderFinanceiro(false)"></td>
+      <td><input class="ctl-input" id="${prefix}-${key}" type="number" min="0" step="0.01" value="${Number(values?.[key] || 0)}" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td>
     </tr>
   `).join('');
 }
@@ -1475,8 +1507,11 @@ function applyFinanceSettingsToInputs(settings = {}) {
   merged.revenueItems = { ...(settings.revenueItems || {}), ...(settings.extraRevenue || {}) };
   const fields = {
     financeMgmtPct: merged.managementPct,
+    financeP3AcEquityPct: merged.p3AcEquityPct,
     financePlatformPct: merged.platformPct,
-    financeEnergyCost: merged.energyCostPerKWh
+    financeEnergyCost: merged.energyCostPerKWh,
+    financeInvestmentValue: merged.investmentValue,
+    financeInvestorQuotaPct: merged.investorQuotaPct
   };
   Object.entries(fields).forEach(([id, value]) => {
     const el = document.getElementById(id);
@@ -1503,82 +1538,116 @@ function renderFinanceiro(applySaved = true) {
   if (applySaved) applyFinanceSettingsToInputs(financialSettings[mk] || financialSettings.default || defaultFinanceSettings());
   const settings = currentFinanceSettingsFromInputs();
   const charges = allCharges.filter(c => monthKey(c.startDate) === mk);
-  const revenue = charges.reduce((sum, c) => sum + c.revenue, 0);
-  const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
+  const result = financeForCharges(charges, settings);
+  const { revenue, energy, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3Gross, ubyGross, ubyNet, investorDistribution, ubyRetained, paybackMonths, roiMonthly, margin } = result;
   const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
-  const management = revenue * settings.managementPct / 100;
-  const platform = revenue * settings.platformPct / 100;
-  const ownerShare = Math.max(revenue - management - platform, 0);
-  const energyCost = energy * settings.energyCostPerKWh;
-  const extraCosts = sumFinanceItems(settings.costItems);
-  const extraRevenue = sumFinanceItems(settings.revenueItems);
-  const p3Gross = management + platform + extraRevenue;
-  const p3Net = p3Gross - energyCost - extraCosts;
-  const margin = revenue ? p3Net / revenue * 100 : 0;
   const p3TakePct = revenue ? p3Gross / revenue * 100 : 0;
 
   document.getElementById('financeHeroMeta').innerHTML =
     `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}`;
   document.getElementById('financeFormula').innerHTML =
-    `<strong>Modelo configurado</strong><br>Gestao P3 ${settings.managementPct}% + plataforma ${settings.platformPct}% + receitas extras ${fmtBRL(extraRevenue)}<br>Custos: energia ${fmtBRL(energyCost)} + extras ${fmtBRL(extraCosts)}<br><strong style="color:#57B7FF">Lucro liquido P3: ${fmtBRL(p3Net)}</strong>`;
+    `<strong>Modelo configurado</strong><br>P3: gestao ${settings.managementPct}% + plataforma ${settings.platformPct}% + sociedade AC ${settings.p3AcEquityPct}%<br>UBY: resultado dos carregadores apos custos e repasses<br><strong style="color:#57B7FF">Payback: ${formatPaybackMonths(paybackMonths)}</strong>`;
 
   document.getElementById('financeKpis').innerHTML = `
     <div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>
-    <div class="card"><div class="label">Gestao P3</div><div class="value">${fmtBRL(management)}</div><div class="sub">${settings.managementPct}% da receita</div></div>
-    <div class="card"><div class="label">Plataforma</div><div class="value">${fmtBRL(platform)}</div><div class="sub">${settings.platformPct}% da receita</div></div>
-    <div class="card"><div class="label">Repasse dono</div><div class="value">${fmtBRL(ownerShare)}</div><div class="sub">receita - gestao - plataforma</div></div>
-    <div class="card"><div class="label">Lucro liquido P3</div><div class="value">${fmtBRL(p3Net)}</div><div class="sub">apos energia e custos extras</div></div>
-    <div class="card"><div class="label">Margem liquida</div><div class="value">${fmtPct(margin)}</div><div class="bar"><span style="width:${Math.min(Math.max(margin,0),100).toFixed(1)}%"></span></div><div class="sub">lucro / receita</div></div>
+    <div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao + plataforma + sociedade AC</div></div>
+    <div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos energia, custos e P3</div></div>
+    <div class="card"><div class="label">Investidores</div><div class="value">${fmtBRL(investorDistribution)}</div><div class="sub">${settings.investorQuotaPct}% das cotas UBY</div></div>
+    <div class="card"><div class="label">Payback</div><div class="value">${formatPaybackMonths(paybackMonths)}</div><div class="sub">investimento / resultado UBY</div></div>
+    <div class="card"><div class="label">ROI mensal</div><div class="value">${fmtPct(roiMonthly)}</div><div class="bar"><span style="width:${Math.min(Math.max(roiMonthly,0),100).toFixed(1)}%"></span></div><div class="sub">resultado UBY / investimento</div></div>
   `;
   document.getElementById('financeDistributionTable').innerHTML = `
     <tr><td>Receita total</td><td>${fmtBRL(revenue)}</td></tr>
     <tr><td>Gestao P3 (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>
     <tr><td>Plataforma (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>
+    <tr><td>Sociedade P3 em AC (${settings.p3AcEquityPct}%)</td><td>${fmtBRL(p3AcEquity)}</td></tr>
     <tr><td>Receitas extras</td><td>${fmtBRL(extraRevenue)}</td></tr>
-    <tr><td>Repasse estimado ao dono</td><td>${fmtBRL(ownerShare)}</td></tr>
+    <tr><td>Resultado bruto UBY</td><td>${fmtBRL(ubyGross)}</td></tr>
     <tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>
   `;
   document.getElementById('financeResultTable').innerHTML = `
-    <tr><td>Receita P3 bruta</td><td>${fmtBRL(p3Gross)}</td></tr>
+    <tr><td>Investimento no ponto</td><td>${fmtBRL(settings.investmentValue)}</td></tr>
+    <tr><td>Receita P3</td><td>${fmtBRL(p3Gross)}</td></tr>
     <tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>
     <tr><td>Custos extras</td><td>${fmtBRL(extraCosts)}</td></tr>
-    <tr><td>Resultado liquido P3</td><td>${fmtBRL(p3Net)}</td></tr>
-    <tr><td>Margem liquida</td><td>${fmtPct(margin)}</td></tr>
+    <tr><td>Resultado liquido UBY</td><td>${fmtBRL(ubyNet)}</td></tr>
+    <tr><td>Repasse investidores</td><td>${fmtBRL(investorDistribution)}</td></tr>
+    <tr><td>Retido UBY</td><td>${fmtBRL(ubyRetained)}</td></tr>
+    <tr><td>Payback estimado</td><td>${formatPaybackMonths(paybackMonths)}</td></tr>
+    <tr><td>Margem UBY</td><td>${fmtPct(margin)}</td></tr>
   `;
   document.getElementById('financeNote').innerHTML =
-    p3Net >= 0
-      ? `Com os parametros atuais, este ponto gera ${fmtBRL(p3Net)} liquidos para a P3 no mes. O dono do ponto fica com ${fmtBRL(ownerShare)} antes de custos proprios dele.`
-      : `Com os parametros atuais, este ponto fica negativo em ${fmtBRL(Math.abs(p3Net))}. Revise custo de energia, custos extras, receitas extras ou percentual de gestao/plataforma.`;
+    ubyNet >= 0
+      ? `Com os parametros atuais, a P3 recebe ${fmtBRL(p3Gross)} no mes. A UBY gera ${fmtBRL(ubyNet)} liquidos com os carregadores, repassando ${fmtBRL(investorDistribution)} aos investidores conforme cotas.`
+      : `Com os parametros atuais, a operacao UBY fica negativa em ${fmtBRL(Math.abs(ubyNet))}. Revise custo de energia, custos extras, receitas extras, gestao P3 ou sociedade AC.`;
 }
 
 async function saveFinancialSettings() {
   const mk = financeMonthKey();
   if (!mk) return;
-  financialSettings = {
-    ...financialSettings,
-    [mk]: currentFinanceSettingsFromInputs(),
-    default: currentFinanceSettingsFromInputs()
-  };
+  persistFinancialSettingsFromInputs(mk);
   renderFinanceiro(false);
   setFeedback(`Financeiro de ${monthLabel(mk)} salvo para ${currentWorkName}.`, 'up-loading');
   await saveRechargeBase();
 }
 
+function persistFinancialSettingsFromInputs(mk = financeMonthKey()) {
+  if (!mk) return null;
+  const settings = currentFinanceSettingsFromInputs();
+  financialSettings = { ...financialSettings, [mk]: settings, default: settings };
+  return settings;
+}
+
+function scheduleFinancialSettingsSave() {
+  const mk = financeMonthKey();
+  if (!mk || !currentWorkId) return;
+  persistFinancialSettingsFromInputs(mk);
+  saveLocalRechargeBase();
+  clearTimeout(financeSaveTimer);
+  financeSaveTimer = setTimeout(async () => {
+    try {
+      await saveRechargeBase();
+      setStorageState(`Financeiro de ${monthLabel(mk)} salvo automaticamente para <strong>${currentWorkName}</strong>.`);
+      renderGeneralFinance(getGeneralUnitData());
+    } catch (err) {
+      setStorageState(`Financeiro local salvo. Falha ao sincronizar: ${err.message}`, true);
+    }
+  }, 900);
+}
+
+function formatPaybackMonths(months) {
+  if (!Number.isFinite(months) || months <= 0) return '-';
+  if (months >= 1200) return '> 100 anos';
+  return `${months.toFixed(1).replace('.', ',')} meses`;
+}
+
 function financeForCharges(charges, settings = {}) {
   const cfg = { ...defaultFinanceSettings(), ...settings };
+  cfg.costItems = { ...(settings.costItems || {}), ...(settings.extraCosts || {}) };
+  if (Number(settings.otherCosts || 0) > 0 && !cfg.costItems.otherCostsLegacy) cfg.costItems.otherCostsLegacy = Number(settings.otherCosts || 0);
+  cfg.revenueItems = { ...(settings.revenueItems || {}), ...(settings.extraRevenue || {}) };
   const revenue = charges.reduce((sum, c) => sum + c.revenue, 0);
   const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
+  const acRevenue = charges.filter(c => chargerKind(c) === 'ac').reduce((sum, c) => sum + c.revenue, 0);
   const management = revenue * cfg.managementPct / 100;
   const platform = revenue * cfg.platformPct / 100;
-  const ownerShare = Math.max(revenue - management - platform, 0);
   const energyCost = energy * cfg.energyCostPerKWh;
   const extraCosts = sumFinanceItems(cfg.costItems);
   const extraRevenue = sumFinanceItems(cfg.revenueItems);
   const costs = energyCost + extraCosts;
-  const p3Gross = management + platform + extraRevenue;
-  const p3Net = p3Gross - costs;
-  const margin = revenue ? p3Net / revenue * 100 : 0;
-  return { revenue, energy, management, platform, ownerShare, energyCost, extraCosts, extraRevenue, costs, p3Gross, p3Net, margin };
+  const ubyGross = Math.max(revenue - management - platform + extraRevenue, 0);
+  const ubyBeforeEquity = ubyGross - costs;
+  const acRatio = revenue > 0 ? acRevenue / revenue : 0;
+  const acUbyBase = Math.max(ubyBeforeEquity * acRatio, 0);
+  const p3AcEquity = acUbyBase * cfg.p3AcEquityPct / 100;
+  const p3Gross = management + platform + p3AcEquity;
+  const ubyNet = ubyBeforeEquity - p3AcEquity;
+  const investorDistribution = Math.max(ubyNet, 0) * cfg.investorQuotaPct / 100;
+  const ubyRetained = ubyNet - investorDistribution;
+  const paybackMonths = cfg.investmentValue > 0 && ubyNet > 0 ? cfg.investmentValue / ubyNet : 0;
+  const roiMonthly = cfg.investmentValue > 0 ? ubyNet / cfg.investmentValue * 100 : 0;
+  const margin = revenue ? ubyNet / revenue * 100 : 0;
+  return { revenue, energy, acRevenue, management, platform, p3AcEquity, energyCost, extraCosts, extraRevenue, costs, p3Gross, ubyGross, ubyNet, investorDistribution, ubyRetained, paybackMonths, roiMonthly, margin, investmentValue: cfg.investmentValue };
 }
 
 function generalFinanceByUnit(unitData) {
@@ -1592,10 +1661,16 @@ function generalFinanceByUnit(unitData) {
     const settings = allRechargeRecords[unit.workId]?.financialSettings || {};
     const total = Object.entries(byMonth).reduce((acc, [mk, charges]) => {
       const result = financeForCharges(charges, settings[mk] || settings.default || defaultFinanceSettings());
-      Object.keys(result).forEach(key => acc[key] = (acc[key] || 0) + result[key]);
+      Object.keys(result).forEach(key => {
+        if (['margin', 'paybackMonths', 'roiMonthly', 'investmentValue'].includes(key)) return;
+        acc[key] = (acc[key] || 0) + result[key];
+      });
+      acc.investmentValue = Math.max(acc.investmentValue || 0, result.investmentValue || 0);
       return acc;
     }, {});
-    total.margin = total.revenue ? total.p3Net / total.revenue * 100 : 0;
+    total.margin = total.revenue ? total.ubyNet / total.revenue * 100 : 0;
+    total.paybackMonths = total.investmentValue > 0 && total.ubyNet > 0 ? total.investmentValue / total.ubyNet : 0;
+    total.roiMonthly = total.investmentValue > 0 ? total.ubyNet / total.investmentValue * 100 : 0;
     return { ...unit, finance: total };
   });
 }
@@ -1604,39 +1679,50 @@ function renderGeneralFinance(unitData) {
   const rows = generalFinanceByUnit(unitData);
   const total = rows.reduce((acc, row) => {
     Object.entries(row.finance || {}).forEach(([key, value]) => {
-      if (key !== 'margin') acc[key] = (acc[key] || 0) + Number(value || 0);
+      if (!['margin', 'paybackMonths', 'roiMonthly'].includes(key)) acc[key] = (acc[key] || 0) + Number(value || 0);
     });
     return acc;
   }, {});
-  total.margin = total.revenue ? total.p3Net / total.revenue * 100 : 0;
-  const best = [...rows].sort((a, b) => (b.finance?.p3Net || 0) - (a.finance?.p3Net || 0))[0];
+  total.margin = total.revenue ? total.ubyNet / total.revenue * 100 : 0;
+  total.paybackMonths = total.investmentValue > 0 && total.ubyNet > 0 ? total.investmentValue / total.ubyNet : 0;
+  total.roiMonthly = total.investmentValue > 0 ? total.ubyNet / total.investmentValue * 100 : 0;
+  const best = [...rows].sort((a, b) => (b.finance?.ubyNet || 0) - (a.finance?.ubyNet || 0))[0];
+  document.getElementById('generalFinanceHeroMeta').innerHTML =
+    `Unidades com base: <strong>${rows.length}</strong><br>Investimento cadastrado: <strong>${fmtBRL(total.investmentValue || 0)}</strong><br>Resultado UBY consolidado: <strong>${fmtBRL(total.ubyNet || 0)}</strong>`;
+  document.getElementById('generalFinanceHeroFormula').innerHTML =
+    `<strong>Modelo financeiro</strong><br>P3 recebe gestao/plataforma e sociedade AC quando configurada.<br>UBY recebe o resultado operacional dos carregadores e distribui aos investidores por cotas.`;
   document.getElementById('kpiGeneralFinance').innerHTML = `
     <div class="card"><div class="label">Receita financeira</div><div class="value">${fmtBRL(total.revenue || 0)}</div><div class="sub">base das recargas</div></div>
     <div class="card"><div class="label">Gestao P3</div><div class="value">${fmtBRL(total.management || 0)}</div><div class="sub">percentuais por ponto</div></div>
-    <div class="card"><div class="label">Plataforma</div><div class="value">${fmtBRL(total.platform || 0)}</div><div class="sub">percentuais por ponto</div></div>
-    <div class="card"><div class="label">Repasse donos</div><div class="value">${fmtBRL(total.ownerShare || 0)}</div><div class="sub">estimado</div></div>
-    <div class="card"><div class="label">Lucro P3</div><div class="value">${fmtBRL(total.p3Net || 0)}</div><div class="sub">apos custos</div></div>
-    <div class="card"><div class="label">Margem P3</div><div class="value">${fmtPct(total.margin || 0)}</div><div class="bar"><span style="width:${Math.min(Math.max(total.margin || 0,0),100).toFixed(1)}%"></span></div><div class="sub">lucro / receita</div></div>
+    <div class="card"><div class="label">Receita P3 total</div><div class="value">${fmtBRL(total.p3Gross || 0)}</div><div class="sub">gestao + plataforma + sociedade AC</div></div>
+    <div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(total.ubyNet || 0)}</div><div class="sub">apos custos e P3</div></div>
+    <div class="card"><div class="label">Investidores</div><div class="value">${fmtBRL(total.investorDistribution || 0)}</div><div class="sub">repasses por cotas</div></div>
+    <div class="card"><div class="label">Payback geral</div><div class="value">${formatPaybackMonths(total.paybackMonths || 0)}</div><div class="sub">investimento / resultado UBY</div></div>
   `;
   document.getElementById('generalFinanceTable').innerHTML = `
     <tr><td>Receita total das recargas</td><td>${fmtBRL(total.revenue || 0)}</td></tr>
-    <tr><td>Receita P3 bruta</td><td>${fmtBRL((total.management || 0) + (total.platform || 0) + (total.extraRevenue || 0))}</td></tr>
+    <tr><td>Investimento cadastrado</td><td>${fmtBRL(total.investmentValue || 0)}</td></tr>
+    <tr><td>Receita P3 total</td><td>${fmtBRL(total.p3Gross || 0)}</td></tr>
+    <tr><td>Sociedade P3 em AC</td><td>${fmtBRL(total.p3AcEquity || 0)}</td></tr>
     <tr><td>Receitas extras</td><td>${fmtBRL(total.extraRevenue || 0)}</td></tr>
     <tr><td>Custos configurados</td><td>${fmtBRL(total.costs || 0)}</td></tr>
-    <tr><td>Resultado liquido P3</td><td>${fmtBRL(total.p3Net || 0)}</td></tr>
-    <tr><td>Margem liquida P3</td><td>${fmtPct(total.margin || 0)}</td></tr>
-    <tr><td>Melhor unidade financeira</td><td>${best ? `${best.workName} - ${fmtBRL(best.finance.p3Net || 0)}` : '-'}</td></tr>
+    <tr><td>Resultado liquido UBY</td><td>${fmtBRL(total.ubyNet || 0)}</td></tr>
+    <tr><td>Repasse investidores</td><td>${fmtBRL(total.investorDistribution || 0)}</td></tr>
+    <tr><td>Retido UBY</td><td>${fmtBRL(total.ubyRetained || 0)}</td></tr>
+    <tr><td>Payback geral</td><td>${formatPaybackMonths(total.paybackMonths || 0)}</td></tr>
+    <tr><td>ROI mensal geral</td><td>${fmtPct(total.roiMonthly || 0)}</td></tr>
+    <tr><td>Melhor unidade financeira</td><td>${best ? `${best.workName} - ${fmtBRL(best.finance.ubyNet || 0)}` : '-'}</td></tr>
   `;
   document.getElementById('generalFinanceUnitTable').innerHTML = rows.length ? rows.map(row => `
     <tr>
       <td>${row.workName}</td>
       <td>${fmtBRL(row.finance.revenue || 0)}</td>
       <td>${fmtBRL(row.finance.management || 0)}</td>
-      <td>${fmtBRL(row.finance.platform || 0)}</td>
-      <td>${fmtBRL(row.finance.extraRevenue || 0)}</td>
-      <td>${fmtBRL(row.finance.ownerShare || 0)}</td>
-      <td>${fmtBRL(row.finance.costs || 0)}</td>
-      <td>${fmtBRL(row.finance.p3Net || 0)}</td>
+      <td>${fmtBRL(row.finance.ubyNet || 0)}</td>
+      <td>${fmtBRL(row.finance.investorDistribution || 0)}</td>
+      <td>${fmtBRL(row.finance.ubyRetained || 0)}</td>
+      <td>${formatPaybackMonths(row.finance.paybackMonths || 0)}</td>
+      <td>${fmtPct(row.finance.roiMonthly || 0)}</td>
       <td>${fmtPct(row.finance.margin || 0)}</td>
     </tr>
   `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:20px">Sem bases financeiras para consolidar</td></tr>';
@@ -2031,6 +2117,7 @@ function renderGeral() {
 // ── Render All ────────────────────────────────────────────
 function renderAll() {
   const visibleTab =
+    document.getElementById('tabFinanceiroGeral').style.display === 'block' ? 'financeiroGeral' :
     document.getElementById('tabMensal').style.display === 'block' ? 'mensal' :
     document.getElementById('tabAcumulado').style.display === 'block' ? 'acumulado' :
     document.getElementById('tabFinanceiro').style.display === 'block' ? 'financeiro' :
@@ -2057,6 +2144,7 @@ function renderAll() {
   showTab(visibleTab);
   if (visibleTab === 'detalhes') renderDetalhes();
   if (visibleTab === 'financeiro') renderFinanceiro();
+  if (visibleTab === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2508,19 +2596,22 @@ function renderDetalhes() {
 // ── Navegação de abas ─────────────────────────────────────
 function showTab(name) {
   const isGeneral = name === 'geral';
-  const isWorkReport = !isGeneral && name !== 'none';
+  const isGeneralFinance = name === 'financeiroGeral';
+  const isWorkReport = !isGeneral && !isGeneralFinance && name !== 'none';
   document.getElementById('tabGeral').style.display     = name === 'geral'     ? 'block' : 'none';
+  document.getElementById('tabFinanceiroGeral').style.display = name === 'financeiroGeral' ? 'block' : 'none';
   document.getElementById('tabMensal').style.display    = name === 'mensal'    ? 'block' : 'none';
   document.getElementById('tabAcumulado').style.display = name === 'acumulado' ? 'block' : 'none';
   document.getElementById('tabFinanceiro').style.display = name === 'financeiro' ? 'block' : 'none';
   document.getElementById('tabDetalhes').style.display  = name === 'detalhes'  ? 'block' : 'none';
   document.getElementById('ctrlGeral').style.display    = name === 'geral'     ? 'flex'  : 'none';
+  document.getElementById('ctrlFinanceiroGeral').style.display = name === 'financeiroGeral' ? 'flex' : 'none';
   document.getElementById('ctrlMensal').style.display   = name === 'mensal'    ? 'flex'  : 'none';
   document.getElementById('ctrlAcc').style.display      = name === 'acumulado' ? 'flex'  : 'none';
   document.getElementById('ctrlFinanceiro').style.display = name === 'financeiro' ? 'flex' : 'none';
   document.getElementById('workReportTabs').style.display = isWorkReport ? 'flex' : 'none';
-  document.querySelector('.project-bar').style.display   = isGeneral ? 'none' : '';
-  document.getElementById('uploadZone').style.display    = isGeneral ? 'none' : '';
+  document.querySelector('.project-bar').style.display   = (isGeneral || isGeneralFinance) ? 'none' : '';
+  document.getElementById('uploadZone').style.display    = (isGeneral || isGeneralFinance) ? 'none' : '';
 }
 
 function hideAllTabs() { showTab('none'); }
@@ -2530,6 +2621,7 @@ function switchTab(name, btn) {
   btn.classList.add('active');
   showTab(name);
   if (name === 'geral') renderGeral();
+  if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
   if (name === 'detalhes') renderDetalhes();
   if (name === 'financeiro') renderFinanceiro();
 }
@@ -2538,10 +2630,10 @@ function openGeneralFinanceView() {
   if (new URLSearchParams(location.search).get('view') !== 'financeiro') return;
   document.getElementById('tabsBar').style.display = 'flex';
   document.getElementById('emptyState').style.display = 'none';
-  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
-  showTab('geral');
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.getAttribute('onclick')?.includes("'financeiroGeral'")));
+  showTab('financeiroGeral');
   renderGeral();
-  setTimeout(() => document.getElementById('generalFinanceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+  renderGeneralFinance(getGeneralUnitData());
 }
 
 initWorkSelector();
