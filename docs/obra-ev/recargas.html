@@ -402,7 +402,7 @@
         <h2>Financeiro por unidade</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Unidade</th><th>Receita</th><th>Gestao</th><th>Plataforma</th><th>Repasse dono</th><th>Custos</th><th>Lucro UBY</th><th>Margem</th></tr></thead>
+            <thead><tr><th>Unidade</th><th>Receita</th><th>Gestao P3</th><th>Plataforma</th><th>Receitas extras</th><th>Repasse dono</th><th>Custos</th><th>Lucro P3</th><th>Margem</th></tr></thead>
             <tbody id="generalFinanceUnitTable"></tbody>
           </table>
         </div>
@@ -615,15 +615,25 @@
       <div class="card">
         <h2>Parametros do ponto</h2>
         <table><tbody>
-          <tr><td>% gestao UBY</td><td><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="renderFinanceiro(false)"></td></tr>
+          <tr><td>% gestao P3</td><td><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="renderFinanceiro(false)"></td></tr>
           <tr><td>% plataforma</td><td><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false)"></td></tr>
           <tr><td>Custo energia R$/kWh</td><td><input class="ctl-input" id="financeEnergyCost" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false)"></td></tr>
-          <tr><td>Outros custos do ponto</td><td><input class="ctl-input" id="financeOtherCosts" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false)"></td></tr>
         </tbody></table>
       </div>
       <div class="card">
         <h2>Distribuicao da receita</h2>
         <table><tbody id="financeDistributionTable"></tbody></table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <h2>Custos extras do ponto</h2>
+        <table><tbody id="financeExtraCostsRows"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Receitas extras</h2>
+        <table><tbody id="financeExtraRevenueRows"></tbody></table>
       </div>
     </section>
 
@@ -687,6 +697,31 @@ let financialSettings = {};
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
+const FINANCE_COST_ITEMS = [
+  ['fixedRent', 'Aluguel fixo / vaga'],
+  ['insurance', 'Seguranca'],
+  ['internet', 'Internet / dados'],
+  ['preventiveMaintenance', 'Manutencao preventiva'],
+  ['correctiveMaintenance', 'Manutencao corretiva (provisao)'],
+  ['softwareLicense', 'Licenca software / plataforma'],
+  ['security', 'Seguro'],
+  ['marketing', 'Marketing'],
+  ['accounting', 'Contabilidade / administrativo'],
+  ['demandCost', 'Custo demanda Grupo A (c/ impostos)'],
+  ['otherCostsLegacy', 'Outros custos']
+];
+const FINANCE_EXTRA_REVENUE_ITEMS = [
+  ['subscription', 'Assinatura / mensalidade'],
+  ['parking', 'Estacionamento'],
+  ['advertising', 'Publicidade (OOH / midia)'],
+  ['activationFee', 'Taxa de ativacao / cadastro'],
+  ['convenienceFee', 'Taxa de conveniencia'],
+  ['accessorySales', 'Venda de acessorios'],
+  ['partnerCommission', 'Comissao de parceiros'],
+  ['spaceRental', 'Aluguel de espaco (vending/loja)'],
+  ['localServices', 'Servicos no local (lavagem/cafe)'],
+  ['otherRevenue', 'Outros']
+];
 const appData = window.UBY_APP_DATA || {};
 let currentWorkId = new URLSearchParams(location.search).get('obra') || localStorage.getItem('uby-recargas-current-work') || 'rio';
 let currentWorkName = '';
@@ -1394,8 +1429,22 @@ function defaultFinanceSettings() {
     managementPct: 5,
     platformPct: 0,
     energyCostPerKWh: 0,
-    otherCosts: 0
+    costItems: {},
+    revenueItems: {}
   };
+}
+
+function financeItemValues(items, prefix) {
+  const values = {};
+  items.forEach(([key]) => {
+    const el = document.getElementById(`${prefix}-${key}`);
+    values[key] = el ? Number(parseFloat(el.value) || 0) : 0;
+  });
+  return values;
+}
+
+function sumFinanceItems(values = {}) {
+  return Object.values(values || {}).reduce((sum, value) => sum + Number(value || 0), 0);
 }
 
 function currentFinanceSettingsFromInputs() {
@@ -1403,22 +1452,38 @@ function currentFinanceSettingsFromInputs() {
     managementPct: numberInputValue('financeMgmtPct', 5),
     platformPct: numberInputValue('financePlatformPct', 0),
     energyCostPerKWh: numberInputValue('financeEnergyCost', 0),
-    otherCosts: numberInputValue('financeOtherCosts', 0)
+    costItems: financeItemValues(FINANCE_COST_ITEMS, 'finance-cost'),
+    revenueItems: financeItemValues(FINANCE_EXTRA_REVENUE_ITEMS, 'finance-revenue')
   };
+}
+
+function renderFinanceItemInputs(containerId, items, values, prefix) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = items.map(([key, label]) => `
+    <tr>
+      <td>${label}</td>
+      <td><input class="ctl-input" id="${prefix}-${key}" type="number" min="0" step="0.01" value="${Number(values?.[key] || 0)}" oninput="renderFinanceiro(false)"></td>
+    </tr>
+  `).join('');
 }
 
 function applyFinanceSettingsToInputs(settings = {}) {
   const merged = { ...defaultFinanceSettings(), ...settings };
+  merged.costItems = { ...(settings.costItems || {}), ...(settings.extraCosts || {}) };
+  if (Number(settings.otherCosts || 0) > 0 && !merged.costItems.otherCostsLegacy) merged.costItems.otherCostsLegacy = Number(settings.otherCosts || 0);
+  merged.revenueItems = { ...(settings.revenueItems || {}), ...(settings.extraRevenue || {}) };
   const fields = {
     financeMgmtPct: merged.managementPct,
     financePlatformPct: merged.platformPct,
-    financeEnergyCost: merged.energyCostPerKWh,
-    financeOtherCosts: merged.otherCosts
+    financeEnergyCost: merged.energyCostPerKWh
   };
   Object.entries(fields).forEach(([id, value]) => {
     const el = document.getElementById(id);
     if (el) el.value = Number(value || 0);
   });
+  renderFinanceItemInputs('financeExtraCostsRows', FINANCE_COST_ITEMS, merged.costItems, 'finance-cost');
+  renderFinanceItemInputs('financeExtraRevenueRows', FINANCE_EXTRA_REVENUE_ITEMS, merged.revenueItems, 'finance-revenue');
 }
 
 function financeMonthKey() {
@@ -1445,43 +1510,45 @@ function renderFinanceiro(applySaved = true) {
   const platform = revenue * settings.platformPct / 100;
   const ownerShare = Math.max(revenue - management - platform, 0);
   const energyCost = energy * settings.energyCostPerKWh;
-  const otherCosts = settings.otherCosts;
-  const ubyGross = management + platform;
-  const ubyNet = ubyGross - energyCost - otherCosts;
-  const margin = revenue ? ubyNet / revenue * 100 : 0;
-  const ubyTakePct = revenue ? ubyGross / revenue * 100 : 0;
+  const extraCosts = sumFinanceItems(settings.costItems);
+  const extraRevenue = sumFinanceItems(settings.revenueItems);
+  const p3Gross = management + platform + extraRevenue;
+  const p3Net = p3Gross - energyCost - extraCosts;
+  const margin = revenue ? p3Net / revenue * 100 : 0;
+  const p3TakePct = revenue ? p3Gross / revenue * 100 : 0;
 
   document.getElementById('financeHeroMeta').innerHTML =
     `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}`;
   document.getElementById('financeFormula').innerHTML =
-    `<strong>Modelo configurado</strong><br>Gestao ${settings.managementPct}% + plataforma ${settings.platformPct}%<br>Custos: energia ${fmtBRL(energyCost)} + outros ${fmtBRL(otherCosts)}<br><strong style="color:#57B7FF">Lucro liquido UBY: ${fmtBRL(ubyNet)}</strong>`;
+    `<strong>Modelo configurado</strong><br>Gestao P3 ${settings.managementPct}% + plataforma ${settings.platformPct}% + receitas extras ${fmtBRL(extraRevenue)}<br>Custos: energia ${fmtBRL(energyCost)} + extras ${fmtBRL(extraCosts)}<br><strong style="color:#57B7FF">Lucro liquido P3: ${fmtBRL(p3Net)}</strong>`;
 
   document.getElementById('financeKpis').innerHTML = `
     <div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>
-    <div class="card"><div class="label">Gestao UBY</div><div class="value">${fmtBRL(management)}</div><div class="sub">${settings.managementPct}% da receita</div></div>
+    <div class="card"><div class="label">Gestao P3</div><div class="value">${fmtBRL(management)}</div><div class="sub">${settings.managementPct}% da receita</div></div>
     <div class="card"><div class="label">Plataforma</div><div class="value">${fmtBRL(platform)}</div><div class="sub">${settings.platformPct}% da receita</div></div>
     <div class="card"><div class="label">Repasse dono</div><div class="value">${fmtBRL(ownerShare)}</div><div class="sub">receita - gestao - plataforma</div></div>
-    <div class="card"><div class="label">Lucro liquido UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos custos configurados</div></div>
+    <div class="card"><div class="label">Lucro liquido P3</div><div class="value">${fmtBRL(p3Net)}</div><div class="sub">apos energia e custos extras</div></div>
     <div class="card"><div class="label">Margem liquida</div><div class="value">${fmtPct(margin)}</div><div class="bar"><span style="width:${Math.min(Math.max(margin,0),100).toFixed(1)}%"></span></div><div class="sub">lucro / receita</div></div>
   `;
   document.getElementById('financeDistributionTable').innerHTML = `
     <tr><td>Receita total</td><td>${fmtBRL(revenue)}</td></tr>
-    <tr><td>Gestao UBY (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>
+    <tr><td>Gestao P3 (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>
     <tr><td>Plataforma (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>
+    <tr><td>Receitas extras</td><td>${fmtBRL(extraRevenue)}</td></tr>
     <tr><td>Repasse estimado ao dono</td><td>${fmtBRL(ownerShare)}</td></tr>
-    <tr><td>Percentual UBY bruto</td><td>${fmtPct(ubyTakePct)}</td></tr>
+    <tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>
   `;
   document.getElementById('financeResultTable').innerHTML = `
-    <tr><td>Receita UBY bruta</td><td>${fmtBRL(ubyGross)}</td></tr>
+    <tr><td>Receita P3 bruta</td><td>${fmtBRL(p3Gross)}</td></tr>
     <tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>
-    <tr><td>Outros custos</td><td>${fmtBRL(otherCosts)}</td></tr>
-    <tr><td>Resultado liquido UBY</td><td>${fmtBRL(ubyNet)}</td></tr>
+    <tr><td>Custos extras</td><td>${fmtBRL(extraCosts)}</td></tr>
+    <tr><td>Resultado liquido P3</td><td>${fmtBRL(p3Net)}</td></tr>
     <tr><td>Margem liquida</td><td>${fmtPct(margin)}</td></tr>
   `;
   document.getElementById('financeNote').innerHTML =
-    ubyNet >= 0
-      ? `Com os parametros atuais, este ponto gera ${fmtBRL(ubyNet)} liquidos para a UBY no mes. O dono do ponto fica com ${fmtBRL(ownerShare)} antes de custos proprios dele.`
-      : `Com os parametros atuais, este ponto fica negativo em ${fmtBRL(Math.abs(ubyNet))}. Revise custo de energia, outros custos ou percentual de gestao/plataforma.`;
+    p3Net >= 0
+      ? `Com os parametros atuais, este ponto gera ${fmtBRL(p3Net)} liquidos para a P3 no mes. O dono do ponto fica com ${fmtBRL(ownerShare)} antes de custos proprios dele.`
+      : `Com os parametros atuais, este ponto fica negativo em ${fmtBRL(Math.abs(p3Net))}. Revise custo de energia, custos extras, receitas extras ou percentual de gestao/plataforma.`;
 }
 
 async function saveFinancialSettings() {
@@ -1505,12 +1572,13 @@ function financeForCharges(charges, settings = {}) {
   const platform = revenue * cfg.platformPct / 100;
   const ownerShare = Math.max(revenue - management - platform, 0);
   const energyCost = energy * cfg.energyCostPerKWh;
-  const otherCosts = cfg.otherCosts;
-  const costs = energyCost + otherCosts;
-  const ubyGross = management + platform;
-  const ubyNet = ubyGross - costs;
-  const margin = revenue ? ubyNet / revenue * 100 : 0;
-  return { revenue, energy, management, platform, ownerShare, energyCost, otherCosts, costs, ubyGross, ubyNet, margin };
+  const extraCosts = sumFinanceItems(cfg.costItems);
+  const extraRevenue = sumFinanceItems(cfg.revenueItems);
+  const costs = energyCost + extraCosts;
+  const p3Gross = management + platform + extraRevenue;
+  const p3Net = p3Gross - costs;
+  const margin = revenue ? p3Net / revenue * 100 : 0;
+  return { revenue, energy, management, platform, ownerShare, energyCost, extraCosts, extraRevenue, costs, p3Gross, p3Net, margin };
 }
 
 function generalFinanceByUnit(unitData) {
@@ -1527,7 +1595,7 @@ function generalFinanceByUnit(unitData) {
       Object.keys(result).forEach(key => acc[key] = (acc[key] || 0) + result[key]);
       return acc;
     }, {});
-    total.margin = total.revenue ? total.ubyNet / total.revenue * 100 : 0;
+    total.margin = total.revenue ? total.p3Net / total.revenue * 100 : 0;
     return { ...unit, finance: total };
   });
 }
@@ -1540,23 +1608,24 @@ function renderGeneralFinance(unitData) {
     });
     return acc;
   }, {});
-  total.margin = total.revenue ? total.ubyNet / total.revenue * 100 : 0;
-  const best = [...rows].sort((a, b) => (b.finance?.ubyNet || 0) - (a.finance?.ubyNet || 0))[0];
+  total.margin = total.revenue ? total.p3Net / total.revenue * 100 : 0;
+  const best = [...rows].sort((a, b) => (b.finance?.p3Net || 0) - (a.finance?.p3Net || 0))[0];
   document.getElementById('kpiGeneralFinance').innerHTML = `
     <div class="card"><div class="label">Receita financeira</div><div class="value">${fmtBRL(total.revenue || 0)}</div><div class="sub">base das recargas</div></div>
-    <div class="card"><div class="label">Gestao UBY</div><div class="value">${fmtBRL(total.management || 0)}</div><div class="sub">percentuais por ponto</div></div>
+    <div class="card"><div class="label">Gestao P3</div><div class="value">${fmtBRL(total.management || 0)}</div><div class="sub">percentuais por ponto</div></div>
     <div class="card"><div class="label">Plataforma</div><div class="value">${fmtBRL(total.platform || 0)}</div><div class="sub">percentuais por ponto</div></div>
     <div class="card"><div class="label">Repasse donos</div><div class="value">${fmtBRL(total.ownerShare || 0)}</div><div class="sub">estimado</div></div>
-    <div class="card"><div class="label">Lucro UBY</div><div class="value">${fmtBRL(total.ubyNet || 0)}</div><div class="sub">apos custos</div></div>
-    <div class="card"><div class="label">Margem UBY</div><div class="value">${fmtPct(total.margin || 0)}</div><div class="bar"><span style="width:${Math.min(Math.max(total.margin || 0,0),100).toFixed(1)}%"></span></div><div class="sub">lucro / receita</div></div>
+    <div class="card"><div class="label">Lucro P3</div><div class="value">${fmtBRL(total.p3Net || 0)}</div><div class="sub">apos custos</div></div>
+    <div class="card"><div class="label">Margem P3</div><div class="value">${fmtPct(total.margin || 0)}</div><div class="bar"><span style="width:${Math.min(Math.max(total.margin || 0,0),100).toFixed(1)}%"></span></div><div class="sub">lucro / receita</div></div>
   `;
   document.getElementById('generalFinanceTable').innerHTML = `
     <tr><td>Receita total das recargas</td><td>${fmtBRL(total.revenue || 0)}</td></tr>
-    <tr><td>Receita UBY bruta</td><td>${fmtBRL((total.management || 0) + (total.platform || 0))}</td></tr>
+    <tr><td>Receita P3 bruta</td><td>${fmtBRL((total.management || 0) + (total.platform || 0) + (total.extraRevenue || 0))}</td></tr>
+    <tr><td>Receitas extras</td><td>${fmtBRL(total.extraRevenue || 0)}</td></tr>
     <tr><td>Custos configurados</td><td>${fmtBRL(total.costs || 0)}</td></tr>
-    <tr><td>Resultado liquido UBY</td><td>${fmtBRL(total.ubyNet || 0)}</td></tr>
-    <tr><td>Margem liquida UBY</td><td>${fmtPct(total.margin || 0)}</td></tr>
-    <tr><td>Melhor unidade financeira</td><td>${best ? `${best.workName} - ${fmtBRL(best.finance.ubyNet || 0)}` : '-'}</td></tr>
+    <tr><td>Resultado liquido P3</td><td>${fmtBRL(total.p3Net || 0)}</td></tr>
+    <tr><td>Margem liquida P3</td><td>${fmtPct(total.margin || 0)}</td></tr>
+    <tr><td>Melhor unidade financeira</td><td>${best ? `${best.workName} - ${fmtBRL(best.finance.p3Net || 0)}` : '-'}</td></tr>
   `;
   document.getElementById('generalFinanceUnitTable').innerHTML = rows.length ? rows.map(row => `
     <tr>
@@ -1564,12 +1633,13 @@ function renderGeneralFinance(unitData) {
       <td>${fmtBRL(row.finance.revenue || 0)}</td>
       <td>${fmtBRL(row.finance.management || 0)}</td>
       <td>${fmtBRL(row.finance.platform || 0)}</td>
+      <td>${fmtBRL(row.finance.extraRevenue || 0)}</td>
       <td>${fmtBRL(row.finance.ownerShare || 0)}</td>
       <td>${fmtBRL(row.finance.costs || 0)}</td>
-      <td>${fmtBRL(row.finance.ubyNet || 0)}</td>
+      <td>${fmtBRL(row.finance.p3Net || 0)}</td>
       <td>${fmtPct(row.finance.margin || 0)}</td>
     </tr>
-  `).join('') : '<tr><td colspan="8" style="color:var(--p3-muted);text-align:center;padding:20px">Sem bases financeiras para consolidar</td></tr>';
+  `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:20px">Sem bases financeiras para consolidar</td></tr>';
 }
 
 // ── Potência ──────────────────────────────────────────────
