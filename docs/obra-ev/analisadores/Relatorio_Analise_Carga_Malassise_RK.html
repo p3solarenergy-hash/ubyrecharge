@@ -435,13 +435,20 @@
 
   <section>
     <h2><span class="num">8</span>Dimensionamento do Padrão de Entrada</h2>
+    <div class="alert info">
+      <div class="ico">&#9432;</div>
+      <div>
+        <strong>Leitura corrigida do ensaio com carregador</strong>
+        <div>O PDF de 10/06/2026 mede o conjunto posto + carregador, com pico total de <b>61,15 kW / 61,35 kVA</b>. Como o PDF não traz a curva exportada separando posto e EV, a potência instantânea do carregador não deve ser tratada como medição isolada. Para simulação, o EV atual foi fixado em <b>50 kW</b> e o teste pontual em <b>60 kW</b> permanece como cenário de verificação.</div>
+      </div>
+    </div>
     <div class="controls">
       <div class="ctrl">
         <label class="k" for="evPower">Carregador EV</label>
         <select id="evPower">
-          <option value="60">60 kW</option><option value="65">65 kW</option><option value="70">70 kW</option><option value="75">75 kW</option><option value="80">80 kW</option>
+          <option value="50" selected>50 kW</option><option value="60">60 kW</option><option value="65">65 kW</option><option value="70">70 kW</option><option value="75">75 kW</option><option value="80">80 kW</option>
         </select>
-        <div class="ctrl-hint">Potência nominal do carregador DC</div>
+        <div class="ctrl-hint">Configuração atual: 50 kW; 60 kW foi teste pontual</div>
       </div>
       <div class="ctrl">
         <label class="k" for="padrao">Padrão de Entrada</label>
@@ -507,9 +514,10 @@
       <div class="rec warn">
         <h3><span class="pri">Prioridade 1</span>Padrão 200 A com Smart Charger</h3>
         <ul>
-          <li>Default P3 Energy: 200 A com DLM ativo.</li>
-          <li>Atende com modulação dinâmica em horário de pico.</li>
-          <li>Sem DLM: padrão 200 A é insuficiente.</li>
+          <li>Configuração atual considerada: EV 50 kW com DLM ativo.</li>
+          <li>O cálculo foi corrigido: posto em kVA medido e EV separado com FP 0,99.</li>
+          <li>200 A fica operável com DLM, mas sem folga para liberar 50-60 kW em qualquer pico.</li>
+          <li>250 A é a referência para liberar 50 kW com margem e 60 kW com folga mínima.</li>
         </ul>
       </div>
       <div class="rec danger">
@@ -610,7 +618,7 @@ new Chart(document.getElementById('chartConsumo'), {
 
 
 
-const STORAGE_KEY = 'p3_RK_completo';
+const STORAGE_KEY = 'p3_RK_completo_v2_50kw';
 function saveConfig(){
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -629,7 +637,7 @@ function loadConfig(){
     if(saved.dlm !== undefined) document.getElementById('dlm').checked = saved.dlm;
   } catch(e){}
 }
-const CFG = {V:220, P_posto:28.06, S_posto:28.78, P_med:10.19, FP_atual:0.79, FP_meta:0.92, FP_ev:0.99, RESERVA:0.05, SQRT3:Math.sqrt(3)};
+const CFG = {V:220, P_posto:28.06, S_posto:28.78, P_med:10.19, FP_atual:0.79, FP_meta:0.92, FP_ev:0.99, EV_ATUAL:50, EV_TESTE:60, P_com_ev:61.15, S_com_ev:61.35, RESERVA:0.05, SQRT3:Math.sqrt(3)};
 const POSTO_PROFILE = [0.12,0.10,0.10,0.10,0.13,0.20,0.45,0.65,0.75,0.82,0.88,0.95,1.00,0.95,0.85,0.72,0.68,0.78,0.95,1.00,0.82,0.55,0.30,0.18];
 let chart24hInst = null;
 const fmt = (v, dec=1) => v.toLocaleString('pt-BR',{minimumFractionDigits:dec, maximumFractionDigits:dec});
@@ -642,7 +650,7 @@ function vereditoTag(util){if(util<=0.85)return{cls:'ok',txt:'Atende'};if(util<=
 function evDisponivel(P_posto_kW, cap_kVA, P_ev_max){
   const reserva_kVA = cap_kVA * CFG.RESERVA;
   const cap_util_kVA = cap_kVA - reserva_kVA;
-  const S_posto = P_posto_kW / CFG.FP_atual;
+  const S_posto = P_posto_kW === CFG.P_posto ? CFG.S_posto : P_posto_kW / CFG.FP_atual;
   const disponivel_kVA = Math.max(0, cap_util_kVA - S_posto);
   return Math.max(0, Math.min(P_ev_max, disponivel_kVA * CFG.FP_ev));
 }
@@ -657,10 +665,12 @@ function calcular(){
   saveConfig();
 
   const ev_dlm_pico = evDisponivel(CFG.P_posto, cap_kVA, P_ev);
+  const S_ev_full = P_ev / CFG.FP_ev;
   const cenarios = [
-    {nome:'Apenas posto (atual, FP 0,79)', P:CFG.P_posto, S:CFG.S_posto, I:correnteDeS(CFG.S_posto)},
-    {nome:`Posto + EV (${P_ev} kW) sem DLM — PIOR CASO`, P:CFG.P_posto+P_ev, S:(CFG.P_posto+P_ev)/CFG.FP_atual, I:correnteDeS((CFG.P_posto+P_ev)/CFG.FP_atual)},
-    {nome:`Posto + EV com DLM ativo (no pico do posto)`, P:CFG.P_posto+ev_dlm_pico, S:(CFG.P_posto+ev_dlm_pico)/CFG.FP_atual, I:correnteDeS((CFG.P_posto+ev_dlm_pico)/CFG.FP_atual)},
+    {nome:'Apenas posto sem EV (medido)', P:CFG.P_posto, S:CFG.S_posto, I:correnteDeS(CFG.S_posto)},
+    {nome:`Posto + EV ${P_ev} kW sem DLM (calculo corrigido)`, P:CFG.P_posto+P_ev, S:CFG.S_posto+S_ev_full, I:correnteDeS(CFG.S_posto+S_ev_full)},
+    {nome:`Posto + EV com DLM ativo (no pico do posto)`, P:CFG.P_posto+ev_dlm_pico, S:CFG.S_posto+(ev_dlm_pico/CFG.FP_ev), I:correnteDeS(CFG.S_posto+(ev_dlm_pico/CFG.FP_ev))},
+    {nome:'Pico real medido com carregador (PDF 10/06)', P:CFG.P_com_ev, S:CFG.S_com_ev, I:correnteDeS(CFG.S_com_ev)},
     {nome:`Apenas EV (${P_ev} kW) em horário não-pico`, P:P_ev, S:P_ev/CFG.FP_ev, I:correnteDeS(P_ev/CFG.FP_ev)}
   ];
   const tbody = document.getElementById('scenariosBody');
@@ -706,10 +716,11 @@ function atualizarPainelOperacional(P_ev, padrao, dlm){
     <span class="pill">Padrão ${padrao} A — ${fmt(cap_kVA)} kVA</span>
     <span class="pill">EV ${P_ev} kW</span>
     <span class="pill ${dlm ? '' : 'warn'}">DLM ${dlm ? 'Ativo' : 'INATIVO'}</span>
+    <span class="pill muted">Pico real com EV ${fmt(CFG.S_com_ev)} kVA</span>
     <span style="margin-left:auto;font-size:11px;color:var(--p3-muted)">Reserva técnica: ${(CFG.RESERVA*100).toFixed(0)}% (${fmt(reserva_kVA)} kVA)</span>
   `;
 
-  const S_posto_pico = CFG.P_posto/CFG.FP_atual;
+  const S_posto_pico = CFG.S_posto;
   const ev_pico_kW = evDisponivel(CFG.P_posto, cap_kVA, P_ev);
   const ev_pico_kVA = ev_pico_kW/CFG.FP_ev;
   const pct_posto = (S_posto_pico/cap_kVA)*100;
