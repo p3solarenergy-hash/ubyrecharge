@@ -1286,25 +1286,22 @@ function readFile(file) {
       if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
 
       importedCharges.forEach(charge => { charge._month = selectedMonth || monthKey(charge.startDate); });
-      const importedDates = new Set(importedCharges.map(chargeDateKey).filter(Boolean));
-      const importedIds = new Set(importedCharges.map(charge => String(charge.id || '').trim()).filter(Boolean));
-      const importedMonths = new Set(importedCharges.map(charge => charge._month || monthKey(charge.startDate)).filter(Boolean));
-      const beforeCount = allCharges.length;
-      allCharges = allCharges.filter(charge => {
-        const sameDate = importedDates.has(chargeDateKey(charge));
-        const sameId = importedIds.has(String(charge.id || '').trim());
-        const sameMonth = importedMonths.has(charge._month || monthKey(charge.startDate));
-        return !sameMonth && !sameDate && !sameId;
-      });
+      const importedMonths = new Set(importedCharges.map(chargeMonthKey).filter(Boolean));
+      const replacedCount = allCharges.filter(charge => importedMonths.has(chargeMonthKey(charge))).length;
+      allCharges = allCharges.filter(charge => !importedMonths.has(chargeMonthKey(charge)));
       allCharges.push(...importedCharges);
-      loadedFiles = loadedFiles.filter(fileItem =>
-        fileItem?.name === file.name || allCharges.some(charge => charge._file === fileItem?.name)
-      );
-      const replacedCount = beforeCount - allCharges.filter(charge => charge._file !== file.name).length;
+      loadedFiles = loadedFiles.filter(fileItem => {
+        const fileMonth = fileItem?.month || '';
+        const isCurrentFile = fileItem?.name === file.name && fileMonth === selectedMonth;
+        const stillHasCharges = allCharges.some(charge =>
+          charge._file === fileItem?.name && (!fileMonth || chargeMonthKey(charge) === fileMonth)
+        );
+        return isCurrentFile || stillHasCharges;
+      });
 
       setFeedback('', '');
       uploadZone.classList.add('compact');
-      loadedFiles = loadedFiles.map(item => item.name === file.name ? { ...item, month: selectedMonth, importedAt: new Date().toISOString() } : item);
+      loadedFiles = loadedFiles.map(item => item.name === file.name && item.month === selectedMonth ? { ...item, month: selectedMonth, importedAt: new Date().toISOString() } : item);
       updateChips();
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
