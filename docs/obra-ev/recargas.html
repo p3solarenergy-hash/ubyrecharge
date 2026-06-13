@@ -1285,11 +1285,21 @@ function readFile(file) {
       }
       if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
 
+      const dateMonths = [...new Set(importedCharges.map(charge => monthKey(charge.startDate)).filter(k => k && k !== 'unknown'))];
+      const wrongMonths = dateMonths.filter(k => k !== selectedMonth);
+      if (selectedMonth && wrongMonths.length) {
+        throw new Error(`O mes escolhido foi ${monthLabel(selectedMonth)}, mas a planilha tem recargas de ${dateMonths.map(monthLabel).join(', ')}. Escolha o mes correto antes de subir.`);
+      }
+
       importedCharges.forEach(charge => { charge._month = selectedMonth || monthKey(charge.startDate); });
       const importedMonths = new Set(importedCharges.map(chargeMonthKey).filter(Boolean));
       const replacedCount = allCharges.filter(charge => importedMonths.has(chargeMonthKey(charge))).length;
       allCharges = allCharges.filter(charge => !importedMonths.has(chargeMonthKey(charge)));
       allCharges.push(...importedCharges);
+      importedMonths.forEach(mk => {
+        const closing = buildMonthClosing(mk);
+        if (closing) monthlyClosings = { ...monthlyClosings, [mk]: closing };
+      });
       loadedFiles = loadedFiles.filter(fileItem => {
         const fileMonth = fileItem?.month || '';
         const isCurrentFile = fileItem?.name === file.name && fileMonth === selectedMonth;
@@ -1366,7 +1376,10 @@ function monthLabel(key) {
 }
 function daysInMonth(y, m) { return new Date(+y, +m, 0).getDate(); }
 function getMonths() {
-  return [...new Set(allCharges.map(chargeMonthKey))]
+  return [...new Set([
+    ...allCharges.map(chargeMonthKey),
+    ...Object.keys(monthlyClosings || {})
+  ])]
     .filter(k => k !== 'unknown').sort();
 }
 
@@ -1395,20 +1408,57 @@ function buildMonthClosing(mk) {
   const revenue = charges.reduce((sum, c) => sum + c.revenue, 0);
   const dates = charges.map(c => c.startDate).filter(Boolean).sort((a, b) => a - b);
   const files = [...new Set(charges.map(c => c._file).filter(Boolean))];
+  const power = getPower();
+  const closedWindow = periodWindow(charges, mk, 'closed');
+  const occInterval = occByInterval(charges, power, closedWindow);
+  const occFull = occByFullMonth(charges, mk);
   return {
     month: mk,
     workId: currentWorkId,
     workName: currentWorkName,
     closedAt: new Date().toISOString(),
+    source: 'latest_upload',
     charges: charges.length,
     clients: users.size,
     energyKWh: energy,
     revenue,
     averageTicket: charges.length ? revenue / charges.length : 0,
+    occupancyIntervalPct: occInterval.pct,
+    occupancyFullMonthPct: occFull.pct,
+    power,
     firstDate: dates[0] ? dates[0].toISOString() : '',
     lastDate: dates[dates.length - 1] ? dates[dates.length - 1].toISOString() : '',
     files
   };
+}
+
+function monthSummaryFromClosing(closing) {
+  if (!closing) return null;
+  return {
+    label: monthLabel(closing.month),
+    mk: closing.month,
+    rev: Number(closing.revenue) || 0,
+    energy: Number(closing.energyKWh) || 0,
+    occI: Number(closing.occupancyIntervalPct) || 0,
+    occF: Number(closing.occupancyFullMonthPct) || 0,
+    count: Number(closing.charges) || 0,
+    clients: Number(closing.clients) || 0,
+    avgTkt: Number(closing.averageTicket) || 0,
+    fromClosing: true
+  };
+}
+
+function monthSummaryForMonth(mk, power = getPower()) {
+  const ch = allCharges.filter(c => chargeMonthKey(c) === mk);
+  if (ch.length) {
+    const revM = ch.reduce((s,c) => s+c.revenue, 0);
+    const enerM = ch.reduce((s,c) => s+c.energyKWh, 0);
+    const occI = occByInterval(ch, power, periodWindow(ch, mk, 'closed'));
+    const occF = occByFullMonth(ch, mk);
+    const cln = new Set(ch.map(c => c.userEmail||c.userName)).size;
+    return { label: monthLabel(mk), mk, rev: revM, energy: enerM, occI: occI.pct, occF: occF.pct, count: ch.length, clients: cln, avgTkt: ch.length ? revM/ch.length : 0, fromClosing: false };
+  }
+  return monthSummaryFromClosing(monthlyClosings?.[mk]);
 }
 
 function renderMonthClosing(mk) {
@@ -1421,7 +1471,7 @@ function renderMonthClosing(mk) {
     table.innerHTML = `<tr><td colspan="9" style="color:var(--p3-muted)">Clique em Fechar mes para salvar o fechamento de ${monthLabel(mk)}.</td></tr>`;
     return;
   }
-  status.textContent = `Fechamento salvo para ${monthLabel(mk)}.`;
+  status.textContent = `${closing.source === 'manual' ? 'Fechamento manual' : 'Ultima base do mes'} salva para ${monthLabel(mk)}.`;
   table.innerHTML = `<tr>
     <td>${monthLabel(closing.month)}</td>
     <td>${closing.charges}</td>
@@ -1444,7 +1494,7 @@ async function closeSelectedMonth() {
     return;
   }
   if (monthlyClosings[mk] && !confirm(`Substituir o fechamento ja salvo de ${monthLabel(mk)}?`)) return;
-  monthlyClosings = { ...monthlyClosings, [mk]: closing };
+  monthlyClosings = { ...monthlyClosings, [mk]: { ...closing, source: 'manual' } };
   renderMonthClosing(mk);
   setFeedback(`Fechamento de ${monthLabel(mk)} salvo.`, 'up-loading');
   await saveRechargeBase();
@@ -2483,20 +2533,12 @@ function renderFinancialNote(charges) {
 
 function renderMonthlyTable() {
   document.getElementById('monthlyTable').innerHTML = getMonths().map(mk => {
-    const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
-    const window = periodWindow(monthCharges, mk);
-    const ch      = filterChargesByWindow(monthCharges, window);
-    const energy  = ch.reduce((s,c) => s+c.energyKWh, 0);
-    const rev     = ch.reduce((s,c) => s+c.revenue, 0);
-    const clients = new Set(ch.map(c => c.userEmail||c.userName)).size;
-    const avgTkt  = ch.length ? rev/ch.length : 0;
-    const occ     = occByInterval(ch, undefined, window);
-    const occFull = occByFullMonth(ch, mk);
+    const summary = monthSummaryForMonth(mk);
     return `<tr>
-      <td>${mk}</td><td>${ch.length}</td><td>${clients}</td>
-      <td>${energy.toFixed(2).replace('.',',')}</td>
-      <td>${fmtBRL(rev)}</td><td>${fmtBRL(avgTkt)}</td>
-      <td>${fmtPct(occ.pct)}</td><td>${fmtPct(occFull.pct)}</td>
+      <td>${mk}${summary?.fromClosing ? ' <span style="color:var(--p3-muted);font-size:11px">(fechado)</span>' : ''}</td><td>${summary?.count || 0}</td><td>${summary?.clients || 0}</td>
+      <td>${(summary?.energy || 0).toFixed(2).replace('.',',')}</td>
+      <td>${fmtBRL(summary?.rev || 0)}</td><td>${fmtBRL(summary?.avgTkt || 0)}</td>
+      <td>${fmtPct(summary?.occI || 0)}</td><td>${fmtPct(summary?.occF || 0)}</td>
     </tr>`;
   }).join('');
 }
@@ -2599,45 +2641,32 @@ function renderTechDiagnostic(charges) {
 function renderAcumulado() {
   const months = getMonths();
   const power  = getPower();
+  const md = months.map(mk => monthSummaryForMonth(mk, power)).filter(Boolean);
 
   // KPIs acumulados
-  const energy  = allCharges.reduce((s,c) => s+c.energyKWh, 0);
-  const rev     = allCharges.reduce((s,c) => s+c.revenue, 0);
-  const avgTkt  = allCharges.length ? rev/allCharges.length : 0;
-  const clients = new Set(allCharges.map(c => c.userEmail||c.userName)).size;
-  let totalMaxKWh = 0;
-  months.forEach(mk => {
-    const ch = allCharges.filter(c => chargeMonthKey(c) === mk);
-    totalMaxKWh += occByInterval(ch, power, periodWindow(ch, mk, 'closed')).maxKWh;
-  });
+  const energy  = md.reduce((s,d) => s+d.energy, 0);
+  const rev     = md.reduce((s,d) => s+d.rev, 0);
+  const totalCharges = md.reduce((s,d) => s+d.count, 0);
+  const avgTkt  = totalCharges ? rev/totalCharges : 0;
+  const clients = md.reduce((s,d) => s+d.clients, 0);
+  const totalMaxKWh = md.reduce((s,d) => s + (d.occI > 0 ? d.energy/(d.occI/100) : 0), 0);
   const totalOcc = totalMaxKWh > 0 ? energy/totalMaxKWh*100 : 0;
 
   document.getElementById('kpiAcc').innerHTML = `
     <div class="card"><div class="label">Total recargas</div>
-      <div class="value">${allCharges.length}</div>
+      <div class="value">${totalCharges}</div>
       <div class="sub">${months.length} ${months.length===1?'mês':'meses'} · ${clients} clientes</div></div>
     <div class="card"><div class="label">Receita acumulada</div>
       <div class="value">${fmtBRL(rev)}</div>
       <div class="sub">Ticket médio ${fmtBRL(avgTkt)}</div></div>
     <div class="card"><div class="label">Energia total</div>
       <div class="value">${fmtKWh(energy)}</div>
-      <div class="sub">${(energy/Math.max(allCharges.length,1)).toFixed(1)} kWh/sessão</div></div>
+      <div class="sub">${(energy/Math.max(totalCharges,1)).toFixed(1)} kWh/sessão</div></div>
     <div class="card"><div class="label">Ocupação média</div>
       <div class="value">${fmtPct(totalOcc)}</div>
       <div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div>
       <div class="sub">base mês completo por mês</div></div>
   `;
-
-  // Dados por mês
-  const md = months.map(mk => {
-    const ch      = allCharges.filter(c => chargeMonthKey(c) === mk);
-    const revM    = ch.reduce((s,c) => s+c.revenue, 0);
-    const enerM   = ch.reduce((s,c) => s+c.energyKWh, 0);
-    const occI    = occByInterval(ch, power, periodWindow(ch, mk, 'closed'));
-    const occF    = occByFullMonth(ch, mk);
-    const cln     = new Set(ch.map(c => c.userEmail||c.userName)).size;
-    return { label: monthLabel(mk), mk, rev: revM, energy: enerM, occI: occI.pct, occF: occF.pct, count: ch.length, clients: cln, avgTkt: ch.length ? revM/ch.length : 0 };
-  });
 
   // Gráficos simples
   const axBase = {
@@ -2696,7 +2725,7 @@ function renderAcumulado() {
   // Tabela histórica
   document.getElementById('accMonthTable').innerHTML = md.map(d =>
     `<tr>
-       <td>${d.label}</td><td>${d.count}</td><td>${d.clients}</td>
+       <td>${d.label}${d.fromClosing ? ' <span style="color:var(--p3-muted);font-size:11px">(fechado)</span>' : ''}</td><td>${d.count}</td><td>${d.clients}</td>
        <td>${d.energy.toFixed(2).replace('.',',')}</td>
        <td>${fmtBRL(d.rev)}</td><td>${fmtBRL(d.avgTkt)}</td>
        <td>${fmtPct(d.occI)}</td><td>${fmtPct(d.occF)}</td>
