@@ -1359,6 +1359,9 @@ function monthKey(date) {
   if (!date) return 'unknown';
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 }
+function chargeMonthKey(charge) {
+  return charge?._month || monthKey(charge?.startDate);
+}
 function monthLabel(key) {
   const n = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const [y, m] = key.split('-');
@@ -1366,7 +1369,7 @@ function monthLabel(key) {
 }
 function daysInMonth(y, m) { return new Date(+y, +m, 0).getDate(); }
 function getMonths() {
-  return [...new Set(allCharges.map(c => monthKey(c.startDate)))]
+  return [...new Set(allCharges.map(chargeMonthKey))]
     .filter(k => k !== 'unknown').sort();
 }
 
@@ -1388,7 +1391,7 @@ function fmtDateOnly(value) {
 }
 
 function buildMonthClosing(mk) {
-  const charges = allCharges.filter(c => monthKey(c.startDate) === mk);
+  const charges = allCharges.filter(c => chargeMonthKey(c) === mk);
   if (!charges.length) return null;
   const users = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean));
   const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
@@ -1559,7 +1562,7 @@ function renderFinanceiro(applySaved = true) {
   if (!mk) return;
   if (applySaved) applyFinanceSettingsToInputs(financialSettings[mk] || financialSettings.default || defaultFinanceSettings());
   const settings = currentFinanceSettingsFromInputs();
-  const charges = allCharges.filter(c => monthKey(c.startDate) === mk);
+  const charges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const result = financeForCharges(charges, settings);
   const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, investorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
@@ -1791,7 +1794,7 @@ function generalFinanceByUnit(unitData) {
   return unitData.map(unit => {
     const byMonth = {};
     unit.charges.forEach(charge => {
-      const mk = monthKey(charge.startDate);
+      const mk = chargeMonthKey(charge);
       if (mk === 'unknown') return;
       (byMonth[mk] ||= []).push(charge);
     });
@@ -2142,7 +2145,7 @@ function renderGeral() {
   const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
   const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
   const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
-  const months = [...new Set(charges.map(charge => monthKey(charge.startDate)).filter(key => key !== 'unknown'))].sort();
+  const months = [...new Set(charges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const dates = charges.map(charge => charge.startDate).filter(Boolean);
   const firstDate = dates.length ? new Date(Math.min(...dates)) : null;
   const lastDate = dates.length ? new Date(Math.max(...dates)) : null;
@@ -2151,7 +2154,7 @@ function renderGeral() {
   const generalWindows = [];
   unitData.forEach(unit => {
     months.forEach(mk => {
-      const monthCharges = unit.charges.filter(charge => monthKey(charge.startDate) === mk);
+      const monthCharges = unit.charges.filter(charge => chargeMonthKey(charge) === mk);
       if (!monthCharges.length) return;
       const window = periodWindow(monthCharges, mk, 'mtd');
       generalWindows.push(window);
@@ -2225,7 +2228,7 @@ function renderGeral() {
   simpleBar('chartGeneralEnergyUnit', unitLabels, unitData.map(unit => unit.energy), 'kWh', '#246BFE');
 
   const monthData = months.map(mk => {
-    const monthCharges = charges.filter(charge => monthKey(charge.startDate) === mk);
+    const monthCharges = charges.filter(charge => chargeMonthKey(charge) === mk);
     return {
       label: monthLabel(mk),
       revenue: monthCharges.reduce((sum, charge) => sum + charge.revenue, 0),
@@ -2296,7 +2299,7 @@ function renderAll() {
 function renderMensal() {
   const mk      = document.getElementById('monthSelector').value;
   if (!mk) return;
-  const monthCharges = allCharges.filter(c => monthKey(c.startDate) === mk);
+  const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
   if (!charges.length) {
@@ -2480,7 +2483,7 @@ function renderFinancialNote(charges) {
 
 function renderMonthlyTable() {
   document.getElementById('monthlyTable').innerHTML = getMonths().map(mk => {
-    const monthCharges = allCharges.filter(c => monthKey(c.startDate) === mk);
+    const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
     const window = periodWindow(monthCharges, mk);
     const ch      = filterChargesByWindow(monthCharges, window);
     const energy  = ch.reduce((s,c) => s+c.energyKWh, 0);
@@ -2604,7 +2607,7 @@ function renderAcumulado() {
   const clients = new Set(allCharges.map(c => c.userEmail||c.userName)).size;
   let totalMaxKWh = 0;
   months.forEach(mk => {
-    const ch = allCharges.filter(c => monthKey(c.startDate) === mk);
+    const ch = allCharges.filter(c => chargeMonthKey(c) === mk);
     totalMaxKWh += occByInterval(ch, power, periodWindow(ch, mk, 'closed')).maxKWh;
   });
   const totalOcc = totalMaxKWh > 0 ? energy/totalMaxKWh*100 : 0;
@@ -2627,7 +2630,7 @@ function renderAcumulado() {
 
   // Dados por mês
   const md = months.map(mk => {
-    const ch      = allCharges.filter(c => monthKey(c.startDate) === mk);
+    const ch      = allCharges.filter(c => chargeMonthKey(c) === mk);
     const revM    = ch.reduce((s,c) => s+c.revenue, 0);
     const enerM   = ch.reduce((s,c) => s+c.energyKWh, 0);
     const occI    = occByInterval(ch, power, periodWindow(ch, mk, 'closed'));
