@@ -1942,12 +1942,15 @@ function periodWindow(monthCharges, mk, mode = selectedPeriodMode()) {
     if (start < monthStart) start = monthStart;
   }
   const hours = Math.max((end - start) / 3_600_000, 0);
-  return { start, end, hours, mode };
+  return { start, end, hours, mode, monthKey: mk };
 }
 
 function filterChargesByWindow(charges, window) {
   if (!window?.start || !window?.end) return charges;
-  return charges.filter(charge => charge.startDate && charge.startDate >= window.start && charge.startDate <= window.end);
+  return charges.filter(charge => {
+    if ((window.mode === 'mtd' || window.mode === 'closed') && chargeMonthKey(charge) === window.monthKey) return true;
+    return charge.startDate && charge.startDate >= window.start && charge.startDate <= window.end;
+  });
 }
 
 function periodModeLabel(mode = selectedPeriodMode()) {
