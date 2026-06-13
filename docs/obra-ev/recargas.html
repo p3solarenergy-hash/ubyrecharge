@@ -630,7 +630,7 @@
         <h1>Financeiro de Recargas</h1>
         <div class="meta" id="financeHeroMeta">Configure percentuais e custos do ponto.</div>
       </div>
-      <div class="formula" id="financeFormula">Resultado liquido = gestao + plataforma - custos.</div>
+      <div class="formula" id="financeFormula">Resultado liquido = gestao P3, app terceiros, custos e modelo da operacao.</div>
     </section>
 
     <section class="section">
@@ -642,10 +642,12 @@
           <tr><td>% sociedade P3 geral</td><td><input class="ctl-input" id="financeP3SocietyPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
           <tr><td>% sociedade P3 em AC</td><td><input class="ctl-input" id="financeP3AcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
           <tr><td>% sociedade P3 em DC</td><td><input class="ctl-input" id="financeP3DcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>% plataforma</td><td><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr><td>% app / plataforma terceiros</td><td><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
           <tr><td>Custo energia R$/kWh</td><td><input class="ctl-input" id="financeEnergyCost" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
           <tr><td>Investimento no ponto (R$)</td><td><input class="ctl-input" id="financeInvestmentValue" type="number" min="0" step="100" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
           <tr><td>% cotas investidores</td><td><input class="ctl-input" id="financeInvestorQuotaPct" type="number" min="0" max="100" step="0.1" value="100" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr><td>Objetivo de ocupacao (%)</td><td><input class="ctl-input" id="financeTargetOccPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr><td>R$/kWh objetivo (0 = real)</td><td><input class="ctl-input" id="financeTargetRevenuePerKWh" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
         </tbody></table>
       </div>
       <div class="card">
@@ -1464,6 +1466,8 @@ function defaultFinanceSettings() {
     energyCostPerKWh: 0,
     investmentValue: 0,
     investorQuotaPct: 100,
+    targetOccPct: 0,
+    targetRevenuePerKWh: 0,
     costItems: {},
     revenueItems: {}
   };
@@ -1493,6 +1497,8 @@ function currentFinanceSettingsFromInputs() {
     energyCostPerKWh: numberInputValue('financeEnergyCost', 0),
     investmentValue: numberInputValue('financeInvestmentValue', 0),
     investorQuotaPct: numberInputValue('financeInvestorQuotaPct', 100),
+    targetOccPct: numberInputValue('financeTargetOccPct', 0),
+    targetRevenuePerKWh: numberInputValue('financeTargetRevenuePerKWh', 0),
     costItems: financeItemValues(FINANCE_COST_ITEMS, 'finance-cost'),
     revenueItems: financeItemValues(FINANCE_EXTRA_REVENUE_ITEMS, 'finance-revenue')
   };
@@ -1524,7 +1530,9 @@ function applyFinanceSettingsToInputs(settings = {}) {
     financePlatformPct: merged.platformPct,
     financeEnergyCost: merged.energyCostPerKWh,
     financeInvestmentValue: merged.investmentValue,
-    financeInvestorQuotaPct: merged.investorQuotaPct
+    financeInvestorQuotaPct: merged.investorQuotaPct,
+    financeTargetOccPct: merged.targetOccPct,
+    financeTargetRevenuePerKWh: merged.targetRevenuePerKWh
   };
   Object.entries(fields).forEach(([id, value]) => {
     const el = document.getElementById(id);
@@ -1554,22 +1562,25 @@ function renderFinanceiro(applySaved = true) {
   const charges = allCharges.filter(c => monthKey(c.startDate) === mk);
   const result = financeForCharges(charges, settings);
   const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, investorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin } = result;
+  const target = targetOccupationMetrics(charges, mk, settings);
   const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
   const p3TakePct = revenue ? p3Gross / revenue * 100 : 0;
 
   document.getElementById('financeHeroMeta').innerHTML =
     `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}`;
   document.getElementById('financeFormula').innerHTML =
-    `<strong>${operationModelLabel(settings.operationModel)}</strong><br>P3: gestao ${settings.managementPct}% + plataforma ${settings.platformPct}% + sociedade configurada<br>AC ${fmtBRL(acRevenue)} / DC ${fmtBRL(dcRevenue)}<br><strong style="color:#57B7FF">Payback: ${formatPaybackMonths(paybackMonths)}</strong>`;
+    `<strong>${operationModelLabel(settings.operationModel)}</strong><br>P3: gestao ${settings.managementPct}% + sociedade configurada. App/plataforma ${settings.platformPct}% e servico de terceiros.<br>Meta ocupacao: ${fmtPct(target.targetOccPct)} | real ${fmtPct(target.realOccPct)}<br><strong style="color:#57B7FF">Payback: ${formatPaybackMonths(paybackMonths)}</strong>`;
 
   document.getElementById('financeKpis').innerHTML = `
     <div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>
-    <div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao + plataforma + sociedade AC</div></div>
+    <div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao + sociedades</div></div>
     <div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos energia, custos e P3</div></div>
     <div class="card"><div class="label">Sociedade P3</div><div class="value">${fmtBRL(p3SocietyProfit)}</div><div class="sub">fora da UBY quando aplicavel</div></div>
     <div class="card"><div class="label">Investidores UBY</div><div class="value">${fmtBRL(investorDistribution)}</div><div class="sub">${settings.investorQuotaPct}% das cotas UBY</div></div>
     <div class="card"><div class="label">Payback</div><div class="value">${formatPaybackMonths(paybackMonths)}</div><div class="sub">investimento / resultado proprio</div></div>
     <div class="card"><div class="label">ROI mensal</div><div class="value">${fmtPct(roiMonthly)}</div><div class="bar"><span style="width:${Math.min(Math.max(roiMonthly,0),100).toFixed(1)}%"></span></div><div class="sub">resultado proprio / investimento</div></div>
+    <div class="card"><div class="label">Meta ocupacao</div><div class="value">${fmtPct(target.targetOccPct)}</div><div class="sub">real ${fmtPct(target.realOccPct)} | falta ${fmtPct(target.targetOccPct - target.realOccPct)}</div></div>
+    <div class="card"><div class="label">Faturamento pretendido</div><div class="value">${fmtBRL(target.targetRevenue)}</div><div class="sub">${target.revenueGap >= 0 ? 'faltam' : 'acima'} ${fmtBRL(Math.abs(target.revenueGap))}</div></div>
   `;
   document.getElementById('financeDistributionTable').innerHTML = `
     <tr><td>Modelo da operacao</td><td>${operationModelLabel(settings.operationModel)}</td></tr>
@@ -1577,17 +1588,22 @@ function renderFinanceiro(applySaved = true) {
     <tr><td>Receita AC</td><td>${fmtBRL(acRevenue)}</td></tr>
     <tr><td>Receita DC</td><td>${fmtBRL(dcRevenue)}</td></tr>
     <tr><td>Gestao P3 (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>
-    <tr><td>Plataforma (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>
+    <tr><td>App/plataforma terceiros (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>
     <tr><td>Sociedade P3 em AC (${settings.p3AcEquityPct}%)</td><td>${fmtBRL(p3AcEquity)}</td></tr>
     <tr><td>Sociedade P3 em DC (${settings.p3DcEquityPct}%)</td><td>${fmtBRL(p3DcEquity)}</td></tr>
     <tr><td>Sociedade P3 geral (${settings.p3SocietyPct}%)</td><td>${fmtBRL(settings.operationModel === 'p3_society' ? p3SocietyProfit : 0)}</td></tr>
     <tr><td>Receitas extras</td><td>${fmtBRL(extraRevenue)}</td></tr>
     <tr><td>Resultado operacional apos custos</td><td>${fmtBRL(operationNet)}</td></tr>
     <tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>
+    <tr><td>Ocupacao real x objetivo</td><td>${fmtPct(target.realOccPct)} / ${fmtPct(target.targetOccPct)}</td></tr>
+    <tr><td>kWh pretendido</td><td>${fmtKWh(target.targetEnergy)}</td></tr>
+    <tr><td>Faturamento pretendido</td><td>${fmtBRL(target.targetRevenue)}</td></tr>
+    <tr><td>Recargas pretendidas</td><td>${target.targetCharges.toFixed(1).replace('.', ',')}</td></tr>
   `;
   document.getElementById('financeResultTable').innerHTML = `
     <tr><td>Investimento no ponto</td><td>${fmtBRL(settings.investmentValue)}</td></tr>
     <tr><td>Receita P3</td><td>${fmtBRL(p3Gross)}</td></tr>
+    <tr><td>App/plataforma terceiros</td><td>${fmtBRL(platform)}</td></tr>
     <tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>
     <tr><td>Custos extras</td><td>${fmtBRL(extraCosts)}</td></tr>
     <tr><td>Lucro sociedade P3</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>
@@ -1601,7 +1617,7 @@ function renderFinanceiro(applySaved = true) {
     <tr><td>Margem UBY</td><td>${fmtPct(margin)}</td></tr>
   `;
   document.getElementById('financeNote').innerHTML =
-    `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. A UBY fica com ${fmtBRL(ubyNet)} quando o ativo entra na UBY; sociedades fora da UBY somam ${fmtBRL(p3SocietyProfit)} para a P3 e ${fmtBRL(partnerShare)} para socio/local. Investidores UBY recebem ${fmtBRL(investorDistribution)} conforme cotas.`;
+    `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). A UBY fica com ${fmtBRL(ubyNet)} quando o ativo entra na UBY; sociedades fora da UBY somam ${fmtBRL(p3SocietyProfit)} para a P3 e ${fmtBRL(partnerShare)} para socio/local. Meta: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)} no periodo.`;
 }
 
 async function saveFinancialSettings() {
@@ -1641,6 +1657,34 @@ function formatPaybackMonths(months) {
   if (!Number.isFinite(months) || months <= 0) return '-';
   if (months >= 1200) return '> 100 anos';
   return `${months.toFixed(1).replace('.', ',')} meses`;
+}
+
+function targetOccupationMetrics(charges, mk, settings = {}) {
+  const targetOccPct = Number(settings.targetOccPct || 0);
+  const window = periodWindow(charges, mk, 'mtd');
+  const occ = occByInterval(charges, undefined, window);
+  const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
+  const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
+  const avgKWh = charges.length ? energy / charges.length : 0;
+  const realRevenuePerKWh = energy > 0 ? revenue / energy : 0;
+  const targetRevenuePerKWh = Number(settings.targetRevenuePerKWh || 0) > 0 ? Number(settings.targetRevenuePerKWh || 0) : realRevenuePerKWh;
+  const targetEnergy = occ.maxKWh * targetOccPct / 100;
+  const targetRevenue = targetEnergy * targetRevenuePerKWh;
+  const targetCharges = avgKWh > 0 ? targetEnergy / avgKWh : 0;
+  return {
+    targetOccPct,
+    realOccPct: occ.pct,
+    maxKWh: occ.maxKWh,
+    power: occ.power,
+    hours: occ.hours,
+    targetEnergy,
+    targetRevenue,
+    targetCharges,
+    targetRevenuePerKWh,
+    energyGap: targetEnergy - energy,
+    revenueGap: targetRevenue - revenue,
+    chargeGap: targetCharges - charges.length
+  };
 }
 
 function operationModelLabel(model) {
@@ -1703,10 +1747,10 @@ function financeForCharges(charges, settings = {}) {
 
   const p3AcEquity = model === 'hybrid' ? ac.net * cfg.p3AcEquityPct / 100 : 0;
   const p3DcEquity = model === 'hybrid' ? dc.net * cfg.p3DcEquityPct / 100 : 0;
-  const p3Gross = management + platform + p3SocietyProfit;
+  const p3Gross = management + p3SocietyProfit;
   const investorDistribution = Math.max(ubyNet, 0) * cfg.investorQuotaPct / 100;
   const ubyRetained = ubyNet - investorDistribution;
-  const p3OperationalResult = management + platform + p3SocietyProfit;
+  const p3OperationalResult = management + p3SocietyProfit;
   const ownResult = ubyNet + p3SocietyProfit;
   const paybackBase = model === 'p3_society' ? p3SocietyProfit : (model === 'management_only' ? p3OperationalResult : ownResult);
   const paybackMonths = cfg.investmentValue > 0 && paybackBase > 0 ? cfg.investmentValue / paybackBase : 0;
@@ -1783,10 +1827,10 @@ function renderGeneralFinance(unitData) {
   document.getElementById('generalFinanceHeroMeta').innerHTML =
     `Unidades com base: <strong>${rows.length}</strong><br>Investimento cadastrado: <strong>${fmtBRL(total.investmentValue || 0)}</strong><br>Resultado UBY consolidado: <strong>${fmtBRL(total.ubyNet || 0)}</strong>`;
   document.getElementById('generalFinanceHeroFormula').innerHTML =
-    `<strong>Modelo financeiro</strong><br>P3 recebe gestao/plataforma e sociedades configuradas.<br>UBY recebe apenas ativos UBY e distribui aos investidores por cotas. Sociedades fora da UBY ficam separadas.`;
+    `<strong>Modelo financeiro</strong><br>P3 recebe gestao e sociedades configuradas. App/plataforma e servico de terceiros.<br>UBY recebe apenas ativos UBY e distribui aos investidores por cotas. Sociedades fora da UBY ficam separadas.`;
   document.getElementById('kpiGeneralFinance').innerHTML = `
     <div class="card"><div class="label">Receita financeira</div><div class="value">${fmtBRL(total.revenue || 0)}</div><div class="sub">base das recargas</div></div>
-    <div class="card"><div class="label">Receita P3 total</div><div class="value">${fmtBRL(total.p3Gross || 0)}</div><div class="sub">gestao + plataforma + sociedade AC</div></div>
+    <div class="card"><div class="label">Receita P3 total</div><div class="value">${fmtBRL(total.p3Gross || 0)}</div><div class="sub">gestao + sociedades</div></div>
     <div class="card"><div class="label">Sociedades P3</div><div class="value">${fmtBRL(total.p3SocietyProfit || 0)}</div><div class="sub">fora da UBY quando configurado</div></div>
     <div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(total.ubyNet || 0)}</div><div class="sub">apos custos e P3</div></div>
     <div class="card"><div class="label">Investidores</div><div class="value">${fmtBRL(total.investorDistribution || 0)}</div><div class="sub">repasses por cotas</div></div>
@@ -1796,6 +1840,7 @@ function renderGeneralFinance(unitData) {
     <tr><td>Receita total das recargas</td><td>${fmtBRL(total.revenue || 0)}</td></tr>
     <tr><td>Investimento cadastrado</td><td>${fmtBRL(total.investmentValue || 0)}</td></tr>
     <tr><td>Receita P3 total</td><td>${fmtBRL(total.p3Gross || 0)}</td></tr>
+    <tr><td>App/plataforma terceiros</td><td>${fmtBRL(total.platform || 0)}</td></tr>
     <tr><td>Sociedade P3 total</td><td>${fmtBRL(total.p3SocietyProfit || 0)}</td></tr>
     <tr><td>Sociedade P3 em AC</td><td>${fmtBRL(total.p3AcEquity || 0)}</td></tr>
     <tr><td>Sociedade P3 em DC</td><td>${fmtBRL(total.p3DcEquity || 0)}</td></tr>
