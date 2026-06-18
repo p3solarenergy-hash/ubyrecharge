@@ -510,21 +510,6 @@
 
     <!-- Mensal/acumulado | Base da análise -->
     <section class="section">
-      <div class="card" style="grid-column:1/-1">
-        <h2>Relatorio para dono da area</h2>
-        <div class="section" style="margin-top:0">
-          <div>
-            <table><tbody>
-              <tr><td>Energia para reembolso (R$/kWh)</td><td><input class="ctl-input" id="ownerEnergyRate" type="number" min="0" step="0.01" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
-              <tr><td>Repasse sobre faturamento (%)</td><td><input class="ctl-input" id="ownerRevenueSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
-            </tbody></table>
-            <div class="note" style="margin-top:12px">Use estes campos para relatorio basico ao proprietario do local. Eles ficam salvos por mes.</div>
-          </div>
-          <div>
-            <table><tbody id="ownerAreaReportTable"></tbody></table>
-          </div>
-        </div>
-      </div>
       <div class="card">
         <h2>Mensal e acumulado</h2>
         <div style="overflow-x:auto">
@@ -679,6 +664,25 @@
       <div class="card">
         <h2>Receitas extras</h2>
         <table><tbody id="financeExtraRevenueRows"></tbody></table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Relatorio para dono da area</h2>
+        <div class="section" style="margin-top:0">
+          <div>
+            <table><tbody>
+              <tr><td>Energia para reembolso (R$/kWh)</td><td><input class="ctl-input" id="ownerEnergyRate" type="number" min="0" step="0.01" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
+              <tr><td>Repasse sobre faturamento (%)</td><td><input class="ctl-input" id="ownerRevenueSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
+              <tr><td>Repasse sobre lucro liquido (%)</td><td><input class="ctl-input" id="ownerNetProfitSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
+            </tbody></table>
+            <div class="note" style="margin-top:12px">Use estes campos para relatorio basico ao proprietario do local. Eles ficam salvos por mes. Em pontos com sociedade, informe o percentual sobre lucro liquido.</div>
+          </div>
+          <div>
+            <table><tbody id="ownerAreaReportTable"></tbody></table>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1535,6 +1539,7 @@ function defaultFinanceSettings() {
     targetRevenuePerKWh: 0,
     ownerEnergyRate: 0,
     ownerRevenueSharePct: 0,
+    ownerNetProfitSharePct: 0,
     costItems: {},
     revenueItems: {}
   };
@@ -1568,6 +1573,7 @@ function currentFinanceSettingsFromInputs() {
     targetRevenuePerKWh: numberInputValue('financeTargetRevenuePerKWh', 0),
     ownerEnergyRate: numberInputValue('ownerEnergyRate', Number(financialSettings[financeMonthKey()]?.ownerEnergyRate || financialSettings.default?.ownerEnergyRate || 0)),
     ownerRevenueSharePct: numberInputValue('ownerRevenueSharePct', Number(financialSettings[financeMonthKey()]?.ownerRevenueSharePct || financialSettings.default?.ownerRevenueSharePct || 0)),
+    ownerNetProfitSharePct: numberInputValue('ownerNetProfitSharePct', Number(financialSettings[financeMonthKey()]?.ownerNetProfitSharePct || financialSettings.default?.ownerNetProfitSharePct || 0)),
     costItems: financeItemValues(FINANCE_COST_ITEMS, 'finance-cost'),
     revenueItems: financeItemValues(FINANCE_EXTRA_REVENUE_ITEMS, 'finance-revenue')
   };
@@ -1603,7 +1609,8 @@ function applyFinanceSettingsToInputs(settings = {}) {
     financeTargetOccPct: merged.targetOccPct,
     financeTargetRevenuePerKWh: merged.targetRevenuePerKWh,
     ownerEnergyRate: merged.ownerEnergyRate,
-    ownerRevenueSharePct: merged.ownerRevenueSharePct
+    ownerRevenueSharePct: merged.ownerRevenueSharePct,
+    ownerNetProfitSharePct: merged.ownerNetProfitSharePct
   };
   Object.entries(fields).forEach(([id, value]) => {
     const el = document.getElementById(id);
@@ -1621,18 +1628,15 @@ function financeMonthKey() {
 function ownerAreaSettingsForMonth(mk, useInputs = false) {
   const saved = { ...defaultFinanceSettings(), ...(financialSettings.default || {}), ...(financialSettings[mk] || {}) };
   if (!useInputs) return saved;
-  return {
-    ...saved,
-    ownerEnergyRate: numberInputValue('ownerEnergyRate', Number(saved.ownerEnergyRate || 0)),
-    ownerRevenueSharePct: numberInputValue('ownerRevenueSharePct', Number(saved.ownerRevenueSharePct || 0))
-  };
+  return { ...saved, ...currentFinanceSettingsFromInputs() };
 }
 
 function applyOwnerAreaSettingsToInputs(mk) {
   const settings = ownerAreaSettingsForMonth(mk);
   const fields = {
     ownerEnergyRate: settings.ownerEnergyRate,
-    ownerRevenueSharePct: settings.ownerRevenueSharePct
+    ownerRevenueSharePct: settings.ownerRevenueSharePct,
+    ownerNetProfitSharePct: settings.ownerNetProfitSharePct
   };
   Object.entries(fields).forEach(([id, value]) => {
     const el = document.getElementById(id);
@@ -1640,40 +1644,52 @@ function applyOwnerAreaSettingsToInputs(mk) {
   });
 }
 
-function ownerAreaReportForSummary(summary, settings = {}) {
+function ownerAreaReportForSummary(summary, settings = {}, charges = []) {
   const energy = Number(summary?.energy || 0);
   const revenue = Number(summary?.rev || 0);
   const energyRate = Number(settings.ownerEnergyRate || 0);
   const sharePct = Number(settings.ownerRevenueSharePct || 0);
+  const netProfitSharePct = Number(settings.ownerNetProfitSharePct || 0);
+  const finance = financeForCharges(charges || [], settings);
+  const netProfit = charges?.length ? Number(finance.operationNet || 0) : Math.max(revenue - energy * energyRate, 0);
   const energyReimbursement = energy * energyRate;
   const revenueShare = revenue * sharePct / 100;
+  const netProfitShare = Math.max(netProfit, 0) * netProfitSharePct / 100;
   return {
     energy,
     revenue,
     energyRate,
     sharePct,
+    netProfit,
+    netProfitSharePct,
     energyReimbursement,
     revenueShare,
-    ownerTotal: energyReimbursement + revenueShare
+    netProfitShare,
+    ownerTotal: energyReimbursement + revenueShare + netProfitShare
   };
 }
 
 function renderOwnerAreaReportForCurrentMonth() {
-  const mk = document.getElementById('monthSelector')?.value || financeMonthKey();
+  const financeVisible = document.getElementById('tabFinanceiro')?.style.display === 'block';
+  const mk = (financeVisible ? document.getElementById('financeMonthSelector')?.value : document.getElementById('monthSelector')?.value) || financeMonthKey();
   if (!mk) return;
   const currentSummary = monthSummaryForMonth(mk);
   const currentSettings = ownerAreaSettingsForMonth(mk, true);
-  const current = ownerAreaReportForSummary(currentSummary, currentSettings);
+  const currentCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const current = ownerAreaReportForSummary(currentSummary, currentSettings, currentCharges);
   const accumulated = getMonths().reduce((acc, monthKeyValue) => {
     const settings = monthKeyValue === mk ? currentSettings : ownerAreaSettingsForMonth(monthKeyValue);
-    const report = ownerAreaReportForSummary(monthSummaryForMonth(monthKeyValue), settings);
+    const charges = allCharges.filter(c => chargeMonthKey(c) === monthKeyValue);
+    const report = ownerAreaReportForSummary(monthSummaryForMonth(monthKeyValue), settings, charges);
     acc.energy += report.energy;
     acc.revenue += report.revenue;
+    acc.netProfit += report.netProfit;
     acc.energyReimbursement += report.energyReimbursement;
     acc.revenueShare += report.revenueShare;
+    acc.netProfitShare += report.netProfitShare;
     acc.ownerTotal += report.ownerTotal;
     return acc;
-  }, { energy: 0, revenue: 0, energyReimbursement: 0, revenueShare: 0, ownerTotal: 0 });
+  }, { energy: 0, revenue: 0, netProfit: 0, energyReimbursement: 0, revenueShare: 0, netProfitShare: 0, ownerTotal: 0 });
 
   const table = document.getElementById('ownerAreaReportTable');
   if (!table) return;
@@ -1683,13 +1699,17 @@ function renderOwnerAreaReportForCurrentMonth() {
     <tr><td>Reembolso de energia</td><td>${fmtBRL(current.energyReimbursement)}</td><td>kWh x valor definido</td></tr>
     <tr><td>Faturamento bruto</td><td>${fmtBRL(current.revenue)}</td><td>${fmtPct(current.sharePct)} de repasse</td></tr>
     <tr><td>Repasse sobre faturamento</td><td>${fmtBRL(current.revenueShare)}</td><td>receita x percentual</td></tr>
-    <tr><td><strong>Total para dono da area</strong></td><td><strong>${fmtBRL(current.ownerTotal)}</strong></td><td>energia + repasse</td></tr>
+    <tr><td>Lucro liquido base</td><td>${fmtBRL(current.netProfit)}</td><td>apos custos configurados</td></tr>
+    <tr><td>Repasse sobre lucro liquido</td><td>${fmtBRL(current.netProfitShare)}</td><td>${fmtPct(current.netProfitSharePct)} do lucro liquido</td></tr>
+    <tr><td><strong>Total para dono da area</strong></td><td><strong>${fmtBRL(current.ownerTotal)}</strong></td><td>energia + faturamento + lucro</td></tr>
     <tr><td colspan="3"><strong>Acumulado da unidade</strong></td></tr>
     <tr><td>Energia acumulada</td><td>${fmtKWh(accumulated.energy)}</td><td>todos os meses salvos</td></tr>
     <tr><td>Reembolso energia acumulado</td><td>${fmtBRL(accumulated.energyReimbursement)}</td><td>por valor mensal salvo</td></tr>
     <tr><td>Faturamento acumulado</td><td>${fmtBRL(accumulated.revenue)}</td><td>todos os meses salvos</td></tr>
     <tr><td>Repasse faturamento acumulado</td><td>${fmtBRL(accumulated.revenueShare)}</td><td>por percentual mensal salvo</td></tr>
-    <tr><td><strong>Total acumulado para dono</strong></td><td><strong>${fmtBRL(accumulated.ownerTotal)}</strong></td><td>energia + repasse</td></tr>
+    <tr><td>Lucro liquido acumulado</td><td>${fmtBRL(accumulated.netProfit)}</td><td>apos custos configurados</td></tr>
+    <tr><td>Repasse lucro liquido acumulado</td><td>${fmtBRL(accumulated.netProfitShare)}</td><td>por percentual mensal salvo</td></tr>
+    <tr><td><strong>Total acumulado para dono</strong></td><td><strong>${fmtBRL(accumulated.ownerTotal)}</strong></td><td>energia + faturamento + lucro</td></tr>
   `;
 }
 
@@ -1764,6 +1784,7 @@ function renderFinanceiro(applySaved = true) {
   `;
   document.getElementById('financeNote').innerHTML =
     `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). A UBY fica com ${fmtBRL(ubyNet)} quando o ativo entra na UBY; sociedades fora da UBY somam ${fmtBRL(p3SocietyProfit)} para a P3 e ${fmtBRL(partnerShare)} para socio/local. Meta: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)} no periodo.`;
+  renderOwnerAreaReportForCurrentMonth();
 }
 
 async function saveFinancialSettings() {
@@ -2445,13 +2466,11 @@ function renderAll() {
 function renderMensal() {
   const mk      = document.getElementById('monthSelector').value;
   if (!mk) return;
-  applyOwnerAreaSettingsToInputs(mk);
   const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
   if (!charges.length) {
     setStorageState(`Sem recargas em ${periodModeLabel(window.mode)} para <strong>${currentWorkName}</strong>.`);
-    renderOwnerAreaReportForCurrentMonth();
     renderMonthClosing(mk);
     return;
   }
@@ -2463,7 +2482,6 @@ function renderMensal() {
   renderUserPieChart(charges);
   renderUserBars(charges, 'userBars');
   renderFinancialNote(charges);
-  renderOwnerAreaReportForCurrentMonth();
   renderMonthlyTable();
   renderBaseTable(charges, mk, window);
   renderMonthClosing(mk);
