@@ -235,7 +235,7 @@
 
     .project-bar {
       display:grid;
-      grid-template-columns:minmax(220px,420px) minmax(160px,220px) 1fr;
+      grid-template-columns:minmax(220px,420px) minmax(150px,200px) minmax(180px,260px) 1fr;
       gap:12px;
       align-items:end;
       margin-bottom:18px;
@@ -344,6 +344,13 @@
       <label>Mês da planilha</label>
       <input id="importMonth" type="month">
     </div>
+    <div class="project-field">
+      <label>Modo de importação</label>
+      <select id="importMode">
+        <option value="merge">Consolidar no mês</option>
+        <option value="replace">Substituir mês completo</option>
+      </select>
+    </div>
     <div>
       <div class="project-state" id="storageState">Escolha a obra antes de anexar a planilha.</div>
       <button type="button" class="btn-danger" id="clearRechargeBaseBtn" style="display:none;margin-top:8px">Excluir base salva desta obra</button>
@@ -357,7 +364,7 @@
     <span class="up-icon">📂</span>
     <p>Arraste a planilha <strong>.xlsx</strong> exportada da plataforma ou <strong>clique para selecionar</strong></p>
     <p class="up-hint" style="font-size:11px;color:#4a6058;margin-top:3px">
-      Escolha o mês acima antes de subir. Uma nova planilha do mesmo mês substitui a anterior.
+      Use consolidar para somar vários carregadores no mesmo mês. Use substituir quando a planilha já for o fechamento completo.
     </p>
     <input type="file" id="fileInput" accept=".xlsx,.xls" multiple>
     <div class="file-chips" id="fileChips"></div>
@@ -591,6 +598,19 @@
           <table>
             <thead><tr><th>ID</th><th>Cliente</th><th>Início</th><th>kWh</th><th>Receita</th><th>Ociosidade</th></tr></thead>
             <tbody id="idleTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Avaliações dos clientes</h2>
+        <div class="kpis" id="reviewKpis" style="margin-top:0"></div>
+        <div style="overflow-x:auto;margin-top:14px">
+          <table>
+            <thead><tr><th>Avaliação</th><th>Quantidade</th><th>Participação</th><th>Comentários</th></tr></thead>
+            <tbody id="reviewsTable"></tbody>
           </table>
         </div>
       </div>
@@ -1010,6 +1030,7 @@ function saveLocalRechargeBase() {
       size: file.size || 0,
       lastModified: file.lastModified || 0,
       month: file.month || '',
+      importMode: file.importMode || 'merge',
       importedAt: file.importedAt || new Date().toISOString(),
       rows: allCharges.filter(charge => charge._file === file.name).length
     })),
@@ -1058,6 +1079,7 @@ function applyRechargeRecord(record, sourceLabel) {
     size: file.size || 0,
     lastModified: file.lastModified || 0,
     month: file.month || '',
+    importMode: file.importMode || 'merge',
     importedAt: file.importedAt || record.updatedAt || new Date().toISOString()
   }));
   if (!allCharges.length) {
@@ -1190,6 +1212,7 @@ fileInput.addEventListener('change', e => {
 
 function handleFiles(files) {
   const selectedMonth = document.getElementById('importMonth')?.value || '';
+  const importMode = document.getElementById('importMode')?.value || 'merge';
   if (!selectedMonth) {
     setFeedback('Escolha o mes da planilha antes de subir o arquivo.', 'up-error');
     return;
@@ -1199,6 +1222,7 @@ function handleFiles(files) {
     .forEach(f => {
       loadedFiles = loadedFiles.filter(lf => !(lf?.name === f.name && lf?.month === selectedMonth));
       f.month = selectedMonth;
+      f.importMode = importMode;
       loadedFiles.push(f);
       readFile(f);
     });
@@ -1299,6 +1323,20 @@ function readCell(row = [], index = -1) {
   return index >= 0 ? row[index] : '';
 }
 
+function rechargeUniqueKey(charge = {}) {
+  const id = safeText(charge.id).trim();
+  if (id) return `id:${id}`;
+  return [
+    'fallback',
+    safeText(charge.station).trim().toLowerCase(),
+    safeText(charge.connType).trim().toLowerCase(),
+    safeText(charge.startStr || charge.startIso || charge.startDate?.toISOString?.()).trim(),
+    safeText(charge.userEmail || charge.userName).trim().toLowerCase(),
+    Number(charge.energyKWh || 0).toFixed(3),
+    Number(charge.revenue || 0).toFixed(2)
+  ].join('|');
+}
+
 function excelSerialToDate(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
@@ -1343,6 +1381,8 @@ function readFile(file) {
 
       const headers = rows[0] || [];
       const voucherCol = findColumnIndex(headers, ['Voucher utilizado', 'Voucher'], 26);
+      const ratingCol = findColumnIndex(headers, ['Avaliação', 'Avaliacao'], 27);
+      const reviewCommentCol = findColumnIndex(headers, ['Comentário', 'Comentario', 'Comentários', 'Comentarios', 'Comentário da avaliação', 'Comentario da avaliacao'], -1);
       const selectedMonth = file.month || document.getElementById('importMonth')?.value || '';
       const importedCharges = [];
       for (let i = 1; i < rows.length; i++) {
@@ -1371,7 +1411,8 @@ function readFile(file) {
           idleTime:      String(r[24] || ''),
           idleValue:     parseNumber(r[25]),
           voucher:       String(readCell(r, voucherCol) || '').trim(),
-          rating:        String(r[27] || '').trim()
+          rating:        String(readCell(r, ratingCol) || '').trim(),
+          reviewComment: String(readCell(r, reviewCommentCol) || '').trim()
         });
       }
       if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
@@ -1382,10 +1423,25 @@ function readFile(file) {
         throw new Error(`O mes escolhido foi ${monthLabel(selectedMonth)}, mas a planilha tem recargas de ${dateMonths.map(monthLabel).join(', ')}. Escolha o mes correto antes de subir.`);
       }
 
+      const importMode = file.importMode || document.getElementById('importMode')?.value || 'merge';
       importedCharges.forEach(charge => { charge._month = selectedMonth || monthKey(charge.startDate); });
       const importedMonths = new Set(importedCharges.map(chargeMonthKey).filter(Boolean));
-      const replacedCount = allCharges.filter(charge => importedMonths.has(chargeMonthKey(charge))).length;
-      allCharges = allCharges.filter(charge => !importedMonths.has(chargeMonthKey(charge)));
+      let replacedCount = 0;
+      let duplicateCount = 0;
+      if (importMode === 'replace') {
+        replacedCount = allCharges.filter(charge => importedMonths.has(chargeMonthKey(charge))).length;
+        allCharges = allCharges.filter(charge => !importedMonths.has(chargeMonthKey(charge)));
+      } else {
+        const importedKeys = new Set(importedCharges.map(rechargeUniqueKey));
+        const before = allCharges.length;
+        allCharges = allCharges.filter(charge => {
+          const sameImportedMonth = importedMonths.has(chargeMonthKey(charge));
+          const sameFileMonth = charge._file === file.name && sameImportedMonth;
+          const duplicateCharge = sameImportedMonth && importedKeys.has(rechargeUniqueKey(charge));
+          return !sameFileMonth && !duplicateCharge;
+        });
+        duplicateCount = before - allCharges.length;
+      }
       allCharges.push(...importedCharges);
       importedMonths.forEach(mk => {
         const closing = buildMonthClosing(mk);
@@ -1402,7 +1458,7 @@ function readFile(file) {
 
       setFeedback('', '');
       uploadZone.classList.add('compact');
-      loadedFiles = loadedFiles.map(item => item.name === file.name && item.month === selectedMonth ? { ...item, month: selectedMonth, importedAt: new Date().toISOString() } : item);
+      loadedFiles = loadedFiles.map(item => item.name === file.name && item.month === selectedMonth ? { ...item, month: selectedMonth, importMode, importedAt: new Date().toISOString() } : item);
       updateChips();
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
@@ -1411,7 +1467,9 @@ function readFile(file) {
       setStorageState(`Planilha importada para <strong>${currentWorkName}</strong>: ${importedCharges.length} recarga(s), ${fmtKWh(importedCharges.reduce((s,c)=>s+c.energyKWh,0))}, ${fmtBRL(importedCharges.reduce((s,c)=>s+c.revenue,0))}. Salvando no banco...`);
       await saveRechargeBase();
       if (replacedCount > 0) {
-        setFeedback(`${replacedCount} recarga(s) das mesmas datas foram substituidas.`, 'up-loading');
+        setFeedback(`${replacedCount} recarga(s) do mês foram substituidas.`, 'up-loading');
+      } else if (duplicateCount > 0) {
+        setFeedback(`${duplicateCount} recarga(s) duplicada(s) foram atualizadas. As demais foram consolidadas no mês.`, 'up-loading');
       }
 
     } catch (err) {
@@ -2693,6 +2751,7 @@ function renderMensal() {
   renderMonthClosing(mk);
   renderClientsTable(charges);
   renderIdleAlerts(charges);
+  renderReviews(charges);
   renderTechDiagnostic(charges);
 }
 
@@ -2929,6 +2988,56 @@ function renderIdleAlerts(charges) {
         </tr>`;
       }).join('')
     : '<tr><td colspan="6" style="color:var(--p3-muted);text-align:center;padding:20px">Nenhum alerta relevante</td></tr>';
+}
+
+function parseRatingValue(value) {
+  const raw = safeText(value).trim();
+  if (!raw) return 0;
+  const match = raw.match(/(\d+(?:[,.]\d+)?)/);
+  if (!match) return 0;
+  const rating = Number(match[1].replace(',', '.'));
+  return Number.isFinite(rating) ? Math.max(0, Math.min(5, rating)) : 0;
+}
+
+function renderReviews(charges) {
+  const rated = charges
+    .map(charge => ({ ...charge, ratingValue: parseRatingValue(charge.rating), comment: safeText(charge.reviewComment).trim() }))
+    .filter(charge => charge.ratingValue > 0 || charge.comment);
+  const onlyRated = rated.filter(charge => charge.ratingValue > 0);
+  const comments = rated.filter(charge => charge.comment);
+  const avg = onlyRated.length ? onlyRated.reduce((sum, charge) => sum + charge.ratingValue, 0) / onlyRated.length : 0;
+  document.getElementById('reviewKpis').innerHTML = `
+    <div class="card"><div class="label">Média</div><div class="value">${avg ? avg.toFixed(1).replace('.', ',') : '0,0'} ★</div><div class="sub">${onlyRated.length} avaliação(ões)</div></div>
+    <div class="card"><div class="label">Comentários</div><div class="value">${comments.length}</div><div class="sub">comentários preenchidos</div></div>
+    <div class="card"><div class="label">Cobertura</div><div class="value">${charges.length ? fmtPct(onlyRated.length / charges.length * 100) : '0,00%'}</div><div class="sub">recargas com avaliação</div></div>
+  `;
+
+  const rows = [5, 4, 3, 2, 1].map(stars => {
+    const group = onlyRated.filter(charge => Math.round(charge.ratingValue) === stars);
+    const pct = onlyRated.length ? group.length / onlyRated.length * 100 : 0;
+    const groupComments = comments
+      .filter(charge => Math.round(charge.ratingValue) === stars)
+      .slice(0, 3)
+      .map(charge => escapeHtml(charge.comment))
+      .join('<br>');
+    return `<tr>
+      <td>${stars} estrela${stars === 1 ? '' : 's'}</td>
+      <td>${group.length}</td>
+      <td>${fmtPct(pct)}</td>
+      <td>${groupComments || '<span style="color:var(--p3-muted)">Sem comentários</span>'}</td>
+    </tr>`;
+  }).join('');
+  const commentsWithoutRating = comments.filter(charge => !charge.ratingValue);
+  const unratedRow = commentsWithoutRating.length ? `<tr>
+    <td>Sem estrela</td>
+    <td>0</td>
+    <td>-</td>
+    <td>${commentsWithoutRating.slice(0, 3).map(charge => escapeHtml(charge.comment)).join('<br>')}</td>
+  </tr>` : '';
+
+  document.getElementById('reviewsTable').innerHTML = onlyRated.length || comments.length
+    ? rows + unratedRow
+    : '<tr><td colspan="4" style="color:var(--p3-muted);text-align:center;padding:20px">Nenhuma avaliação encontrada na planilha.</td></tr>';
 }
 
 function renderTechDiagnostic(charges) {
