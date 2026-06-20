@@ -1281,6 +1281,24 @@ function parseNumber(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizeHeaderName(value) {
+  return safeText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function findColumnIndex(headers = [], names = [], fallbackIndex = -1) {
+  const wanted = names.map(normalizeHeaderName);
+  const found = headers.findIndex(header => wanted.includes(normalizeHeaderName(header)));
+  return found >= 0 ? found : fallbackIndex;
+}
+
+function readCell(row = [], index = -1) {
+  return index >= 0 ? row[index] : '';
+}
+
 function excelSerialToDate(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
@@ -1323,6 +1341,8 @@ function readFile(file) {
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
       if (rows.length < 2) throw new Error('Planilha sem dados de recargas.');
 
+      const headers = rows[0] || [];
+      const voucherCol = findColumnIndex(headers, ['Voucher utilizado', 'Voucher'], 26);
       const selectedMonth = file.month || document.getElementById('importMonth')?.value || '';
       const importedCharges = [];
       for (let i = 1; i < rows.length; i++) {
@@ -1350,7 +1370,7 @@ function readFile(file) {
           paymentStatus: String(r[21] || '').trim(),
           idleTime:      String(r[24] || ''),
           idleValue:     parseNumber(r[25]),
-          voucher:       String(r[26] || '').trim(),
+          voucher:       String(readCell(r, voucherCol) || '').trim(),
           rating:        String(r[27] || '').trim()
         });
       }
