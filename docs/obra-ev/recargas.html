@@ -1026,13 +1026,15 @@ function saveLocalRechargeBase() {
     workId: currentWorkId,
     workName: currentWorkName,
     files: loadedFiles.map(file => ({
+      fileKey: file.fileKey || fileSourceKey(file.month, file.name, file.station || ''),
       name: file.name,
+      station: file.station || '',
       size: file.size || 0,
       lastModified: file.lastModified || 0,
       month: file.month || '',
       importMode: file.importMode || 'merge',
       importedAt: file.importedAt || new Date().toISOString(),
-      rows: allCharges.filter(charge => charge._file === file.name).length
+      rows: allCharges.filter(charge => (file.fileKey && charge._fileKey === file.fileKey) || (!file.fileKey && charge._file === file.name)).length
     })),
     charges: allCharges.map(serializeCharge),
     monthlyClosings,
@@ -1075,7 +1077,9 @@ function applyRechargeRecord(record, sourceLabel) {
   monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
   financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
   loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
+    fileKey: file.fileKey || fileSourceKey(file.month, file.name, file.station || ''),
     name: file.name,
+    station: file.station || '',
     size: file.size || 0,
     lastModified: file.lastModified || 0,
     month: file.month || '',
@@ -1220,7 +1224,6 @@ function handleFiles(files) {
   Array.from(files || [])
     .filter(f => f?.name && /\.(xlsx|xls)$/i.test(String(f.name)))
     .forEach(f => {
-      loadedFiles = loadedFiles.filter(lf => !(lf?.name === f.name && lf?.month === selectedMonth));
       f.month = selectedMonth;
       f.importMode = importMode;
       loadedFiles.push(f);
@@ -1228,9 +1231,15 @@ function handleFiles(files) {
     });
 }
 
-function removeFile(name) {
-  loadedFiles = loadedFiles.filter(f => f?.name !== name);
-  allCharges  = allCharges.filter(c => c._file !== name);
+function removeFile(fileKey, name = '') {
+  const legacyName = name || fileKey;
+  loadedFiles = loadedFiles.filter(f => {
+    const key = f?.fileKey || fileSourceKey(f?.month, f?.name, f?.station || '');
+    return key !== fileKey && f?.name !== legacyName;
+  });
+  allCharges = allCharges.filter(c => {
+    return c._fileKey !== fileKey && c._file !== legacyName;
+  });
   updateChips();
   if (!allCharges.length) {
     uploadZone.classList.remove('compact');
@@ -1323,6 +1332,11 @@ function readCell(row = [], index = -1) {
   return index >= 0 ? row[index] : '';
 }
 
+function fileSourceKey(month = '', name = '', station = '') {
+  const clean = value => safeText(value).trim().toLowerCase();
+  return [clean(month), clean(name), clean(station)].join('|');
+}
+
 function rechargeUniqueKey(charge = {}) {
   const id = safeText(charge.id).trim();
   if (id) return `id:${id}`;
@@ -1366,7 +1380,7 @@ function readFile(file) {
 
   if (typeof XLSX === 'undefined') {
     setFeedback('❌ Biblioteca SheetJS não carregou. Verifique sua conexão e recarregue a página.', 'up-error');
-    loadedFiles = loadedFiles.filter(f => f.name !== file.name);
+    loadedFiles = loadedFiles.filter(f => f !== file);
     return;
   }
 
@@ -1424,7 +1438,15 @@ function readFile(file) {
       }
 
       const importMode = file.importMode || document.getElementById('importMode')?.value || 'merge';
-      importedCharges.forEach(charge => { charge._month = selectedMonth || monthKey(charge.startDate); });
+      const sourceStation = [...new Set(importedCharges.map(charge => charge.station).filter(Boolean))].join(' + ');
+      const sourceKey = fileSourceKey(selectedMonth, file.name, sourceStation);
+      file.fileKey = sourceKey;
+      file.station = sourceStation;
+      importedCharges.forEach(charge => {
+        charge._month = selectedMonth || monthKey(charge.startDate);
+        charge._fileKey = sourceKey;
+        charge._sourceStation = sourceStation;
+      });
       const importedMonths = new Set(importedCharges.map(chargeMonthKey).filter(Boolean));
       let replacedCount = 0;
       let duplicateCount = 0;
@@ -1436,7 +1458,7 @@ function readFile(file) {
         const before = allCharges.length;
         allCharges = allCharges.filter(charge => {
           const sameImportedMonth = importedMonths.has(chargeMonthKey(charge));
-          const sameFileMonth = charge._file === file.name && sameImportedMonth;
+          const sameFileMonth = sameImportedMonth && ((charge._fileKey && charge._fileKey === sourceKey) || (!charge._fileKey && charge._file === file.name));
           const duplicateCharge = sameImportedMonth && importedKeys.has(rechargeUniqueKey(charge));
           return !sameFileMonth && !duplicateCharge;
         });
@@ -1449,16 +1471,17 @@ function readFile(file) {
       });
       loadedFiles = loadedFiles.filter(fileItem => {
         const fileMonth = fileItem?.month || '';
-        const isCurrentFile = fileItem?.name === file.name && fileMonth === selectedMonth;
+        const fileKey = fileItem?.fileKey || fileSourceKey(fileMonth, fileItem?.name, fileItem?.station || '');
+        const isCurrentFile = fileKey === sourceKey;
         const stillHasCharges = allCharges.some(charge =>
-          charge._file === fileItem?.name && (!fileMonth || chargeMonthKey(charge) === fileMonth)
+          ((charge._fileKey && charge._fileKey === fileKey) || (!charge._fileKey && charge._file === fileItem?.name)) && (!fileMonth || chargeMonthKey(charge) === fileMonth)
         );
         return isCurrentFile || stillHasCharges;
       });
 
       setFeedback('', '');
       uploadZone.classList.add('compact');
-      loadedFiles = loadedFiles.map(item => item.name === file.name && item.month === selectedMonth ? { ...item, month: selectedMonth, importMode, importedAt: new Date().toISOString() } : item);
+      loadedFiles = loadedFiles.map(item => item === file || (item.fileKey && item.fileKey === sourceKey) ? { ...item, fileKey: sourceKey, station: sourceStation, month: selectedMonth, importMode, importedAt: new Date().toISOString() } : item);
       updateChips();
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
@@ -1474,13 +1497,13 @@ function readFile(file) {
 
     } catch (err) {
       setFeedback('❌ ' + err.message, 'up-error');
-      loadedFiles = loadedFiles.filter(f => f.name !== file.name);
+      loadedFiles = loadedFiles.filter(f => f !== file);
       updateChips();
     }
   };
   reader.onerror = () => {
     setFeedback('❌ Erro ao ler o arquivo. Tente novamente.', 'up-error');
-    loadedFiles = loadedFiles.filter(f => f.name !== file.name);
+    loadedFiles = loadedFiles.filter(f => f !== file);
     updateChips();
   };
   reader.readAsArrayBuffer(file);
@@ -2385,7 +2408,7 @@ function renderCouponSummary(id, details = []) {
   const el = document.getElementById(id);
   if (!el) return;
   if (!details.length) {
-    el.innerHTML = '<div class="note" style="padding:10px 12px">Nenhum cupom usado neste periodo.</div>';
+    el.innerHTML = '<div class="note" style="padding:10px 12px">Nenhum cupom encontrado neste periodo. Se a planilha tem Voucher utilizado na coluna AA, reimporte este mes para atualizar a base salva.</div>';
     return;
   }
   el.innerHTML = details.slice(0, 6).map(item => {
