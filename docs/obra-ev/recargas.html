@@ -115,6 +115,13 @@
     .coupon-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(3,auto); gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--p3-border); color:var(--p3-muted); font-size:11px; }
     .coupon-row strong { color:var(--p3-text); font-size:12px; overflow-wrap:anywhere; }
     .coupon-row span { white-space:nowrap; }
+    .ai-insights { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:16px; }
+    .ai-card { background:#0B1524; border:1px solid var(--p3-border); border-left:4px solid var(--p3-primary); border-radius:10px; padding:14px; min-height:150px; }
+    .ai-card.warn { border-left-color:var(--p3-warn); }
+    .ai-card.good { border-left-color:#38C96F; }
+    .ai-card strong { display:block; color:var(--p3-text); font-size:13px; margin-bottom:8px; }
+    .ai-card p { margin:0 0 10px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .ai-card .action { color:#E8EFEB; font-size:12px; font-weight:700; }
 
     /* ── NOVO: Upload zone ── */
     .upload-zone {
@@ -275,6 +282,7 @@
       .unit-card { grid-template-columns:1fr; }
       .unit-card .unit-value,.unit-card .unit-sub { text-align:left; }
       .unit-actions { justify-content:flex-start; }
+      .ai-insights { grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -284,6 +292,7 @@
   <div class="tabs-bar" id="tabsBar" style="display:none">
     <div class="tabs">
       <button class="tab active" onclick="switchTab('geral',this)">Geral</button>
+      <button class="tab" onclick="switchTab('uby',this)">UBY</button>
       <button class="tab" onclick="switchTab('financeiroGeral',this)">Financeiro geral</button>
     </div>
     <div class="controls" id="ctrlGeral">
@@ -450,6 +459,48 @@
   <!-- ════════════════════════════════════════
        TAB: MENSAL
   ════════════════════════════════════════ -->
+  <div id="tabUby" style="display:none">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/04_simbolo_badge.svg" alt="UBY"></div>
+          <div>
+            <div class="brand-name">UBY Recharge</div>
+            <div class="brand-tag">Operação própria UBY</div>
+          </div>
+        </div>
+        <h1>Painel UBY</h1>
+        <div class="meta" id="ubyHeroMeta">Carregadores marcados como operação UBY. Por padrão, DC entra automaticamente.</div>
+      </div>
+      <div class="formula" id="ubyHeroFormula">Use o check para incluir ou retirar carregadores específicos da operação UBY.</div>
+    </section>
+
+    <section class="grid kpis" id="kpiUby"></section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Receita UBY por unidade</h2>
+        <canvas id="chartUbyRevenueUnit"></canvas>
+      </div>
+      <div class="card">
+        <h2>Energia UBY por unidade</h2>
+        <canvas id="chartUbyEnergyUnit"></canvas>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Classificação dos carregadores</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>UBY</th><th>Unidade</th><th>Carregador</th><th>Tipo</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>Origem da regra</th><th>Abrir</th></tr></thead>
+            <tbody id="ubyChargerTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <div id="tabFinanceiroGeral" style="display:none">
     <section class="hero general-hero">
       <div>
@@ -613,6 +664,7 @@
             <tbody id="reviewsTable"></tbody>
           </table>
         </div>
+        <div class="ai-insights" id="reviewAiInsights"></div>
       </div>
     </section>
 
@@ -798,6 +850,7 @@ let openingWorkReport = false;
 let monthlyClosings = {};
 let financialSettings = {};
 let financeSaveTimer = null;
+let ubyOperationOverrides = {};
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -902,7 +955,13 @@ function escapeHtml(value) {
 }
 
 function escapeAttr(value) {
-  return safeText(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return safeText(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'");
 }
 
 function clientIdentityKey(name = '', email = '') {
@@ -964,6 +1023,7 @@ function syncGeneralRecordsFromLocal() {
       files: Array.isArray(record.files) ? record.files : [],
       charges: Array.isArray(record.charges) ? record.charges.map(hydrateCharge) : [],
       financialSettings: record.financialSettings || record.summary?.financialSettings || {},
+      ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || ''
     };
   });
@@ -983,6 +1043,7 @@ function mergeCloudRechargeRecords(records) {
       files: Array.isArray(record.files) ? record.files : [],
       charges: Array.isArray(record.charges) ? record.charges : [],
       financialSettings: record.financialSettings || record.summary?.financialSettings || {},
+      ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
     db[workId] = normalized;
@@ -1006,6 +1067,7 @@ function rechargeSummary() {
     files: loadedFiles.length,
     monthlyClosings,
     financialSettings,
+    ubyOperationOverrides,
     energyKWh: energy,
     revenue,
     firstDate: dates.length ? new Date(Math.min(...dates)).toISOString() : '',
@@ -1039,6 +1101,7 @@ function saveLocalRechargeBase() {
     charges: allCharges.map(serializeCharge),
     monthlyClosings,
     financialSettings,
+    ubyOperationOverrides,
     summary: rechargeSummary(),
     updatedAt: new Date().toISOString()
   };
@@ -1076,6 +1139,7 @@ function applyRechargeRecord(record, sourceLabel) {
   allCharges = (record?.charges || []).map(hydrateCharge);
   monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
   financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
+  ubyOperationOverrides = record?.ubyOperationOverrides || record?.summary?.ubyOperationOverrides || {};
   loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
     fileKey: file.fileKey || fileSourceKey(file.month, file.name, file.station || ''),
     name: file.name,
@@ -1262,6 +1326,7 @@ async function clearRechargeBase() {
   loadedFiles = [];
   monthlyClosings = {};
   financialSettings = {};
+  ubyOperationOverrides = {};
   saveLocalRechargeBase();
   try {
     await clearCloudRechargeBase();
@@ -2450,6 +2515,16 @@ function chargerKey(charge = {}) {
   return key || `${charge.workId || ''}|sem-identificacao`;
 }
 
+function ubyOperationKey(charge = {}) {
+  return chargerKey(charge);
+}
+
+function isUbyOperationCharge(charge = {}, overrides = ubyOperationOverrides) {
+  const key = ubyOperationKey(charge);
+  if (Object.prototype.hasOwnProperty.call(overrides || {}, key)) return !!overrides[key];
+  return chargerKind(charge) === 'dc';
+}
+
 function generalAcDcStats(charges = []) {
   const stats = {
     acCharges: 0,
@@ -2513,6 +2588,7 @@ function getGeneralUnitData() {
         stations,
         files: record.files || [],
         charges,
+        ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
         count: charges.length,
         energy,
         revenue,
@@ -2547,6 +2623,7 @@ function getGeneralStationRows(unitData) {
       stations: [],
       files: [],
       charges: [],
+      ubyOperationOverrides: {},
       count: 0,
       energy: 0,
       revenue: 0,
@@ -2557,6 +2634,135 @@ function getGeneralStationRows(unitData) {
       updatedAt: ''
     };
   }).sort((a, b) => (b.count > 0) - (a.count > 0) || String(a.stationName).localeCompare(String(b.stationName)));
+}
+
+function getUbyChargerRows(unitData = getGeneralUnitData()) {
+  const rows = [];
+  unitData.forEach(unit => {
+    const groups = new Map();
+    unit.charges.forEach(charge => {
+      const key = ubyOperationKey(charge);
+      if (!groups.has(key)) {
+        groups.set(key, {
+          workId: unit.workId,
+          workName: unit.workName,
+          key,
+          station: charge.station || unit.stationName || unit.workName,
+          connType: charge.connType || '',
+          kind: chargerKind(charge),
+          charges: [],
+          energy: 0,
+          revenue: 0,
+          clients: new Set()
+        });
+      }
+      const group = groups.get(key);
+      group.charges.push(charge);
+      group.energy += Number(charge.energyKWh || 0);
+      group.revenue += Number(charge.revenue || 0);
+      const client = charge.userEmail || charge.userName;
+      if (client) group.clients.add(client);
+    });
+
+    groups.forEach(group => {
+      const hasOverride = Object.prototype.hasOwnProperty.call(unit.ubyOperationOverrides || {}, group.key);
+      const included = isUbyOperationCharge(group.charges[0], unit.ubyOperationOverrides);
+      rows.push({
+        ...group,
+        clients: group.clients.size,
+        included,
+        ruleSource: hasOverride ? 'manual' : group.kind === 'dc' ? 'DC automatico' : 'fora por padrao'
+      });
+    });
+  });
+  return rows.sort((a, b) => Number(b.included) - Number(a.included) || b.revenue - a.revenue);
+}
+
+async function toggleUbyOperation(workId, key, checked) {
+  syncGeneralRecordsFromLocal();
+  const db = localRechargeDb();
+  const record = db[workId] || allRechargeRecords[workId];
+  if (!record) return;
+  const overrides = { ...(record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {}) };
+  overrides[key] = !!checked;
+  record.ubyOperationOverrides = overrides;
+  record.summary = { ...(record.summary || {}), ubyOperationOverrides: overrides, updatedAt: new Date().toISOString() };
+  record.updatedAt = new Date().toISOString();
+  db[workId] = record;
+  writeJson(RECARGAS_LOCAL_KEY, db);
+  allRechargeRecords[workId] = record;
+
+  if (workId === currentWorkId) {
+    ubyOperationOverrides = overrides;
+    saveLocalRechargeBase();
+    try {
+      await saveRechargeBase();
+    } catch (err) {
+      setStorageState(`Marcacao UBY salva neste navegador. Supabase pendente: ${err.message}`, true);
+    }
+  } else if (window.UBY_SUPABASE?.saveRechargeBase) {
+    try {
+      await window.UBY_SUPABASE.saveRechargeBase(workId, record);
+    } catch (err) {
+      setStorageState(`Marcacao UBY salva neste navegador. Supabase pendente: ${err.message}`, true);
+    }
+  }
+  renderUbyOperation();
+  renderGeral();
+}
+
+function renderUbyOperation() {
+  const unitData = getGeneralUnitData();
+  const rows = getUbyChargerRows(unitData);
+  const included = rows.filter(row => row.included);
+  const allUbyCharges = included.flatMap(row => row.charges);
+  const revenue = included.reduce((sum, row) => sum + row.revenue, 0);
+  const energy = included.reduce((sum, row) => sum + row.energy, 0);
+  const clients = new Set(allUbyCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  const dcCount = included.filter(row => row.kind === 'dc').length;
+  const acCount = included.filter(row => row.kind === 'ac').length;
+  const totalCharges = allUbyCharges.length;
+  const avgTicket = totalCharges ? revenue / totalCharges : 0;
+
+  document.getElementById('ubyHeroMeta').innerHTML = included.length
+    ? `${included.length} carregador(es) UBY em ${new Set(included.map(row => row.workId)).size} unidade(s). DC entra por padrao; ajustes manuais ficam salvos.`
+    : 'Nenhum carregador marcado como operacao UBY ainda.';
+  document.getElementById('ubyHeroFormula').innerHTML =
+    `${fmtBRL(revenue)} de receita UBY | ${fmtKWh(energy)} | ${totalCharges} recarga(s) | ${dcCount} DC e ${acCount} AC`;
+
+  document.getElementById('kpiUby').innerHTML = `
+    <div class="card"><div class="label">Receita UBY</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${included.length} carregador(es) marcados</div></div>
+    <div class="card"><div class="label">Energia UBY</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${totalCharges} recarga(s)</div></div>
+    <div class="card"><div class="label">Ticket medio</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas UBY</div></div>
+    <div class="card"><div class="label">Clientes UBY</div><div class="value">${clients}</div><div class="sub">clientes unicos</div></div>
+    <div class="card"><div class="label">Carregadores DC</div><div class="value">${dcCount}</div><div class="sub">incluidos na operacao UBY</div></div>
+    <div class="card"><div class="label">Carregadores AC</div><div class="value">${acCount}</div><div class="sub">incluidos manualmente</div></div>
+  `;
+
+  const byUnit = new Map();
+  included.forEach(row => {
+    if (!byUnit.has(row.workId)) byUnit.set(row.workId, { name: row.workName, revenue: 0, energy: 0 });
+    const item = byUnit.get(row.workId);
+    item.revenue += row.revenue;
+    item.energy += row.energy;
+  });
+  const chartRows = [...byUnit.values()].sort((a, b) => b.revenue - a.revenue);
+  renderBarChart('chartUbyRevenueUnit', chartRows.map(row => row.name), chartRows.map(row => row.revenue), '#57B7FF', ' R$');
+  renderBarChart('chartUbyEnergyUnit', chartRows.map(row => row.name), chartRows.map(row => row.energy), '#2DBBD3', ' kWh');
+
+  document.getElementById('ubyChargerTable').innerHTML = rows.length ? rows.map(row => `
+    <tr>
+      <td><input type="checkbox" ${row.included ? 'checked' : ''} onchange="toggleUbyOperation('${escapeAttr(row.workId)}','${escapeAttr(row.key)}',this.checked)"></td>
+      <td>${escapeHtml(row.workName)}</td>
+      <td>${escapeHtml(row.station)}<br><span style="color:var(--p3-muted)">${escapeHtml(row.connType || 'Sem conector')}</span></td>
+      <td>${row.kind.toUpperCase()}</td>
+      <td>${row.charges.length}</td>
+      <td>${row.energy.toFixed(2).replace('.', ',')}</td>
+      <td>${fmtBRL(row.revenue)}</td>
+      <td>${row.ruleSource}</td>
+      <td><button class="btn-open" onclick="openWorkReport('${escapeAttr(row.workId)}','mensal')">Abrir</button></td>
+    </tr>
+  `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:20px">Sem carregadores com base salva.</td></tr>';
 }
 
 function showGeneralWhenCurrentWorkIsEmpty() {
@@ -2717,6 +2923,7 @@ function renderGeral() {
 function renderAll() {
   const visibleTab =
     document.getElementById('tabFinanceiroGeral').style.display === 'block' ? 'financeiroGeral' :
+    document.getElementById('tabUby').style.display === 'block' ? 'uby' :
     document.getElementById('tabMensal').style.display === 'block' ? 'mensal' :
     document.getElementById('tabAcumulado').style.display === 'block' ? 'acumulado' :
     document.getElementById('tabFinanceiro').style.display === 'block' ? 'financeiro' :
@@ -2738,9 +2945,11 @@ function renderAll() {
   renderAcumulado();
   renderFinanceiro();
   renderGeral();
+  renderUbyOperation();
 
   document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${visibleTab}'`)));
   showTab(visibleTab);
+  if (visibleTab === 'uby') renderUbyOperation();
   if (visibleTab === 'detalhes') renderDetalhes();
   if (visibleTab === 'financeiro') renderFinanceiro();
   if (visibleTab === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
@@ -3022,6 +3231,122 @@ function parseRatingValue(value) {
   return Number.isFinite(rating) ? Math.max(0, Math.min(5, rating)) : 0;
 }
 
+function median(values = []) {
+  const nums = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!nums.length) return 0;
+  const mid = Math.floor(nums.length / 2);
+  return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+}
+
+function normalizeTextForInsight(value) {
+  return safeText(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function topEntries(map = {}, limit = 1) {
+  return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, limit);
+}
+
+function reviewInsightCard(title, evidence, action, type = '') {
+  return `<div class="ai-card ${type}">
+    <strong>${escapeHtml(title)}</strong>
+    <p>${evidence}</p>
+    <div class="action">${action}</div>
+  </div>`;
+}
+
+function buildReviewAiInsights(charges, reviewData = {}) {
+  const total = charges.length;
+  const revenue = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const avgTicket = total ? revenue / total : 0;
+  const avgKwh = total ? energy / total : 0;
+  const mk = chargeMonthKey(charges[0] || {});
+  const window = mk && mk !== 'unknown' ? periodWindow(charges, mk, 'mtd') : periodBounds(charges);
+  const occ = occByInterval(charges, undefined, window);
+  const idleCount = charges.filter(charge => idleToMin(charge.idleTime) >= 10).length;
+  const couponCharges = charges.filter(charge => safeText(charge.voucher).trim());
+  const couponRevenue = couponCharges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const paymentIssues = charges.filter(charge => {
+    const status = normalizeTextForInsight(charge.paymentStatus);
+    return status && !/(aprov|pago|paid|approved|success|conclu)/.test(status);
+  }).length;
+  const byHour = {};
+  charges.forEach(charge => {
+    if (!charge.startDate || Number.isNaN(charge.startDate.getTime())) return;
+    const hour = String(charge.startDate.getHours()).padStart(2, '0') + 'h';
+    byHour[hour] = (byHour[hour] || 0) + 1;
+  });
+  const peak = topEntries(byHour, 1)[0];
+  const comments = reviewData.comments || [];
+  const avgRating = reviewData.avg || 0;
+  const onlyRated = reviewData.onlyRated || [];
+  const lowRated = onlyRated.filter(charge => charge.ratingValue && charge.ratingValue < 4);
+  const allCommentText = normalizeTextForInsight(comments.map(charge => charge.comment).join(' '));
+  const themes = [
+    [/(caro|preco|valor|tarifa|custo)/, 'preço'],
+    [/(pagamento|cartao|pix|wallet|app|aplicativo|cobranca)/, 'pagamento/app'],
+    [/(lento|demora|rapido|velocidade|potencia)/, 'velocidade de carga'],
+    [/(vaga|bloqueado|fila|ocupado|entrada|sinalizacao|localizacao)/, 'acesso e vaga'],
+    [/(erro|falha|travou|indisponivel|nao funcionou|problema)/, 'falha operacional']
+  ].filter(([regex]) => regex.test(allCommentText)).map(([, label]) => label);
+  const peers = getGeneralUnitData()
+    .filter(unit => unit.workId !== currentWorkId)
+    .map(unit => {
+      const monthCharges = mk && mk !== 'unknown' ? unit.charges.filter(charge => chargeMonthKey(charge) === mk) : unit.charges;
+      const rev = monthCharges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+      const kwh = monthCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+      return {
+        count: monthCharges.length,
+        ticket: monthCharges.length ? rev / monthCharges.length : 0,
+        kwhSession: monthCharges.length ? kwh / monthCharges.length : 0
+      };
+    })
+    .filter(unit => unit.count > 0);
+  const peerTicket = median(peers.map(unit => unit.ticket));
+  const peerKwh = median(peers.map(unit => unit.kwhSession));
+  const insights = [];
+
+  if (!total) {
+    return reviewInsightCard('Sem base para IA operacional', 'Ainda não há recargas no período selecionado para cruzar avaliações, uso e receita.', 'Suba a planilha do mês para gerar recomendações específicas.', 'warn');
+  }
+  if (onlyRated.length < Math.max(3, total * 0.12)) {
+    insights.push(reviewInsightCard('Amostra de avaliação fraca', `Só ${onlyRated.length} de ${total} recargas têm avaliação (${fmtPct(total ? onlyRated.length / total * 100 : 0)}). A decisão por nota ainda tem baixa confiança.`, 'Adicionar QR/link pós-recarga no ponto e conferir se a plataforma está pedindo avaliação.', 'warn'));
+  } else if (avgRating >= 4.5) {
+    insights.push(reviewInsightCard('Experiência validada pelo cliente', `Nota média ${avgRating.toFixed(1).replace('.', ',')} com ${onlyRated.length} avaliações. A experiência não parece ser o gargalo principal.`, 'Priorizar aquisição: divulgação local e cupom em horário ocioso.', 'good'));
+  } else if (avgRating > 0) {
+    insights.push(reviewInsightCard('Nota pede intervenção operacional', `Nota média ${avgRating.toFixed(1).replace('.', ',')} e ${lowRated.length} avaliação(ões) abaixo de 4 estrelas.`, themes.length ? `Atacar primeiro: ${themes.slice(0, 2).join(' e ')}.` : 'Auditar ativação, pagamento, conexão e sinalização no local.', 'warn'));
+  }
+  if (themes.length) {
+    insights.push(reviewInsightCard('Tema recorrente dos comentários', `${comments.length} comentário(s) citam sinais ligados a ${themes.slice(0, 3).join(', ')}.`, 'Abrir tarefa operacional para o tema mais citado e comparar a nota após a próxima semana.', 'warn'));
+  }
+  if (peerTicket && avgTicket < peerTicket * 0.85) {
+    insights.push(reviewInsightCard('Ticket abaixo do benchmark interno', `Ticket médio ${fmtBRL(avgTicket)} contra mediana interna ${fmtBRL(peerTicket)} nas outras unidades salvas.`, 'Avaliar tarifa, permanência e comunicação para aumentar sessões de maior valor.', 'warn'));
+  } else if (peerTicket && avgTicket > peerTicket * 1.15) {
+    insights.push(reviewInsightCard('Ticket acima do benchmark interno', `Ticket médio ${fmtBRL(avgTicket)} contra mediana interna ${fmtBRL(peerTicket)}.`, 'Replicar posicionamento comercial deste ponto nos carregadores similares.', 'good'));
+  }
+  if (peerKwh && avgKwh < peerKwh * 0.8) {
+    insights.push(reviewInsightCard('Sessões curtas versus mercado interno', `Média de ${avgKwh.toFixed(1).replace('.', ',')} kWh/sessão contra ${peerKwh.toFixed(1).replace('.', ',')} kWh/sessão nas demais unidades.`, 'Testar convênio local ou comunicação de permanência para aumentar kWh por sessão.', 'warn'));
+  }
+  if (occ.pct < 5 && total >= 5) {
+    insights.push(reviewInsightCard('Demanda baixa para o ativo', `Ocupação real ${fmtPct(occ.pct)} com ${total} recargas. Há capacidade ociosa relevante.`, peak ? `Concentrar campanha fora do pico ${peak[0]}, evitando desconto onde já existe demanda.` : 'Criar ação local de aquisição antes de mexer em preço.', 'warn'));
+  } else if (occ.pct >= 12) {
+    insights.push(reviewInsightCard('Uso começa a justificar expansão', `Ocupação ${fmtPct(occ.pct)} e ${fmtKWh(energy)} entregues no período.`, 'Monitorar fila/ociosidade e avaliar segundo conector se a nota se mantiver alta.', 'good'));
+  }
+  if (couponCharges.length) {
+    insights.push(reviewInsightCard('Cupom com impacto mensurável', `${couponCharges.length} recarga(s) com voucher geraram ${fmtBRL(couponRevenue)} (${fmtPct(revenue ? couponRevenue / revenue * 100 : 0)} da receita).`, couponRevenue / Math.max(revenue, 1) > 0.35 ? 'Medir recompra sem desconto para evitar dependência de cupom.' : 'Manter cupom como aquisição e medir recompra no mês seguinte.'));
+  }
+  if (paymentIssues > 0) {
+    insights.push(reviewInsightCard('Atrito de pagamento detectado', `${paymentIssues} recarga(s) têm status de pagamento fora do padrão aprovado/pago.`, 'Conferir gateway/app antes de investir em mídia.', 'warn'));
+  }
+  if (idleCount >= Math.max(2, total * 0.15)) {
+    insights.push(reviewInsightCard('Ociosidade afeta giro da vaga', `${idleCount} recarga(s) tiveram mais de 10 minutos de ociosidade registrada.`, 'Ajustar alerta de retirada e regra de tolerância para liberar o carregador mais rápido.', 'warn'));
+  }
+  if (insights.length < 3) {
+    insights.push(reviewInsightCard('Próxima melhor decisão', `Base atual: ${total} recargas, ${fmtBRL(revenue)} de receita, ${fmtKWh(energy)} e ticket ${fmtBRL(avgTicket)}.`, 'Aumentar volume de avaliações e revisar os insights após nova importação do mês.'));
+  }
+  return insights.slice(0, 6).join('');
+}
+
 function renderReviews(charges) {
   const rated = charges
     .map(charge => ({ ...charge, ratingValue: parseRatingValue(charge.rating), comment: safeText(charge.reviewComment).trim() }))
@@ -3061,6 +3386,7 @@ function renderReviews(charges) {
   document.getElementById('reviewsTable').innerHTML = onlyRated.length || comments.length
     ? rows + unratedRow
     : '<tr><td colspan="4" style="color:var(--p3-muted);text-align:center;padding:20px">Nenhuma avaliação encontrada na planilha.</td></tr>';
+  document.getElementById('reviewAiInsights').innerHTML = buildReviewAiInsights(charges, { onlyRated, comments, avg });
 }
 
 function renderTechDiagnostic(charges) {
@@ -3231,22 +3557,24 @@ function renderDetalhes() {
 // ── Navegação de abas ─────────────────────────────────────
 function showTab(name) {
   const isGeneral = name === 'geral';
+  const isUby = name === 'uby';
   const isGeneralFinance = name === 'financeiroGeral';
-  const isWorkReport = !isGeneral && !isGeneralFinance && name !== 'none';
+  const isWorkReport = !isGeneral && !isUby && !isGeneralFinance && name !== 'none';
   document.getElementById('tabGeral').style.display     = name === 'geral'     ? 'block' : 'none';
+  document.getElementById('tabUby').style.display       = name === 'uby'       ? 'block' : 'none';
   document.getElementById('tabFinanceiroGeral').style.display = name === 'financeiroGeral' ? 'block' : 'none';
   document.getElementById('tabMensal').style.display    = name === 'mensal'    ? 'block' : 'none';
   document.getElementById('tabAcumulado').style.display = name === 'acumulado' ? 'block' : 'none';
   document.getElementById('tabFinanceiro').style.display = name === 'financeiro' ? 'block' : 'none';
   document.getElementById('tabDetalhes').style.display  = name === 'detalhes'  ? 'block' : 'none';
-  document.getElementById('ctrlGeral').style.display    = name === 'geral'     ? 'flex'  : 'none';
+  document.getElementById('ctrlGeral').style.display    = (isGeneral || isUby) ? 'flex'  : 'none';
   document.getElementById('ctrlFinanceiroGeral').style.display = name === 'financeiroGeral' ? 'flex' : 'none';
   document.getElementById('ctrlMensal').style.display   = name === 'mensal'    ? 'flex'  : 'none';
   document.getElementById('ctrlAcc').style.display      = name === 'acumulado' ? 'flex'  : 'none';
   document.getElementById('ctrlFinanceiro').style.display = name === 'financeiro' ? 'flex' : 'none';
   document.getElementById('workReportTabs').style.display = isWorkReport ? 'flex' : 'none';
-  document.querySelector('.project-bar').style.display   = (isGeneral || isGeneralFinance) ? 'none' : '';
-  document.getElementById('uploadZone').style.display    = (isGeneral || isGeneralFinance) ? 'none' : '';
+  document.querySelector('.project-bar').style.display   = (isGeneral || isUby || isGeneralFinance) ? 'none' : '';
+  document.getElementById('uploadZone').style.display    = (isGeneral || isUby || isGeneralFinance) ? 'none' : '';
 }
 
 function hideAllTabs() { showTab('none'); }
@@ -3256,6 +3584,7 @@ function switchTab(name, btn) {
   btn.classList.add('active');
   showTab(name);
   if (name === 'geral') renderGeral();
+  if (name === 'uby') renderUbyOperation();
   if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
   if (name === 'detalhes') renderDetalhes();
   if (name === 'financeiro') renderFinanceiro();
