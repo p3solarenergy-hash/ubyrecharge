@@ -111,7 +111,10 @@
     .usage-grid canvas { height:230px !important; max-height:240px; }
     .pie-card canvas { min-height:260px; max-height:300px; }
     canvas { width:100%; max-height:320px; }
-    .brand-input { width:150px; max-width:100%; }
+    .coupon-summary { display:grid; gap:8px; margin-top:12px; }
+    .coupon-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(3,auto); gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--p3-border); color:var(--p3-muted); font-size:11px; }
+    .coupon-row strong { color:var(--p3-text); font-size:12px; overflow-wrap:anywhere; }
+    .coupon-row span { white-space:nowrap; }
 
     /* ── NOVO: Upload zone ── */
     .upload-zone {
@@ -406,8 +409,8 @@
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Tempo de permanência</h2><canvas id="usageGeneralStayBuckets"></canvas></div>
-      <div class="card pie-card"><h2>Marcas de veículos cadastradas</h2><canvas id="usageGeneralBrands"></canvas></div>
-      <div class="card"><h2>Utilização de cupons</h2><canvas id="usageGeneralCoupons"></canvas></div>
+      <div class="card"><h2>Cupons usados</h2><canvas id="usageGeneralCoupons"></canvas><div class="coupon-summary" id="usageGeneralCouponSummary"></div></div>
+      <div class="card"><h2>Receita por cupom</h2><canvas id="usageGeneralCouponRevenue"></canvas></div>
     </section>
     <section class="section" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Horários mais populares</h2><canvas id="usageGeneralPopularHours"></canvas></div>
@@ -503,8 +506,8 @@
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Tempo de permanência</h2><canvas id="usageStayBuckets"></canvas></div>
-      <div class="card pie-card"><h2>Marcas de veículos cadastradas</h2><canvas id="usageBrands"></canvas></div>
-      <div class="card"><h2>Utilização de cupons</h2><canvas id="usageCoupons"></canvas></div>
+      <div class="card"><h2>Cupons usados</h2><canvas id="usageCoupons"></canvas><div class="coupon-summary" id="usageCouponSummary"></div></div>
+      <div class="card"><h2>Receita por cupom</h2><canvas id="usageCouponRevenue"></canvas></div>
     </section>
     <section class="section" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Horários mais populares</h2><canvas id="usagePopularHours"></canvas></div>
@@ -577,7 +580,7 @@
         <h2>Clientes</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Cliente</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>R$/kWh medio</th><th>Marca</th><th>Última recarga</th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>R$/kWh medio</th><th>Última recarga</th></tr></thead>
             <tbody id="clientsTable"></tbody>
           </table>
         </div>
@@ -775,8 +778,6 @@ let openingWorkReport = false;
 let monthlyClosings = {};
 let financialSettings = {};
 let financeSaveTimer = null;
-let vehicleBrandByClient = {};
-let vehicleBrandSaveTimer = null;
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -892,20 +893,6 @@ function clientKeyFromCharge(charge = {}) {
   return clientIdentityKey(charge.userName, charge.userEmail);
 }
 
-function applyVehicleBrandMap(charges = [], brandMap = vehicleBrandByClient) {
-  return charges.map(charge => {
-    const key = clientKeyFromCharge(charge);
-    const mappedBrand = key ? safeText(brandMap?.[key]).trim() : '';
-    return mappedBrand ? { ...charge, vehicleBrand: mappedBrand } : charge;
-  });
-}
-
-function normalizeVehicleBrandMap(map = {}) {
-  return Object.fromEntries(Object.entries(map || {})
-    .map(([key, value]) => [safeText(key).trim().toLowerCase(), safeText(value).trim()])
-    .filter(([key, value]) => key && value));
-}
-
 function serializeCharge(charge) {
   return {
     ...charge,
@@ -975,7 +962,6 @@ function mergeCloudRechargeRecords(records) {
       workName: record.summary?.workName || record.workName || workNameById(workId),
       files: Array.isArray(record.files) ? record.files : [],
       charges: Array.isArray(record.charges) ? record.charges : [],
-      vehicleBrandByClient: normalizeVehicleBrandMap(record.vehicleBrandByClient || record.summary?.vehicleBrandByClient || {}),
       financialSettings: record.financialSettings || record.summary?.financialSettings || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
@@ -1000,7 +986,6 @@ function rechargeSummary() {
     files: loadedFiles.length,
     monthlyClosings,
     financialSettings,
-    vehicleBrandByClient,
     energyKWh: energy,
     revenue,
     firstDate: dates.length ? new Date(Math.min(...dates)).toISOString() : '',
@@ -1031,7 +1016,6 @@ function saveLocalRechargeBase() {
     charges: allCharges.map(serializeCharge),
     monthlyClosings,
     financialSettings,
-    vehicleBrandByClient,
     summary: rechargeSummary(),
     updatedAt: new Date().toISOString()
   };
@@ -1066,8 +1050,7 @@ async function saveRechargeBase() {
 
 function applyRechargeRecord(record, sourceLabel) {
   syncGeneralRecordsFromLocal();
-  vehicleBrandByClient = normalizeVehicleBrandMap(record?.vehicleBrandByClient || record?.summary?.vehicleBrandByClient || {});
-  allCharges = applyVehicleBrandMap((record?.charges || []).map(hydrateCharge), vehicleBrandByClient);
+  allCharges = (record?.charges || []).map(hydrateCharge);
   monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
   financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
   loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
@@ -1246,7 +1229,6 @@ async function clearRechargeBase() {
   loadedFiles = [];
   monthlyClosings = {};
   financialSettings = {};
-  vehicleBrandByClient = {};
   saveLocalRechargeBase();
   try {
     await clearCloudRechargeBase();
@@ -1380,11 +1362,7 @@ function readFile(file) {
         throw new Error(`O mes escolhido foi ${monthLabel(selectedMonth)}, mas a planilha tem recargas de ${dateMonths.map(monthLabel).join(', ')}. Escolha o mes correto antes de subir.`);
       }
 
-      importedCharges.forEach(charge => {
-        charge._month = selectedMonth || monthKey(charge.startDate);
-        const savedBrand = vehicleBrandByClient[clientKeyFromCharge(charge)];
-        if (savedBrand) charge.vehicleBrand = savedBrand;
-      });
+      importedCharges.forEach(charge => { charge._month = selectedMonth || monthKey(charge.startDate); });
       const importedMonths = new Set(importedCharges.map(chargeMonthKey).filter(Boolean));
       const replacedCount = allCharges.filter(charge => importedMonths.has(chargeMonthKey(charge))).length;
       allCharges = allCharges.filter(charge => !importedMonths.has(chargeMonthKey(charge)));
@@ -2278,18 +2256,11 @@ function chargeDayLabel(charge) {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
 }
 
-function vehicleBrand(charge = {}) {
-  const mappedBrand = vehicleBrandByClient[clientKeyFromCharge(charge)];
-  const raw = mappedBrand || charge.vehicleBrand || charge.vehicleMake || charge.carBrand || charge.brand || '';
-  return String(raw || '').trim() || 'Não informado';
-}
-
 function usageSeries(charges = []) {
   const recent = recentCharges(charges, 7);
   const byDay = Object.fromEntries(recent.labels.map(label => [label, { duration: 0, count: 0, energy: 0 }]));
   const stayBuckets = { '<1h': 0, '1h-2h': 0, '2h-4h': 0, '>4h': 0 };
   const byHour = Object.fromEntries(Array.from({ length: 24 }, (_, h) => [String(h), 0]));
-  const byBrand = {};
   const byCoupon = {};
 
   recent.charges.forEach(charge => {
@@ -2306,11 +2277,15 @@ function usageSeries(charges = []) {
     else if (duration < 4) stayBuckets['2h-4h'] += 1;
     else stayBuckets['>4h'] += 1;
     byHour[String(charge.startDate.getHours())] += 1;
-    const brand = vehicleBrand(charge);
-    byBrand[brand] = (byBrand[brand] || 0) + 1;
     const coupon = safeText(charge.voucher || charge.coupon || charge.couponCode).trim();
-    if (coupon) byCoupon[coupon] = (byCoupon[coupon] || 0) + 1;
+    if (coupon) {
+      if (!byCoupon[coupon]) byCoupon[coupon] = { coupon, count: 0, energy: 0, revenue: 0 };
+      byCoupon[coupon].count += 1;
+      byCoupon[coupon].energy += energy;
+      byCoupon[coupon].revenue += Number(charge.revenue || 0);
+    }
   });
+  const couponDetails = Object.values(byCoupon).sort((a, b) => b.count - a.count || b.revenue - a.revenue);
 
   return {
     labels: recent.labels,
@@ -2321,11 +2296,29 @@ function usageSeries(charges = []) {
     stayValues: Object.values(stayBuckets),
     hourLabels: Object.keys(byHour),
     hourValues: Object.values(byHour),
-    brandLabels: Object.keys(byBrand).length ? Object.keys(byBrand) : ['Não informado'],
-    brandValues: Object.keys(byBrand).length ? Object.values(byBrand) : [0],
-    couponLabels: Object.keys(byCoupon).length ? Object.keys(byCoupon) : ['Sem cupom'],
-    couponValues: Object.keys(byCoupon).length ? Object.values(byCoupon) : [0]
+    couponDetails,
+    couponLabels: couponDetails.length ? couponDetails.map(item => item.coupon) : ['Sem cupom'],
+    couponValues: couponDetails.length ? couponDetails.map(item => item.count) : [0],
+    couponRevenueValues: couponDetails.length ? couponDetails.map(item => item.revenue) : [0]
   };
+}
+
+function renderCouponSummary(id, details = []) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!details.length) {
+    el.innerHTML = '<div class="note" style="padding:10px 12px">Nenhum cupom usado neste periodo.</div>';
+    return;
+  }
+  el.innerHTML = details.slice(0, 6).map(item => {
+    const avgTicket = item.count ? item.revenue / item.count : 0;
+    return `<div class="coupon-row">
+      <strong>${escapeHtml(item.coupon)}</strong>
+      <span>${item.count} uso(s)</span>
+      <span>${fmtKWh(item.energy)}</span>
+      <span>${fmtBRL(item.revenue)} · ticket ${fmtBRL(avgTicket)}</span>
+    </div>`;
+  }).join('');
 }
 
 function renderUsageInsights(charges = [], prefix = 'usage') {
@@ -2334,8 +2327,9 @@ function renderUsageInsights(charges = [], prefix = 'usage') {
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
   renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
   renderBarChart(`${prefix}StayBuckets`, data.stayLabels, data.stayValues, '#3B32D0');
-  renderPieChart(`${prefix}Brands`, data.brandLabels, data.brandValues);
   renderBarChart(`${prefix}Coupons`, data.couponLabels, data.couponValues, '#FFD66B');
+  renderBarChart(`${prefix}CouponRevenue`, data.couponLabels, data.couponRevenueValues, '#57B7FF', ' R$');
+  renderCouponSummary(`${prefix}CouponSummary`, data.couponDetails);
   renderBarChart(`${prefix}PopularHours`, data.hourLabels, data.hourValues, '#AEE33F');
 }
 
@@ -2404,7 +2398,7 @@ function getGeneralUnitData() {
   syncGeneralRecordsFromLocal();
   return Object.values(allRechargeRecords)
     .map(record => {
-      const charges = applyVehicleBrandMap((record.charges || []).map(hydrateCharge), normalizeVehicleBrandMap(record.vehicleBrandByClient || record.summary?.vehicleBrandByClient || {}));
+      const charges = (record.charges || []).map(hydrateCharge);
       const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
       const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
       const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
@@ -2884,31 +2878,15 @@ function renderClientsTable(charges) {
     .sort((a,b) => b[1].rev - a[1].rev)
     .map(([, d]) => {
       const avgKwh = d.kwh > 0 ? d.rev / d.kwh : 0;
-      const brand = vehicleBrandByClient[d.key] || '';
       return (
       `<tr>
          <td>${escapeHtml(d.name)}</td><td>${d.n}</td>
          <td>${d.kwh.toFixed(2).replace('.',',')}</td>
          <td>${fmtBRL(d.rev)}</td>
          <td>${fmtBRL(avgKwh)}</td>
-         <td><input class="ctl-input brand-input" value="${escapeHtml(brand)}" placeholder="Marca" oninput="updateClientVehicleBrand('${escapeAttr(d.key)}', this.value)"></td>
          <td>${fmtDT(d.last)}</td>
        </tr>`);
     }).join('');
-}
-
-function updateClientVehicleBrand(key, value) {
-  const normalizedKey = safeText(key).trim().toLowerCase();
-  if (!normalizedKey) return;
-  const brand = safeText(value).trim();
-  if (brand) vehicleBrandByClient[normalizedKey] = brand;
-  else delete vehicleBrandByClient[normalizedKey];
-  allCharges = allCharges.map(charge => clientKeyFromCharge(charge) === normalizedKey ? { ...charge, vehicleBrand: brand } : charge);
-  const mk = document.getElementById('monthSelector')?.value || '';
-  renderUsageInsights(mk ? allCharges.filter(charge => chargeMonthKey(charge) === mk) : allCharges, 'usage');
-  saveLocalRechargeBase();
-  clearTimeout(vehicleBrandSaveTimer);
-  vehicleBrandSaveTimer = setTimeout(() => saveRechargeBase(), 900);
 }
 
 function renderIdleAlerts(charges) {
