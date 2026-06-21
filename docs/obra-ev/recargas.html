@@ -2436,6 +2436,7 @@ function renderCouponDonutChart(id, labels, values, unit = '') {
                   text: `${label} ${fmtPct(total ? value / total * 100 : 0)}`,
                   fillStyle: dataset.backgroundColor[index],
                   strokeStyle: '#0E1B2D',
+                  fontColor: '#BFD4CC',
                   lineWidth: 2,
                   hidden: !chart.getDataVisibility(index),
                   index
@@ -2504,16 +2505,20 @@ function usageSeries(charges = []) {
     else if (duration < 4) stayBuckets['2h-4h'] += 1;
     else stayBuckets['>4h'] += 1;
     byHour[String(charge.startDate.getHours())] += 1;
+  });
+  charges.forEach(charge => {
+    const energy = Number(charge.energyKWh || 0);
+    const revenue = Number(charge.revenue || 0);
     const coupon = safeText(charge.voucher || charge.coupon || charge.couponCode).trim();
     if (coupon) {
       if (!byCoupon[coupon]) byCoupon[coupon] = { coupon, count: 0, energy: 0, revenue: 0 };
       byCoupon[coupon].count += 1;
       byCoupon[coupon].energy += energy;
-      byCoupon[coupon].revenue += Number(charge.revenue || 0);
+      byCoupon[coupon].revenue += revenue;
     } else {
       noCoupon.count += 1;
       noCoupon.energy += energy;
-      noCoupon.revenue += Number(charge.revenue || 0);
+      noCoupon.revenue += revenue;
     }
   });
   const couponDetails = [noCoupon, ...Object.values(byCoupon)]
