@@ -2405,13 +2405,16 @@ function renderCouponDonutChart(id, labels, values, unit = '') {
   destroyChart(id);
   const ctx = document.getElementById(id);
   if (!ctx) return;
-  const hasData = values.some(value => Number(value || 0) > 0);
+  const numericValues = values.map(value => +Number(value || 0).toFixed(2));
+  const total = numericValues.reduce((sum, value) => sum + Number(value || 0), 0);
+  const displayLabels = labels.map((label, index) => `${label} ${fmtPct(total ? numericValues[index] / total * 100 : 0)}`);
+  const hasData = numericValues.some(value => Number(value || 0) > 0);
   charts[id] = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels,
+      labels: displayLabels,
       datasets: [{
-        data: values.map(value => +Number(value || 0).toFixed(2)),
+        data: numericValues,
         backgroundColor: hasData ? COLORS : ['#20344F'],
         borderColor: '#0E1B2D',
         borderWidth: 3
@@ -2422,29 +2425,7 @@ function renderCouponDonutChart(id, labels, values, unit = '') {
       maintainAspectRatio: false,
       cutout: '62%',
       plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            color: '#8FA39A',
-            font: { size: 11 },
-            generateLabels(chart) {
-              const dataset = chart.data.datasets[0] || { data: [], backgroundColor: [] };
-              const total = dataset.data.reduce((sum, item) => sum + Number(item || 0), 0);
-              return chart.data.labels.map((label, index) => {
-                const value = Number(dataset.data[index] || 0);
-                return {
-                  text: `${label} ${fmtPct(total ? value / total * 100 : 0)}`,
-                  fillStyle: dataset.backgroundColor[index],
-                  strokeStyle: '#0E1B2D',
-                  fontColor: '#BFD4CC',
-                  lineWidth: 2,
-                  hidden: !chart.getDataVisibility(index),
-                  index
-                };
-              });
-            }
-          }
-        },
+        legend: { position: 'bottom', labels: { color: '#BFD4CC', font: { size: 11 } } },
         tooltip: {
           callbacks: {
             label: context => {
