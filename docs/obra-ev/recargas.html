@@ -2422,7 +2422,28 @@ function renderCouponDonutChart(id, labels, values, unit = '') {
       maintainAspectRatio: false,
       cutout: '62%',
       plugins: {
-        legend: { position: 'bottom', labels: { color: '#8FA39A', font: { size: 11 } } },
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#8FA39A',
+            font: { size: 11 },
+            generateLabels(chart) {
+              const dataset = chart.data.datasets[0] || { data: [], backgroundColor: [] };
+              const total = dataset.data.reduce((sum, item) => sum + Number(item || 0), 0);
+              return chart.data.labels.map((label, index) => {
+                const value = Number(dataset.data[index] || 0);
+                return {
+                  text: `${label} ${fmtPct(total ? value / total * 100 : 0)}`,
+                  fillStyle: dataset.backgroundColor[index],
+                  strokeStyle: '#0E1B2D',
+                  lineWidth: 2,
+                  hidden: !chart.getDataVisibility(index),
+                  index
+                };
+              });
+            }
+          }
+        },
         tooltip: {
           callbacks: {
             label: context => {
@@ -2467,6 +2488,7 @@ function usageSeries(charges = []) {
   const stayBuckets = { '<1h': 0, '1h-2h': 0, '2h-4h': 0, '>4h': 0 };
   const byHour = Object.fromEntries(Array.from({ length: 24 }, (_, h) => [String(h), 0]));
   const byCoupon = {};
+  const noCoupon = { coupon: 'Sem cupom', count: 0, energy: 0, revenue: 0 };
 
   recent.charges.forEach(charge => {
     const label = chargeDayLabel(charge);
@@ -2488,9 +2510,15 @@ function usageSeries(charges = []) {
       byCoupon[coupon].count += 1;
       byCoupon[coupon].energy += energy;
       byCoupon[coupon].revenue += Number(charge.revenue || 0);
+    } else {
+      noCoupon.count += 1;
+      noCoupon.energy += energy;
+      noCoupon.revenue += Number(charge.revenue || 0);
     }
   });
-  const couponDetails = Object.values(byCoupon).sort((a, b) => b.count - a.count || b.revenue - a.revenue);
+  const couponDetails = [noCoupon, ...Object.values(byCoupon)]
+    .filter(item => item.count > 0)
+    .sort((a, b) => b.count - a.count || b.revenue - a.revenue);
 
   return {
     labels: recent.labels,
@@ -2512,14 +2540,16 @@ function renderCouponSummary(id, details = []) {
   const el = document.getElementById(id);
   if (!el) return;
   if (!details.length) {
-    el.innerHTML = '<div class="note" style="padding:10px 12px">Nenhum cupom encontrado neste periodo. Se a planilha tem Voucher utilizado na coluna AA, reimporte este mes para atualizar a base salva.</div>';
+    el.innerHTML = '<div class="note" style="padding:10px 12px">Sem recargas neste periodo para calcular participacao de cupons.</div>';
     return;
   }
+  const totalCount = details.reduce((sum, item) => sum + Number(item.count || 0), 0);
   el.innerHTML = details.slice(0, 6).map(item => {
     const avgTicket = item.count ? item.revenue / item.count : 0;
+    const share = totalCount ? item.count / totalCount * 100 : 0;
     return `<div class="coupon-row">
       <strong>${escapeHtml(item.coupon)}</strong>
-      <span>${item.count} uso(s)</span>
+      <span>${item.count} uso(s) Â· ${fmtPct(share)}</span>
       <span>${fmtKWh(item.energy)}</span>
       <span>${fmtBRL(item.revenue)} · ticket ${fmtBRL(avgTicket)}</span>
     </div>`;
