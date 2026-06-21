@@ -425,8 +425,8 @@
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Tempo de permanência</h2><canvas id="usageGeneralStayBuckets"></canvas></div>
-      <div class="card"><h2>Cupons usados</h2><canvas id="usageGeneralCoupons"></canvas><div class="coupon-summary" id="usageGeneralCouponSummary"></div></div>
-      <div class="card"><h2>Receita por cupom</h2><canvas id="usageGeneralCouponRevenue"></canvas></div>
+      <div class="card pie-card"><h2>Cupons usados</h2><canvas id="usageGeneralCoupons"></canvas><div class="coupon-summary" id="usageGeneralCouponSummary"></div></div>
+      <div class="card pie-card"><h2>Receita por cupom</h2><canvas id="usageGeneralCouponRevenue"></canvas></div>
     </section>
     <section class="section" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Horários mais populares</h2><canvas id="usageGeneralPopularHours"></canvas></div>
@@ -564,8 +564,8 @@
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Tempo de permanência</h2><canvas id="usageStayBuckets"></canvas></div>
-      <div class="card"><h2>Cupons usados</h2><canvas id="usageCoupons"></canvas><div class="coupon-summary" id="usageCouponSummary"></div></div>
-      <div class="card"><h2>Receita por cupom</h2><canvas id="usageCouponRevenue"></canvas></div>
+      <div class="card pie-card"><h2>Cupons usados</h2><canvas id="usageCoupons"></canvas><div class="coupon-summary" id="usageCouponSummary"></div></div>
+      <div class="card pie-card"><h2>Receita por cupom</h2><canvas id="usageCouponRevenue"></canvas></div>
     </section>
     <section class="section" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Horários mais populares</h2><canvas id="usagePopularHours"></canvas></div>
@@ -2401,6 +2401,45 @@ function renderPieChart(id, labels, values) {
   });
 }
 
+function renderCouponDonutChart(id, labels, values, unit = '') {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const hasData = values.some(value => Number(value || 0) > 0);
+  charts[id] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values.map(value => +Number(value || 0).toFixed(2)),
+        backgroundColor: hasData ? COLORS : ['#20344F'],
+        borderColor: '#0E1B2D',
+        borderWidth: 3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#8FA39A', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: context => {
+              const label = context.label || 'Cupom';
+              const value = Number(context.raw || 0);
+              const total = context.dataset.data.reduce((sum, item) => sum + Number(item || 0), 0);
+              const pct = total ? value / total * 100 : 0;
+              const formatted = unit === ' R$' ? fmtBRL(value) : `${value.toLocaleString('pt-BR')} uso(s)`;
+              return `${label}: ${formatted} (${fmtPct(pct)})`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
 function recentCharges(charges = [], days = 7) {
   const dated = charges.filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()));
   if (!dated.length) return { charges: [], labels: [] };
@@ -2493,8 +2532,8 @@ function renderUsageInsights(charges = [], prefix = 'usage') {
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
   renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
   renderBarChart(`${prefix}StayBuckets`, data.stayLabels, data.stayValues, '#3B32D0');
-  renderBarChart(`${prefix}Coupons`, data.couponLabels, data.couponValues, '#FFD66B');
-  renderBarChart(`${prefix}CouponRevenue`, data.couponLabels, data.couponRevenueValues, '#57B7FF', ' R$');
+  renderCouponDonutChart(`${prefix}Coupons`, data.couponLabels, data.couponValues);
+  renderCouponDonutChart(`${prefix}CouponRevenue`, data.couponLabels, data.couponRevenueValues, ' R$');
   renderCouponSummary(`${prefix}CouponSummary`, data.couponDetails);
   renderBarChart(`${prefix}PopularHours`, data.hourLabels, data.hourValues, '#AEE33F');
 }
