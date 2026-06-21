@@ -1964,7 +1964,7 @@ function renderFinanceiro(applySaved = true) {
     <div class="card"><div class="label">Payback</div><div class="value">${formatPaybackMonths(paybackMonths)}</div><div class="sub">investimento / resultado proprio</div></div>
     <div class="card"><div class="label">ROI mensal</div><div class="value">${fmtPct(roiMonthly)}</div><div class="bar"><span style="width:${Math.min(Math.max(roiMonthly,0),100).toFixed(1)}%"></span></div><div class="sub">resultado proprio / investimento</div></div>
     <div class="card"><div class="label">Meta ocupacao</div><div class="value">${fmtPct(target.targetOccPct)}</div><div class="sub">real ${fmtPct(target.realOccPct)} | falta ${fmtPct(target.targetOccPct - target.realOccPct)}</div></div>
-    <div class="card"><div class="label">Faturamento pretendido</div><div class="value">${fmtBRL(target.targetRevenue)}</div><div class="sub">${target.revenueGap >= 0 ? 'faltam' : 'acima'} ${fmtBRL(Math.abs(target.revenueGap))}</div></div>
+    <div class="card"><div class="label">Faturamento pretendido</div><div class="value">${fmtBRL(target.targetRevenue)}</div><div class="sub">periodo atual | mes cheio ${fmtBRL(target.fullMonthTargetRevenue)}</div></div>
   `;
   document.getElementById('financeDistributionTable').innerHTML = `
     <tr><td>Modelo da operacao</td><td>${operationModelLabel(settings.operationModel)}</td></tr>
@@ -1980,9 +1980,12 @@ function renderFinanceiro(applySaved = true) {
     <tr><td>Resultado operacional apos custos</td><td>${fmtBRL(operationNet)}</td></tr>
     <tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>
     <tr><td>Ocupacao real x objetivo</td><td>${fmtPct(target.realOccPct)} / ${fmtPct(target.targetOccPct)}</td></tr>
-    <tr><td>kWh pretendido</td><td>${fmtKWh(target.targetEnergy)}</td></tr>
-    <tr><td>Faturamento pretendido</td><td>${fmtBRL(target.targetRevenue)}</td></tr>
-    <tr><td>Recargas pretendidas</td><td>${target.targetCharges.toFixed(1).replace('.', ',')}</td></tr>
+    <tr><td>kWh pretendido ate o periodo</td><td>${fmtKWh(target.targetEnergy)}</td></tr>
+    <tr><td>Faturamento pretendido ate o periodo</td><td>${fmtBRL(target.targetRevenue)}</td></tr>
+    <tr><td>Recargas pretendidas ate o periodo</td><td>${target.targetCharges.toFixed(1).replace('.', ',')}</td></tr>
+    <tr><td>kWh pretendido mes completo</td><td>${fmtKWh(target.fullMonthTargetEnergy)}</td></tr>
+    <tr><td>Faturamento pretendido mes completo</td><td>${fmtBRL(target.fullMonthTargetRevenue)}</td></tr>
+    <tr><td>Recargas pretendidas mes completo</td><td>${target.fullMonthTargetCharges.toFixed(1).replace('.', ',')}</td></tr>
   `;
   document.getElementById('financeResultTable').innerHTML = `
     <tr><td>Investimento no ponto</td><td>${fmtBRL(settings.investmentValue)}</td></tr>
@@ -2001,7 +2004,7 @@ function renderFinanceiro(applySaved = true) {
     <tr><td>Margem UBY</td><td>${fmtPct(margin)}</td></tr>
   `;
   document.getElementById('financeNote').innerHTML =
-    `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). A UBY fica com ${fmtBRL(ubyNet)} quando o ativo entra na UBY; sociedades fora da UBY somam ${fmtBRL(p3SocietyProfit)} para a P3 e ${fmtBRL(partnerShare)} para socio/local. Meta: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)} no periodo.`;
+    `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). A UBY fica com ${fmtBRL(ubyNet)} quando o ativo entra na UBY; sociedades fora da UBY somam ${fmtBRL(p3SocietyProfit)} para a P3 e ${fmtBRL(partnerShare)} para socio/local. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`;
   renderOwnerAreaReportForCurrentMonth();
 }
 
@@ -2047,7 +2050,9 @@ function formatPaybackMonths(months) {
 function targetOccupationMetrics(charges, mk, settings = {}) {
   const targetOccPct = Number(settings.targetOccPct || 0);
   const window = periodWindow(charges, mk, 'mtd');
+  const fullMonthWindow = periodWindow(charges, mk, 'closed');
   const occ = occByInterval(charges, undefined, window);
+  const fullMonthOcc = occByInterval(charges, undefined, fullMonthWindow);
   const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
   const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
   const avgKWh = charges.length ? energy / charges.length : 0;
@@ -2056,15 +2061,23 @@ function targetOccupationMetrics(charges, mk, settings = {}) {
   const targetEnergy = occ.maxKWh * targetOccPct / 100;
   const targetRevenue = targetEnergy * targetRevenuePerKWh;
   const targetCharges = avgKWh > 0 ? targetEnergy / avgKWh : 0;
+  const fullMonthTargetEnergy = fullMonthOcc.maxKWh * targetOccPct / 100;
+  const fullMonthTargetRevenue = fullMonthTargetEnergy * targetRevenuePerKWh;
+  const fullMonthTargetCharges = avgKWh > 0 ? fullMonthTargetEnergy / avgKWh : 0;
   return {
     targetOccPct,
     realOccPct: occ.pct,
     maxKWh: occ.maxKWh,
     power: occ.power,
     hours: occ.hours,
+    fullMonthHours: fullMonthOcc.hours,
+    fullMonthMaxKWh: fullMonthOcc.maxKWh,
     targetEnergy,
     targetRevenue,
     targetCharges,
+    fullMonthTargetEnergy,
+    fullMonthTargetRevenue,
+    fullMonthTargetCharges,
     targetRevenuePerKWh,
     energyGap: targetEnergy - energy,
     revenueGap: targetRevenue - revenue,
