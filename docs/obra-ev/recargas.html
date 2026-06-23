@@ -745,13 +745,14 @@
         <table><tbody>
           <tr><td>Modelo da operacao</td><td><select class="ctl-select" id="financeOperationModel" onchange="renderFinanceiro(false); scheduleFinancialSettingsSave()"><option value="uby">UBY - ativo proprio</option><option value="p3_society">P3 sociedade fora da UBY</option><option value="hybrid">Hibrido AC/DC</option><option value="management_only">Somente gestao</option></select></td></tr>
           <tr><td>% gestao P3</td><td><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>% sociedade P3 geral</td><td><input class="ctl-input" id="financeP3SocietyPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>% sociedade P3 em AC</td><td><input class="ctl-input" id="financeP3AcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>% sociedade P3 em DC</td><td><input class="ctl-input" id="financeP3DcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr class="finance-model-row" data-models="p3_society"><td>% sociedade P3 geral</td><td><input class="ctl-input" id="financeP3SocietyPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr class="finance-model-row" data-models="hybrid"><td>% sociedade P3 em AC</td><td><input class="ctl-input" id="financeP3AcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr class="finance-model-row" data-models="hybrid"><td>% sociedade P3 em DC</td><td><input class="ctl-input" id="financeP3DcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
           <tr><td>% app / plataforma terceiros</td><td><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>Custo energia R$/kWh</td><td><input class="ctl-input" id="financeEnergyCost" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr><td>Custo energia R$/kWh</td><td><input class="ctl-input" id="financeEnergyCost" type="number" min="0" step="0.01" value="0" oninput="syncOwnerEnergyRateFromCost(true); renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
           <tr><td>Investimento no ponto (R$)</td><td><input class="ctl-input" id="financeInvestmentValue" type="number" min="0" step="100" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>% cotas investidores</td><td><input class="ctl-input" id="financeInvestorQuotaPct" type="number" min="0" max="100" step="0.1" value="100" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr class="finance-model-row" data-models="uby hybrid"><td>% cotas investidores</td><td><input class="ctl-input" id="financeInvestorQuotaPct" type="number" min="0" max="100" step="0.1" value="100" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
+          <tr class="finance-model-row" data-models="uby hybrid"><td>Retencao obrigatoria S.A. (%)</td><td><input class="ctl-input" id="financeSaRetentionPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
           <tr><td>Objetivo de ocupacao (%)</td><td><input class="ctl-input" id="financeTargetOccPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
           <tr><td>R$/kWh objetivo (0 = real)</td><td><input class="ctl-input" id="financeTargetRevenuePerKWh" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
         </tbody></table>
@@ -780,8 +781,9 @@
           <div>
             <table><tbody>
               <tr><td>Energia para reembolso (R$/kWh)</td><td><input class="ctl-input" id="ownerEnergyRate" type="number" min="0" step="0.01" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
-              <tr><td>Repasse sobre faturamento (%)</td><td><input class="ctl-input" id="ownerRevenueSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
-              <tr><td>Repasse sobre lucro liquido (%)</td><td><input class="ctl-input" id="ownerNetProfitSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
+              <tr><td>Tipo de repasse ao dono</td><td><select class="ctl-select" id="ownerTransferMode" onchange="renderFinanceiro(false); scheduleFinancialSettingsSave()"><option value="gross">Sobre faturamento bruto</option><option value="net">Sobre lucro liquido</option></select></td></tr>
+              <tr id="ownerRevenueShareRow"><td>Repasse sobre faturamento (%)</td><td><input class="ctl-input" id="ownerRevenueSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
+              <tr id="ownerNetProfitShareRow"><td>Repasse sobre lucro liquido (%)</td><td><input class="ctl-input" id="ownerNetProfitSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
             </tbody></table>
             <div class="note" style="margin-top:12px">Use estes campos para relatorio basico ao proprietario do local. Eles ficam salvos por mes. Em pontos com sociedade, informe o percentual sobre lucro liquido.</div>
           </div>
@@ -1753,9 +1755,11 @@ function defaultFinanceSettings() {
     energyCostPerKWh: 0,
     investmentValue: 0,
     investorQuotaPct: 100,
+    saRetentionPct: 0,
     targetOccPct: 0,
     targetRevenuePerKWh: 0,
     ownerEnergyRate: 0,
+    ownerTransferMode: 'gross',
     ownerRevenueSharePct: 0,
     ownerNetProfitSharePct: 0,
     costItems: {},
@@ -1777,6 +1781,8 @@ function sumFinanceItems(values = {}) {
 }
 
 function currentFinanceSettingsFromInputs() {
+  const energyCostPerKWh = numberInputValue('financeEnergyCost', 0);
+  const savedOwnerEnergyRate = Number(financialSettings[financeMonthKey()]?.ownerEnergyRate || financialSettings.default?.ownerEnergyRate || 0);
   return {
     operationModel: document.getElementById('financeOperationModel')?.value || 'uby',
     managementPct: numberInputValue('financeMgmtPct', 5),
@@ -1784,12 +1790,14 @@ function currentFinanceSettingsFromInputs() {
     p3AcEquityPct: numberInputValue('financeP3AcEquityPct', 0),
     p3DcEquityPct: numberInputValue('financeP3DcEquityPct', 0),
     platformPct: numberInputValue('financePlatformPct', 0),
-    energyCostPerKWh: numberInputValue('financeEnergyCost', 0),
+    energyCostPerKWh,
     investmentValue: numberInputValue('financeInvestmentValue', 0),
     investorQuotaPct: numberInputValue('financeInvestorQuotaPct', 100),
+    saRetentionPct: numberInputValue('financeSaRetentionPct', 0),
     targetOccPct: numberInputValue('financeTargetOccPct', 0),
     targetRevenuePerKWh: numberInputValue('financeTargetRevenuePerKWh', 0),
-    ownerEnergyRate: numberInputValue('ownerEnergyRate', Number(financialSettings[financeMonthKey()]?.ownerEnergyRate || financialSettings.default?.ownerEnergyRate || 0)),
+    ownerEnergyRate: numberInputValue('ownerEnergyRate', savedOwnerEnergyRate || energyCostPerKWh),
+    ownerTransferMode: document.getElementById('ownerTransferMode')?.value || financialSettings[financeMonthKey()]?.ownerTransferMode || financialSettings.default?.ownerTransferMode || 'gross',
     ownerRevenueSharePct: numberInputValue('ownerRevenueSharePct', Number(financialSettings[financeMonthKey()]?.ownerRevenueSharePct || financialSettings.default?.ownerRevenueSharePct || 0)),
     ownerNetProfitSharePct: numberInputValue('ownerNetProfitSharePct', Number(financialSettings[financeMonthKey()]?.ownerNetProfitSharePct || financialSettings.default?.ownerNetProfitSharePct || 0)),
     costItems: financeItemValues(FINANCE_COST_ITEMS, 'finance-cost'),
@@ -1811,6 +1819,8 @@ function renderFinanceItemInputs(containerId, items, values, prefix) {
 function applyFinanceSettingsToInputs(settings = {}) {
   const merged = { ...defaultFinanceSettings(), ...settings };
   if (!settings.operationModel && (Number(settings.p3AcEquityPct || 0) > 0 || Number(settings.p3DcEquityPct || 0) > 0)) merged.operationModel = 'hybrid';
+  if (!settings.ownerTransferMode && Number(settings.ownerNetProfitSharePct || 0) > 0) merged.ownerTransferMode = 'net';
+  if (!Number(merged.ownerEnergyRate || 0) && Number(merged.energyCostPerKWh || 0) > 0) merged.ownerEnergyRate = merged.energyCostPerKWh;
   merged.costItems = { ...(settings.costItems || {}), ...(settings.extraCosts || {}) };
   if (Number(settings.otherCosts || 0) > 0 && !merged.costItems.otherCostsLegacy) merged.costItems.otherCostsLegacy = Number(settings.otherCosts || 0);
   merged.revenueItems = { ...(settings.revenueItems || {}), ...(settings.extraRevenue || {}) };
@@ -1824,19 +1834,34 @@ function applyFinanceSettingsToInputs(settings = {}) {
     financeEnergyCost: merged.energyCostPerKWh,
     financeInvestmentValue: merged.investmentValue,
     financeInvestorQuotaPct: merged.investorQuotaPct,
+    financeSaRetentionPct: merged.saRetentionPct,
     financeTargetOccPct: merged.targetOccPct,
     financeTargetRevenuePerKWh: merged.targetRevenuePerKWh,
     ownerEnergyRate: merged.ownerEnergyRate,
+    ownerTransferMode: merged.ownerTransferMode,
     ownerRevenueSharePct: merged.ownerRevenueSharePct,
     ownerNetProfitSharePct: merged.ownerNetProfitSharePct
   };
   Object.entries(fields).forEach(([id, value]) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.value = el.tagName === 'SELECT' ? String(value || defaultFinanceSettings().operationModel) : Number(value || 0);
+    if (el.tagName === 'SELECT') {
+      el.value = String(value || defaultFinanceSettings()[id === 'ownerTransferMode' ? 'ownerTransferMode' : 'operationModel']);
+    } else {
+      el.value = Number(value || 0);
+    }
   });
   renderFinanceItemInputs('financeExtraCostsRows', FINANCE_COST_ITEMS, merged.costItems, 'finance-cost');
   renderFinanceItemInputs('financeExtraRevenueRows', FINANCE_EXTRA_REVENUE_ITEMS, merged.revenueItems, 'finance-revenue');
+}
+
+function syncOwnerEnergyRateFromCost(force = false) {
+  const ownerInput = document.getElementById('ownerEnergyRate');
+  const costInput = document.getElementById('financeEnergyCost');
+  if (!ownerInput || !costInput) return;
+  const cost = Number(parseFloat(costInput.value) || 0);
+  const current = Number(parseFloat(ownerInput.value) || 0);
+  if (force || !current) ownerInput.value = cost;
 }
 
 function financeMonthKey() {
@@ -1853,12 +1878,14 @@ function applyOwnerAreaSettingsToInputs(mk) {
   const settings = ownerAreaSettingsForMonth(mk);
   const fields = {
     ownerEnergyRate: settings.ownerEnergyRate,
+    ownerTransferMode: settings.ownerTransferMode,
     ownerRevenueSharePct: settings.ownerRevenueSharePct,
     ownerNetProfitSharePct: settings.ownerNetProfitSharePct
   };
   Object.entries(fields).forEach(([id, value]) => {
     const el = document.getElementById(id);
-    if (el) el.value = Number(value || 0);
+    if (!el) return;
+    el.value = el.tagName === 'SELECT' ? String(value || defaultFinanceSettings().ownerTransferMode) : Number(value || 0);
   });
 }
 
@@ -1866,6 +1893,7 @@ function ownerAreaReportForSummary(summary, settings = {}, charges = []) {
   const energy = Number(summary?.energy || 0);
   const revenue = Number(summary?.rev || 0);
   const energyRate = Number(settings.ownerEnergyRate || 0);
+  const transferMode = settings.ownerTransferMode || 'gross';
   const sharePct = Number(settings.ownerRevenueSharePct || 0);
   const netProfitSharePct = Number(settings.ownerNetProfitSharePct || 0);
   const finance = financeForCharges(charges || [], settings);
@@ -1873,17 +1901,26 @@ function ownerAreaReportForSummary(summary, settings = {}, charges = []) {
   const energyReimbursement = energy * energyRate;
   const revenueShare = revenue * sharePct / 100;
   const netProfitShare = Math.max(netProfit, 0) * netProfitSharePct / 100;
+  const selectedShare = transferMode === 'net' ? netProfitShare : revenueShare;
+  const selectedSharePct = transferMode === 'net' ? netProfitSharePct : sharePct;
+  const selectedShareBase = transferMode === 'net' ? netProfit : revenue;
+  const selectedShareLabel = transferMode === 'net' ? 'Repasse sobre lucro liquido' : 'Repasse sobre faturamento';
   return {
     energy,
     revenue,
     energyRate,
+    transferMode,
     sharePct,
     netProfit,
     netProfitSharePct,
     energyReimbursement,
     revenueShare,
     netProfitShare,
-    ownerTotal: energyReimbursement + revenueShare + netProfitShare
+    selectedShare,
+    selectedSharePct,
+    selectedShareBase,
+    selectedShareLabel,
+    ownerTotal: energyReimbursement + selectedShare
   };
 }
 
@@ -1905,30 +1942,36 @@ function renderOwnerAreaReportForCurrentMonth() {
     acc.energyReimbursement += report.energyReimbursement;
     acc.revenueShare += report.revenueShare;
     acc.netProfitShare += report.netProfitShare;
+    acc.selectedShare += report.selectedShare;
     acc.ownerTotal += report.ownerTotal;
     return acc;
-  }, { energy: 0, revenue: 0, netProfit: 0, energyReimbursement: 0, revenueShare: 0, netProfitShare: 0, ownerTotal: 0 });
+  }, { energy: 0, revenue: 0, netProfit: 0, energyReimbursement: 0, revenueShare: 0, netProfitShare: 0, selectedShare: 0, ownerTotal: 0 });
 
   const table = document.getElementById('ownerAreaReportTable');
   if (!table) return;
+  updateOwnerTransferModeVisibility(current.transferMode);
   table.innerHTML = `
     <tr><td colspan="3"><strong>Mes atual - ${monthLabel(mk)}</strong></td></tr>
     <tr><td>Energia consumida</td><td>${fmtKWh(current.energy)}</td><td>${fmtBRL(current.energyRate)} / kWh</td></tr>
     <tr><td>Reembolso de energia</td><td>${fmtBRL(current.energyReimbursement)}</td><td>kWh x valor definido</td></tr>
-    <tr><td>Faturamento bruto</td><td>${fmtBRL(current.revenue)}</td><td>${fmtPct(current.sharePct)} de repasse</td></tr>
-    <tr><td>Repasse sobre faturamento</td><td>${fmtBRL(current.revenueShare)}</td><td>receita x percentual</td></tr>
-    <tr><td>Lucro liquido base</td><td>${fmtBRL(current.netProfit)}</td><td>apos custos configurados</td></tr>
-    <tr><td>Repasse sobre lucro liquido</td><td>${fmtBRL(current.netProfitShare)}</td><td>${fmtPct(current.netProfitSharePct)} do lucro liquido</td></tr>
-    <tr><td><strong>Total para dono da area</strong></td><td><strong>${fmtBRL(current.ownerTotal)}</strong></td><td>energia + faturamento + lucro</td></tr>
+    <tr><td>${current.transferMode === 'net' ? 'Lucro liquido base' : 'Faturamento bruto'}</td><td>${fmtBRL(current.selectedShareBase)}</td><td>${fmtPct(current.selectedSharePct)} de repasse</td></tr>
+    <tr><td>${current.selectedShareLabel}</td><td>${fmtBRL(current.selectedShare)}</td><td>${current.transferMode === 'net' ? 'lucro liquido x percentual' : 'receita x percentual'}</td></tr>
+    <tr><td><strong>Total para dono da area</strong></td><td><strong>${fmtBRL(current.ownerTotal)}</strong></td><td>energia + repasse escolhido</td></tr>
     <tr><td colspan="3"><strong>Acumulado da unidade</strong></td></tr>
     <tr><td>Energia acumulada</td><td>${fmtKWh(accumulated.energy)}</td><td>todos os meses salvos</td></tr>
     <tr><td>Reembolso energia acumulado</td><td>${fmtBRL(accumulated.energyReimbursement)}</td><td>por valor mensal salvo</td></tr>
-    <tr><td>Faturamento acumulado</td><td>${fmtBRL(accumulated.revenue)}</td><td>todos os meses salvos</td></tr>
-    <tr><td>Repasse faturamento acumulado</td><td>${fmtBRL(accumulated.revenueShare)}</td><td>por percentual mensal salvo</td></tr>
-    <tr><td>Lucro liquido acumulado</td><td>${fmtBRL(accumulated.netProfit)}</td><td>apos custos configurados</td></tr>
-    <tr><td>Repasse lucro liquido acumulado</td><td>${fmtBRL(accumulated.netProfitShare)}</td><td>por percentual mensal salvo</td></tr>
-    <tr><td><strong>Total acumulado para dono</strong></td><td><strong>${fmtBRL(accumulated.ownerTotal)}</strong></td><td>energia + faturamento + lucro</td></tr>
+    <tr><td>${current.transferMode === 'net' ? 'Lucro liquido acumulado' : 'Faturamento acumulado'}</td><td>${fmtBRL(current.transferMode === 'net' ? accumulated.netProfit : accumulated.revenue)}</td><td>todos os meses salvos</td></tr>
+    <tr><td>${current.transferMode === 'net' ? 'Repasse lucro liquido acumulado' : 'Repasse faturamento acumulado'}</td><td>${fmtBRL(accumulated.selectedShare)}</td><td>por modo mensal salvo</td></tr>
+    <tr><td><strong>Total acumulado para dono</strong></td><td><strong>${fmtBRL(accumulated.ownerTotal)}</strong></td><td>energia + repasse escolhido</td></tr>
   `;
+}
+
+function updateOwnerTransferModeVisibility(mode = 'gross') {
+  const isNet = mode === 'net';
+  const grossRow = document.getElementById('ownerRevenueShareRow');
+  const netRow = document.getElementById('ownerNetProfitShareRow');
+  if (grossRow) grossRow.style.display = isNet ? 'none' : '';
+  if (netRow) netRow.style.display = isNet ? '' : 'none';
 }
 
 function renderFinanceiro(applySaved = true) {
@@ -1943,69 +1986,84 @@ function renderFinanceiro(applySaved = true) {
   if (!mk) return;
   if (applySaved) applyFinanceSettingsToInputs(financialSettings[mk] || financialSettings.default || defaultFinanceSettings());
   const settings = currentFinanceSettingsFromInputs();
+  updateFinanceModelVisibility(settings.operationModel);
   const charges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const result = financeForCharges(charges, settings);
-  const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, investorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin } = result;
+  const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
   const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
   const p3TakePct = revenue ? p3Gross / revenue * 100 : 0;
+  const isUbyModel = settings.operationModel === 'uby' || settings.operationModel === 'hybrid';
+  const hasP3Society = settings.operationModel === 'p3_society' || settings.operationModel === 'hybrid';
 
   document.getElementById('financeHeroMeta').innerHTML =
     `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}`;
   document.getElementById('financeFormula').innerHTML =
     `<strong>${operationModelLabel(settings.operationModel)}</strong><br>P3: gestao ${settings.managementPct}% + sociedade configurada. App/plataforma ${settings.platformPct}% e servico de terceiros.<br>Meta ocupacao: ${fmtPct(target.targetOccPct)} | real ${fmtPct(target.realOccPct)}<br><strong style="color:#57B7FF">Payback: ${formatPaybackMonths(paybackMonths)}</strong>`;
 
-  document.getElementById('financeKpis').innerHTML = `
-    <div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>
-    <div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao + sociedades</div></div>
-    <div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos energia, custos e P3</div></div>
-    <div class="card"><div class="label">Sociedade P3</div><div class="value">${fmtBRL(p3SocietyProfit)}</div><div class="sub">fora da UBY quando aplicavel</div></div>
-    <div class="card"><div class="label">Investidores UBY</div><div class="value">${fmtBRL(investorDistribution)}</div><div class="sub">${settings.investorQuotaPct}% das cotas UBY</div></div>
-    <div class="card"><div class="label">Payback</div><div class="value">${formatPaybackMonths(paybackMonths)}</div><div class="sub">investimento / resultado proprio</div></div>
-    <div class="card"><div class="label">ROI mensal</div><div class="value">${fmtPct(roiMonthly)}</div><div class="bar"><span style="width:${Math.min(Math.max(roiMonthly,0),100).toFixed(1)}%"></span></div><div class="sub">resultado proprio / investimento</div></div>
-    <div class="card"><div class="label">Meta ocupacao</div><div class="value">${fmtPct(target.targetOccPct)}</div><div class="sub">real ${fmtPct(target.realOccPct)} | falta ${fmtPct(target.targetOccPct - target.realOccPct)}</div></div>
-    <div class="card"><div class="label">Faturamento pretendido</div><div class="value">${fmtBRL(target.targetRevenue)}</div><div class="sub">periodo atual | mes cheio ${fmtBRL(target.fullMonthTargetRevenue)}</div></div>
-  `;
-  document.getElementById('financeDistributionTable').innerHTML = `
-    <tr><td>Modelo da operacao</td><td>${operationModelLabel(settings.operationModel)}</td></tr>
-    <tr><td>Receita total</td><td>${fmtBRL(revenue)}</td></tr>
-    <tr><td>Receita AC</td><td>${fmtBRL(acRevenue)}</td></tr>
-    <tr><td>Receita DC</td><td>${fmtBRL(dcRevenue)}</td></tr>
-    <tr><td>Gestao P3 (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>
-    <tr><td>App/plataforma terceiros (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>
-    <tr><td>Sociedade P3 em AC (${settings.p3AcEquityPct}%)</td><td>${fmtBRL(p3AcEquity)}</td></tr>
-    <tr><td>Sociedade P3 em DC (${settings.p3DcEquityPct}%)</td><td>${fmtBRL(p3DcEquity)}</td></tr>
-    <tr><td>Sociedade P3 geral (${settings.p3SocietyPct}%)</td><td>${fmtBRL(settings.operationModel === 'p3_society' ? p3SocietyProfit : 0)}</td></tr>
-    <tr><td>Receitas extras</td><td>${fmtBRL(extraRevenue)}</td></tr>
-    <tr><td>Resultado operacional apos custos</td><td>${fmtBRL(operationNet)}</td></tr>
-    <tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>
-    <tr><td>Ocupacao real x objetivo</td><td>${fmtPct(target.realOccPct)} / ${fmtPct(target.targetOccPct)}</td></tr>
-    <tr><td>kWh pretendido ate o periodo</td><td>${fmtKWh(target.targetEnergy)}</td></tr>
-    <tr><td>Faturamento pretendido ate o periodo</td><td>${fmtBRL(target.targetRevenue)}</td></tr>
-    <tr><td>Recargas pretendidas ate o periodo</td><td>${target.targetCharges.toFixed(1).replace('.', ',')}</td></tr>
-    <tr><td>kWh pretendido mes completo</td><td>${fmtKWh(target.fullMonthTargetEnergy)}</td></tr>
-    <tr><td>Faturamento pretendido mes completo</td><td>${fmtBRL(target.fullMonthTargetRevenue)}</td></tr>
-    <tr><td>Recargas pretendidas mes completo</td><td>${target.fullMonthTargetCharges.toFixed(1).replace('.', ',')}</td></tr>
-  `;
-  document.getElementById('financeResultTable').innerHTML = `
-    <tr><td>Investimento no ponto</td><td>${fmtBRL(settings.investmentValue)}</td></tr>
-    <tr><td>Receita P3</td><td>${fmtBRL(p3Gross)}</td></tr>
-    <tr><td>App/plataforma terceiros</td><td>${fmtBRL(platform)}</td></tr>
-    <tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>
-    <tr><td>Custos extras</td><td>${fmtBRL(extraCosts)}</td></tr>
-    <tr><td>Lucro sociedade P3</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>
-    <tr><td>Resultado liquido UBY</td><td>${fmtBRL(ubyNet)}</td></tr>
-    <tr><td>Resultado socio/local</td><td>${fmtBRL(partnerShare)}</td></tr>
-    <tr><td>Resultado proprio para payback</td><td>${fmtBRL(paybackBase)}</td></tr>
-    <tr><td>Resultado proprio total</td><td>${fmtBRL(ownResult)}</td></tr>
-    <tr><td>Repasse investidores</td><td>${fmtBRL(investorDistribution)}</td></tr>
-    <tr><td>Retido UBY</td><td>${fmtBRL(ubyRetained)}</td></tr>
-    <tr><td>Payback estimado</td><td>${formatPaybackMonths(paybackMonths)}</td></tr>
-    <tr><td>Margem UBY</td><td>${fmtPct(margin)}</td></tr>
-  `;
+  document.getElementById('financeKpis').innerHTML = [
+    `<div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>`,
+    `<div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao${hasP3Society ? ' + sociedades' : ''}</div></div>`,
+    isUbyModel ? `<div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos energia, custos e P3</div></div>` : '',
+    hasP3Society ? `<div class="card"><div class="label">Sociedade P3</div><div class="value">${fmtBRL(p3SocietyProfit)}</div><div class="sub">fora da UBY quando aplicavel</div></div>` : '',
+    isUbyModel ? `<div class="card"><div class="label">Retencao S.A.</div><div class="value">${fmtBRL(saRetention)}</div><div class="sub">${settings.saRetentionPct}% do lucro liquido UBY</div></div>` : '',
+    isUbyModel ? `<div class="card"><div class="label">Investidores UBY</div><div class="value">${fmtBRL(investorDistribution)}</div><div class="sub">${settings.investorQuotaPct}% de ${fmtBRL(ubyDistributable)}</div></div>` : '',
+    `<div class="card"><div class="label">Payback</div><div class="value">${formatPaybackMonths(paybackMonths)}</div><div class="sub">investimento / resultado proprio</div></div>`,
+    `<div class="card"><div class="label">ROI mensal</div><div class="value">${fmtPct(roiMonthly)}</div><div class="bar"><span style="width:${Math.min(Math.max(roiMonthly,0),100).toFixed(1)}%"></span></div><div class="sub">resultado proprio / investimento</div></div>`,
+    `<div class="card"><div class="label">Meta ocupacao</div><div class="value">${fmtPct(target.targetOccPct)}</div><div class="sub">real ${fmtPct(target.realOccPct)} | falta ${fmtPct(target.targetOccPct - target.realOccPct)}</div></div>`,
+    `<div class="card"><div class="label">Faturamento pretendido</div><div class="value">${fmtBRL(target.targetRevenue)}</div><div class="sub">periodo atual | mes cheio ${fmtBRL(target.fullMonthTargetRevenue)}</div></div>`
+  ].filter(Boolean).join('');
+  document.getElementById('financeDistributionTable').innerHTML = [
+    `<tr><td>Modelo da operacao</td><td>${operationModelLabel(settings.operationModel)}</td></tr>`,
+    `<tr><td>Receita total</td><td>${fmtBRL(revenue)}</td></tr>`,
+    `<tr><td>Receita AC</td><td>${fmtBRL(acRevenue)}</td></tr>`,
+    `<tr><td>Receita DC</td><td>${fmtBRL(dcRevenue)}</td></tr>`,
+    `<tr><td>Gestao P3 (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>`,
+    `<tr><td>App/plataforma terceiros (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>`,
+    settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em AC (${settings.p3AcEquityPct}%)</td><td>${fmtBRL(p3AcEquity)}</td></tr>` : '',
+    settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em DC (${settings.p3DcEquityPct}%)</td><td>${fmtBRL(p3DcEquity)}</td></tr>` : '',
+    settings.operationModel === 'p3_society' ? `<tr><td>Sociedade P3 geral (${settings.p3SocietyPct}%)</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
+    `<tr><td>Receitas extras</td><td>${fmtBRL(extraRevenue)}</td></tr>`,
+    `<tr><td>Resultado operacional apos custos</td><td>${fmtBRL(operationNet)}</td></tr>`,
+    `<tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>`,
+    `<tr><td>Ocupacao real x objetivo</td><td>${fmtPct(target.realOccPct)} / ${fmtPct(target.targetOccPct)}</td></tr>`,
+    `<tr><td>kWh pretendido ate o periodo</td><td>${fmtKWh(target.targetEnergy)}</td></tr>`,
+    `<tr><td>Faturamento pretendido ate o periodo</td><td>${fmtBRL(target.targetRevenue)}</td></tr>`,
+    `<tr><td>Recargas pretendidas ate o periodo</td><td>${target.targetCharges.toFixed(1).replace('.', ',')}</td></tr>`,
+    `<tr><td>kWh pretendido mes completo</td><td>${fmtKWh(target.fullMonthTargetEnergy)}</td></tr>`,
+    `<tr><td>Faturamento pretendido mes completo</td><td>${fmtBRL(target.fullMonthTargetRevenue)}</td></tr>`,
+    `<tr><td>Recargas pretendidas mes completo</td><td>${target.fullMonthTargetCharges.toFixed(1).replace('.', ',')}</td></tr>`
+  ].filter(Boolean).join('');
+  document.getElementById('financeResultTable').innerHTML = [
+    `<tr><td>Investimento no ponto</td><td>${fmtBRL(settings.investmentValue)}</td></tr>`,
+    `<tr><td>Receita P3</td><td>${fmtBRL(p3Gross)}</td></tr>`,
+    `<tr><td>App/plataforma terceiros</td><td>${fmtBRL(platform)}</td></tr>`,
+    `<tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>`,
+    `<tr><td>Custos extras</td><td>${fmtBRL(extraCosts)}</td></tr>`,
+    hasP3Society ? `<tr><td>Lucro sociedade P3</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
+    isUbyModel ? `<tr><td>Resultado liquido UBY</td><td>${fmtBRL(ubyNet)}</td></tr>` : '',
+    isUbyModel ? `<tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(saRetention)}</td></tr>` : '',
+    isUbyModel ? `<tr><td>Base distribuivel UBY</td><td>${fmtBRL(ubyDistributable)}</td></tr>` : '',
+    partnerShare ? `<tr><td>Resultado socio/local</td><td>${fmtBRL(partnerShare)}</td></tr>` : '',
+    `<tr><td>Resultado proprio para payback</td><td>${fmtBRL(paybackBase)}</td></tr>`,
+    `<tr><td>Resultado proprio total</td><td>${fmtBRL(ownResult)}</td></tr>`,
+    isUbyModel ? `<tr><td>Repasse investidores</td><td>${fmtBRL(investorDistribution)}</td></tr>` : '',
+    isUbyModel ? `<tr><td>Retido UBY</td><td>${fmtBRL(ubyRetained)}</td></tr>` : '',
+    `<tr><td>Payback estimado</td><td>${formatPaybackMonths(paybackMonths)}</td></tr>`,
+    isUbyModel ? `<tr><td>Margem UBY</td><td>${fmtPct(margin)}</td></tr>` : ''
+  ].filter(Boolean).join('');
   document.getElementById('financeNote').innerHTML =
-    `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). A UBY fica com ${fmtBRL(ubyNet)} quando o ativo entra na UBY; sociedades fora da UBY somam ${fmtBRL(p3SocietyProfit)} para a P3 e ${fmtBRL(partnerShare)} para socio/local. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`;
+    isUbyModel
+      ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). A UBY fica com ${fmtBRL(ubyNet)} antes da retencao S.A.; ${fmtBRL(saRetention)} ficam retidos por estatuto e ${fmtBRL(investorDistribution)} sao distribuiveis aos investidores. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
+      : `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). O socio/local fica com ${fmtBRL(partnerShare)} conforme o modelo escolhido. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`;
   renderOwnerAreaReportForCurrentMonth();
+}
+
+function updateFinanceModelVisibility(model = 'uby') {
+  document.querySelectorAll('.finance-model-row').forEach(row => {
+    const models = String(row.dataset.models || '').split(/\s+/).filter(Boolean);
+    row.style.display = models.includes(model) ? '' : 'none';
+  });
 }
 
 async function saveFinancialSettings() {
@@ -2146,7 +2204,9 @@ function financeForCharges(charges, settings = {}) {
   const p3AcEquity = model === 'hybrid' ? ac.net * cfg.p3AcEquityPct / 100 : 0;
   const p3DcEquity = model === 'hybrid' ? dc.net * cfg.p3DcEquityPct / 100 : 0;
   const p3Gross = management + p3SocietyProfit;
-  const investorDistribution = Math.max(ubyNet, 0) * cfg.investorQuotaPct / 100;
+  const saRetention = Math.max(ubyNet, 0) * cfg.saRetentionPct / 100;
+  const ubyDistributable = Math.max(ubyNet - saRetention, 0);
+  const investorDistribution = ubyDistributable * cfg.investorQuotaPct / 100;
   const ubyRetained = ubyNet - investorDistribution;
   const p3OperationalResult = management + p3SocietyProfit;
   const ownResult = ubyNet + p3SocietyProfit;
@@ -2175,6 +2235,8 @@ function financeForCharges(charges, settings = {}) {
     p3Gross,
     operationNet,
     ubyNet,
+    saRetention,
+    ubyDistributable,
     investorDistribution,
     ubyRetained,
     paybackBase,
@@ -2231,6 +2293,7 @@ function renderGeneralFinance(unitData) {
     <div class="card"><div class="label">Receita P3 total</div><div class="value">${fmtBRL(total.p3Gross || 0)}</div><div class="sub">gestao + sociedades</div></div>
     <div class="card"><div class="label">Sociedades P3</div><div class="value">${fmtBRL(total.p3SocietyProfit || 0)}</div><div class="sub">fora da UBY quando configurado</div></div>
     <div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(total.ubyNet || 0)}</div><div class="sub">apos custos e P3</div></div>
+    <div class="card"><div class="label">Retencao S.A.</div><div class="value">${fmtBRL(total.saRetention || 0)}</div><div class="sub">retencao estatutaria</div></div>
     <div class="card"><div class="label">Investidores</div><div class="value">${fmtBRL(total.investorDistribution || 0)}</div><div class="sub">repasses por cotas</div></div>
     <div class="card"><div class="label">Payback geral</div><div class="value">${formatPaybackMonths(total.paybackMonths || 0)}</div><div class="sub">investimento / resultado proprio</div></div>
   `;
@@ -2245,6 +2308,8 @@ function renderGeneralFinance(unitData) {
     <tr><td>Receitas extras</td><td>${fmtBRL(total.extraRevenue || 0)}</td></tr>
     <tr><td>Custos configurados</td><td>${fmtBRL(total.costs || 0)}</td></tr>
     <tr><td>Resultado liquido UBY</td><td>${fmtBRL(total.ubyNet || 0)}</td></tr>
+    <tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(total.saRetention || 0)}</td></tr>
+    <tr><td>Base distribuivel UBY</td><td>${fmtBRL(total.ubyDistributable || 0)}</td></tr>
     <tr><td>Resultado proprio total</td><td>${fmtBRL(total.ownResult || 0)}</td></tr>
     <tr><td>Repasse investidores</td><td>${fmtBRL(total.investorDistribution || 0)}</td></tr>
     <tr><td>Retido UBY</td><td>${fmtBRL(total.ubyRetained || 0)}</td></tr>
