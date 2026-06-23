@@ -1442,6 +1442,165 @@ function splitDateRange(value, fallbackEnd = '') {
   return [raw, fallbackEnd instanceof Date ? dateToInputText(fallbackEnd) : String(fallbackEnd || '')];
 }
 
+function hasHeader(headers = [], names = []) {
+  const normalized = headers.map(normalizeHeaderName);
+  return names.some(name => normalized.includes(normalizeHeaderName(name)));
+}
+
+function rechargeSheetRows(workbook) {
+  const preferred = workbook.Sheets['Recargas'];
+  const sheetName = preferred ? 'Recargas' : workbook.SheetNames[0];
+  const ws = preferred || workbook.Sheets[sheetName];
+  if (!ws) throw new Error('Nenhuma aba encontrada no arquivo.');
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+  if (rows.length < 2) throw new Error('Planilha sem dados de recargas.');
+  return { rows, sheetName };
+}
+
+function detectRechargeLayout(rows = []) {
+  const scanRows = rows.slice(0, 12);
+  for (let rowIndex = 0; rowIndex < scanRows.length; rowIndex++) {
+    const headers = scanRows[rowIndex] || [];
+    if (
+      hasHeader(headers, ['E-mail']) &&
+      hasHeader(headers, ['Estacao', 'Estação']) &&
+      hasHeader(headers, ['ID da Transacao', 'ID da Transação']) &&
+      hasHeader(headers, ['Energia em kWh']) &&
+      hasHeader(headers, ['Inicio (Horario Local)', 'Início (Horário Local)'])
+    ) {
+      return {
+        type: 'gogrid',
+        platform: 'Go Grid',
+        headerRow: rowIndex,
+        allowMultiMonth: true,
+        cols: {
+          email: findColumnIndex(headers, ['E-mail']),
+          station: findColumnIndex(headers, ['Estacao', 'Estação']),
+          plug: findColumnIndex(headers, ['Plug']),
+          transactionId: findColumnIndex(headers, ['ID da Transacao', 'ID da Transação']),
+          energy: findColumnIndex(headers, ['Energia em kWh']),
+          totalValue: findColumnIndex(headers, ['Valor Total']),
+          energyValue: findColumnIndex(headers, ['Valor da Energia']),
+          paymentType: findColumnIndex(headers, ['Forma de Pagamento']),
+          startLocal: findColumnIndex(headers, ['Inicio (Horario Local)', 'Início (Horário Local)']),
+          endLocal: findColumnIndex(headers, ['Fim (Horario Local)', 'Fim (Horário Local)']),
+          duration: findColumnIndex(headers, ['Duracao', 'Duração']),
+          couponValue: findColumnIndex(headers, ['Valor do Cupom']),
+          couponBenefit: findColumnIndex(headers, ['Beneficio do Cupom', 'Benefício do Cupom']),
+          idleValue: findColumnIndex(headers, ['Taxa de Ociosidade']),
+          socInitial: findColumnIndex(headers, ['SoC inicial']),
+          socFinal: findColumnIndex(headers, ['SoC final'])
+        }
+      };
+    }
+  }
+  const headers = rows[0] || [];
+  return {
+    type: 'uby',
+    platform: 'Padrao UBY',
+    headerRow: 0,
+    allowMultiMonth: false,
+    cols: {
+      voucher: findColumnIndex(headers, ['Voucher utilizado', 'Voucher'], 26),
+      rating: findColumnIndex(headers, ['AvaliaÃ§Ã£o', 'Avaliacao'], 27),
+      reviewComment: findColumnIndex(headers, ['ComentÃ¡rio', 'Comentario', 'ComentÃ¡rios', 'Comentarios', 'ComentÃ¡rio da avaliaÃ§Ã£o', 'Comentario da avaliacao'], -1)
+    }
+  };
+}
+
+function rowHasData(row = []) {
+  return row.some(value => String(value ?? '').trim() !== '');
+}
+
+function rowCellText(row = [], index = -1) {
+  return String(readCell(row, index) || '').trim();
+}
+
+function couponLabelFromGoGrid(row = [], cols = {}) {
+  const benefit = rowCellText(row, cols.couponBenefit);
+  const value = parseNumber(readCell(row, cols.couponValue));
+  if (benefit && benefit !== '---') return benefit;
+  return value > 0 ? 'Cupom' : '';
+}
+
+function normalizeGoGridStation(value = '') {
+  const raw = String(value || '').replace(/\s+-\s+/g, ' | ').replace(/\s+/g, ' ').trim();
+  if (normalizeHeaderName(raw).includes('postopratacambe')) return 'Go Grid | Posto Prata Cambe (DC)';
+  return raw;
+}
+
+function parseRechargeRow(row = [], layout = {}, file = {}) {
+  if (layout.type === 'gogrid') {
+    const cols = layout.cols || {};
+    const id = rowCellText(row, cols.transactionId);
+    const email = rowCellText(row, cols.email);
+    const station = normalizeGoGridStation(rowCellText(row, cols.station));
+    const startStr = rowCellText(row, cols.startLocal);
+    const endStr = rowCellText(row, cols.endLocal);
+    const paymentType = rowCellText(row, cols.paymentType);
+    const startDate = parseDate(startStr);
+    const endDate = parseDate(endStr);
+    const energy = parseNumber(readCell(row, cols.energy));
+    const revenue = parseNumber(readCell(row, cols.totalValue) || readCell(row, cols.energyValue));
+    if (!id && !station && !email && !startStr && !energy && !revenue) return null;
+    return {
+      workId:        currentWorkId,
+      workName:      currentWorkName,
+      _file:         file.name,
+      sourcePlatform:'Go Grid',
+      id,
+      station,
+      connType:      rowCellText(row, cols.plug) ? `Plug ${rowCellText(row, cols.plug)}` : '',
+      userName:      email ? email.split('@')[0] : '',
+      userEmail:     email,
+      startStr,
+      endStr,
+      startDate,
+      endDate,
+      duration:      rowCellText(row, cols.duration),
+      energyKWh:     energy,
+      revenue,
+      paymentType,
+      paymentStatus: /andamento/i.test(paymentType) ? 'Carga em andamento' : (paymentType ? 'Pago' : ''),
+      idleTime:      '',
+      idleValue:     parseNumber(readCell(row, cols.idleValue)),
+      voucher:       couponLabelFromGoGrid(row, cols),
+      rating:        '',
+      reviewComment: '',
+      socInitial:    rowCellText(row, cols.socInitial),
+      socFinal:      rowCellText(row, cols.socFinal)
+    };
+  }
+
+  const cols = layout.cols || {};
+  const [startStr, endStr] = splitDateRange(row[12], row[13]);
+  const startDate = parseDate(startStr);
+  const endDate = parseDate(endStr);
+  return {
+    workId:        currentWorkId,
+    workName:      currentWorkName,
+    _file:         file.name,
+    id:            row[0],
+    station:       String(row[1] || '').trim(),
+    connType:      String(row[3] || '').trim(),
+    userName:      String(row[4] || '').trim(),
+    userEmail:     String(row[5] || '').trim(),
+    startStr, endStr,
+    startDate,
+    endDate,
+    duration:      String(row[13] || ''),
+    energyKWh:     parseNumber(row[14]),
+    revenue:       parseNumber(row[18]),
+    paymentType:   String(row[20] || '').trim(),
+    paymentStatus: String(row[21] || '').trim(),
+    idleTime:      String(row[24] || ''),
+    idleValue:     parseNumber(row[25]),
+    voucher:       String(readCell(row, cols.voucher) || '').trim(),
+    rating:        String(readCell(row, cols.rating) || '').trim(),
+    reviewComment: String(readCell(row, cols.reviewComment) || '').trim()
+  };
+}
+
 function readFile(file) {
   setFeedback('⏳ Lendo planilha...', 'up-loading');
 
@@ -1460,12 +1619,21 @@ function readFile(file) {
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
       if (rows.length < 2) throw new Error('Planilha sem dados de recargas.');
 
+      const layout = detectRechargeLayout(rows);
       const headers = rows[0] || [];
       const voucherCol = findColumnIndex(headers, ['Voucher utilizado', 'Voucher'], 26);
       const ratingCol = findColumnIndex(headers, ['Avaliação', 'Avaliacao'], 27);
       const reviewCommentCol = findColumnIndex(headers, ['Comentário', 'Comentario', 'Comentários', 'Comentarios', 'Comentário da avaliação', 'Comentario da avaliacao'], -1);
       const selectedMonth = file.month || document.getElementById('importMonth')?.value || '';
       const importedCharges = [];
+      if (layout.type === 'gogrid') {
+        for (let i = layout.headerRow + 1; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || !rowHasData(r)) continue;
+          const charge = parseRechargeRow(r, layout, file);
+          if (charge) importedCharges.push(charge);
+        }
+      } else {
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
         if (!r || r[0] == null) continue;
@@ -1496,11 +1664,12 @@ function readFile(file) {
           reviewComment: String(readCell(r, reviewCommentCol) || '').trim()
         });
       }
+      }
       if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
 
       const dateMonths = [...new Set(importedCharges.map(charge => monthKey(charge.startDate)).filter(k => k && k !== 'unknown'))];
       const wrongMonths = dateMonths.filter(k => k !== selectedMonth);
-      if (selectedMonth && wrongMonths.length) {
+      if (selectedMonth && wrongMonths.length && !layout.allowMultiMonth) {
         throw new Error(`O mes escolhido foi ${monthLabel(selectedMonth)}, mas a planilha tem recargas de ${dateMonths.map(monthLabel).join(', ')}. Escolha o mes correto antes de subir.`);
       }
 
@@ -1509,8 +1678,9 @@ function readFile(file) {
       const sourceKey = fileSourceKey(selectedMonth, file.name, sourceStation);
       file.fileKey = sourceKey;
       file.station = sourceStation;
+      const fileMonth = dateMonths.length === 1 ? (dateMonths[0] || selectedMonth) : '';
       importedCharges.forEach(charge => {
-        charge._month = selectedMonth || monthKey(charge.startDate);
+        charge._month = layout.allowMultiMonth ? monthKey(charge.startDate) : (selectedMonth || monthKey(charge.startDate));
         charge._fileKey = sourceKey;
         charge._sourceStation = sourceStation;
       });
@@ -1548,7 +1718,7 @@ function readFile(file) {
 
       setFeedback('', '');
       uploadZone.classList.add('compact');
-      loadedFiles = loadedFiles.map(item => item === file || (item.fileKey && item.fileKey === sourceKey) ? { ...item, fileKey: sourceKey, station: sourceStation, month: selectedMonth, importMode, importedAt: new Date().toISOString() } : item);
+      loadedFiles = loadedFiles.map(item => item === file || (item.fileKey && item.fileKey === sourceKey) ? { ...item, fileKey: sourceKey, station: sourceStation, month: fileMonth, importMode, importedAt: new Date().toISOString(), sourcePlatform: layout.platform } : item);
       updateChips();
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
@@ -1591,12 +1761,22 @@ function parseDate(s) {
 }
 function durToHours(d) {
   if (!d) return 0;
-  const p = d.split(':');
+  const raw = String(d).trim();
+  const verbose = raw.match(/(?:(\d+(?:[.,]\d+)?)\s*h)?\s*(?:(\d+(?:[.,]\d+)?)\s*m)?\s*(?:(\d+(?:[.,]\d+)?)\s*s)?/i);
+  if (verbose && (verbose[1] || verbose[2] || verbose[3])) {
+    return parseNumber(verbose[1]) + parseNumber(verbose[2]) / 60 + parseNumber(verbose[3]) / 3600;
+  }
+  const p = raw.split(':');
   return (+p[0]||0) + (+p[1]||0)/60 + (+p[2]||0)/3600;
 }
 function idleToMin(s) {
   if (!s) return 0;
-  const p = s.split(':');
+  const raw = String(s).trim();
+  const verbose = raw.match(/(?:(\d+(?:[.,]\d+)?)\s*h)?\s*(?:(\d+(?:[.,]\d+)?)\s*m)?\s*(?:(\d+(?:[.,]\d+)?)\s*s)?/i);
+  if (verbose && (verbose[1] || verbose[2] || verbose[3])) {
+    return parseNumber(verbose[1]) * 60 + parseNumber(verbose[2]) + parseNumber(verbose[3]) / 60;
+  }
+  const p = raw.split(':');
   return (+p[0]||0)*60 + (+p[1]||0) + (+p[2]||0)/60;
 }
 
