@@ -3747,6 +3747,7 @@ function renderAcumulado() {
   const rev     = md.reduce((s,d) => s+d.rev, 0);
   const totalCharges = md.reduce((s,d) => s+d.count, 0);
   const avgTkt  = totalCharges ? rev/totalCharges : 0;
+  const avgRevenuePerKWh = energy > 0 ? rev/energy : 0;
   const clients = md.reduce((s,d) => s+d.clients, 0);
   const totalMaxKWh = md.reduce((s,d) => s + (d.occI > 0 ? d.energy/(d.occI/100) : 0), 0);
   const totalOcc = totalMaxKWh > 0 ? energy/totalMaxKWh*100 : 0;
@@ -3761,6 +3762,9 @@ function renderAcumulado() {
     <div class="card"><div class="label">Energia total</div>
       <div class="value">${fmtKWh(energy)}</div>
       <div class="sub">${(energy/Math.max(totalCharges,1)).toFixed(1)} kWh/sessão</div></div>
+    <div class="card"><div class="label">R$/kWh medio</div>
+      <div class="value">${fmtBRL(avgRevenuePerKWh)}</div>
+      <div class="sub">receita / energia acumulada</div></div>
     <div class="card"><div class="label">Ocupação média</div>
       <div class="value">${fmtPct(totalOcc)}</div>
       <div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div>
