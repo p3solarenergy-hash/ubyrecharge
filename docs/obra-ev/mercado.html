@@ -257,20 +257,20 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .hitem-text{font-size:12px;color:var(--muted2);line-height:1.5}
 .hitem-text strong{color:var(--text)}
 .map-shell{display:grid;grid-template-columns:minmax(420px,1.25fr) minmax(300px,.75fr);gap:16px;margin-bottom:16px}
-.map-stage{position:relative;min-height:520px;border-radius:14px;overflow:hidden;
+.map-stage{position:relative;min-height:560px;border-radius:14px;overflow:hidden;
   background:radial-gradient(circle at 52% 42%,rgba(79,163,255,.13),transparent 54%),linear-gradient(145deg,#0d1420,#0a0d14);
   border:1px solid var(--border)}
 .map-stage svg{position:absolute;inset:34px 26px 20px;width:calc(100% - 52px);height:calc(100% - 54px);opacity:.74;filter:drop-shadow(0 18px 38px rgba(0,0,0,.35))}
 .map-region{fill:rgba(79,163,255,.08);stroke:rgba(79,163,255,.35);stroke-width:1.4}
 .map-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:58px 58px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.65),rgba(0,0,0,.15))}
 .map-pin{position:absolute;transform:translate(-50%,-50%);border:0;border-radius:999px;
-  min-width:34px;height:34px;padding:0 8px;background:rgba(13,16,24,.88);color:var(--text);
-  display:flex;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:900;
+  min-width:30px;height:30px;padding:0 7px;background:rgba(13,16,24,.88);color:var(--text);
+  display:flex;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:900;
   box-shadow:0 0 0 1px rgba(255,255,255,.11),0 10px 24px rgba(0,0,0,.28);cursor:pointer;transition:transform .18s,box-shadow .18s,background .18s;z-index:2}
 .map-pin:hover,.map-pin.sel{transform:translate(-50%,-50%) scale(1.12);background:rgba(79,163,255,.22);box-shadow:0 0 0 1px var(--blue),0 0 24px rgba(79,163,255,.28)}
 .map-pin.hot{background:rgba(29,233,128,.18);box-shadow:0 0 0 1px rgba(29,233,128,.4),0 10px 24px rgba(0,0,0,.28)}
 .map-pin.warn{background:rgba(255,140,66,.18);box-shadow:0 0 0 1px rgba(255,140,66,.4),0 10px 24px rgba(0,0,0,.28)}
-.map-rank{font-size:9px;color:var(--muted2);font-weight:800}
+.map-rank{font-size:8px;color:var(--muted2);font-weight:800}
 .map-panel{display:flex;flex-direction:column;gap:12px}
 .map-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .map-kpi{border:1px solid var(--border);border-radius:12px;padding:14px;background:rgba(255,255,255,.025)}
@@ -293,7 +293,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   .istrip{grid-template-columns:repeat(2,1fr)}
   .gap-need{grid-template-columns:1fr 1fr}
   .page{padding:14px}
-  .map-stage{min-height:460px}
+  .map-stage{min-height:500px}
   .estado-hero{flex-direction:column;text-align:center}
   .fact-row{grid-template-columns:repeat(2,1fr)}
 }
@@ -659,7 +659,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <div class="map-kpis">
             <div class="map-kpi"><div class="lbl">Emplacados 2025</div><div class="val" id="mapCars">0</div><div class="sub">total eletrificados</div></div>
             <div class="map-kpi"><div class="lbl">Carregadores</div><div class="val" id="mapChargers">0</div><div class="sub">eletropostos mapeados</div></div>
-            <div class="map-kpi"><div class="lbl">Carros / carregador</div><div class="val" id="mapRatio">1:0</div><div class="sub" id="mapRatioSub">base total 2025</div></div>
+            <div class="map-kpi"><div class="lbl">Plug-in / carregador</div><div class="val" id="mapRatio">1:0</div><div class="sub" id="mapRatioSub">base estimada</div></div>
             <div class="map-kpi"><div class="lbl">Cobertura</div><div class="val" id="mapCoverage">0%</div><div class="sub" id="mapCoverageSub">municípios atendidos</div></div>
           </div>
           <div class="div"></div>
@@ -1247,11 +1247,11 @@ const MERCADO_NACIONAL = {
 };
 
 const MAP_POS = {
-  AC:[15,55], AM:[24,35], RR:[31,16], AP:[48,18], PA:[45,32], RO:[28,54], TO:[55,49],
-  MA:[65,36], PI:[70,43], CE:[78,43], RN:[84,45], PB:[82,49], PE:[79,52], AL:[78,56], SE:[76,60], BA:[68,63],
-  MT:[43,59], MS:[47,74], GO:[56,64], DF:[60,62],
-  MG:[64,73], ES:[73,73], RJ:[70,80], SP:[61,82],
-  PR:[57,89], SC:[60,94], RS:[55,98]
+  AC:[16,55], AM:[25,38], RR:[33,20], AP:[50,22], PA:[47,36], RO:[30,55], TO:[55,51],
+  MA:[65,39], PI:[70,45], CE:[76,45], RN:[81,48], PB:[80,51], PE:[78,54], AL:[77,57], SE:[76,60], BA:[68,65],
+  MT:[43,61], MS:[48,74], GO:[57,66], DF:[61,64],
+  MG:[64,74], ES:[72,74], RJ:[70,80], SP:[61,81],
+  PR:[58,87], SC:[61,91], RS:[58,96]
 };
 
 let estadoChart = null;
@@ -1283,7 +1283,7 @@ function renderMap() {
 
   pins.innerHTML = Object.entries(ESTADOS).map(([uf, e]) => {
     const pos = MAP_POS[uf];
-    const ratio = e.eletrif2025 / Math.max(e.eletropostos, 1);
+    const ratio = e.ratio;
     return `<button class="map-pin ${ratioClass(ratio)}" data-uf="${uf}" style="left:${pos[0]}%;top:${pos[1]}%" onclick="selectEstado('${uf}')"><span>${uf}</span><span class="map-rank">${e.rankNac}</span></button>`;
   }).join('');
 
@@ -1291,7 +1291,7 @@ function renderMap() {
     .sort((a,b) => b[1].eletrif2025 - a[1].eletrif2025)
     .slice(0, 8)
     .map(([uf, e], idx) => {
-      const ratio = e.eletrif2025 / Math.max(e.eletropostos, 1);
+      const ratio = e.ratio;
       return `<div class="map-row" onclick="selectEstado('${uf}')">
         <div class="uf">${idx + 1}º</div>
         <div><div class="name">${e.name}</div><div class="meta">${e.eletropostos.toLocaleString('pt-BR')} eletropostos · 1:${ratio.toFixed(1).replace('.', ',')}</div></div>
@@ -1305,7 +1305,7 @@ function updateMapSummary(sigla) {
   if (!e) return;
   const title = document.getElementById('mapTitle');
   if (!title) return;
-  const ratio = e.eletrif2025 / Math.max(e.eletropostos, 1);
+  const ratio = e.ratio;
   const coverage = e.municipiosCom / e.municipiosTotal * 100;
   title.textContent = e.name;
   document.getElementById('mapSubtitle').textContent = `${e.region} · ${e.capital}`;
@@ -1313,9 +1313,9 @@ function updateMapSummary(sigla) {
   document.getElementById('mapChargers').textContent = e.eletropostos.toLocaleString('pt-BR');
   document.getElementById('mapRatio').textContent = `1:${ratio.toFixed(1).replace('.', ',')}`;
   document.getElementById('mapCoverage').textContent = coverage.toFixed(0) + '%';
-  document.getElementById('mapRatioSub').textContent = `total 2025 / base ${MERCADO_NACIONAL.baseInfra}`;
+  document.getElementById('mapRatioSub').textContent = `plug-in estimado / base ${MERCADO_NACIONAL.baseInfra}`;
   document.getElementById('mapCoverageSub').textContent = `${e.municipiosCom} de ${e.municipiosTotal} municípios`;
-  document.getElementById('mapNote').innerHTML = `<strong>${e.name}</strong> teve <strong>${e.eletrif2025.toLocaleString('pt-BR')} eletrificados em 2025</strong> e <strong>${e.eletropostos.toLocaleString('pt-BR')} eletropostos</strong>. Para decisões de recarga, este ratio usa total eletrificado como visão de mercado; quando tivermos BEV+PHEV estadual fechado, o indicador fica mais preciso para demanda real de carregamento.`;
+  document.getElementById('mapNote').innerHTML = `<strong>${e.name}</strong> teve <strong>${e.eletrif2025.toLocaleString('pt-BR')} eletrificados em 2025</strong> e <strong>${e.eletropostos.toLocaleString('pt-BR')} eletropostos</strong>. O tamanho de mercado usa total eletrificado; o indicador carros x carregadores usa a base plug-in estimada, porque HEV não utiliza recarga na tomada.`;
 }
 
 function renderEstado(sigla) {
@@ -1331,7 +1331,7 @@ function renderEstado(sigla) {
   const ratioBrasilWidth = Math.min(MERCADO_NACIONAL.ratio / 30 * 100, 100).toFixed(0);
 
   const carsBase = e.eletrif2025;
-  const carChargerRatio = carsBase / Math.max(e.eletropostos, 1);
+  const carChargerRatio = e.ratio;
 
   // ratio color
   const ratioColor = carChargerRatio <= 10 ? 'var(--green)' : carChargerRatio <= 20 ? 'var(--amber)' : 'var(--red)';
@@ -1348,7 +1348,7 @@ function renderEstado(sigla) {
         <div class="ehero-badges">
           <span class="ebadge g">⚡ ${carsBase.toLocaleString('pt-BR')} eletrificados em 2025</span>
           <span class="ebadge b">🔌 ${e.eletropostos.toLocaleString('pt-BR')} eletropostos</span>
-          <span class="ebadge ${ratioTag}">Carros x carregador 1:${carChargerRatio.toFixed(1).replace('.',',')}</span>
+          <span class="ebadge ${ratioTag}">Plug-in x carregador 1:${carChargerRatio.toFixed(1).replace('.',',')}</span>
           ${e.janjun2026 ? `<span class="ebadge p">📈 ${e.janjun2026.toLocaleString('pt-BR')} BEVs em 2026 parcial</span>` : ''}
         </div>
       </div>
@@ -1370,7 +1370,7 @@ function renderEstado(sigla) {
       </div>
       <div class="fact">
         <div class="fact-val" style="color:${ratioColor}">1:${carChargerRatio.toFixed(1).replace('.',',')}</div>
-        <div class="fact-lbl">Total 2025 / carregadores ${carChargerRatio<=10?'✅ Equilibrado':'⚠️ Atenção'}</div>
+        <div class="fact-lbl">Plug-in estimado / carregadores ${carChargerRatio<=10?'✅ Equilibrado':'⚠️ Atenção'}</div>
       </div>
       <div class="fact">
         <div class="fact-val" style="color:var(--orange)">${e.municipiosCom}</div>
