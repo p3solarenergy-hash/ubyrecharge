@@ -579,12 +579,8 @@
       <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageIdleValueDaily"></canvas></div>
     </section>
 
-    <!-- Receita diária | Pagamento | Clientes pizza -->
-    <section class="section section-3" style="margin-top:18px">
-      <div class="card">
-        <h2>Receita por dia</h2>
-        <canvas id="dailyChart" aria-label="Receita por dia"></canvas>
-      </div>
+    <!-- Pagamento | Clientes pizza -->
+    <section class="section" style="margin-top:18px">
       <div class="card pie-card">
         <h2>Forma de pagamento</h2>
         <canvas id="paymentPie" aria-label="Forma de pagamento"></canvas>
@@ -3355,7 +3351,6 @@ function renderMensal() {
 
   renderHero(charges, mk, window);
   renderKPIs(charges, mk, window);
-  renderDailyChart(charges);
   renderPaymentChart(charges);
   renderUserPieChart(charges);
   renderUserBars(charges, 'userBars');
@@ -3421,39 +3416,6 @@ function renderKPIs(charges, mk, window) {
       <div class="value">${fmtKWh(energy)}</div>
       <div class="sub">projeção ${fmtKWh(energy * proj)}</div></div>
   `;
-}
-
-function renderDailyChart(charges) {
-  const byDay = {};
-  charges.forEach(c => {
-    if (!c.startDate) return;
-    const k = `${String(c.startDate.getDate()).padStart(2,'0')}/${String(c.startDate.getMonth()+1).padStart(2,'0')}`;
-    byDay[k] = (byDay[k] || 0) + c.revenue;
-  });
-  const keys = Object.keys(byDay).sort((a, b) => {
-    const [da,ma] = a.split('/').map(Number);
-    const [db,mb] = b.split('/').map(Number);
-    return ma !== mb ? ma - mb : da - db;
-  });
-
-  destroyChart('dailyChart');
-  const ctx = document.getElementById('dailyChart');
-  if (!ctx) return;
-  charts['dailyChart'] = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: keys,
-      datasets: [{ label: 'Receita (R$)', data: keys.map(k => +byDay[k].toFixed(2)), backgroundColor: '#57B7FF', borderRadius: 4, yAxisID: 'y' }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { color: '#8FA39A' } } },
-      scales: {
-        y: { beginAtZero: true, ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } },
-        x: { ticks: { color: '#8FA39A', autoSkip: false, maxRotation: 45 }, grid: { color: '#24364E' } }
-      }
-    }
-  });
 }
 
 function renderPaymentChart(charges) {
