@@ -33,6 +33,8 @@ header{
 }
 body.uby-shell header{top:54px}
 body.uby-shell .page{padding-top:22px}
+#pestado{padding-top:96px}
+body.uby-shell #pestado{padding-top:118px}
 .hrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .brand{display:flex;align-items:center;gap:12px}
 .brand-icon{
@@ -280,7 +282,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
     <div class="hright">
       <div class="live"><div class="dot"></div>Dados atualizados</div>
-      <div class="hmeta">maio/2026 · ABVE · Canal VE · CNN Brasil</div>
+      <div class="hmeta">junho/2026 · ABVE · Canal VE · CNN Brasil</div>
     </div>
   </div>
   <div class="tabs">
@@ -295,10 +297,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <div class="page active" id="p2026">
 
   <div class="kstrip">
-    <div class="kpi g"><div class="kpi-lbl">Emplacamentos Jan–Abr 2026</div><div class="kpi-num" data-count="122463" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 65,5%</span> vs mesmo período 2025</div></div>
-    <div class="kpi b"><div class="kpi-lbl">BEV puro Jan–Abr 2026</div><div class="kpi-num" data-count="48514" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 174%</span> vs Jan–Abr 2025 (17.695 un.)</div></div>
-    <div class="kpi o"><div class="kpi-lbl">Share de mercado Abr/26</div><div class="kpi-num" data-count="16.2" data-fmt="p">0</div><div class="kpi-note">Era 9% no fechamento de 2025</div></div>
-    <div class="kpi p"><div class="kpi-lbl">Projeção anual 2026</div><div class="kpi-num" data-count="300" data-fmt="k">0</div><div class="kpi-note"><span class="tag up">▲ 34%</span> vs 223.912 em 2025</div></div>
+    <div class="kpi g"><div class="kpi-lbl">Emplacamentos Jan–Mai 2026</div><div class="kpi-num" data-count="167444" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ forte aceleração</span> maio foi novo recorde</div></div>
+    <div class="kpi b"><div class="kpi-lbl">BEV puro Jan–Mai 2026</div><div class="kpi-num" data-count="69488" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 198%</span> maio/26 vs maio/25</div></div>
+    <div class="kpi o"><div class="kpi-lbl">Share de mercado Mai/26</div><div class="kpi-num" data-count="17" data-fmt="p">0</div><div class="kpi-note">Era 7,8% em maio/2025</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Ritmo anualizado 2026</div><div class="kpi-num" data-count="400" data-fmt="k">0</div><div class="kpi-note"><span class="tag up">▲ acima de 2025</span> base Jan–Mai</div></div>
   </div>
 
   <div class="g3">
@@ -306,7 +308,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="card">
       <div class="ch">
         <div><div class="ct">Emplacamentos Mensais — 2026</div><div class="cs">Total eletrificados · BEV puro · Share de mercado (%)</div></div>
-        <span class="tag up">📈 +63% em 4 meses</span>
+        <span class="tag up">📈 maio: 44.981 unidades</span>
       </div>
       <div class="cb"><canvas id="cMensal" height="230"></canvas></div>
     </div>
@@ -314,15 +316,15 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="col">
       <div class="ins g">
         <div class="ins-icon">🏆</div>
-        <div class="ins-val">38.516</div>
-        <div class="ins-lbl">Recorde histórico — Abril</div>
-        <div class="ins-note">Maior volume mensal já registrado · 16,2% do mercado total de leves no Brasil</div>
+        <div class="ins-val">44.981</div>
+        <div class="ins-lbl">Recorde histórico — Maio</div>
+        <div class="ins-note">17% do mercado total de leves no Brasil · +16,8% vs abril</div>
       </div>
       <div class="ins b">
         <div class="ins-icon">⚡</div>
-        <div class="ins-val">+174%</div>
+        <div class="ins-val">20.974</div>
         <div class="ins-lbl">BEV puro acelera forte</div>
-        <div class="ins-note">Quase 3× mais veículos 100% elétricos em 4 meses vs mesmo período 2025</div>
+        <div class="ins-note">BEVs foram 47% dos eletrificados em maio · +20% vs abril</div>
       </div>
       <div class="ins o">
         <div class="ins-icon">📅</div>
@@ -338,21 +340,21 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="col">
       <!-- Market share donut 2026 -->
       <div class="card">
-        <div class="ch"><div><div class="ct">Market share BEV — 2026</div><div class="cs">Por fabricante · Jan–Abr</div></div></div>
+        <div class="ch"><div><div class="ct">Market share BEV — 1º trimestre 2026</div><div class="cs">Por fabricante · ranking BEV</div></div></div>
         <div class="cb">
           <div class="dw">
             <div class="dc"><canvas id="cMarca" width="140" height="140"></canvas></div>
             <div class="lg">
-              <div class="li"><div class="ld" style="background:var(--blue)"></div><span class="ll">BYD</span><span class="lv">68,4%</span></div>
-              <div class="li"><div class="ld" style="background:var(--green)"></div><span class="ll">Geely</span><span class="lv">15,1%</span></div>
-              <div class="li"><div class="ld" style="background:var(--orange)"></div><span class="ll">GM</span><span class="lv">7,0%</span></div>
-              <div class="li"><div class="ld" style="background:rgba(148,163,184,.3)"></div><span class="ll">Outros</span><span class="lv">9,5%</span></div>
+              <div class="li"><div class="ld" style="background:var(--blue)"></div><span class="ll">BYD</span><span class="lv">69,4%</span></div>
+              <div class="li"><div class="ld" style="background:var(--green)"></div><span class="ll">Geely</span><span class="lv">10,1%</span></div>
+              <div class="li"><div class="ld" style="background:var(--orange)"></div><span class="ll">GM</span><span class="lv">5,4%</span></div>
+              <div class="li"><div class="ld" style="background:rgba(148,163,184,.3)"></div><span class="ll">Outros</span><span class="lv">15,1%</span></div>
             </div>
           </div>
           <div class="div"></div>
           <div class="alert i" style="margin-bottom:0">
             <div class="ai">📈</div>
-            <div><div class="at">Geely dobrou seu share</div><div class="ab">EX2 e EX5 elevaram Geely de <strong>7% (2025) → 15% (2026)</strong>. Principal rival da BYD no segmento acessível.</div></div>
+            <div><div class="at">BYD lidera, Geely pressiona no acesso</div><div class="ab">Dolphin Mini e Dolphin mantêm a BYD dominante, mas o <strong>EX2 já entrou no top 3</strong> e virou o principal sinal competitivo no segmento de entrada.</div></div>
           </div>
         </div>
       </div>
@@ -361,7 +363,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <!-- Tabela ranking -->
     <div class="card">
       <div class="ch">
-        <div><div class="ct">Ranking BEV — Acumulado Jan–Abr 2026</div><div class="cs">Apenas veículos 100% elétricos · Fonte: ABVE / Canal VE</div></div>
+        <div><div class="ct">Ranking BEV — 1º trimestre 2026</div><div class="cs">Apenas veículos 100% elétricos · Fonte: ABVE / Canal VE</div></div>
       </div>
       <div class="cb0">
         <table>
@@ -374,57 +376,57 @@ tr:hover td{background:rgba(255,255,255,.02)}
               <td class="rk">🥇</td>
               <td><div class="mn">Dolphin Mini</div></td>
               <td><span class="chip c-byd">BYD</span></td>
-              <td class="nc">21.637</td>
-              <td><div class="bar-r"><div class="pct">44,6%</div><div class="br"><div class="bf" style="width:100%;background:linear-gradient(90deg,var(--blue),var(--teal))"></div></div></div></td>
+              <td class="nc">14.757</td>
+              <td><div class="bar-r"><div class="pct">47,6%</div><div class="br"><div class="bf" style="width:100%;background:linear-gradient(90deg,var(--blue),var(--teal))"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">🥈</td>
               <td><div class="mn">Dolphin</div></td>
               <td><span class="chip c-byd">BYD</span></td>
-              <td class="nc">7.403</td>
-              <td><div class="bar-r"><div class="pct">15,3%</div><div class="br"><div class="bf" style="width:34%;background:var(--blue)"></div></div></div></td>
+              <td class="nc">4.381</td>
+              <td><div class="bar-r"><div class="pct">14,1%</div><div class="br"><div class="bf" style="width:30%;background:var(--blue)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">🥉</td>
-              <td><div class="mn">EX2<span class="new-badge">↑ Surpresa</span></div><div class="msub">Subiu 2 posições vs 2025</div></td>
+              <td><div class="mn">EX2<span class="new-badge">↑ Surpresa</span></div><div class="msub">Geely entrou forte no top 3</div></td>
               <td><span class="chip c-geely">Geely</span></td>
-              <td class="nc">6.076</td>
-              <td><div class="bar-r"><div class="pct">12,5%</div><div class="br"><div class="bf" style="width:28%;background:var(--green)"></div></div></div></td>
+              <td class="nc">2.474</td>
+              <td><div class="bar-r"><div class="pct">8,0%</div><div class="br"><div class="bf" style="width:17%;background:var(--green)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">4</td>
               <td><div class="mn">Yuan Pro</div></td>
               <td><span class="chip c-byd">BYD</span></td>
-              <td class="nc">2.975</td>
-              <td><div class="bar-r"><div class="pct">6,1%</div><div class="br"><div class="bf" style="width:14%;background:var(--blue)"></div></div></div></td>
+              <td class="nc">1.575</td>
+              <td><div class="bar-r"><div class="pct">5,1%</div><div class="br"><div class="bf" style="width:11%;background:var(--blue)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">5</td>
-              <td><div class="mn">Spark EUV<span class="up-badge">1k+ em abr</span></div></td>
+              <td><div class="mn">Spark EUV</div></td>
               <td><span class="chip c-gm">GM</span></td>
-              <td class="nc">1.984</td>
-              <td><div class="bar-r"><div class="pct">4,1%</div><div class="br"><div class="bf" style="width:9%;background:var(--orange)"></div></div></div></td>
+              <td class="nc">984</td>
+              <td><div class="bar-r"><div class="pct">3,2%</div><div class="br"><div class="bf" style="width:7%;background:var(--orange)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">6</td>
               <td><div class="mn">Captiva EV</div></td>
               <td><span class="chip c-gm">GM</span></td>
-              <td class="nc">1.401</td>
-              <td><div class="bar-r"><div class="pct">2,9%</div><div class="br"><div class="bf" style="width:6%;background:var(--orange)"></div></div></div></td>
+              <td class="nc">701</td>
+              <td><div class="bar-r"><div class="pct">2,3%</div><div class="br"><div class="bf" style="width:5%;background:var(--orange)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">7</td>
               <td><div class="mn">EX5<span class="new-badge">Estreia</span></div><div class="msub">Novo modelo Geely em 2026</div></td>
               <td><span class="chip c-geely">Geely</span></td>
-              <td class="nc">1.260</td>
-              <td><div class="bar-r"><div class="pct">2,6%</div><div class="br"><div class="bf" style="width:6%;background:var(--green)"></div></div></div></td>
+              <td class="nc">660</td>
+              <td><div class="bar-r"><div class="pct">2,1%</div><div class="br"><div class="bf" style="width:4.5%;background:var(--green)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">8</td>
               <td><div class="mn">Seal</div></td>
               <td><span class="chip c-byd">BYD</span></td>
-              <td class="nc">841</td>
-              <td><div class="bar-r"><div class="pct">1,7%</div><div class="br"><div class="bf" style="width:4%;background:var(--blue)"></div></div></div></td>
+              <td class="nc">441</td>
+              <td><div class="bar-r"><div class="pct">1,4%</div><div class="br"><div class="bf" style="width:3%;background:var(--blue)"></div></div></div></td>
             </tr>
           </tbody>
         </table>
@@ -483,46 +485,46 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <div class="page" id="pcharge">
 
   <div class="kstrip">
-    <div class="kpi g"><div class="kpi-lbl">Eletropostos (fev/26)</div><div class="kpi-num" data-count="21061" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 42%</span> em 12 meses</div></div>
-    <div class="kpi b"><div class="kpi-lbl">Carregadores DC rápidos</div><div class="kpi-num" data-count="6479" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 167%</span> em 12 meses</div></div>
-    <div class="kpi o"><div class="kpi-lbl">Municípios cobertos</div><div class="kpi-num" data-count="1649" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 21%</span> · 5.451 ainda sem ponto</div></div>
-    <div class="kpi p"><div class="kpi-lbl">Ratio veículo/carregador</div><div class="kpi-num" style="font-size:24px;padding-top:4px" data-count="19.6" data-fmt="r">0</div><div class="kpi-note"><span class="tag warn">⚠ Meta: 1:10</span> · gap ainda crítico</div></div>
+    <div class="kpi g"><div class="kpi-lbl">Eletropostos (mai/26)</div><div class="kpi-num" data-count="25429" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 20,7%</span> vs fev/26</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Carregadores DC rápidos</div><div class="kpi-num" data-count="8601" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 32,8%</span> em 3 meses</div></div>
+    <div class="kpi o"><div class="kpi-lbl">Municípios cobertos</div><div class="kpi-num" data-count="1788" data-fmt="n">0</div><div class="kpi-note"><span class="tag up">▲ 8,4%</span> vs fev/26</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Ratio plug-in/carregador</div><div class="kpi-num" style="font-size:24px;padding-top:4px" data-count="19.9" data-fmt="r">0</div><div class="kpi-note"><span class="tag warn">⚠ Meta: 1:10</span> · gap ainda crítico</div></div>
   </div>
 
   <!-- Alertas principais -->
   <div class="alert r">
     <div class="ai">🔴</div>
-    <div><div class="at">Gap de infraestrutura crítico</div><div class="ab">Com <strong>48.514 BEVs emplacados só em Jan–Abr 2026</strong>, a frota elétrica cresce muito mais rápido que a rede de carregadores. Ao ritmo atual, o Brasil precisaria adicionar <strong>~16.000 novos pontos</strong> para atingir o padrão 1:10 — o dobro do que existe hoje.</div></div>
+    <div><div class="at">Gap de infraestrutura crítico</div><div class="ab">Com <strong>505.806 veículos plug-in</strong> na frota acumulada até maio/2026, a rede de <strong>25.429 pontos</strong> ainda opera perto de <strong>1:19,9</strong>. Para chegar ao padrão 1:10, o Brasil precisaria de cerca de <strong>50,6 mil pontos</strong>.</div></div>
   </div>
 
   <!-- GAP ANALYSIS VISUAL -->
   <div class="gap-wrap">
     <div class="gap-title">🎯 Análise de Déficit — Quantos carregadores o Brasil precisa?</div>
-    <div class="gap-sub">Comparativo: rede atual vs meta setorial (1 carregador : 10 veículos) · Base fev/2026</div>
+    <div class="gap-sub">Comparativo: rede atual vs meta setorial (1 carregador : 10 veículos plug-in) · Base maio/2026</div>
 
     <div class="slbl">Rede atual vs necessidade estimada</div>
     <div class="gap-bar-wrap">
       <div style="font-size:11px;color:var(--muted2);margin-bottom:5px">Carregadores instalados hoje</div>
       <div class="gap-track">
         <div class="gap-fill" style="width:51%;background:linear-gradient(90deg,var(--green),var(--teal));color:#000">
-          21.061 instalados
+          25.429 instalados
         </div>
-        <div class="gap-label">Meta: ~41.000</div>
+        <div class="gap-label">Meta: ~50.600</div>
       </div>
     </div>
     <div class="gap-bar-wrap">
       <div style="font-size:11px;color:var(--muted2);margin-bottom:5px">Déficit atual estimado</div>
       <div class="gap-track">
         <div class="gap-fill" style="width:49%;background:linear-gradient(90deg,var(--red),var(--orange));color:#fff">
-          ~19.939 em falta (49%)
+          ~25.200 em falta (50%)
         </div>
       </div>
     </div>
-    <div class="gap-scale"><span>0</span><span>10k</span><span>20k</span><span>30k</span><span>40k</span><span>41k (meta)</span></div>
+    <div class="gap-scale"><span>0</span><span>10k</span><span>20k</span><span>30k</span><span>40k</span><span>50,6k (meta)</span></div>
 
     <div class="gap-need">
       <div class="gn">
-        <div class="gn-val" style="color:var(--red)">~20k</div>
+        <div class="gn-val" style="color:var(--red)">~25k</div>
         <div class="gn-lbl">pontos em déficit hoje</div>
       </div>
       <div class="gn">
@@ -530,19 +532,19 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <div class="gn-lbl">ritmo necessário para fechar o gap até 2028</div>
       </div>
       <div class="gn">
-        <div class="gn-val" style="color:var(--green)">~420/mês</div>
-        <div class="gn-lbl">ritmo atual de instalações (jan–fev 2026)</div>
+        <div class="gn-val" style="color:var(--green)">~1.456/mês</div>
+        <div class="gn-lbl">ritmo fev–mai 2026</div>
       </div>
     </div>
   </div>
 
   <div class="istrip">
-    <div class="ins g"><div class="ins-icon">📈</div><div class="ins-val">+42%</div><div class="ins-lbl">Crescimento total da rede</div><div class="ins-note">14.827 → 21.061 eletropostos em 12 meses (fev/25→fev/26)</div></div>
-    <div class="ins b"><div class="ins-icon">⚡</div><div class="ins-val">31%</div><div class="ins-lbl">Rede já é DC rápido</div><div class="ins-note">Era 17% há 1 ano — a rede está claramente migrando para carga rápida</div></div>
-    <div class="ins t"><div class="ins-icon">🗺️</div><div class="ins-val">+74,5%</div><div class="ins-lbl">Maior crescimento: Norte</div><div class="ins-note">47 → 82 municípios cobertos — expansão regional mais acelerada do país</div></div>
-    <div class="ins p"><div class="ins-icon">🏙️</div><div class="ins-val">21%</div><div class="ins-lbl">SP concentra a rede</div><div class="ins-note">4.500 dos 21.061 pontos estão em São Paulo — desigualdade estrutural</div></div>
-    <div class="ins o"><div class="ins-icon">🎯</div><div class="ins-val">25 mil</div><div class="ins-lbl">Meta dez/2026</div><div class="ins-note">+19% sobre fev/26 — foco em corredores interurbanos e Nordeste</div></div>
-    <div class="ins r"><div class="ins-icon">🔴</div><div class="ins-val">1:19,6</div><div class="ins-lbl">Ratio atual</div><div class="ins-note">Quase 2x acima do ideal (1:10). Se EVs crescem +65%, o gap se aprofunda</div></div>
+    <div class="ins g"><div class="ins-icon">📈</div><div class="ins-val">+20,7%</div><div class="ins-lbl">Crescimento trimestral da rede</div><div class="ins-note">21.060 → 25.429 pontos entre fev/26 e mai/26</div></div>
+    <div class="ins b"><div class="ins-icon">⚡</div><div class="ins-val">33,8%</div><div class="ins-lbl">Rede já é DC rápido</div><div class="ins-note">8.601 pontos DC; eram 6.479 em fevereiro</div></div>
+    <div class="ins t"><div class="ins-icon">🗺️</div><div class="ins-val">+30,7%</div><div class="ins-lbl">Maior crescimento: Norte</div><div class="ins-note">657 → 859 pontos totais em três meses</div></div>
+    <div class="ins p"><div class="ins-icon">🏙️</div><div class="ins-val">11.079</div><div class="ins-lbl">Sudeste lidera a rede</div><div class="ins-note">Maior base instalada; crescimento de 18,1% no trimestre</div></div>
+    <div class="ins o"><div class="ins-icon">🎯</div><div class="ins-val">1.788</div><div class="ins-lbl">Municípios atendidos</div><div class="ins-note">139 novos municípios com infraestrutura desde fevereiro</div></div>
+    <div class="ins r"><div class="ins-icon">🔴</div><div class="ins-val">1:19,9</div><div class="ins-lbl">Ratio atual</div><div class="ins-note">Quase 2x acima do ideal; frota plug-in chegou a 505,8 mil</div></div>
   </div>
 
   <div class="g2">
@@ -551,48 +553,48 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <div class="cb"><canvas id="cEletro" height="230"></canvas></div>
     </div>
     <div class="card">
-      <div class="ch"><div><div class="ct">AC vs DC — Composição e Crescimento</div><div class="cs">Composição fev/2026 · Evolução dos DC rápidos</div></div></div>
+      <div class="ch"><div><div class="ct">AC vs DC — Composição e Crescimento</div><div class="cs">Composição maio/2026 · Evolução dos DC rápidos</div></div></div>
       <div class="cb">
         <div class="dw" style="margin-bottom:16px">
           <div class="dc"><canvas id="cDcAc" width="150" height="150"></canvas></div>
           <div class="lg">
-            <div class="li"><div class="ld" style="background:var(--blue)"></div><span class="ll">AC lento / semirápido</span><span class="lv">14.582</span><span class="lp">69%</span></div>
-            <div class="li"><div class="ld" style="background:var(--green)"></div><span class="ll">DC rápido / ultrarrápido</span><span class="lv">6.479</span><span class="lp">31%</span></div>
+            <div class="li"><div class="ld" style="background:var(--blue)"></div><span class="ll">AC lento / semirápido</span><span class="lv">16.828</span><span class="lp">66%</span></div>
+            <div class="li"><div class="ld" style="background:var(--green)"></div><span class="ll">DC rápido / ultrarrápido</span><span class="lv">8.601</span><span class="lp">34%</span></div>
           </div>
         </div>
         <div class="div"></div>
-        <div class="slbl">Evolução DC rápidos (12 meses)</div>
+        <div class="slbl">Evolução DC rápidos</div>
         <div class="pw"><div class="ph"><span class="pl">Fev/2025</span><span class="pv">2.430</span></div><div class="pb"><div class="pf" style="width:37%;background:var(--muted)"></div></div></div>
-        <div class="pw"><div class="ph"><span class="pl">Ago/2025</span><span class="pv">3.800</span></div><div class="pb"><div class="pf" style="width:59%;background:rgba(79,163,255,.5)"></div></div></div>
-        <div class="pw"><div class="ph"><span class="pl">Fev/2026 <span class="tag up">▲ 167%</span></span><span class="pv">6.479</span></div><div class="pb"><div class="pf" style="width:100%;background:linear-gradient(90deg,var(--green),var(--teal))"></div></div></div>
+        <div class="pw"><div class="ph"><span class="pl">Fev/2026</span><span class="pv">6.479</span></div><div class="pb"><div class="pf" style="width:75%;background:rgba(79,163,255,.5)"></div></div></div>
+        <div class="pw"><div class="ph"><span class="pl">Mai/2026 <span class="tag up">▲ 32,8%</span></span><span class="pv">8.601</span></div><div class="pb"><div class="pf" style="width:100%;background:linear-gradient(90deg,var(--green),var(--teal))"></div></div></div>
       </div>
     </div>
   </div>
 
   <div class="card" style="margin-bottom:16px">
-    <div class="ch"><div><div class="ct">Distribuição Regional e Crescimento (12 meses)</div><div class="cs">Eletropostos por estado/região · fev/2026</div></div></div>
+    <div class="ch"><div><div class="ct">Distribuição Regional e Crescimento</div><div class="cs">Eletropostos por região · maio/2026</div></div></div>
     <div class="cb">
       <div class="g2" style="margin-bottom:0">
         <div><canvas id="cRegiao" height="230"></canvas></div>
         <div>
-          <div class="slbl">Crescimento regional (fev/25 → fev/26)</div>
-          <div class="pw"><div class="ph"><span class="pl">🟢 Norte</span><span class="pv" style="color:var(--green)">▲ 74,5%</span></div><div class="pb"><div class="pf" style="width:100%;background:var(--green)"></div></div></div>
-          <div class="pw"><div class="ph"><span class="pl">🔵 Nordeste</span><span class="pv" style="color:var(--blue)">▲ 26,4%</span></div><div class="pb"><div class="pf" style="width:35%;background:var(--blue)"></div></div></div>
-          <div class="pw"><div class="ph"><span class="pl">🟡 Centro-Oeste</span><span class="pv" style="color:var(--amber)">▲ 25,6%</span></div><div class="pb"><div class="pf" style="width:34%;background:var(--amber)"></div></div></div>
-          <div class="pw"><div class="ph"><span class="pl">🟠 Sul</span><span class="pv" style="color:var(--orange)">▲ 40%</span></div><div class="pb"><div class="pf" style="width:54%;background:var(--orange)"></div></div></div>
-          <div class="pw"><div class="ph"><span class="pl">⚪ Sudeste</span><span class="pv" style="color:var(--muted2)">▲ 35%</span></div><div class="pb"><div class="pf" style="width:47%;background:var(--muted2)"></div></div></div>
-          <div class="pw"><div class="ph"><span class="pl">🌐 Brasil (média)</span><span class="pv" style="color:var(--green)">▲ 42%</span></div><div class="pb"><div class="pf" style="width:57%;background:linear-gradient(90deg,var(--green),var(--blue))"></div></div></div>
+          <div class="slbl">Crescimento regional (fev/26 → mai/26)</div>
+          <div class="pw"><div class="ph"><span class="pl">⚪ Sudeste</span><span class="pv" style="color:var(--muted2)">11.079 · ▲ 18,1%</span></div><div class="pb"><div class="pf" style="width:100%;background:var(--muted2)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">🟠 Sul</span><span class="pv" style="color:var(--orange)">6.115 · ▲ 23,4%</span></div><div class="pb"><div class="pf" style="width:55%;background:var(--orange)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">🔵 Nordeste</span><span class="pv" style="color:var(--blue)">4.542 · ▲ 20,5%</span></div><div class="pb"><div class="pf" style="width:41%;background:var(--blue)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">🟡 Centro-Oeste</span><span class="pv" style="color:var(--amber)">2.840 · ▲ 23,7%</span></div><div class="pb"><div class="pf" style="width:26%;background:var(--amber)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">🟢 Norte</span><span class="pv" style="color:var(--green)">859 · ▲ 30,7%</span></div><div class="pb"><div class="pf" style="width:8%;background:var(--green)"></div></div></div>
+          <div class="pw"><div class="ph"><span class="pl">🌐 Brasil</span><span class="pv" style="color:var(--green)">25.429 · ▲ 20,7%</span></div><div class="pb"><div class="pf" style="width:100%;background:linear-gradient(90deg,var(--green),var(--blue))"></div></div></div>
           <div class="div"></div>
           <div class="alert i" style="margin-bottom:0">
             <div class="ai">💡</div>
-            <div><div class="at">Oportunidade: interior e rotas interurbanas</div><div class="ab"><strong>98% dos municípios</strong> (5.451 cidades) ainda não têm eletroposto. O foco da expansão 2026 são corredores BR-116, BR-101 e regiões produtoras de agronegócio.</div></div>
+            <div><div class="at">Oportunidade: interior e rotas interurbanas</div><div class="ab"><strong>3.782 municípios</strong> ainda não têm eletroposto. A expansão de 2026 está saindo das capitais e entrando em cidades médias, turismo e corredores logísticos.</div></div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="src">📌 <a href="https://abve.org.br/recarga-publica-rapida-cresce-167-em-12-meses-e-ja-atinge-31-dos-21-mil-eletropostos-da-rede/">ABVE</a> · <a href="https://www.otempo.com.br/autotempo/2026/3/4/brasil-atinge-21-mil-eletropostos-carregadores-rapidos-crescem-166">O Tempo</a> · <a href="https://alphaautos.com.br/2026/04/mobilidade-eletrica-exige-atencao-na-infraestrutura-de-recarga">Alpha Autos</a> · <a href="https://hitech-e.com.br/2026/02/23/expansao-infraestrutura-carregamento/">Hitech-e</a></div>
+  <div class="src">📌 <a href="https://abve.org.br/recarga-rapida-dc-cresce-33-em-tres-meses-e-puxa-a-expansao-da-rede/">ABVE / Tupi - maio 2026</a></div>
 </div>
 
 <!-- ═══════ PAGE POR ESTADO ═══════ -->
@@ -715,17 +717,17 @@ const gradG = makeGrad(ctxM,'rgba(29,233,128,0.45)','rgba(29,233,128,0.02)');
 
 const cMensal = new Chart(ctxM, {
   data:{
-    labels:['Janeiro','Fevereiro','Março','Abril'],
+    labels:['Janeiro','Fevereiro','Março','Abril','Maio'],
     datasets:[
-      {type:'bar',label:'Total eletrificados',data:[23706,24885,35356,38516],
-       backgroundColor:['rgba(79,163,255,0.55)','rgba(79,163,255,0.55)','rgba(79,163,255,0.75)','rgba(79,163,255,0.9)'],
+      {type:'bar',label:'Total eletrificados',data:[23706,24885,35356,38516,44981],
+       backgroundColor:['rgba(79,163,255,0.55)','rgba(79,163,255,0.55)','rgba(79,163,255,0.72)','rgba(79,163,255,0.82)','rgba(79,163,255,0.95)'],
        borderRadius:7,borderSkipped:false,yAxisID:'y',order:2},
-      {type:'bar',label:'BEV puro',data:[10200,11400,13200,13714],
-       backgroundColor:['rgba(29,233,128,0.5)','rgba(29,233,128,0.5)','rgba(29,233,128,0.7)','rgba(29,233,128,0.85)'],
+      {type:'bar',label:'BEV puro',data:[8250,8703,14073,17488,20974],
+       backgroundColor:['rgba(29,233,128,0.5)','rgba(29,233,128,0.55)','rgba(29,233,128,0.7)','rgba(29,233,128,0.82)','rgba(29,233,128,0.95)'],
        borderRadius:7,borderSkipped:false,yAxisID:'y',order:3},
-      {type:'line',label:'Share mercado',data:[10.2,10.8,14.0,16.2],
+      {type:'line',label:'Share mercado',data:[14.6,14.1,13.7,16.2,17.0],
        borderColor:C.o,backgroundColor:'transparent',borderWidth:2.5,
-       pointBackgroundColor:[C.o,C.o,C.o,'#fff'],pointRadius:[4,4,4,6],pointBorderColor:C.o,pointBorderWidth:2,
+       pointBackgroundColor:[C.o,C.o,C.o,C.o,'#fff'],pointRadius:[4,4,4,4,6],pointBorderColor:C.o,pointBorderWidth:2,
        tension:0.35,yAxisID:'y2',order:1}
     ]
   },
@@ -763,9 +765,9 @@ const cMensal = new Chart(ctxM, {
       ctx.fill();ctx.stroke();
       ctx.fillStyle=C.o;ctx.font='bold 10px sans-serif';ctx.textAlign='center';
       ctx.fillText('📍 +146% vs mar/25', xMar, yMar-11);
-      // "Recorde" on April
-      const xAbr = x.getPixelForValue(3);
-      const yAbr = y.getPixelForValue(38516);
+      // "Recorde" on May
+      const xAbr = x.getPixelForValue(4);
+      const yAbr = y.getPixelForValue(44981);
       ctx.fillStyle='rgba(29,233,128,0.12)';
       ctx.strokeStyle=C.g;ctx.lineWidth=1;
       roundRect(ctx, xAbr-38, yAbr-26, 76, 20, 5);
@@ -1341,7 +1343,7 @@ new Chart(document.getElementById('cMarca'),{
   type:'doughnut',
   data:{
     labels:['BYD','Geely','GM','Outros'],
-    datasets:[{data:[68.4,15.1,7.0,9.5],
+    datasets:[{data:[69.4,10.1,5.4,15.1],
       backgroundColor:[C.b,C.g,C.o,'rgba(148,163,184,0.25)'],
       borderColor:'rgba(0,0,0,0)',borderWidth:4,hoverOffset:6}]
   },
@@ -1355,7 +1357,7 @@ new Chart(ctxA,{
   data:{
     labels:['2021','2022','2023','2024','2025','2026*'],
     datasets:[{
-      data:[34500,49245,93927,177358,223912,300000],
+      data:[34500,49245,93927,177358,223912,400000],
       backgroundColor:[C.mu,C.mu,'rgba(148,163,184,0.4)',
         'rgba(79,163,255,0.6)','rgba(29,233,128,0.8)','rgba(29,233,128,0.3)'],
       borderRadius:8,borderSkipped:false,
@@ -1373,7 +1375,7 @@ new Chart(ctxA,{
     id:'yrlabels',afterDraw(chart){
       const {ctx,scales:{x,y}}=chart;
       const vals=[34500,49245,93927,177358,223912,null];
-      const growths=[null,'+43%','+91%','+89%','+26%','▲Proj'];
+      const growths=[null,'+43%','+91%','+89%','+26%','Proj'];
       vals.forEach((v,i)=>{
         if(!v)return;
         const xp=x.getPixelForValue(i), yp=y.getPixelForValue(v);
@@ -1390,9 +1392,9 @@ const gradS = makeGrad(ctxS,'rgba(255,140,66,0.25)','rgba(255,140,66,0.01)');
 new Chart(ctxS,{
   type:'line',
   data:{
-    labels:['2021','2022','2023','2024','2025\n(média)','Dez/25','Abr/26'],
+    labels:['2021','2022','2023','2024','2025\n(média)','Dez/25','Mai/26'],
     datasets:[{
-      data:[0.9,1.8,3.5,7.5,9.0,13.0,16.2],
+      data:[0.9,1.8,3.5,7.5,9.0,13.0,17.0],
       borderColor:C.o,backgroundColor:gradS,borderWidth:2.5,fill:true,tension:0.4,
       pointBackgroundColor:[C.o,C.o,C.o,C.o,C.o,C.o,'#fff'],
       pointRadius:[4,4,4,4,4,4,7],pointBorderColor:C.o,pointBorderWidth:2,
@@ -1409,9 +1411,9 @@ new Chart(ctxS,{
   plugins:[{
     id:'sharelabel',afterDraw(chart){
       const {ctx,scales:{x,y}}=chart;
-      const xp=x.getPixelForValue(6), yp=y.getPixelForValue(16.2);
+      const xp=x.getPixelForValue(6), yp=y.getPixelForValue(17.0);
       ctx.save();ctx.fillStyle=C.o;ctx.font='bold 11px sans-serif';ctx.textAlign='left';
-      ctx.fillText('16,2%',xp+8,yp+4);ctx.restore();
+      ctx.fillText('17,0%',xp+8,yp+4);ctx.restore();
     }
   }]
 });
@@ -1420,9 +1422,9 @@ new Chart(ctxS,{
 new Chart(document.getElementById('cGrowth'),{
   type:'bar',
   data:{
-    labels:['2022','2023','2024','2025','Jan-Abr 2026'],
+    labels:['2022','2023','2024','2025','Mai/26'],
     datasets:[{
-      data:[42.7,90.7,88.8,26.3,65.5],
+      data:[42.7,90.7,88.8,26.3,170.3],
       backgroundColor:[C.mu,C.mu,C.b,'rgba(29,233,128,0.6)',C.o],
       borderRadius:8,borderSkipped:false,
     }]
@@ -1453,12 +1455,12 @@ const gradE2 = makeGrad(ctxE,'rgba(79,163,255,0.15)','rgba(79,163,255,0.01)');
 new Chart(ctxE,{
   type:'line',
   data:{
-    labels:['Jan/24','Ago/24','Fev/25','Ago/25','Fev/26','Dez/26*'],
+    labels:['Jan/24','Ago/24','Fev/25','Fev/26','Mai/26','Dez/26*'],
     datasets:[
-      {label:'Total eletropostos',data:[7800,10000,14827,16880,21061,25000],
+      {label:'Total eletropostos',data:[7800,10000,14827,21060,25429,30000],
         borderColor:C.g,backgroundColor:gradE1,borderWidth:2.5,fill:true,tension:0.35,
         pointBackgroundColor:C.g,pointRadius:[4,4,4,4,6,4],pointBorderColor:'rgba(0,0,0,0)'},
-      {label:'DC rápidos',data:[900,1500,2430,3800,6479,9000],
+      {label:'DC rápidos',data:[900,1500,2430,6479,8601,10500],
         borderColor:C.b,backgroundColor:gradE2,borderWidth:2,fill:true,tension:0.35,
         pointBackgroundColor:C.b,pointRadius:4,borderDash:[6,3],pointBorderColor:'rgba(0,0,0,0)'}
     ]
@@ -1480,11 +1482,11 @@ new Chart(ctxE,{
   plugins:[{
     id:'dcLabel',afterDraw(chart){
       const {ctx,scales:{x,y}}=chart;
-      const xp=x.getPixelForValue(4), yp=y.getPixelForValue(6479);
+      const xp=x.getPixelForValue(4), yp=y.getPixelForValue(8601);
       ctx.save();ctx.fillStyle='rgba(79,163,255,0.15)';ctx.strokeStyle=C.b;ctx.lineWidth=1;
       roundRect(ctx,xp-36,yp-24,72,18,5);ctx.fill();ctx.stroke();
       ctx.fillStyle=C.b;ctx.font='bold 9px sans-serif';ctx.textAlign='center';
-      ctx.fillText('▲ 167% YoY',xp,yp-11);ctx.restore();
+      ctx.fillText('▲ 32,8% tri',xp,yp-11);ctx.restore();
     }
   }]
 });
@@ -1494,7 +1496,7 @@ new Chart(document.getElementById('cDcAc'),{
   type:'doughnut',
   data:{
     labels:['AC (lento/semirápido)','DC (rápido/ultrarrápido)'],
-    datasets:[{data:[14582,6479],backgroundColor:[C.b,'rgba(29,233,128,0.9)'],
+    datasets:[{data:[16828,8601],backgroundColor:[C.b,'rgba(29,233,128,0.9)'],
       borderColor:'rgba(0,0,0,0)',borderWidth:4,hoverOffset:6}]
   },
   options:{cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.parsed.toLocaleString('pt-BR')+' pontos'}}}}
@@ -1504,12 +1506,12 @@ new Chart(document.getElementById('cDcAc'),{
 new Chart(document.getElementById('cRegiao'),{
   type:'bar',
   data:{
-    labels:['São Paulo','Rio de Janeiro','Minas Gerais','Paraná','Santa Catarina','Rio Grande do Sul','Demais estados'],
+    labels:['Sudeste','Sul','Nordeste','Centro-Oeste','Norte'],
     datasets:[{
       label:'Eletropostos',
-      data:[4500,2800,2100,1800,1600,1400,6861],
-      backgroundColor:['rgba(79,163,255,0.85)','rgba(79,163,255,0.65)','rgba(79,163,255,0.5)',
-        'rgba(29,233,128,0.75)','rgba(29,233,128,0.6)','rgba(29,233,128,0.5)','rgba(148,163,184,0.25)'],
+      data:[11079,6115,4542,2840,859],
+      backgroundColor:['rgba(148,163,184,0.55)','rgba(255,140,66,0.75)','rgba(79,163,255,0.75)',
+        'rgba(255,189,68,0.75)','rgba(29,233,128,0.75)'],
       borderRadius:5,borderSkipped:false,
     }]
   },
