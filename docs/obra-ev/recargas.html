@@ -419,8 +419,7 @@
     </section>
 
     <section class="section usage-grid" style="margin-top:18px">
-      <div class="card"><h2>Receita diária do período</h2><canvas id="usageGeneralRevenueDaily"></canvas></div>
-      <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageGeneralIdleValueDaily"></canvas></div>
+      <div class="card" style="grid-column:1/-1"><h2>Receita diária do período</h2><canvas id="usageGeneralRevenueDaily"></canvas></div>
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageGeneralDuration7"></canvas></div>
@@ -434,6 +433,10 @@
     </section>
     <section class="section" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Horários mais populares</h2><canvas id="usageGeneralPopularHours"></canvas></div>
+    </section>
+
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Valor de ociosidade por dia</h2><canvas id="usageGeneralIdleValueDaily"></canvas></div>
     </section>
 
     <section class="section" style="margin-top:18px">
@@ -562,8 +565,7 @@
     <section class="grid kpis" id="kpiGrid"></section>
 
     <section class="section usage-grid" style="margin-top:18px">
-      <div class="card"><h2>Receita diária do período</h2><canvas id="usageRevenueDaily"></canvas></div>
-      <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageIdleValueDaily"></canvas></div>
+      <div class="card" style="grid-column:1/-1"><h2>Receita diária do período</h2><canvas id="usageRevenueDaily"></canvas></div>
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageDuration7"></canvas></div>
@@ -660,6 +662,10 @@
           </table>
         </div>
       </div>
+    </section>
+
+    <section class="section usage-grid">
+      <div class="card" style="grid-column:1/-1"><h2>Valor de ociosidade por dia</h2><canvas id="usageIdleValueDaily"></canvas></div>
     </section>
 
     <section class="section">
@@ -2656,6 +2662,32 @@ function renderBarChart(id, labels, values, color = '#57B7FF', unit = '') {
   });
 }
 
+function renderSmoothLineChart(id, labels, values, color = '#57B7FF', unit = '') {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values.map(v => +Number(v || 0).toFixed(2)),
+        borderColor: color,
+        backgroundColor: `${color}22`,
+        pointBackgroundColor: color,
+        pointBorderColor: '#0E1B2D',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        borderWidth: 3,
+        tension: 0.38,
+        fill: true
+      }]
+    },
+    options: chartAxisOptions(unit)
+  });
+}
+
 function renderPieChart(id, labels, values) {
   destroyChart(id);
   const ctx = document.getElementById(id);
@@ -2843,7 +2875,7 @@ function renderCouponSummary(id, details = []) {
 function renderUsageInsights(charges = [], prefix = 'usage') {
   const data = usageSeries(charges);
   const daily = dailyFinancialSeries(charges);
-  renderBarChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
+  renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
   renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
