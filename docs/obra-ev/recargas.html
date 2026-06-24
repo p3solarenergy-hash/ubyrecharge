@@ -418,6 +418,10 @@
       </div>
     </section>
 
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Receita diária do período</h2><canvas id="usageGeneralRevenueDaily"></canvas></div>
+      <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageGeneralIdleValueDaily"></canvas></div>
+    </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageGeneralDuration7"></canvas></div>
       <div class="card"><h2>Recargas nos últimos 7 dias</h2><canvas id="usageGeneralCount7"></canvas></div>
@@ -557,6 +561,10 @@
     <!-- KPIs -->
     <section class="grid kpis" id="kpiGrid"></section>
 
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Receita diária do período</h2><canvas id="usageRevenueDaily"></canvas></div>
+      <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageIdleValueDaily"></canvas></div>
+    </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageDuration7"></canvas></div>
       <div class="card"><h2>Recargas nos últimos 7 dias</h2><canvas id="usageCount7"></canvas></div>
@@ -647,7 +655,7 @@
         <h2>Alertas de ociosidade</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>ID</th><th>Cliente</th><th>Início</th><th>kWh</th><th>Receita</th><th>Ociosidade</th></tr></thead>
+            <thead><tr><th>ID</th><th>Cliente</th><th>Início</th><th>kWh</th><th>Receita</th><th>Ociosidade</th><th>Valor</th></tr></thead>
             <tbody id="idleTable"></tbody>
           </table>
         </div>
@@ -2722,9 +2730,35 @@ function chargeDayLabel(charge) {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
 }
 
+function dailyFinancialSeries(charges = []) {
+  const dated = charges.filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()));
+  if (!dated.length) return { labels: [], revenue: [], idleValue: [] };
+
+  const byDay = {};
+  dated.forEach(charge => {
+    const label = chargeDayLabel(charge);
+    if (!byDay[label]) {
+      byDay[label] = {
+        date: new Date(charge.startDate.getFullYear(), charge.startDate.getMonth(), charge.startDate.getDate()),
+        revenue: 0,
+        idleValue: 0
+      };
+    }
+    byDay[label].revenue += Number(charge.revenue || 0);
+    byDay[label].idleValue += Number(charge.idleValue || 0);
+  });
+
+  const rows = Object.entries(byDay).sort((a, b) => a[1].date - b[1].date);
+  return {
+    labels: rows.map(([label]) => label),
+    revenue: rows.map(([, day]) => day.revenue),
+    idleValue: rows.map(([, day]) => day.idleValue)
+  };
+}
+
 function usageSeries(charges = []) {
   const recent = recentCharges(charges, 7);
-  const byDay = Object.fromEntries(recent.labels.map(label => [label, { duration: 0, count: 0, energy: 0 }]));
+  const byDay = Object.fromEntries(recent.labels.map(label => [label, { duration: 0, count: 0, energy: 0, revenue: 0, idleValue: 0 }]));
   const stayBuckets = { '<1h': 0, '1h-2h': 0, '2h-4h': 0, '>4h': 0 };
   const byHour = Object.fromEntries(Array.from({ length: 24 }, (_, h) => [String(h), 0]));
   const byCoupon = {};
@@ -2734,10 +2768,14 @@ function usageSeries(charges = []) {
     const label = chargeDayLabel(charge);
     const duration = durToHours(charge.duration);
     const energy = Number(charge.energyKWh || 0);
+    const revenue = Number(charge.revenue || 0);
+    const idleValue = Number(charge.idleValue || 0);
     if (byDay[label]) {
       byDay[label].duration += duration;
       byDay[label].count += 1;
       byDay[label].energy += energy;
+      byDay[label].revenue += revenue;
+      byDay[label].idleValue += idleValue;
     }
     if (duration < 1) stayBuckets['<1h'] += 1;
     else if (duration < 2) stayBuckets['1h-2h'] += 1;
@@ -2769,6 +2807,8 @@ function usageSeries(charges = []) {
     duration: recent.labels.map(label => byDay[label].duration),
     count: recent.labels.map(label => byDay[label].count),
     energy: recent.labels.map(label => byDay[label].energy),
+    revenue: recent.labels.map(label => byDay[label].revenue),
+    idleValue: recent.labels.map(label => byDay[label].idleValue),
     stayLabels: Object.keys(stayBuckets),
     stayValues: Object.values(stayBuckets),
     hourLabels: Object.keys(byHour),
@@ -2802,6 +2842,9 @@ function renderCouponSummary(id, details = []) {
 
 function renderUsageInsights(charges = [], prefix = 'usage') {
   const data = usageSeries(charges);
+  const daily = dailyFinancialSeries(charges);
+  renderBarChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
+  renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
   renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
@@ -3530,9 +3573,10 @@ function renderIdleAlerts(charges) {
           <td>${c.energyKWh.toFixed(2)}</td>
           <td>${fmtBRL(c.revenue)}</td>
           <td style="color:var(--p3-warn)">${h}h ${m}min</td>
+          <td>${fmtBRL(c.idleValue || 0)}</td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="6" style="color:var(--p3-muted);text-align:center;padding:20px">Nenhum alerta relevante</td></tr>';
+    : '<tr><td colspan="7" style="color:var(--p3-muted);text-align:center;padding:20px">Nenhum alerta relevante</td></tr>';
 }
 
 function parseRatingValue(value) {
