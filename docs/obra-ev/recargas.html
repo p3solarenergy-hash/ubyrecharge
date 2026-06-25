@@ -894,8 +894,24 @@ function readJson(key, fallback) {
   catch { return fallback; }
 }
 
+function storageQuotaExceeded(err) {
+  return err?.name === 'QuotaExceededError' || /quota|exceeded/i.test(String(err?.message || ''));
+}
+
+function tryWriteJson(key, value) {
+  try {
+    const payload = JSON.stringify(value);
+    localStorage.setItem(key, payload);
+    return { ok: true, size: payload.length };
+  } catch (err) {
+    return { ok: false, error: err };
+  }
+}
+
 function writeJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  const result = tryWriteJson(key, value);
+  if (!result.ok && !storageQuotaExceeded(result.error)) throw result.error;
+  return result.ok;
 }
 
 function workOptions() {
@@ -1052,10 +1068,13 @@ function mergeCloudRechargeRecords(records) {
       ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
-    db[workId] = normalized;
+    allRechargeRecords[workId] = {
+      ...normalized,
+      charges: Array.isArray(normalized.charges) ? normalized.charges.map(hydrateCharge) : []
+    };
+    db[workId] = compactRechargeRecord(normalized);
   });
   writeJson(RECARGAS_LOCAL_KEY, db);
-  syncGeneralRecordsFromLocal();
 }
 
 function localRecord() {
@@ -1082,15 +1101,9 @@ function rechargeSummary() {
   };
 }
 
-function saveLocalRechargeBase() {
-  const db = localRechargeDb();
-  if (!allCharges.length && !loadedFiles.length) {
-    delete db[currentWorkId];
-    writeJson(RECARGAS_LOCAL_KEY, db);
-    syncGeneralRecordsFromLocal();
-    return;
-  }
-  db[currentWorkId] = {
+function buildRechargeRecord() {
+  const updatedAt = new Date().toISOString();
+  return {
     workId: currentWorkId,
     workName: currentWorkName,
     files: loadedFiles.map(file => ({
@@ -1101,7 +1114,7 @@ function saveLocalRechargeBase() {
       lastModified: file.lastModified || 0,
       month: file.month || '',
       importMode: file.importMode || 'merge',
-      importedAt: file.importedAt || new Date().toISOString(),
+      importedAt: file.importedAt || updatedAt,
       rows: allCharges.filter(charge => (file.fileKey && charge._fileKey === file.fileKey) || (!file.fileKey && charge._file === file.name)).length
     })),
     charges: allCharges.map(serializeCharge),
@@ -1109,10 +1122,61 @@ function saveLocalRechargeBase() {
     financialSettings,
     ubyOperationOverrides,
     summary: rechargeSummary(),
-    updatedAt: new Date().toISOString()
+    updatedAt
   };
-  writeJson(RECARGAS_LOCAL_KEY, db);
+}
+
+function compactRechargeRecord(record) {
+  if (!record) return record;
+  const summary = record.summary || {};
+  return {
+    ...record,
+    charges: [],
+    localCompact: true,
+    summary: {
+      ...summary,
+      charges: summary.charges ?? (Array.isArray(record.charges) ? record.charges.length : 0),
+      files: summary.files ?? (Array.isArray(record.files) ? record.files.length : 0),
+      energyKWh: summary.energyKWh ?? 0,
+      revenue: summary.revenue ?? 0,
+      updatedAt: summary.updatedAt || record.updatedAt || new Date().toISOString(),
+      localCompact: true
+    }
+  };
+}
+
+function compactRechargeDb(db, preferredWorkId = '') {
+  return Object.fromEntries(Object.entries(db || {}).map(([workId, record]) => {
+    return [workId, workId === preferredWorkId ? compactRechargeRecord(record) : compactRechargeRecord(record)];
+  }));
+}
+
+function saveLocalRechargeBase(record = null) {
+  const db = localRechargeDb();
+  if (!allCharges.length && !loadedFiles.length && !record) {
+    delete db[currentWorkId];
+    writeJson(RECARGAS_LOCAL_KEY, db);
+    syncGeneralRecordsFromLocal();
+    return { mode: 'deleted' };
+  }
+  const fullRecord = record || buildRechargeRecord();
+  db[currentWorkId] = fullRecord;
+  const fullSave = tryWriteJson(RECARGAS_LOCAL_KEY, db);
+  if (!fullSave.ok) {
+    if (!storageQuotaExceeded(fullSave.error)) throw fullSave.error;
+    const compactDb = compactRechargeDb(db, currentWorkId);
+    const compactSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactDb);
+    if (!compactSave.ok) {
+      if (!storageQuotaExceeded(compactSave.error)) throw compactSave.error;
+      localStorage.removeItem(RECARGAS_LOCAL_KEY);
+      allRechargeRecords = {};
+      return { mode: 'none', error: compactSave.error };
+    }
+    syncGeneralRecordsFromLocal();
+    return { mode: 'compact', error: fullSave.error };
+  }
   syncGeneralRecordsFromLocal();
+  return { mode: 'full', size: fullSave.size };
 }
 
 async function clearCloudRechargeBase() {
@@ -1122,11 +1186,16 @@ async function clearCloudRechargeBase() {
 }
 
 async function saveRechargeBase() {
-  saveLocalRechargeBase();
-  const record = localRecord();
+  if (!allCharges.length && !loadedFiles.length) {
+    saveLocalRechargeBase();
+    return;
+  }
+  const record = buildRechargeRecord();
+  const localSave = saveLocalRechargeBase(record);
   if (!record) return;
   if (!window.UBY_SUPABASE?.saveRechargeBase) {
-    setStorageState(`Salvo neste navegador para <strong>${currentWorkName}</strong>. Banco ainda nao carregado.`);
+    const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
+    setStorageState(`Salvo neste navegador para <strong>${currentWorkName}</strong>. Banco ainda nao carregado.${localMode}`);
     return;
   }
   try {
@@ -1134,9 +1203,11 @@ async function saveRechargeBase() {
       await window.UBY_SUPABASE.ensureCoreWorks(appData.baseObras);
     }
     const result = await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
-    setStorageState(`Banco atualizado para <strong>${currentWorkName}</strong>: ${result.files} arquivo(s), ${result.charges} recarga(s).`);
+    const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
+    setStorageState(`Banco atualizado para <strong>${currentWorkName}</strong>: ${result.files} arquivo(s), ${result.charges} recarga(s).${localMode}`);
   } catch (err) {
-    setStorageState(`Salvo neste navegador para <strong>${currentWorkName}</strong>. Supabase pendente: ${err.message}`, true);
+    const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
+    setStorageState(`Salvo neste navegador para <strong>${currentWorkName}</strong>. Supabase pendente: ${err.message}.${localMode}`, true);
   }
 }
 
@@ -1181,19 +1252,19 @@ function applyRechargeRecord(record, sourceLabel) {
 
 async function loadRechargeBase() {
   const local = localRecord();
-  if (local) applyRechargeRecord(local, 'base local');
+  if (local && !local.localCompact) applyRechargeRecord(local, 'base local');
   else applyRechargeRecord(null, 'base local');
   if (!window.UBY_SUPABASE?.loadRechargeBase) return;
   try {
     const cloud = await window.UBY_SUPABASE.loadRechargeBase(currentWorkId);
     if (cloud?.charges?.length) {
       const currentLocal = localRecord();
-      if (currentLocal && !isCloudRecordNewer(currentLocal, cloud)) {
+      if (currentLocal && !currentLocal.localCompact && !isCloudRecordNewer(currentLocal, cloud)) {
         setStorageState(`Base local mais recente preservada para <strong>${currentWorkName}</strong>. Reenvie a planilha para atualizar o banco, se necessario.`);
         return;
       }
       const db = localRechargeDb();
-      db[currentWorkId] = { ...cloud, workName: cloud.summary?.workName || currentWorkName };
+      db[currentWorkId] = compactRechargeRecord({ ...cloud, workName: cloud.summary?.workName || currentWorkName });
       writeJson(RECARGAS_LOCAL_KEY, db);
       applyRechargeRecord(cloud, 'Supabase');
     }
