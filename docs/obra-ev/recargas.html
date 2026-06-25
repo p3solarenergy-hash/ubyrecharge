@@ -1033,22 +1033,40 @@ function isCloudRecordNewer(local, cloud) {
   return updatedAtMs(cloud) >= updatedAtMs(local);
 }
 
+function hydratedRechargeRecord(record, workId = '') {
+  const id = String(workId || record?.workId || record?.summary?.workId || '').trim();
+  return {
+    ...record,
+    workId: id,
+    workName: record.workName || record.summary?.workName || workNameById(id),
+    files: Array.isArray(record.files) ? record.files : [],
+    charges: Array.isArray(record.charges) ? record.charges.map(hydrateCharge) : [],
+    financialSettings: record.financialSettings || record.summary?.financialSettings || {},
+    ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
+    updatedAt: record.updatedAt || record.summary?.updatedAt || ''
+  };
+}
+
 function syncGeneralRecordsFromLocal() {
   const db = localRechargeDb();
-  allRechargeRecords = {};
-  Object.entries(db).forEach(([workId, record]) => {
+  const entries = Object.entries(db);
+  if (!entries.length) return;
+  const nextRecords = {};
+  entries.forEach(([workId, record]) => {
     if (!record) return;
-    allRechargeRecords[workId] = {
-      ...record,
-      workId,
-      workName: record.workName || workNameById(workId),
-      files: Array.isArray(record.files) ? record.files : [],
-      charges: Array.isArray(record.charges) ? record.charges.map(hydrateCharge) : [],
-      financialSettings: record.financialSettings || record.summary?.financialSettings || {},
-      ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
-      updatedAt: record.updatedAt || record.summary?.updatedAt || ''
-    };
+    const existing = allRechargeRecords[workId];
+    const hydrated = hydratedRechargeRecord(record, workId);
+    if (record.localCompact && existing?.charges?.length) {
+      nextRecords[workId] = {
+        ...hydrated,
+        charges: existing.charges,
+        files: existing.files?.length ? existing.files : hydrated.files
+      };
+      return;
+    }
+    nextRecords[workId] = hydrated;
   });
+  allRechargeRecords = nextRecords;
 }
 
 function mergeCloudRechargeRecords(records) {
@@ -1068,10 +1086,7 @@ function mergeCloudRechargeRecords(records) {
       ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
-    allRechargeRecords[workId] = {
-      ...normalized,
-      charges: Array.isArray(normalized.charges) ? normalized.charges.map(hydrateCharge) : []
-    };
+    allRechargeRecords[workId] = hydratedRechargeRecord(normalized, workId);
     db[workId] = compactRechargeRecord(normalized);
   });
   writeJson(RECARGAS_LOCAL_KEY, db);
@@ -1156,6 +1171,7 @@ function saveLocalRechargeBase(record = null) {
   if (!allCharges.length && !loadedFiles.length && !record) {
     delete db[currentWorkId];
     writeJson(RECARGAS_LOCAL_KEY, db);
+    delete allRechargeRecords[currentWorkId];
     syncGeneralRecordsFromLocal();
     return { mode: 'deleted' };
   }
@@ -1192,6 +1208,7 @@ async function saveRechargeBase() {
   }
   const record = buildRechargeRecord();
   const localSave = saveLocalRechargeBase(record);
+  allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
   if (!record) return;
   if (!window.UBY_SUPABASE?.saveRechargeBase) {
     const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
@@ -1266,6 +1283,7 @@ async function loadRechargeBase() {
       const db = localRechargeDb();
       db[currentWorkId] = compactRechargeRecord({ ...cloud, workName: cloud.summary?.workName || currentWorkName });
       writeJson(RECARGAS_LOCAL_KEY, db);
+      allRechargeRecords[currentWorkId] = hydratedRechargeRecord(cloud, currentWorkId);
       applyRechargeRecord(cloud, 'Supabase');
     }
   } catch (err) {
