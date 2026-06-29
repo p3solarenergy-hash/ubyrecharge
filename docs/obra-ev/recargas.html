@@ -122,6 +122,19 @@
     .ai-card strong { display:block; color:var(--p3-text); font-size:13px; margin-bottom:8px; }
     .ai-card p { margin:0 0 10px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
     .ai-card .action { color:#E8EFEB; font-size:12px; font-weight:700; }
+    .daily-metrics { display:grid; gap:10px; }
+    .metric-strip { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .metric-mini { background:#0B1524; border:1px solid var(--p3-border); border-radius:9px; padding:11px 12px; min-height:86px; }
+    .metric-mini strong { display:block; color:var(--p3-primary); font-size:17px; margin-top:4px; line-height:1.15; }
+    .metric-mini span { display:block; color:var(--p3-muted); font-size:11px; }
+    .metric-mini.good strong { color:#38C96F; }
+    .metric-mini.warn strong { color:var(--p3-warn); }
+    .metric-lines { display:grid; gap:7px; margin-top:4px; }
+    .metric-line { display:grid; grid-template-columns:92px 1fr auto; gap:10px; align-items:center; border-bottom:1px solid var(--p3-border); padding:8px 0; color:var(--p3-muted); font-size:12px; }
+    .metric-line strong { color:var(--p3-text); }
+    .metric-line b { color:var(--p3-primary); font-weight:700; white-space:nowrap; }
+    .metric-line .warn { color:var(--p3-warn); }
+    .metric-line .good { color:#38C96F; }
 
     /* ── NOVO: Upload zone ── */
     .upload-zone {
@@ -271,6 +284,7 @@
       .section-3 { grid-template-columns:1fr; }
       .acc-grid { grid-template-columns:1fr; }
       .general-split { grid-template-columns:1fr; }
+      .metric-strip { grid-template-columns:1fr; }
     }
     @media (max-width:960px) {
       .hero,.section,.kpis { grid-template-columns:1fr; }
@@ -421,6 +435,10 @@
     <section class="section usage-grid" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Receita diária do período</h2><canvas id="usageGeneralRevenueDaily"></canvas></div>
     </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageGeneralDailyMetrics"></div></div>
+      <div class="card"><h2>Falhas recentes e Kwid</h2><div class="daily-metrics" id="usageGeneralRecentOps"></div></div>
+    </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageGeneralDuration7"></canvas></div>
       <div class="card"><h2>Recargas nos últimos 7 dias</h2><canvas id="usageGeneralCount7"></canvas></div>
@@ -563,6 +581,10 @@
 
     <section class="section usage-grid" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Receita diária do período</h2><canvas id="usageRevenueDaily"></canvas></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageDailyMetrics"></div></div>
+      <div class="card"><h2>Falhas recentes e Kwid</h2><div class="daily-metrics" id="usageRecentOps"></div></div>
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageDuration7"></canvas></div>
@@ -1582,7 +1604,11 @@ function detectRechargeLayout(rows = []) {
           couponBenefit: findColumnIndex(headers, ['Beneficio do Cupom', 'Benefício do Cupom']),
           idleValue: findColumnIndex(headers, ['Taxa de Ociosidade']),
           socInitial: findColumnIndex(headers, ['SoC inicial']),
-          socFinal: findColumnIndex(headers, ['SoC final'])
+          socFinal: findColumnIndex(headers, ['SoC final']),
+          vehicleBrand: findColumnIndex(headers, ['Marca', 'Marca do Veiculo', 'Marca do Veículo', 'Fabricante']),
+          vehicleModel: findColumnIndex(headers, ['Modelo', 'Modelo do Veiculo', 'Modelo do Veículo', 'Veiculo', 'Veículo']),
+          status: findColumnIndex(headers, ['Status', 'Status da Recarga', 'Status da Carga']),
+          failureReason: findColumnIndex(headers, ['Motivo', 'Motivo da Falha', 'Erro', 'Falha'])
         }
       };
     }
@@ -1596,7 +1622,11 @@ function detectRechargeLayout(rows = []) {
     cols: {
       voucher: findColumnIndex(headers, ['Voucher utilizado', 'Voucher'], 26),
       rating: findColumnIndex(headers, ['AvaliaÃ§Ã£o', 'Avaliacao'], 27),
-      reviewComment: findColumnIndex(headers, ['ComentÃ¡rio', 'Comentario', 'ComentÃ¡rios', 'Comentarios', 'ComentÃ¡rio da avaliaÃ§Ã£o', 'Comentario da avaliacao'], -1)
+      reviewComment: findColumnIndex(headers, ['ComentÃ¡rio', 'Comentario', 'ComentÃ¡rios', 'Comentarios', 'ComentÃ¡rio da avaliaÃ§Ã£o', 'Comentario da avaliacao'], -1),
+      vehicleBrand: findColumnIndex(headers, ['Marca', 'Marca do Veiculo', 'Marca do Veículo', 'Fabricante']),
+      vehicleModel: findColumnIndex(headers, ['Modelo', 'Modelo do Veiculo', 'Modelo do Veículo', 'Veiculo', 'Veículo']),
+      status: findColumnIndex(headers, ['Status', 'Status da Recarga', 'Status da Carga']),
+      failureReason: findColumnIndex(headers, ['Motivo', 'Motivo da Falha', 'Erro', 'Falha'])
     }
   };
 }
@@ -1661,7 +1691,11 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
       rating:        '',
       reviewComment: '',
       socInitial:    rowCellText(row, cols.socInitial),
-      socFinal:      rowCellText(row, cols.socFinal)
+      socFinal:      rowCellText(row, cols.socFinal),
+      vehicleBrand:  rowCellText(row, cols.vehicleBrand),
+      vehicleModel:  rowCellText(row, cols.vehicleModel),
+      failureReason: rowCellText(row, cols.failureReason),
+      rawStatus:     rowCellText(row, cols.status)
     };
   }
 
@@ -1690,7 +1724,11 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
     idleValue:     parseNumber(row[25]),
     voucher:       String(readCell(row, cols.voucher) || '').trim(),
     rating:        String(readCell(row, cols.rating) || '').trim(),
-    reviewComment: String(readCell(row, cols.reviewComment) || '').trim()
+    reviewComment: String(readCell(row, cols.reviewComment) || '').trim(),
+    vehicleBrand:  String(readCell(row, cols.vehicleBrand) || '').trim(),
+    vehicleModel:  String(readCell(row, cols.vehicleModel) || '').trim(),
+    failureReason: String(readCell(row, cols.failureReason) || '').trim(),
+    rawStatus:     String(readCell(row, cols.status) || '').trim()
   };
 }
 
@@ -1730,32 +1768,8 @@ function readFile(file) {
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
         if (!r || r[0] == null) continue;
-        const [startStr, endStr] = splitDateRange(r[12], r[13]);
-        const startDate = parseDate(startStr);
-        const endDate = parseDate(endStr);
-        importedCharges.push({
-          workId:        currentWorkId,
-          workName:      currentWorkName,
-          _file:         file.name,
-          id:            r[0],
-          station:       String(r[1] || '').trim(),
-          connType:      String(r[3] || '').trim(),
-          userName:      String(r[4] || '').trim(),
-          userEmail:     String(r[5] || '').trim(),
-          startStr, endStr,
-          startDate,
-          endDate,
-          duration:      String(r[13] || ''),
-          energyKWh:     parseNumber(r[14]),
-          revenue:       parseNumber(r[18]),
-          paymentType:   String(r[20] || '').trim(),
-          paymentStatus: String(r[21] || '').trim(),
-          idleTime:      String(r[24] || ''),
-          idleValue:     parseNumber(r[25]),
-          voucher:       String(readCell(r, voucherCol) || '').trim(),
-          rating:        String(readCell(r, ratingCol) || '').trim(),
-          reviewComment: String(readCell(r, reviewCommentCol) || '').trim()
-        });
+        const charge = parseRechargeRow(r, layout, file);
+        if (charge) importedCharges.push(charge);
       }
       }
       if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
@@ -2546,7 +2560,11 @@ function generalFinanceByUnit(unitData) {
 }
 
 function renderGeneralFinance(unitData) {
-  const rows = generalFinanceByUnit(unitData);
+  const rows = generalFinanceByUnit(unitData).sort((a, b) => {
+    const ownDiff = (Number(b.finance?.ownResult) || 0) - (Number(a.finance?.ownResult) || 0);
+    if (Math.abs(ownDiff) > 0.009) return ownDiff;
+    return (Number(b.finance?.revenue) || 0) - (Number(a.finance?.revenue) || 0);
+  });
   const total = rows.reduce((acc, row) => {
     Object.entries(row.finance || {}).forEach(([key, value]) => {
       if (!['margin', 'paybackMonths', 'roiMonthly'].includes(key)) acc[key] = (acc[key] || 0) + Number(value || 0);
@@ -2867,6 +2885,162 @@ function dailyFinancialSeries(charges = []) {
   };
 }
 
+function chargeDayKeyFromDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function dailyOperationalRows(charges = []) {
+  const dated = charges.filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()));
+  if (!dated.length) return [];
+  const firstClientDay = {};
+  dated
+    .slice()
+    .sort((a, b) => a.startDate - b.startDate)
+    .forEach(charge => {
+      const client = clientKeyFromCharge(charge);
+      if (!client) return;
+      firstClientDay[client] ||= chargeDayKeyFromDate(charge.startDate);
+    });
+  const byDay = {};
+  dated.forEach(charge => {
+    const key = chargeDayKeyFromDate(charge.startDate);
+    if (!byDay[key]) {
+      const date = new Date(charge.startDate.getFullYear(), charge.startDate.getMonth(), charge.startDate.getDate());
+      byDay[key] = { key, date, label: chargeDayLabel(charge), revenue: 0, energy: 0, count: 0, clients: new Set(), newClients: new Set(), failed: 0 };
+    }
+    const client = clientKeyFromCharge(charge);
+    byDay[key].revenue += Number(charge.revenue || 0);
+    byDay[key].energy += Number(charge.energyKWh || 0);
+    byDay[key].count += 1;
+    if (client) byDay[key].clients.add(client);
+    if (client && firstClientDay[client] === key) byDay[key].newClients.add(client);
+    if (isFailedCharge(charge)) byDay[key].failed += 1;
+  });
+  const rows = Object.values(byDay).sort((a, b) => a.date - b.date);
+  rows.forEach((row, index) => {
+    const prev = rows[index - 1]?.revenue || 0;
+    row.growthPct = prev > 0 ? (row.revenue - prev) / prev * 100 : (row.revenue > 0 ? 100 : 0);
+    row.clientCount = row.clients.size;
+    row.newClientCount = row.newClients.size;
+  });
+  return rows;
+}
+
+function rangeRevenue(rows = [], days = 1, offsetDays = 0) {
+  if (!rows.length) return { revenue: 0, count: 0, newClients: 0 };
+  const last = rows[rows.length - 1].date;
+  const end = new Date(last);
+  end.setDate(end.getDate() - offsetDays);
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(end);
+  start.setDate(start.getDate() - (days - 1));
+  start.setHours(0, 0, 0, 0);
+  const selected = rows.filter(row => row.date >= start && row.date <= end);
+  return {
+    revenue: selected.reduce((sum, row) => sum + row.revenue, 0),
+    count: selected.reduce((sum, row) => sum + row.count, 0),
+    newClients: selected.reduce((sum, row) => sum + row.newClientCount, 0)
+  };
+}
+
+function pctChange(current = 0, previous = 0) {
+  if (previous > 0) return (current - previous) / previous * 100;
+  return current > 0 ? 100 : 0;
+}
+
+function vehicleLabel(charge = {}) {
+  return safeText(`${charge.vehicleBrand || ''} ${charge.vehicleModel || ''}`).replace(/\s+/g, ' ').trim();
+}
+
+function isKwidCharge(charge = {}) {
+  return /kwid/.test(normalizeTextForInsight(vehicleLabel(charge)));
+}
+
+function isFailedCharge(charge = {}) {
+  const text = normalizeTextForInsight([
+    charge.rawStatus,
+    charge.paymentStatus,
+    charge.paymentType,
+    charge.failureReason
+  ].filter(Boolean).join(' '));
+  if (/(falha|erro|cancel|recus|negad|expir|timeout|interromp|incomplet|nao conclu|sem sucesso|failed|declin|invalid|invalido)/.test(text)) return true;
+  if (/(aprov|pago|paid|approved|success|conclu|finaliz|complet)/.test(text)) return false;
+  return Number(charge.energyKWh || 0) <= 0 && Number(charge.revenue || 0) <= 0;
+}
+
+function renderDailyOperationalMetrics(prefix = 'usage', charges = []) {
+  const el = document.getElementById(`${prefix}DailyMetrics`);
+  if (!el) return;
+  const rows = dailyOperationalRows(charges);
+  if (!rows.length) {
+    el.innerHTML = '<div class="note">Sem datas validas para calcular ritmo diario.</div>';
+    return;
+  }
+  const last = rows[rows.length - 1];
+  const r3 = rangeRevenue(rows, 3, 0);
+  const p3 = rangeRevenue(rows, 3, 3);
+  const r7 = rangeRevenue(rows, 7, 0);
+  const p7 = rangeRevenue(rows, 7, 7);
+  const growth1 = last.growthPct || 0;
+  const growth3 = pctChange(r3.revenue, p3.revenue);
+  const growth7 = pctChange(r7.revenue, p7.revenue);
+  const growthClass = value => value >= 0 ? 'good' : 'warn';
+  const growthText = value => `${value >= 0 ? '+' : ''}${fmtPct(value)}`;
+  const recentLines = rows.slice(-7).reverse().map(row => `
+    <div class="metric-line">
+      <strong>${row.label}</strong>
+      <span>${row.count} recarga(s), ${row.newClientCount} cliente(s) novo(s), ${row.failed} falha(s)</span>
+      <b class="${growthClass(row.growthPct)}">${fmtBRL(row.revenue)} · ${growthText(row.growthPct)}</b>
+    </div>
+  `).join('');
+  el.innerHTML = `
+    <div class="metric-strip">
+      <div class="metric-mini ${growthClass(growth1)}"><span>Ultimo dia (${last.label})</span><strong>${fmtBRL(last.revenue)}</strong><span>${growthText(growth1)} vs dia anterior · ${last.newClientCount} novo(s)</span></div>
+      <div class="metric-mini ${growthClass(growth3)}"><span>Ultimos 3 dias</span><strong>${fmtBRL(r3.revenue)}</strong><span>${growthText(growth3)} vs 3 dias anteriores · ${r3.newClients} novo(s)</span></div>
+      <div class="metric-mini ${growthClass(growth7)}"><span>Ultimos 7 dias</span><strong>${fmtBRL(r7.revenue)}</strong><span>${growthText(growth7)} vs 7 dias anteriores · ${r7.newClients} novo(s)</span></div>
+    </div>
+    <div class="metric-lines">${recentLines}</div>
+  `;
+}
+
+function renderRecentFailureDiagnostics(prefix = 'usage', charges = []) {
+  const el = document.getElementById(`${prefix}RecentOps`);
+  if (!el) return;
+  const recent = recentCharges(charges, 7).charges.sort((a, b) => (b.startDate || 0) - (a.startDate || 0));
+  const failed = recent.filter(isFailedCharge);
+  const kwid = failed.filter(isKwidCharge);
+  const withVehicle = failed.filter(charge => vehicleLabel(charge));
+  const reasonMap = {};
+  failed.forEach(charge => {
+    const reason = safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || charge.paymentType || 'Sem motivo na planilha').trim();
+    reasonMap[reason] = (reasonMap[reason] || 0) + 1;
+  });
+  const topReason = topEntries(reasonMap, 1)[0];
+  const mainRead = !failed.length
+    ? 'Nenhuma falha detectada nos ultimos 7 dias.'
+    : kwid.length && kwid.length === failed.length
+      ? 'Todas as falhas recentes com modelo informado sao Kwid.'
+      : kwid.length
+        ? `${kwid.length} de ${failed.length} falha(s) recente(s) envolvem Kwid.`
+        : withVehicle.length
+          ? 'As falhas recentes nao se concentram em Kwid.'
+          : 'A planilha nao trouxe modelo do veiculo para explicar se eram Kwid.';
+  const failedLines = failed.slice(0, 7).map(charge => {
+    const vehicle = vehicleLabel(charge) || 'Veiculo nao informado';
+    const reason = safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || charge.paymentType || 'Sem motivo').trim();
+    return `<div class="metric-line"><strong>${chargeDayLabel(charge)}</strong><span>${escapeHtml(vehicle)} · ${escapeHtml(reason)}</span><b>${fmtKWh(charge.energyKWh || 0)}</b></div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="metric-strip">
+      <div class="metric-mini ${failed.length ? 'warn' : 'good'}"><span>Falhas 7 dias</span><strong>${failed.length}</strong><span>${recent.length} tentativa(s) recentes</span></div>
+      <div class="metric-mini ${kwid.length ? 'warn' : ''}"><span>Kwid nas falhas</span><strong>${kwid.length}</strong><span>${withVehicle.length ? `${fmtPct(kwid.length / Math.max(withVehicle.length, 1) * 100)} dos modelos informados` : 'sem modelo informado'}</span></div>
+      <div class="metric-mini"><span>Principal motivo</span><strong style="font-size:14px;white-space:normal">${escapeHtml(topReason?.[0] || '-')}</strong><span>${topReason ? `${topReason[1]} ocorrencia(s)` : 'sem falhas'}</span></div>
+    </div>
+    <div class="note">${mainRead} ${failed.length && !withVehicle.length ? 'Para levantar causa por modelo, a exportacao precisa trazer marca/modelo ou veiculo.' : ''}</div>
+    <div class="metric-lines">${failedLines || '<div class="metric-line"><strong>OK</strong><span>Nenhuma falha recente para listar.</span><b class="good">0</b></div>'}</div>
+  `;
+}
+
 function usageSeries(charges = []) {
   const recent = recentCharges(charges, 7);
   const byDay = Object.fromEntries(recent.labels.map(label => [label, { duration: 0, count: 0, energy: 0, revenue: 0, idleValue: 0 }]));
@@ -2956,6 +3130,8 @@ function renderUsageInsights(charges = [], prefix = 'usage') {
   const daily = dailyFinancialSeries(charges);
   renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
   renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
+  renderDailyOperationalMetrics(prefix, charges);
+  renderRecentFailureDiagnostics(prefix, charges);
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
   renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
@@ -3314,7 +3490,7 @@ function renderGeral() {
     <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${totalCharges ? (energy / totalCharges).toFixed(1).replace('.', ',') : '0,0'} kWh/sessao</div></div>
     <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
     <div class="card"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">mes ate a planilha, igual ao mensal</div></div>
-    <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${unitData[0]?.workName || '-'}</div><div class="sub">${unitData[0] ? fmtBRL(unitData[0].revenue) : 'sem dados'}</div></div>
+    <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.workName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
     <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
@@ -3357,9 +3533,10 @@ function renderGeral() {
     });
   }
 
-  const unitLabels = unitData.map(unit => unit.workName.length > 18 ? unit.workName.slice(0, 18) + '...' : unit.workName);
-  simpleBar('chartGeneralRevenueUnit', unitLabels, unitData.map(unit => unit.revenue), 'Receita', '#57B7FF');
-  simpleBar('chartGeneralEnergyUnit', unitLabels, unitData.map(unit => unit.energy), 'kWh', '#246BFE');
+  const rankedUnits = stationRows.filter(unit => unit.count > 0 || unit.revenue > 0);
+  const unitLabels = rankedUnits.map(unit => unit.workName.length > 18 ? unit.workName.slice(0, 18) + '...' : unit.workName);
+  simpleBar('chartGeneralRevenueUnit', unitLabels, rankedUnits.map(unit => unit.revenue), 'Receita', '#57B7FF');
+  simpleBar('chartGeneralEnergyUnit', unitLabels, rankedUnits.map(unit => unit.energy), 'kWh', '#246BFE');
 
   const monthData = months.map(mk => {
     const monthCharges = charges.filter(charge => chargeMonthKey(charge) === mk);
