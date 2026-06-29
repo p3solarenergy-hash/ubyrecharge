@@ -341,6 +341,11 @@
     </div>
     <div class="controls" id="ctrlGeral">
       <span id="generalSourceLabel">Escolha uma estação abaixo para abrir o relatório detalhado</span>
+      <span style="margin-left:8px">Visão:</span>
+      <select class="ctl-select" id="generalViewMode" onchange="renderGeral()">
+        <option value="month">Mês atual</option>
+        <option value="accumulated">Acumulado</option>
+      </select>
       <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar geral</button>
     </div>
     <div class="controls" id="ctrlFinanceiroGeral" style="display:none">
@@ -3389,6 +3394,39 @@ function getGeneralUnitData() {
     .sort((a, b) => b.revenue - a.revenue);
 }
 
+function summarizeGeneralUnit(unit, charges) {
+  const hydrated = (charges || []).map(hydrateCharge);
+  const energy = hydrated.reduce((sum, charge) => sum + charge.energyKWh, 0);
+  const revenue = hydrated.reduce((sum, charge) => sum + charge.revenue, 0);
+  const clients = new Set(hydrated.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  const dates = hydrated.map(charge => charge.startDate).filter(Boolean);
+  const stations = [...new Set(hydrated.map(charge => charge.station).filter(Boolean))];
+  return {
+    ...unit,
+    stationName: stations[0] || unit.stationName || unit.workName,
+    stations: stations.length ? stations : (unit.stations || []),
+    charges: hydrated,
+    count: hydrated.length,
+    energy,
+    revenue,
+    clients,
+    avgTicket: hydrated.length ? revenue / hydrated.length : 0,
+    lastDate: dates.length ? new Date(Math.max(...dates)) : null,
+    acdc: generalAcDcStats(hydrated)
+  };
+}
+
+function filterGeneralUnitDataByMonth(unitData, monthKeyValue) {
+  if (!monthKeyValue) return unitData;
+  return unitData
+    .map(unit => summarizeGeneralUnit(
+      unit,
+      unit.charges.filter(charge => chargeMonthKey(charge) === monthKeyValue)
+    ))
+    .filter(unit => unit.count > 0)
+    .sort((a, b) => b.revenue - a.revenue);
+}
+
 function getAllGeneralCharges(unitData) {
   return unitData.flatMap(unit => unit.charges.map(charge => ({
     ...charge,
@@ -3588,7 +3626,13 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
 }
 
 function renderGeral() {
-  const unitData = getGeneralUnitData();
+  const sourceUnitData = getGeneralUnitData();
+  const sourceCharges = getAllGeneralCharges(sourceUnitData);
+  const sourceMonths = [...new Set(sourceCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
+  const currentGeneralMonth = sourceMonths[sourceMonths.length - 1] || '';
+  const generalViewMode = document.getElementById('generalViewMode')?.value || 'month';
+  const isGeneralMonthView = generalViewMode !== 'accumulated' && !!currentGeneralMonth;
+  const unitData = isGeneralMonthView ? filterGeneralUnitDataByMonth(sourceUnitData, currentGeneralMonth) : sourceUnitData;
   const stationRows = getGeneralStationRows(unitData);
   const charges = getAllGeneralCharges(unitData);
   const acdc = generalAcDcStats(charges);
@@ -3616,15 +3660,17 @@ function renderGeral() {
   const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
   const firstPeriod = generalWindows.length ? new Date(Math.min(...generalWindows.map(window => window.start).filter(Boolean))) : firstDate;
   const lastPeriod = generalWindows.length ? new Date(Math.max(...generalWindows.map(window => window.end).filter(Boolean))) : lastDate;
+  const viewLabel = isGeneralMonthView ? `Mês atual (${monthLabel(currentGeneralMonth)})` : 'Acumulado';
+  const viewDetail = isGeneralMonthView ? 'ocupação calculada somente sobre o mês atual' : 'histórico completo das bases salvas';
 
   document.getElementById('generalHeroMeta').innerHTML = totalCharges
-    ? `Unidades com base: <strong>${units}</strong><br>Periodo: <strong>${fmtDT(firstPeriod)}</strong> ate <strong>${fmtDT(lastPeriod)}</strong><br>Meses consolidados: <strong>${months.length}</strong>`
+    ? `Visão: <strong>${viewLabel}</strong><br>Unidades com base: <strong>${units}</strong><br>Periodo: <strong>${fmtDT(firstPeriod)}</strong> ate <strong>${fmtDT(lastPeriod)}</strong><br>Meses consolidados: <strong>${isGeneralMonthView ? 1 : months.length}</strong>`
     : 'Nenhuma unidade com base de recargas salva ainda.';
   document.getElementById('generalHeroFormula').innerHTML = totalCharges
-    ? `<strong>Visao geral</strong><br>${fmtBRL(revenue)} em receita<br>${fmtKWh(energy)} entregues<br><strong style="color:#57B7FF">${totalCharges} recargas em ${units} unidade(s)</strong><br>AC: ${acdc.acCharges} recargas / DC: ${acdc.dcCharges} recargas`
+    ? `<strong>${viewLabel}</strong><br>${fmtBRL(revenue)} em receita<br>${fmtKWh(energy)} entregues<br><strong style="color:#57B7FF">${totalCharges} recargas em ${units} unidade(s)</strong><br>AC: ${acdc.acCharges} recargas / DC: ${acdc.dcCharges}<br><span style="color:#A8C8BC">${viewDetail}</span>`
     : 'Suba a planilha em cada unidade para o painel geral acumular tudo.';
   document.getElementById('generalSourceLabel').textContent = totalCharges
-    ? `${units} estação(ões) com base salva - escolha uma para abrir`
+    ? `${viewLabel}: ${units} estação(ões) com base salva - escolha uma para abrir`
     : 'Sem bases salvas para consolidar';
   const occClass = totalOcc < 15 ? 'occ-red' : (totalOcc < 30 ? 'occ-yellow' : 'occ-green');
   const occStatus = totalOcc < 15 ? 'abaixo do objetivo minimo de 15%' : (totalOcc < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
@@ -3643,7 +3689,7 @@ function renderGeral() {
   `;
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
   renderUsageInsights(charges, 'usageGeneral');
-  renderGeneralFinance(unitData);
+  renderGeneralFinance(sourceUnitData);
 
   document.getElementById('generalUnitRank').innerHTML = stationRows.length ? stationRows.slice(0, 12).map(unit => `
     <div class="unit-card">
