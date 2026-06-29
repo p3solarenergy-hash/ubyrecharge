@@ -46,6 +46,7 @@
     .grid   { display:grid; gap:14px; }
     .kpis   { grid-template-columns:repeat(6,minmax(150px,1fr)); margin-top:24px; }
     .card   { background:var(--p3-card); border:1px solid var(--p3-border); border-radius:12px; padding:18px; box-shadow:var(--p3-shadow); }
+    .kpis .card { min-height:136px; }
     .label  { color:var(--p3-muted); font-size:11px; text-transform:uppercase; font-weight:700; letter-spacing:.8px; min-height:18px; overflow-wrap:anywhere; }
     .value  { font-size:clamp(22px,2.1vw,30px); font-weight:700; color:var(--p3-primary); margin-top:6px; line-height:1.1; white-space:nowrap; }
     .sub    { color:var(--p3-muted); font-size:11px; margin-top:6px; }
@@ -123,8 +124,8 @@
     .ai-card p { margin:0 0 10px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
     .ai-card .action { color:#E8EFEB; font-size:12px; font-weight:700; }
     .daily-metrics { display:grid; gap:10px; }
-    .metric-strip { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
-    .metric-mini { background:#0B1524; border:1px solid var(--p3-border); border-radius:9px; padding:11px 12px; min-height:86px; }
+    .metric-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; align-items:stretch; }
+    .metric-mini { background:#0B1524; border:1px solid var(--p3-border); border-radius:9px; padding:11px 12px; min-height:104px; display:flex; flex-direction:column; justify-content:space-between; }
     .metric-mini strong { display:block; color:var(--p3-primary); font-size:17px; margin-top:4px; line-height:1.15; }
     .metric-mini span { display:block; color:var(--p3-muted); font-size:11px; }
     .metric-mini.good strong { color:#38C96F; }
@@ -135,6 +136,31 @@
     .metric-line b { color:var(--p3-primary); font-weight:700; white-space:nowrap; }
     .metric-line .warn { color:var(--p3-warn); }
     .metric-line .good { color:#38C96F; }
+    .decision-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-top:18px; }
+    .decision-card { background:#0B1524; border:1px solid var(--p3-border); border-radius:12px; padding:16px; min-height:150px; box-shadow:var(--p3-shadow); }
+    .decision-card.priority { border-left:4px solid var(--p3-primary); }
+    .decision-card.warn { border-left:4px solid var(--p3-warn); }
+    .decision-card.good { border-left:4px solid #38C96F; }
+    .decision-card .label { min-height:0; }
+    .decision-card strong { display:block; color:var(--p3-text); font-size:18px; margin:8px 0 6px; line-height:1.2; }
+    .decision-card p { margin:0; color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .action-list { display:grid; gap:10px; }
+    .action-row { display:grid; grid-template-columns:minmax(140px,1fr) auto; gap:12px; align-items:center; background:#0B1524; border:1px solid var(--p3-border); border-radius:10px; padding:12px 14px; }
+    .action-row strong { display:block; color:var(--p3-text); font-size:13px; }
+    .action-row span { display:block; color:var(--p3-muted); font-size:11px; margin-top:2px; }
+    .action-row b { color:var(--p3-primary); font-size:14px; white-space:nowrap; }
+    .action-row b.warn { color:var(--p3-warn); }
+    .action-row b.good { color:#38C96F; }
+    .kpi-feature { grid-column:span 2; border-left:5px solid var(--p3-primary); background:linear-gradient(135deg,#102945,#0B1524); }
+    .kpi-feature .value { font-size:clamp(34px,4vw,48px); }
+    .kpi-feature.occ-red { border-left-color:#E64B4B; background:linear-gradient(135deg,rgba(230,75,75,.22),#0B1524); }
+    .kpi-feature.occ-red .value { color:#FF6B6B; }
+    .kpi-feature.occ-yellow { border-left-color:var(--p3-warn); background:linear-gradient(135deg,rgba(242,169,61,.20),#0B1524); }
+    .kpi-feature.occ-yellow .value { color:#F2D77F; }
+    .kpi-feature.occ-green { border-left-color:#38C96F; background:linear-gradient(135deg,rgba(56,201,111,.18),#0B1524); }
+    .kpi-feature.occ-green .value { color:#38C96F; }
+    .kpi-feature.revenue-card { border-left-color:#57B7FF; background:linear-gradient(135deg,rgba(45,127,249,.24),#0B1524); }
+    .kpi-feature.revenue-card .value { color:#57B7FF; }
 
     /* ── NOVO: Upload zone ── */
     .upload-zone {
@@ -285,9 +311,13 @@
       .acc-grid { grid-template-columns:1fr; }
       .general-split { grid-template-columns:1fr; }
       .metric-strip { grid-template-columns:1fr; }
+      .decision-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .kpi-feature { grid-column:span 2; }
     }
     @media (max-width:960px) {
       .hero,.section,.kpis { grid-template-columns:1fr; }
+      .decision-grid { grid-template-columns:1fr; }
+      .kpi-feature { grid-column:span 1; }
       .project-bar { grid-template-columns:1fr; }
       .wrap { padding:16px; }
       .value { white-space:normal; }
@@ -421,6 +451,20 @@
 
     <section class="grid kpis" id="kpiGeneral"></section>
 
+    <section class="decision-grid" id="generalDecisionCockpit"></section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Unidades em crescimento</h2>
+        <div class="sub" style="margin:-8px 0 12px">Comparação: últimos 7 dias vs 7 dias anteriores</div>
+        <div class="action-list" id="generalGrowthRank"></div>
+      </div>
+      <div class="card">
+        <h2>Alertas de ação</h2>
+        <div class="action-list" id="generalActionRank"></div>
+      </div>
+    </section>
+
     <section class="general-split">
       <div class="card">
         <h2>Receita por unidade</h2>
@@ -437,7 +481,7 @@
     </section>
     <section class="section" style="margin-top:18px">
       <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageGeneralDailyMetrics"></div></div>
-      <div class="card"><h2>Falhas recentes e Kwid</h2><div class="daily-metrics" id="usageGeneralRecentOps"></div></div>
+      <div class="card"><h2>Relatório de erros</h2><div class="daily-metrics" id="usageGeneralRecentOps"></div></div>
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageGeneralDuration7"></canvas></div>
@@ -584,7 +628,7 @@
     </section>
     <section class="section" style="margin-top:18px">
       <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageDailyMetrics"></div></div>
-      <div class="card"><h2>Falhas recentes e Kwid</h2><div class="daily-metrics" id="usageRecentOps"></div></div>
+      <div class="card"><h2>Relatório de erros</h2><div class="daily-metrics" id="usageRecentOps"></div></div>
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageDuration7"></canvas></div>
@@ -2981,9 +3025,12 @@ function renderDailyOperationalMetrics(prefix = 'usage', charges = []) {
   const p3 = rangeRevenue(rows, 3, 3);
   const r7 = rangeRevenue(rows, 7, 0);
   const p7 = rangeRevenue(rows, 7, 7);
+  const r30 = rangeRevenue(rows, 30, 0);
+  const p30 = rangeRevenue(rows, 30, 30);
   const growth1 = last.growthPct || 0;
   const growth3 = pctChange(r3.revenue, p3.revenue);
   const growth7 = pctChange(r7.revenue, p7.revenue);
+  const growth30 = pctChange(r30.revenue, p30.revenue);
   const growthClass = value => value >= 0 ? 'good' : 'warn';
   const growthText = value => `${value >= 0 ? '+' : ''}${fmtPct(value)}`;
   const recentLines = rows.slice(-7).reverse().map(row => `
@@ -2998,6 +3045,7 @@ function renderDailyOperationalMetrics(prefix = 'usage', charges = []) {
       <div class="metric-mini ${growthClass(growth1)}"><span>Ultimo dia (${last.label})</span><strong>${fmtBRL(last.revenue)}</strong><span>${growthText(growth1)} vs dia anterior · ${last.newClientCount} novo(s)</span></div>
       <div class="metric-mini ${growthClass(growth3)}"><span>Ultimos 3 dias</span><strong>${fmtBRL(r3.revenue)}</strong><span>${growthText(growth3)} vs 3 dias anteriores · ${r3.newClients} novo(s)</span></div>
       <div class="metric-mini ${growthClass(growth7)}"><span>Ultimos 7 dias</span><strong>${fmtBRL(r7.revenue)}</strong><span>${growthText(growth7)} vs 7 dias anteriores · ${r7.newClients} novo(s)</span></div>
+      <div class="metric-mini ${growthClass(growth30)}"><span>Ultimos 30 dias</span><strong>${fmtBRL(r30.revenue)}</strong><span>${growthText(growth30)} vs 30 dias anteriores · ${r30.newClients} novo(s)</span></div>
     </div>
     <div class="metric-lines">${recentLines}</div>
   `;
@@ -3008,37 +3056,132 @@ function renderRecentFailureDiagnostics(prefix = 'usage', charges = []) {
   if (!el) return;
   const recent = recentCharges(charges, 7).charges.sort((a, b) => (b.startDate || 0) - (a.startDate || 0));
   const failed = recent.filter(isFailedCharge);
-  const kwid = failed.filter(isKwidCharge);
-  const withVehicle = failed.filter(charge => vehicleLabel(charge));
   const reasonMap = {};
   failed.forEach(charge => {
     const reason = safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || charge.paymentType || 'Sem motivo na planilha').trim();
     reasonMap[reason] = (reasonMap[reason] || 0) + 1;
   });
   const topReason = topEntries(reasonMap, 1)[0];
-  const mainRead = !failed.length
-    ? 'Nenhuma falha detectada nos ultimos 7 dias.'
-    : kwid.length && kwid.length === failed.length
-      ? 'Todas as falhas recentes com modelo informado sao Kwid.'
-      : kwid.length
-        ? `${kwid.length} de ${failed.length} falha(s) recente(s) envolvem Kwid.`
-        : withVehicle.length
-          ? 'As falhas recentes nao se concentram em Kwid.'
-          : 'A planilha nao trouxe modelo do veiculo para explicar se eram Kwid.';
   const failedLines = failed.slice(0, 7).map(charge => {
-    const vehicle = vehicleLabel(charge) || 'Veiculo nao informado';
     const reason = safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || charge.paymentType || 'Sem motivo').trim();
-    return `<div class="metric-line"><strong>${chargeDayLabel(charge)}</strong><span>${escapeHtml(vehicle)} · ${escapeHtml(reason)}</span><b>${fmtKWh(charge.energyKWh || 0)}</b></div>`;
+    const station = safeText(charge.station || charge.workName || 'Unidade').trim();
+    return `<div class="metric-line"><strong>${chargeDayLabel(charge)}</strong><span>${escapeHtml(station)} · ${escapeHtml(reason)}</span><b>${fmtKWh(charge.energyKWh || 0)}</b></div>`;
   }).join('');
   el.innerHTML = `
     <div class="metric-strip">
       <div class="metric-mini ${failed.length ? 'warn' : 'good'}"><span>Falhas 7 dias</span><strong>${failed.length}</strong><span>${recent.length} tentativa(s) recentes</span></div>
-      <div class="metric-mini ${kwid.length ? 'warn' : ''}"><span>Kwid nas falhas</span><strong>${kwid.length}</strong><span>${withVehicle.length ? `${fmtPct(kwid.length / Math.max(withVehicle.length, 1) * 100)} dos modelos informados` : 'sem modelo informado'}</span></div>
+      <div class="metric-mini ${failed.length ? 'warn' : 'good'}"><span>Taxa de erro</span><strong>${recent.length ? fmtPct(failed.length / recent.length * 100) : '0,00%'}</strong><span>falhas / tentativas recentes</span></div>
       <div class="metric-mini"><span>Principal motivo</span><strong style="font-size:14px;white-space:normal">${escapeHtml(topReason?.[0] || '-')}</strong><span>${topReason ? `${topReason[1]} ocorrencia(s)` : 'sem falhas'}</span></div>
     </div>
-    <div class="note">${mainRead} ${failed.length && !withVehicle.length ? 'Para levantar causa por modelo, a exportacao precisa trazer marca/modelo ou veiculo.' : ''}</div>
+    <div class="note">${failed.length ? 'Priorize os motivos mais repetidos antes de analisar campanha ou crescimento.' : 'Nenhuma falha detectada nos últimos 7 dias.'}</div>
     <div class="metric-lines">${failedLines || '<div class="metric-line"><strong>OK</strong><span>Nenhuma falha recente para listar.</span><b class="good">0</b></div>'}</div>
   `;
+}
+
+function clientRecurrenceStats(charges = []) {
+  const byClient = {};
+  charges.forEach(charge => {
+    const key = clientKeyFromCharge(charge);
+    if (!key) return;
+    byClient[key] = (byClient[key] || 0) + 1;
+  });
+  const total = Object.keys(byClient).length;
+  const recurring = Object.values(byClient).filter(count => count > 1).length;
+  return { total, recurring, pct: total ? recurring / total * 100 : 0 };
+}
+
+function unitMomentum(unit = {}) {
+  const rows = dailyOperationalRows(unit.charges || []);
+  const r7 = rangeRevenue(rows, 7, 0);
+  const p7 = rangeRevenue(rows, 7, 7);
+  const growth7 = pctChange(r7.revenue, p7.revenue);
+  const recent = recentCharges(unit.charges || [], 7).charges;
+  const failures = recent.filter(isFailedCharge).length;
+  const clients = clientRecurrenceStats(unit.charges || []);
+  const lastRevenue = rows[rows.length - 1]?.revenue || 0;
+  return { rows, r7, p7, growth7, failures, clients, lastRevenue };
+}
+
+function actionForUnit(unit = {}, momentum = unitMomentum(unit)) {
+  if (!unit.count) return { level: 'warn', label: 'Sem base ativa', detail: 'Subir ou atualizar planilha antes de avaliar.' };
+  if (momentum.failures > 0) return { level: 'warn', label: 'Falhas recentes', detail: `${momentum.failures} falha(s) nos últimos 7 dias. Ver status/modelo antes de campanha.` };
+  if (momentum.growth7 < -20) return { level: 'warn', label: 'Queda de receita', detail: `Receita 7d caiu ${fmtPct(Math.abs(momentum.growth7))}. Conferir demanda, cupom e disponibilidade.` };
+  if ((unit.revenue || 0) > 0 && (unit.count || 0) <= 3) return { level: 'warn', label: 'Baixa frequência', detail: 'Poucas sessões no período. Buscar clientes recorrentes no entorno.' };
+  if (momentum.growth7 > 20) return { level: 'good', label: 'Acelerar aquisição', detail: `Crescimento 7d de ${fmtPct(momentum.growth7)}. Vale reforçar divulgação local.` };
+  return { level: 'priority', label: 'Manter ritmo', detail: 'Operação estável. Monitorar recorrência e ticket médio.' };
+}
+
+function renderGeneralDecisionCockpit(unitData = [], charges = [], stationRows = []) {
+  const cockpit = document.getElementById('generalDecisionCockpit');
+  const growthEl = document.getElementById('generalGrowthRank');
+  const actionEl = document.getElementById('generalActionRank');
+  if (!cockpit || !growthEl || !actionEl) return;
+  const activeUnits = stationRows.filter(unit => unit.count > 0 || unit.revenue > 0);
+  if (!charges.length) {
+    cockpit.innerHTML = '<div class="decision-card warn" style="grid-column:1/-1"><div class="label">Cockpit</div><strong>Sem base consolidada</strong><p>Suba as planilhas das unidades para o painel gerar decisão por crescimento, alerta e recorrência.</p></div>';
+    growthEl.innerHTML = '<div class="note">Sem dados para ranking de crescimento.</div>';
+    actionEl.innerHTML = '<div class="note">Sem alertas enquanto não houver recargas salvas.</div>';
+    return;
+  }
+  const rows = dailyOperationalRows(charges);
+  const r3 = rangeRevenue(rows, 3, 0);
+  const p3 = rangeRevenue(rows, 3, 3);
+  const r7 = rangeRevenue(rows, 7, 0);
+  const p7 = rangeRevenue(rows, 7, 7);
+  const growth3 = pctChange(r3.revenue, p3.revenue);
+  const growth7 = pctChange(r7.revenue, p7.revenue);
+  const recurrence = clientRecurrenceStats(charges);
+  const failed7 = recentCharges(charges, 7).charges.filter(isFailedCharge).length;
+  const unitScores = activeUnits.map(unit => {
+    const momentum = unitMomentum(unit);
+    return { unit, momentum, action: actionForUnit(unit, momentum) };
+  });
+  const bestGrowth = [...unitScores].sort((a, b) => b.momentum.growth7 - a.momentum.growth7)[0];
+  const actionPriority = [...unitScores].sort((a, b) => {
+    const weight = { warn: 2, priority: 1, good: 0 };
+    return (weight[b.action.level] || 0) - (weight[a.action.level] || 0) || b.unit.revenue - a.unit.revenue;
+  });
+  const growthClass = value => value >= 0 ? 'good' : 'warn';
+  const growthText = value => `${value >= 0 ? '+' : ''}${fmtPct(value)}`;
+  const primaryAction = actionPriority[0];
+  cockpit.innerHTML = `
+    <div class="decision-card ${growthClass(growth7)}">
+      <div class="label">Ritmo da rede</div>
+      <strong>${growthText(growth7)} em 7 dias</strong>
+      <p>${fmtBRL(r7.revenue)} nos últimos 7 dias contra ${fmtBRL(p7.revenue)} nos 7 dias anteriores.</p>
+    </div>
+    <div class="decision-card ${growthClass(growth3)}">
+      <div class="label">Curto prazo</div>
+      <strong>${growthText(growth3)} em 3 dias</strong>
+      <p>${fmtBRL(r3.revenue)} nos últimos 3 dias. Bom para ver reação rápida a campanhas e falhas.</p>
+    </div>
+    <div class="decision-card priority">
+      <div class="label">Clientes</div>
+      <strong>${r7.newClients} novos em 7 dias</strong>
+      <p>Recorrência geral de ${fmtPct(recurrence.pct)} (${recurrence.recurring} de ${recurrence.total} clientes voltaram).</p>
+    </div>
+    <div class="decision-card ${failed7 ? 'warn' : 'good'}">
+      <div class="label">Ação agora</div>
+      <strong>${primaryAction ? primaryAction.action.label : 'Sem alerta'}</strong>
+      <p>${primaryAction ? `${primaryAction.unit.workName}: ${primaryAction.action.detail}` : `${failed7} falha(s) recentes detectadas.`}</p>
+    </div>
+  `;
+  growthEl.innerHTML = unitScores
+    .slice()
+    .sort((a, b) => b.momentum.growth7 - a.momentum.growth7)
+    .slice(0, 8)
+    .map(({ unit, momentum }) => `
+      <div class="action-row">
+        <div><strong>${escapeHtml(unit.workName)}</strong><span>${fmtBRL(momentum.r7.revenue)} nos ultimos 7 dias vs ${fmtBRL(momentum.p7.revenue)} nos 7 dias anteriores · ${momentum.r7.count} recarga(s)</span></div>
+        <b class="${growthClass(momentum.growth7)}">${growthText(momentum.growth7)}</b>
+      </div>
+    `).join('');
+  actionEl.innerHTML = actionPriority.slice(0, 8).map(({ unit, action, momentum }) => `
+    <div class="action-row">
+      <div><strong>${escapeHtml(unit.workName)}</strong><span>${escapeHtml(action.detail)}</span></div>
+      <b class="${action.level === 'warn' ? 'warn' : action.level === 'good' ? 'good' : ''}">${escapeHtml(action.label)}</b>
+    </div>
+  `).join('');
 }
 
 function usageSeries(charges = []) {
@@ -3483,19 +3626,22 @@ function renderGeral() {
   document.getElementById('generalSourceLabel').textContent = totalCharges
     ? `${units} estação(ões) com base salva - escolha uma para abrir`
     : 'Sem bases salvas para consolidar';
+  const occClass = totalOcc < 15 ? 'occ-red' : (totalOcc < 30 ? 'occ-yellow' : 'occ-green');
+  const occStatus = totalOcc < 15 ? 'abaixo do objetivo minimo de 15%' : (totalOcc < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
 
   document.getElementById('kpiGeneral').innerHTML = `
-    <div class="card"><div class="label">Receita total</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${units} unidade(s)</div></div>
+    <div class="card kpi-feature ${occClass}"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">${occStatus} · meta: 15% minimo / 30% ideal</div></div>
     <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div></div>
     <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${totalCharges ? (energy / totalCharges).toFixed(1).replace('.', ',') : '0,0'} kWh/sessao</div></div>
     <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
-    <div class="card"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">mes ate a planilha, igual ao mensal</div></div>
     <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.workName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
+    <div class="card kpi-feature revenue-card"><div class="label">Receita total</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${units} unidade(s) · ranking por faturamento</div></div>
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
     <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
   `;
+  renderGeneralDecisionCockpit(unitData, charges, stationRows);
   renderUsageInsights(charges, 'usageGeneral');
   renderGeneralFinance(unitData);
 
@@ -3625,6 +3771,7 @@ function renderMensal() {
 
   renderHero(charges, mk, window);
   renderKPIs(charges, mk, window);
+  enhanceIndividualKpis();
   renderPaymentChart(charges);
   renderUserPieChart(charges);
   renderUserBars(charges, 'userBars');
@@ -3668,6 +3815,8 @@ function renderKPIs(charges, mk, window) {
   const days    = Math.max(window.hours / 24, 1);
   const dMonth  = daysInMonth(mk.split('-')[0], mk.split('-')[1]);
   const proj    = dMonth / Math.max(days, 1);
+  const occClass = occ.pct < 15 ? 'occ-red' : (occ.pct < 30 ? 'occ-yellow' : 'occ-green');
+  const occStatus = occ.pct < 15 ? 'abaixo do objetivo minimo de 15%' : (occ.pct < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
 
   document.getElementById('kpiGrid').innerHTML = `
     <div class="card"><div class="label">Receita total</div>
@@ -3690,6 +3839,31 @@ function renderKPIs(charges, mk, window) {
       <div class="value">${fmtKWh(energy)}</div>
       <div class="sub">projeção ${fmtKWh(energy * proj)}</div></div>
   `;
+}
+
+function enhanceIndividualKpis() {
+  const grid = document.getElementById('kpiGrid');
+  if (!grid) return;
+  const cards = [...grid.children];
+  const byLabel = text => cards.find(card => normalizeTextForInsight(card.querySelector('.label')?.textContent || '').includes(text));
+  const occCard = byLabel('ocupacao');
+  const revenueCard = byLabel('receita total');
+  const ticketCard = byLabel('ticket');
+  const revKwhCard = byLabel('kwh medio');
+  const countCard = byLabel('total recargas');
+  const energyCard = byLabel('energia entregue');
+  if (occCard) {
+    const occValue = parseNumber(occCard.querySelector('.value')?.textContent || 0);
+    const occClass = occValue < 15 ? 'occ-red' : (occValue < 30 ? 'occ-yellow' : 'occ-green');
+    const occStatus = occValue < 15 ? 'abaixo do objetivo minimo de 15%' : (occValue < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
+    occCard.className = `card kpi-feature ${occClass}`;
+    const sub = occCard.querySelector('.sub');
+    if (sub) sub.textContent = `${occStatus} · meta: 15% minimo / 30% ideal`;
+  }
+  if (revenueCard) revenueCard.className = 'card kpi-feature revenue-card';
+  [occCard, ticketCard, revKwhCard, countCard, energyCard, revenueCard]
+    .filter(Boolean)
+    .forEach(card => grid.appendChild(card));
 }
 
 function renderPaymentChart(charges) {
