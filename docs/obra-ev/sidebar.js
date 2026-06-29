@@ -5,7 +5,7 @@
   const inObras = location.pathname.includes("/obra-ev/") || inPrototypes;
   const inRoot = !inAnalyzers && !inTasks && !inObras;
   const base = inAnalyzers ? "../" : inTasks ? "../obra-ev/" : inRoot ? "obra-ev/" : "./";
-  const home = inAnalyzers ? "../../" : inPrototypes ? "../../docs/" : inTasks ? "../" : inRoot ? "./" : "../";
+  const home = inAnalyzers ? "../index.html" : inPrototypes ? "../../docs/obra-ev/index.html" : inTasks ? "../obra-ev/index.html" : inRoot ? "obra-ev/index.html" : "index.html";
   const dashboardHref = inPrototypes ? "gestao_obra_ev.html" : base + "index.html";
   const engineeringHref = inPrototypes ? "../../docs/obra-ev/engenharia.html" : base + "engenharia.html";
   const analyzersHref = inPrototypes ? "../../docs/obra-ev/analisadores/dashboard.html" : base + "analisadores/dashboard.html";
