@@ -3726,7 +3726,10 @@ function renderGeral() {
   }
 
   const rankedUnits = stationRows.filter(unit => unit.count > 0 || unit.revenue > 0);
-  const unitLabels = rankedUnits.map(unit => unit.workName.length > 18 ? unit.workName.slice(0, 18) + '...' : unit.workName);
+  const unitLabels = rankedUnits.map(unit => {
+    const label = unit.stationName || unit.workName || '-';
+    return label.length > 24 ? label.slice(0, 24) + '...' : label;
+  });
   simpleBar('chartGeneralRevenueUnit', unitLabels, rankedUnits.map(unit => unit.revenue), 'Receita', '#57B7FF');
   simpleBar('chartGeneralEnergyUnit', unitLabels, rankedUnits.map(unit => unit.energy), 'kWh', '#246BFE');
 
