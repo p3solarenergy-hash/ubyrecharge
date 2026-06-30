@@ -488,6 +488,10 @@
       <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageGeneralDailyMetrics"></div></div>
       <div class="card"><h2>Relatório de erros</h2><div class="daily-metrics" id="usageGeneralRecentOps"></div></div>
     </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Análise operacional</h2><div class="daily-metrics" id="usageGeneralOperationQuality"></div></div>
+      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageGeneralAbsentClients"></div></div>
+    </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageGeneralDuration7"></canvas></div>
       <div class="card"><h2>Recargas nos últimos 7 dias</h2><canvas id="usageGeneralCount7"></canvas></div>
@@ -634,6 +638,10 @@
     <section class="section" style="margin-top:18px">
       <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageDailyMetrics"></div></div>
       <div class="card"><h2>Relatório de erros</h2><div class="daily-metrics" id="usageRecentOps"></div></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Análise operacional</h2><div class="daily-metrics" id="usageOperationQuality"></div></div>
+      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageAbsentClients"></div></div>
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageDuration7"></canvas></div>
@@ -2984,6 +2992,10 @@ function chargeDayLabel(charge) {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
 }
 
+function chargeDisplayDay(charge = {}) {
+  return charge?.startDate && !Number.isNaN(charge.startDate.getTime()) ? chargeDayLabel(charge) : 'Sem data';
+}
+
 function dailyFinancialSeries(charges = []) {
   const dated = charges.filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()));
   if (!dated.length) return { labels: [], revenue: [], idleValue: [] };
@@ -3091,6 +3103,136 @@ function isFailedCharge(charge = {}) {
   if (/(falha|erro|cancel|recus|negad|expir|timeout|interromp|incomplet|nao conclu|sem sucesso|failed|declin|invalid|invalido)/.test(text)) return true;
   if (/(aprov|pago|paid|approved|success|conclu|finaliz|complet)/.test(text)) return false;
   return Number(charge.energyKWh || 0) <= 0 && Number(charge.revenue || 0) <= 0;
+}
+
+function isExecutedCharge(charge = {}) {
+  const energy = Number(charge.energyKWh || 0);
+  const revenue = Number(charge.revenue || 0);
+  const durationHours = durToHours(charge.duration);
+  if (isFailedCharge(charge)) return false;
+  if (energy <= 0.2) return false;
+  if (durationHours > 0 && durationHours < 0.08 && energy < 1) return false;
+  if (durationHours <= 0 && revenue <= 0) return false;
+  return true;
+}
+
+function cleanOperationStats(charges = []) {
+  const executed = charges.filter(isExecutedCharge);
+  const removed = charges.filter(charge => !isExecutedCharge(charge));
+  const energy = executed.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const revenue = executed.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const duration = executed.reduce((sum, charge) => sum + durToHours(charge.duration), 0);
+  const failed = charges.filter(isFailedCharge);
+  const shortOrZero = removed.filter(charge => !isFailedCharge(charge));
+  return {
+    total: charges.length,
+    executed,
+    removed,
+    failed,
+    shortOrZero,
+    energy,
+    revenue,
+    duration,
+    avgKwh: executed.length ? energy / executed.length : 0,
+    avgTicket: executed.length ? revenue / executed.length : 0,
+    avgPower: duration > 0 ? energy / duration : 0,
+    validPct: charges.length ? executed.length / charges.length * 100 : 0
+  };
+}
+
+function clientDisplayName(charge = {}) {
+  return safeText(charge.userName || charge.userEmail || 'Cliente sem nome').trim();
+}
+
+function recurringAbsentClients(charges = [], recentDays = 7, minSessions = 2) {
+  const valid = charges
+    .filter(isExecutedCharge)
+    .filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()));
+  if (!valid.length) return [];
+  const maxDate = new Date(Math.max(...valid.map(charge => charge.startDate)));
+  const cutoff = new Date(maxDate);
+  cutoff.setDate(cutoff.getDate() - recentDays);
+  cutoff.setHours(0, 0, 0, 0);
+  const byClient = {};
+  valid.forEach(charge => {
+    const key = clientKeyFromCharge(charge);
+    if (!key) return;
+    if (!byClient[key]) {
+      byClient[key] = {
+        key,
+        name: clientDisplayName(charge),
+        email: charge.userEmail || '',
+        station: charge.station || charge.workName || '',
+        count: 0,
+        energy: 0,
+        revenue: 0,
+        lastDate: null,
+        dates: []
+      };
+    }
+    const item = byClient[key];
+    item.count += 1;
+    item.energy += Number(charge.energyKWh || 0);
+    item.revenue += Number(charge.revenue || 0);
+    item.dates.push(charge.startDate);
+    if (!item.lastDate || charge.startDate > item.lastDate) item.lastDate = charge.startDate;
+  });
+  return Object.values(byClient)
+    .filter(item => item.count >= minSessions && item.lastDate && item.lastDate < cutoff)
+    .map(item => {
+      item.daysAbsent = Math.max(0, Math.floor((maxDate - item.lastDate) / 86_400_000));
+      item.avgKwh = item.count ? item.energy / item.count : 0;
+      item.avgTicket = item.count ? item.revenue / item.count : 0;
+      return item;
+    })
+    .sort((a, b) => b.count - a.count || b.daysAbsent - a.daysAbsent || b.revenue - a.revenue);
+}
+
+function renderOperationQuality(prefix = 'usage', charges = []) {
+  const el = document.getElementById(`${prefix}OperationQuality`);
+  if (!el) return;
+  const stats = cleanOperationStats(charges);
+  const removedShare = stats.total ? stats.removed.length / stats.total * 100 : 0;
+  const qualityClass = removedShare > 15 ? 'warn' : 'good';
+  const removedLines = stats.removed.slice(0, 6).map(charge => {
+    const reason = isFailedCharge(charge)
+      ? safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || charge.paymentType || 'falha/erro').trim()
+      : 'baixo tempo, energia zerada ou sessão não executada';
+    return `<div class="metric-line"><strong>${chargeDisplayDay(charge)}</strong><span>${escapeHtml(clientDisplayName(charge))} · ${escapeHtml(reason)}</span><b class="warn">${fmtKWh(charge.energyKWh || 0)}</b></div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="metric-strip">
+      <div class="metric-mini good"><span>kWh médio válido</span><strong>${stats.avgKwh.toFixed(1).replace('.', ',')} kWh</strong><span>${stats.executed.length} sessão(ões) executada(s)</span></div>
+      <div class="metric-mini ${qualityClass}"><span>Tentativas fora da média</span><strong>${stats.removed.length}</strong><span>${fmtPct(removedShare)} da base removida do cálculo</span></div>
+      <div class="metric-mini"><span>Ticket válido</span><strong>${fmtBRL(stats.avgTicket)}</strong><span>somente recargas executadas</span></div>
+      <div class="metric-mini"><span>Potência média válida</span><strong>${stats.avgPower.toFixed(1).replace('.', ',')} kW</strong><span>kWh / horas conectadas válidas</span></div>
+    </div>
+    <div class="note">A média de kWh ignora falhas, sessões com energia zerada e tentativas muito curtas que distorcem a leitura operacional.</div>
+    <div class="metric-lines">${removedLines || '<div class="metric-line"><strong>OK</strong><span>Nenhuma tentativa removida da média limpa.</span><b class="good">100%</b></div>'}</div>
+  `;
+}
+
+function renderAbsentClientAlerts(prefix = 'usage', charges = []) {
+  const el = document.getElementById(`${prefix}AbsentClients`);
+  if (!el) return;
+  const absent = recurringAbsentClients(charges, 7, 2);
+  const activeRecurring = clientRecurrenceStats(charges.filter(isExecutedCharge));
+  const topLines = absent.slice(0, 8).map(client => `
+    <div class="metric-line">
+      <strong>${escapeHtml(client.name.split(' ').slice(0, 2).join(' '))}</strong>
+      <span>${client.count} recarga(s), ${fmtKWh(client.energy)}, ticket ${fmtBRL(client.avgTicket)} · última ${fmtDateOnly(client.lastDate)}${client.station ? ` · ${escapeHtml(client.station)}` : ''}</span>
+      <b class="warn">${client.daysAbsent}d</b>
+    </div>
+  `).join('');
+  el.innerHTML = `
+    <div class="metric-strip">
+      <div class="metric-mini ${absent.length ? 'warn' : 'good'}"><span>Recorrentes ausentes</span><strong>${absent.length}</strong><span>clientes sem uso nos últimos 7 dias</span></div>
+      <div class="metric-mini"><span>Base recorrente</span><strong>${activeRecurring.recurring}</strong><span>${fmtPct(activeRecurring.pct)} dos clientes já voltaram</span></div>
+      <div class="metric-mini"><span>Critério</span><strong>2+</strong><span>recargas válidas no histórico</span></div>
+    </div>
+    <div class="note">${absent.length ? 'Use esta lista para acionar clientes que já tinham hábito de uso e pararam recentemente.' : 'Nenhum cliente recorrente relevante sumiu nos últimos 7 dias da base.'}</div>
+    <div class="metric-lines">${topLines || '<div class="metric-line"><strong>OK</strong><span>Clientes recorrentes continuam aparecendo no período recente.</span><b class="good">0</b></div>'}</div>
+  `;
 }
 
 function renderDailyOperationalMetrics(prefix = 'usage', charges = []) {
@@ -3349,13 +3491,15 @@ function renderCouponSummary(id, details = []) {
   }).join('');
 }
 
-function renderUsageInsights(charges = [], prefix = 'usage') {
+function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = charges) {
   const data = usageSeries(charges);
   const daily = dailyFinancialSeries(charges);
   renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
   renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
   renderDailyOperationalMetrics(prefix, charges);
   renderRecentFailureDiagnostics(prefix, charges);
+  renderOperationQuality(prefix, charges);
+  renderAbsentClientAlerts(prefix, historyCharges);
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
   renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
@@ -3744,6 +3888,7 @@ function renderGeral() {
   const firstDate = dates.length ? new Date(Math.min(...dates)) : null;
   const lastDate = dates.length ? new Date(Math.max(...dates)) : null;
   const avgTicket = totalCharges ? revenue / totalCharges : 0;
+  const cleanStats = cleanOperationStats(charges);
   let totalMaxKWh = 0;
   const generalWindows = [];
   unitData.forEach(unit => {
@@ -3776,7 +3921,7 @@ function renderGeral() {
   document.getElementById('kpiGeneral').innerHTML = `
     <div class="card kpi-feature ${occClass}"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">${occStatus} · meta: 15% minimo / 30% ideal</div></div>
     <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div></div>
-    <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${totalCharges ? (energy / totalCharges).toFixed(1).replace('.', ',') : '0,0'} kWh/sessao</div></div>
+    <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida</div></div>
     <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
     <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.stationName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
     <div class="card kpi-feature revenue-card"><div class="label">Receita total</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${units} unidade(s) · ranking por faturamento</div></div>
@@ -3786,7 +3931,7 @@ function renderGeral() {
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
   `;
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
-  renderUsageInsights(charges, 'usageGeneral');
+  renderUsageInsights(charges, 'usageGeneral', sourceCharges);
   renderGeneralFinance(sourceUnitData);
 
   document.getElementById('generalUnitRank').innerHTML = stationRows.length ? stationRows.slice(0, 12).map(unit => `
@@ -3909,7 +4054,7 @@ function renderMensal() {
   const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
-  renderUsageInsights(monthCharges, 'usage');
+  renderUsageInsights(monthCharges, 'usage', allCharges);
   if (!charges.length) {
     setStorageState(`Sem recargas em ${periodModeLabel(window.mode)} para <strong>${currentWorkName}</strong>.`);
     renderMonthClosing(mk);
@@ -3954,7 +4099,8 @@ function renderKPIs(charges, mk, window) {
   const energy  = charges.reduce((s, c) => s + c.energyKWh, 0);
   const rev     = charges.reduce((s, c) => s + c.revenue, 0);
   const avgTkt  = charges.length ? rev / charges.length : 0;
-  const avgKwh  = charges.length ? energy / charges.length : 0;
+  const cleanStats = cleanOperationStats(charges);
+  const avgKwh  = cleanStats.avgKwh;
   const revKwh  = energy > 0 ? rev / energy : 0;
   const clients = new Set(charges.map(c => c.userEmail || c.userName)).size;
   const occ     = occByInterval(charges, undefined, window);
@@ -3975,7 +4121,7 @@ function renderKPIs(charges, mk, window) {
       <div class="sub">intervalo · mês cheio ${fmtPct(occFull.pct)}</div></div>
     <div class="card"><div class="label">Ticket médio</div>
       <div class="value">${fmtBRL(avgTkt)}</div>
-      <div class="sub">${avgKwh.toFixed(1).replace('.',',')} kWh por sessão</div></div>
+      <div class="sub">${avgKwh.toFixed(1).replace('.',',')} kWh por sessão válida</div></div>
     <div class="card"><div class="label">R$/kWh médio</div>
       <div class="value">${fmtBRL(revKwh)}</div>
       <div class="sub">receita ÷ energia</div></div>
@@ -4331,6 +4477,7 @@ function renderReviews(charges) {
 
 function renderTechDiagnostic(charges) {
   if (!charges.length) return;
+  const cleanStats = cleanOperationStats(charges);
   const energy     = charges.reduce((s,c) => s+c.energyKWh, 0);
   const rev        = charges.reduce((s,c) => s+c.revenue, 0);
   const power      = getPower();
@@ -4358,6 +4505,8 @@ function renderTechDiagnostic(charges) {
     <tr><td>Horas equivalentes a plena carga</td><td>${equivH.toFixed(1)} h</td><td>Energia vendida convertida em horas a ${power.toFixed(1)} kW</td></tr>
     <tr><td>Receita por hora conectada</td><td>${fmtBRL(revPerH)}</td><td>Receita bruta dividida por duração total</td></tr>
     <tr><td>Ritmo de uso</td><td>${rate.toFixed(2)} recargas/dia</td><td>Média no período exportado</td></tr>
+    <tr><td>kWh médio limpo</td><td>${cleanStats.avgKwh.toFixed(2).replace('.', ',')} kWh</td><td>Remove falhas, energia zerada e sessões muito curtas</td></tr>
+    <tr><td>Sessões válidas para média</td><td>${cleanStats.executed.length} de ${cleanStats.total}</td><td>${cleanStats.removed.length} tentativa(s) fora da média operacional</td></tr>
   `;
 }
 
