@@ -960,6 +960,9 @@ const appData = window.UBY_APP_DATA || {};
 let currentWorkId = new URLSearchParams(location.search).get('obra') || localStorage.getItem('uby-recargas-current-work') || 'rio';
 let currentWorkName = '';
 let currentStationReportName = '';
+const RECHARGE_STATION_BLOCKLIST_BY_WORK = {
+  malassise: ['posto prata', 'prata cambe', 'prata cambé', 'cambe', 'cambé']
+};
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }
@@ -1314,6 +1317,13 @@ function sameStationName(a, b) {
   return !!left && !!right && left === right;
 }
 
+function stationBlockedForWork(workId, stationName) {
+  const blockedTerms = RECHARGE_STATION_BLOCKLIST_BY_WORK[String(workId || '')] || [];
+  if (!blockedTerms.length) return false;
+  const stationText = normalizeStationForCompare(stationName);
+  return blockedTerms.some(term => stationText.includes(normalizeStationForCompare(term)));
+}
+
 function stationLooksRelatedToWork(station, workName) {
   const stationText = normalizeStationForCompare(station);
   const workText = normalizeStationForCompare(workName);
@@ -1343,7 +1353,9 @@ function applyStationReportFilter() {
 
 function applyRechargeRecord(record, sourceLabel) {
   syncGeneralRecordsFromLocal();
-  allCharges = (record?.charges || []).map(hydrateCharge);
+  allCharges = (record?.charges || [])
+    .map(hydrateCharge)
+    .filter(charge => !stationBlockedForWork(currentWorkId, charge.station));
   monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
   financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
   ubyOperationOverrides = record?.ubyOperationOverrides || record?.summary?.ubyOperationOverrides || {};
@@ -3429,7 +3441,9 @@ function getGeneralUnitData() {
   syncGeneralRecordsFromLocal();
   return Object.values(allRechargeRecords)
     .map(record => {
-      const charges = (record.charges || []).map(hydrateCharge);
+      const charges = (record.charges || [])
+        .map(hydrateCharge)
+        .filter(charge => !stationBlockedForWork(record.workId, charge.station));
       const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
       const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
       const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
