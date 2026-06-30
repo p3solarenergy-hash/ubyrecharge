@@ -959,6 +959,7 @@ const FINANCE_EXTRA_REVENUE_ITEMS = [
 const appData = window.UBY_APP_DATA || {};
 let currentWorkId = new URLSearchParams(location.search).get('obra') || localStorage.getItem('uby-recargas-current-work') || 'rio';
 let currentWorkName = '';
+let currentStationReportName = '';
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }
@@ -1273,6 +1274,10 @@ async function clearCloudRechargeBase() {
 }
 
 async function saveRechargeBase() {
+  if (currentStationReportName) {
+    setStorageState(`Visualizacao filtrada por estacao: <strong>${currentStationReportName}</strong>. A base completa nao foi sobrescrita.`, true);
+    return;
+  }
   if (!allCharges.length && !loadedFiles.length) {
     saveLocalRechargeBase();
     return;
@@ -1299,6 +1304,43 @@ async function saveRechargeBase() {
   }
 }
 
+function normalizeStationForCompare(value) {
+  return normalizeTextForInsight(safeText(value)).replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function sameStationName(a, b) {
+  const left = normalizeStationForCompare(a);
+  const right = normalizeStationForCompare(b);
+  return !!left && !!right && left === right;
+}
+
+function stationLooksRelatedToWork(station, workName) {
+  const stationText = normalizeStationForCompare(station);
+  const workText = normalizeStationForCompare(workName);
+  if (!stationText || !workText) return true;
+  if (stationText.includes(workText) || workText.includes(stationText)) return true;
+  const workTokens = new Set(workText.split(' ').filter(token => token.length >= 4));
+  const stationTokens = stationText.split(' ').filter(token => token.length >= 4);
+  return stationTokens.some(token => workTokens.has(token));
+}
+
+function stationMismatchMessage() {
+  if (currentStationReportName || !allCharges.length) return '';
+  const stations = [...new Set(allCharges.map(charge => safeText(charge.station).trim()).filter(Boolean))];
+  if (stations.length !== 1) return '';
+  const station = stations[0];
+  if (stationLooksRelatedToWork(station, currentWorkName)) return '';
+  return ` Atencao: a base salva nesta obra parece ser da estacao <strong>${station}</strong>. Se nao for este projeto, exclua esta base e importe a planilha no projeto correto.`;
+}
+
+function applyStationReportFilter() {
+  if (!currentStationReportName) return;
+  const stationName = currentStationReportName;
+  allCharges = allCharges.filter(charge => sameStationName(charge.station, stationName));
+  loadedFiles = loadedFiles.filter(file => !file.station || sameStationName(file.station, stationName));
+  monthlyClosings = {};
+}
+
 function applyRechargeRecord(record, sourceLabel) {
   syncGeneralRecordsFromLocal();
   allCharges = (record?.charges || []).map(hydrateCharge);
@@ -1315,13 +1357,15 @@ function applyRechargeRecord(record, sourceLabel) {
     importMode: file.importMode || 'merge',
     importedAt: file.importedAt || record.updatedAt || new Date().toISOString()
   }));
+  applyStationReportFilter();
   if (!allCharges.length) {
     uploadZone.classList.remove('compact');
     updateChips();
     document.getElementById('clearRechargeBaseBtn').style.display = 'none';
     document.getElementById('tabsBar').style.display = 'flex';
     document.getElementById('emptyState').style.display = 'none';
-    setStorageState(`Sem planilha salva para <strong>${currentWorkName}</strong>. O Painel Geral continua disponivel.`);
+    const targetName = currentStationReportName || currentWorkName;
+    setStorageState(`Sem planilha salva para <strong>${targetName}</strong>. O Painel Geral continua disponivel.`);
     if (openingWorkReport) return;
     renderGeral();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
@@ -1335,7 +1379,9 @@ function applyRechargeRecord(record, sourceLabel) {
   document.getElementById('emptyState').style.display = 'none';
   renderAll();
   const updated = record.updatedAt ? new Date(record.updatedAt).toLocaleString('pt-BR') : 'agora';
-  setStorageState(`Carregado de ${sourceLabel} para <strong>${currentWorkName}</strong>: ${loadedFiles.length} arquivo(s), ${allCharges.length} recarga(s). Ultima atualizacao: ${updated}.`);
+  const targetName = currentStationReportName || currentWorkName;
+  const filterNote = currentStationReportName ? ' Visualizacao filtrada por estacao; a base completa permanece preservada.' : stationMismatchMessage();
+  setStorageState(`Carregado de ${sourceLabel} para <strong>${targetName}</strong>: ${loadedFiles.length} arquivo(s), ${allCharges.length} recarga(s). Ultima atualizacao: ${updated}.${filterNote}`);
 }
 
 async function loadRechargeBase() {
@@ -1375,6 +1421,7 @@ function initWorkSelector() {
     document.getElementById('chargerPowerAcc').value = power;
   }
   selector.addEventListener('change', () => {
+    currentStationReportName = '';
     currentWorkId = selector.value;
     localStorage.setItem('uby-recargas-current-work', currentWorkId);
     currentWorkName = currentWork().nome || currentWorkId;
@@ -1387,9 +1434,10 @@ function initWorkSelector() {
   });
 }
 
-async function openWorkReport(workId, target = 'mensal') {
+async function openWorkReport(workId, target = 'mensal', stationName = '') {
   const selector = document.getElementById('workSelector');
   currentWorkId = String(workId || currentWorkId);
+  currentStationReportName = safeText(stationName).trim();
   localStorage.setItem('uby-recargas-current-work', currentWorkId);
   if (selector) selector.value = currentWorkId;
   currentWorkName = currentWork().nome || currentWorkId;
@@ -1445,6 +1493,7 @@ fileInput.addEventListener('change', e => {
 });
 
 function handleFiles(files) {
+  currentStationReportName = '';
   const selectedMonth = document.getElementById('importMonth')?.value || '';
   const importMode = document.getElementById('importMode')?.value || 'merge';
   if (!selectedMonth) {
@@ -3451,11 +3500,29 @@ function getAllGeneralCharges(unitData) {
 }
 
 function getGeneralStationRows(unitData) {
-  const byWork = new Map(unitData.map(unit => [unit.workId, unit]));
-  return workOptions().map(work => {
-    const existing = byWork.get(work.id);
-    if (existing) return existing;
-    return {
+  const stationRows = [];
+  unitData.forEach(unit => {
+    const byStation = new Map();
+    unit.charges.forEach(charge => {
+      const stationName = safeText(charge.station || unit.stationName || unit.workName).trim() || unit.workName;
+      if (!byStation.has(stationName)) byStation.set(stationName, []);
+      byStation.get(stationName).push(charge);
+    });
+    byStation.forEach((charges, stationName) => {
+      const summary = summarizeGeneralUnit(unit, charges);
+      stationRows.push({
+        ...summary,
+        stationName,
+        stations: [stationName],
+        files: (unit.files || []).filter(file => !file.station || sameStationName(file.station, stationName))
+      });
+    });
+  });
+
+  const workIdsWithData = new Set(stationRows.map(row => row.workId));
+  workOptions().forEach(work => {
+    if (workIdsWithData.has(work.id)) return;
+    stationRows.push({
       workId: work.id,
       workName: work.nome || work.id,
       stationName: work.nome || work.id,
@@ -3471,8 +3538,10 @@ function getGeneralStationRows(unitData) {
       lastDate: null,
       acdc: generalAcDcStats([]),
       updatedAt: ''
-    };
-  }).sort((a, b) => {
+    });
+  });
+
+  return stationRows.sort((a, b) => {
     const revenueDiff = (Number(b.revenue) || 0) - (Number(a.revenue) || 0);
     if (Math.abs(revenueDiff) > 0.009) return revenueDiff;
     const countDiff = (Number(b.count) || 0) - (Number(a.count) || 0);
@@ -3607,7 +3676,7 @@ function renderUbyOperation() {
       <td>${row.energy.toFixed(2).replace('.', ',')}</td>
       <td>${fmtBRL(row.revenue)}</td>
       <td>${row.ruleSource}</td>
-      <td><button class="btn-open" onclick="openWorkReport('${escapeAttr(row.workId)}','mensal')">Abrir</button></td>
+      <td><button class="btn-open" onclick="openWorkReport('${escapeAttr(row.workId)}','mensal','${escapeAttr(row.station)}')">Abrir</button></td>
     </tr>
   `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:20px">Sem carregadores com base salva.</td></tr>';
 }
@@ -3695,7 +3764,7 @@ function renderGeral() {
     <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div></div>
     <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${totalCharges ? (energy / totalCharges).toFixed(1).replace('.', ',') : '0,0'} kWh/sessao</div></div>
     <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
-    <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.workName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
+    <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.stationName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
     <div class="card kpi-feature revenue-card"><div class="label">Receita total</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${units} unidade(s) · ranking por faturamento</div></div>
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
@@ -3711,14 +3780,14 @@ function renderGeral() {
       <div><strong>${unit.stationName}</strong><span>Obra: ${unit.workName} - ${unit.files.length} arquivo(s) - ${unit.clients} cliente(s)</span></div>
       <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
       <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">AC ${unit.acdc.acCharges} / DC ${unit.acdc.dcCharges}</div></div>
-      <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal')">Abrir estação</button></div>
+      <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir estação</button></div>
     </div>
   `).join('') : '<div class="note">Nenhuma obra cadastrada para abrir.</div>';
 
   document.getElementById('generalUnitTable').innerHTML = stationRows.length ? stationRows.map(unit => `
     <tr>
       <td>${unit.stationName}</td><td>${unit.workName}</td><td>${unit.files.length}</td><td>${unit.count}</td><td>${unit.clients}</td>
-      <td>${unit.energy.toFixed(2).replace('.', ',')}</td><td>${fmtBRL(unit.revenue)}</td><td>${unit.acdc.acCharges}</td><td>${unit.acdc.dcCharges}</td><td>${unit.acdc.acChargers}</td><td>${unit.acdc.dcChargers}</td><td>${fmtBRL(unit.avgTicket)}</td><td>${fmtDT(unit.lastDate)}</td><td><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal')">Abrir</button></td>
+      <td>${unit.energy.toFixed(2).replace('.', ',')}</td><td>${fmtBRL(unit.revenue)}</td><td>${unit.acdc.acCharges}</td><td>${unit.acdc.dcCharges}</td><td>${unit.acdc.acChargers}</td><td>${unit.acdc.dcChargers}</td><td>${fmtBRL(unit.avgTicket)}</td><td>${fmtDT(unit.lastDate)}</td><td><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir</button></td>
     </tr>
   `).join('') : '<tr><td colspan="14" style="color:var(--p3-muted);text-align:center;padding:20px">Sem obras para abrir</td></tr>';
 
