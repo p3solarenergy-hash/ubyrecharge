@@ -1942,7 +1942,8 @@ function monthKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 }
 function chargeMonthKey(charge) {
-  return charge?._month || monthKey(charge?.startDate);
+  const realMonth = monthKey(charge?.startDate);
+  return realMonth !== 'unknown' ? realMonth : (charge?._month || 'unknown');
 }
 function monthLabel(key) {
   const n = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -1951,9 +1952,10 @@ function monthLabel(key) {
 }
 function daysInMonth(y, m) { return new Date(+y, +m, 0).getDate(); }
 function getMonths() {
+  const validClosings = Object.keys(monthlyClosings || {}).filter(mk => closingMatchesMonth(monthlyClosings[mk], mk));
   return [...new Set([
     ...allCharges.map(chargeMonthKey),
-    ...Object.keys(monthlyClosings || {})
+    ...validClosings
   ])]
     .filter(k => k !== 'unknown').sort();
 }
@@ -2009,6 +2011,7 @@ function buildMonthClosing(mk) {
 
 function monthSummaryFromClosing(closing) {
   if (!closing) return null;
+  if (!closingMatchesMonth(closing, closing.month)) return null;
   return {
     label: monthLabel(closing.month),
     mk: closing.month,
@@ -2021,6 +2024,18 @@ function monthSummaryFromClosing(closing) {
     avgTkt: Number(closing.averageTicket) || 0,
     fromClosing: true
   };
+}
+
+function closingMatchesMonth(closing, mk = closing?.month) {
+  if (!closing || !mk) return false;
+  const first = parseDate(closing.firstDate);
+  const last = parseDate(closing.lastDate);
+  if (!first && !last) return false;
+  const firstMonth = first ? monthKey(first) : '';
+  const lastMonth = last ? monthKey(last) : '';
+  if (firstMonth && firstMonth !== mk) return false;
+  if (lastMonth && lastMonth !== mk) return false;
+  return true;
 }
 
 function monthSummaryForMonth(mk, power = getPower()) {
