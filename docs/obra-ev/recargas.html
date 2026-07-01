@@ -961,6 +961,15 @@ let ubyOperationOverrides = {};
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
+const CALENDAR_CONTEXT_CACHE_KEY = 'uby-recargas-calendar-context-v1';
+const CALENDAR_CONTEXT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const WEATHER_LOCATIONS = [
+  { key: 'londrina', name: 'Londrina', lat: -23.3045, lon: -51.1696, aliases: ['londrina', 'rio beach', 'santarem', 'sabar', 'araguaia'] },
+  { key: 'cambe', name: 'Cambé', lat: -23.2758, lon: -51.2784, aliases: ['cambe', 'cambé', 'prata'] },
+  { key: 'maringa', name: 'Maringá', lat: -23.4205, lon: -51.9333, aliases: ['maringa', 'maringá', 'robert koch', 'malassise r k', 'rk'] },
+  { key: 'curitiba', name: 'Curitiba', lat: -25.4284, lon: -49.2733, aliases: ['curitiba'] },
+  { key: 'sao-paulo', name: 'São Paulo', lat: -23.5505, lon: -46.6333, aliases: ['sao paulo', 'são paulo', 'sp'] }
+];
 const FINANCE_COST_ITEMS = [
   ['fixedRent', 'Aluguel fixo / vaga'],
   ['insurance', 'Seguranca'],
@@ -3137,11 +3146,14 @@ function addDays(date, days) {
   return next;
 }
 
-function contextTagsForDate(date) {
+function contextTagsForDate(date, external = {}) {
   const tags = [];
   const day = date.getDate();
   const month = date.getMonth() + 1;
   const weekday = date.getDay();
+  const dateKey = dateKeyLocal(date);
+  const apiHoliday = external.holidays?.[dateKey];
+  if (apiHoliday) tags.push({ text: apiHoliday, type: 'warn' });
   const fixed = {
     '1-1': 'Confraternização',
     '4-21': 'Tiradentes',
@@ -3156,7 +3168,7 @@ function contextTagsForDate(date) {
     '12-25': 'Natal'
   };
   const fixedLabel = fixed[`${month}-${day}`];
-  if (fixedLabel) tags.push({ text: fixedLabel, type: 'warn' });
+  if (fixedLabel && !apiHoliday) tags.push({ text: fixedLabel, type: 'warn' });
   const easter = easterDate(date.getFullYear());
   const movable = new Map([
     [dateKeyLocal(addDays(easter, -48)), 'Carnaval'],
@@ -3171,8 +3183,109 @@ function contextTagsForDate(date) {
   if (day >= 1 && day <= 7) tags.push({ text: 'Janela salário', type: 'muted' });
   if (day >= 20 && day <= 25) tags.push({ text: 'Fim de mês', type: 'muted' });
   if (day >= 10 && day <= 15) tags.push({ text: 'Vale/adiantamento', type: 'muted' });
-  tags.push({ text: 'Clima: integrar API', type: 'muted' });
-  return tags.slice(0, 5);
+  const weather = external.weather?.[dateKey];
+  if (weather) {
+    if (weather.rain > 0.5) tags.push({ text: `Chuva ${weather.rain.toFixed(1).replace('.', ',')}mm`, type: 'warn' });
+    else tags.push({ text: weather.label, type: 'muted' });
+    if (Number.isFinite(weather.tMax)) tags.push({ text: `${Math.round(weather.tMin)}-${Math.round(weather.tMax)}°C`, type: 'muted' });
+  } else if (external.loading) {
+    tags.push({ text: 'Clima carregando', type: 'muted' });
+  } else {
+    tags.push({ text: 'Clima indisponível', type: 'muted' });
+  }
+  return tags.slice(0, 6);
+}
+
+function calendarContextCache() {
+  return readJson(CALENDAR_CONTEXT_CACHE_KEY, {});
+}
+
+function writeCalendarContextCache(cache) {
+  tryWriteJson(CALENDAR_CONTEXT_CACHE_KEY, cache);
+}
+
+async function cachedFetchJson(cacheKey, url, ttl = CALENDAR_CONTEXT_TTL_MS) {
+  const cache = calendarContextCache();
+  const hit = cache[cacheKey];
+  if (hit?.updatedAt && Date.now() - hit.updatedAt < ttl) return hit.data;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Falha API ${response.status}`);
+  const data = await response.json();
+  cache[cacheKey] = { updatedAt: Date.now(), data };
+  writeCalendarContextCache(cache);
+  return data;
+}
+
+function weatherCodeLabel(code) {
+  const n = Number(code);
+  if ([0].includes(n)) return 'Céu limpo';
+  if ([1, 2, 3].includes(n)) return 'Nublado';
+  if ([45, 48].includes(n)) return 'Neblina';
+  if ([51, 53, 55, 56, 57].includes(n)) return 'Garoa';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(n)) return 'Chuva';
+  if ([95, 96, 99].includes(n)) return 'Temporal';
+  return 'Clima normal';
+}
+
+async function fetchBrazilHolidays(year) {
+  try {
+    const url = `https://date.nager.at/api/v4/Holidays/BR/${year}`;
+    const rows = await cachedFetchJson(`holidays-BR-${year}`, url, 30 * 24 * 60 * 60 * 1000);
+    const map = {};
+    (rows || []).forEach(item => {
+      if (!item?.date) return;
+      map[item.date] = item.localName || item.name || 'Feriado';
+    });
+    return map;
+  } catch (err) {
+    return {};
+  }
+}
+
+function calendarLocationForCharges(charges = []) {
+  const scores = WEATHER_LOCATIONS.map(location => ({ ...location, score: 0 }));
+  const workText = safeText(`${currentWorkName} ${currentWork()?.local || ''} ${currentWork()?.cliente || ''}`);
+  charges.forEach(charge => {
+    const haystack = normalizeTextForInsight(`${charge.station || ''} ${charge.workName || ''} ${workText}`);
+    scores.forEach(location => {
+      if (location.aliases.some(alias => haystack.includes(normalizeTextForInsight(alias)))) location.score += 1;
+    });
+  });
+  const best = scores.sort((a, b) => b.score - a.score)[0];
+  return best?.score > 0 ? best : WEATHER_LOCATIONS[0];
+}
+
+async function fetchWeatherContext(charges = [], startDate, endDate) {
+  const location = calendarLocationForCharges(charges);
+  try {
+    const params = new URLSearchParams({
+      latitude: String(location.lat),
+      longitude: String(location.lon),
+      start_date: dateKeyLocal(startDate),
+      end_date: dateKeyLocal(endDate),
+      daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum',
+      timezone: 'America/Sao_Paulo'
+    });
+    const url = `https://archive-api.open-meteo.com/v1/archive?${params.toString()}`;
+    const data = await cachedFetchJson(`weather-${location.key}-${dateKeyLocal(startDate)}-${dateKeyLocal(endDate)}`, url);
+    const map = {};
+    const daily = data?.daily || {};
+    (daily.time || []).forEach((date, index) => {
+      const rain = Number(daily.precipitation_sum?.[index] || 0);
+      const code = daily.weather_code?.[index];
+      map[date] = {
+        location: location.name,
+        rain,
+        code,
+        label: weatherCodeLabel(code),
+        tMax: Number(daily.temperature_2m_max?.[index]),
+        tMin: Number(daily.temperature_2m_min?.[index])
+      };
+    });
+    return { map, location };
+  } catch (err) {
+    return { map: {}, location, error: err.message };
+  }
 }
 
 function calendarBoundsFromCharges(charges = []) {
@@ -3212,28 +3325,42 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
   const historyMap = dailyMapForCalendar(historyCharges);
   const first = new Date(bounds.year, bounds.month, 1);
   const totalDays = daysInMonth(bounds.year, bounds.month + 1);
-  const blanks = Array.from({ length: first.getDay() }, () => '<div class="calendar-day empty"></div>').join('');
-  const weekHeads = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(day => `<div class="calendar-head">${day}</div>`).join('');
-  const days = Array.from({ length: totalDays }, (_, index) => {
-    const date = new Date(bounds.year, bounds.month, index + 1);
-    const key = dateKeyLocal(date);
-    const item = currentMap[key] || { revenue: 0, count: 0, energy: 0, failed: 0 };
-    const prevDate = sameDayPreviousMonth(date);
-    const prev = historyMap[dateKeyLocal(prevDate)] || { revenue: 0, count: 0, energy: 0, failed: 0 };
-    const change = pctChange(item.revenue, prev.revenue);
-    const hasMovement = item.count > 0 || item.revenue > 0;
-    const cls = !hasMovement ? '' : (change >= 10 ? 'good' : (change <= -10 ? 'down' : 'warn'));
-    const changeText = prev.revenue > 0 || item.revenue > 0 ? `${change >= 0 ? '+' : ''}${fmtPct(change)} vs ${String(prevDate.getDate()).padStart(2,'0')}/${String(prevDate.getMonth()+1).padStart(2,'0')}` : 'sem base mês anterior';
-    const tags = contextTagsForDate(date).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
-    return `<div class="calendar-day ${cls}">
-      <div class="day-num"><span>${index + 1}</span><span>${item.failed ? `${item.failed} erro(s)` : ''}</span></div>
-      <div class="day-main">${fmtBRL(item.revenue)}</div>
-      <div class="day-sub">${item.count} recarga(s) · ${fmtKWh(item.energy)}</div>
-      <div class="day-sub">${changeText}</div>
-      <div class="calendar-tags">${tags}</div>
-    </div>`;
-  }).join('');
-  el.innerHTML = `<div class="calendar-grid">${weekHeads}${blanks}${days}</div>`;
+  const firstDay = new Date(bounds.year, bounds.month, 1);
+  const lastDay = new Date(bounds.year, bounds.month, totalDays);
+  const build = (external = {}) => {
+    const blanks = Array.from({ length: first.getDay() }, () => '<div class="calendar-day empty"></div>').join('');
+    const weekHeads = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(day => `<div class="calendar-head">${day}</div>`).join('');
+    const locationLabel = external.location?.name ? `<div class="note" style="margin-bottom:10px">Clima via Open-Meteo: ${escapeHtml(external.location.name)}. Feriados via Nager.Date Brasil.</div>` : '';
+    const days = Array.from({ length: totalDays }, (_, index) => {
+      const date = new Date(bounds.year, bounds.month, index + 1);
+      const key = dateKeyLocal(date);
+      const item = currentMap[key] || { revenue: 0, count: 0, energy: 0, failed: 0 };
+      const prevDate = sameDayPreviousMonth(date);
+      const prev = historyMap[dateKeyLocal(prevDate)] || { revenue: 0, count: 0, energy: 0, failed: 0 };
+      const change = pctChange(item.revenue, prev.revenue);
+      const hasMovement = item.count > 0 || item.revenue > 0;
+      const cls = !hasMovement ? '' : (change >= 10 ? 'good' : (change <= -10 ? 'down' : 'warn'));
+      const changeText = prev.revenue > 0 || item.revenue > 0 ? `${change >= 0 ? '+' : ''}${fmtPct(change)} vs ${String(prevDate.getDate()).padStart(2,'0')}/${String(prevDate.getMonth()+1).padStart(2,'0')}` : 'sem base mês anterior';
+      const tags = contextTagsForDate(date, external).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
+      return `<div class="calendar-day ${cls}">
+        <div class="day-num"><span>${index + 1}</span><span>${item.failed ? `${item.failed} erro(s)` : ''}</span></div>
+        <div class="day-main">${fmtBRL(item.revenue)}</div>
+        <div class="day-sub">${item.count} recarga(s) · ${fmtKWh(item.energy)}</div>
+        <div class="day-sub">${changeText}</div>
+        <div class="calendar-tags">${tags}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML = `${locationLabel}<div class="calendar-grid">${weekHeads}${blanks}${days}</div>`;
+  };
+  build({ loading: true });
+  Promise.all([
+    fetchBrazilHolidays(bounds.year),
+    fetchWeatherContext(charges, firstDay, lastDay)
+  ]).then(([holidays, weather]) => {
+    build({ holidays, weather: weather.map, location: weather.location });
+  }).catch(() => {
+    build({});
+  });
 }
 
 function pctChange(current = 0, previous = 0) {
