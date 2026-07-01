@@ -4072,14 +4072,13 @@ function summarizeGeneralUnit(unit, charges) {
   };
 }
 
-function filterGeneralUnitDataByMonth(unitData, monthKeyValue) {
+function filterGeneralUnitDataByMonth(unitData, monthKeyValue, keepEmpty = false) {
   if (!monthKeyValue) return unitData;
-  return unitData
-    .map(unit => summarizeGeneralUnit(
+  const filtered = unitData.map(unit => summarizeGeneralUnit(
       unit,
       unit.charges.filter(charge => chargeMonthKey(charge) === monthKeyValue)
-    ))
-    .filter(unit => unit.count > 0)
+    ));
+  return (keepEmpty ? filtered : filtered.filter(unit => unit.count > 0))
     .sort((a, b) => b.revenue - a.revenue);
 }
 
@@ -4100,6 +4099,15 @@ function getGeneralStationRows(unitData) {
       if (!byStation.has(stationName)) byStation.set(stationName, []);
       byStation.get(stationName).push(charge);
     });
+    if (!byStation.size) {
+      const summary = summarizeGeneralUnit(unit, []);
+      stationRows.push({
+        ...summary,
+        stationName: unit.stationName || unit.workName,
+        stations: unit.stations || [],
+        files: unit.files || []
+      });
+    }
     byStation.forEach((charges, stationName) => {
       const summary = summarizeGeneralUnit(unit, charges);
       stationRows.push({
@@ -4310,6 +4318,9 @@ function renderGeral() {
   const isGeneralMonthView = generalViewMode !== 'accumulated' && !!currentGeneralMonth;
   const unitData = isGeneralMonthView ? filterGeneralUnitDataByMonth(sourceUnitData, currentGeneralMonth) : sourceUnitData;
   const stationRows = getGeneralStationRows(unitData);
+  const rankingUnitData = currentGeneralMonth ? filterGeneralUnitDataByMonth(sourceUnitData, currentGeneralMonth, true) : sourceUnitData;
+  const rankingStationRows = getGeneralStationRows(rankingUnitData);
+  const accumulatedStationRows = getGeneralStationRows(sourceUnitData);
   const charges = getAllGeneralCharges(unitData);
   const acdc = generalAcDcStats(charges);
   const units = unitData.length;
@@ -4368,16 +4379,16 @@ function renderGeral() {
   renderUsageInsights(charges, 'usageGeneral', sourceCharges);
   renderGeneralFinance(sourceUnitData);
 
-  document.getElementById('generalUnitRank').innerHTML = stationRows.length ? stationRows.slice(0, 12).map(unit => `
+  document.getElementById('generalUnitRank').innerHTML = rankingStationRows.length ? rankingStationRows.slice(0, 12).map(unit => `
     <div class="unit-card">
-      <div><strong>${unit.stationName}</strong><span>Obra: ${unit.workName} - ${unit.files.length} arquivo(s) - ${unit.clients} cliente(s)</span></div>
+      <div><strong>${unit.stationName}</strong><span>Obra: ${unit.workName} - ${monthLabel(currentGeneralMonth) || 'mês atual'} - ${unit.clients} cliente(s)</span></div>
       <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
       <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">AC ${unit.acdc.acCharges} / DC ${unit.acdc.dcCharges}</div></div>
       <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir estação</button></div>
     </div>
   `).join('') : '<div class="note">Nenhuma obra cadastrada para abrir.</div>';
 
-  document.getElementById('generalUnitTable').innerHTML = stationRows.length ? stationRows.map(unit => `
+  document.getElementById('generalUnitTable').innerHTML = accumulatedStationRows.length ? accumulatedStationRows.map(unit => `
     <tr>
       <td>${unit.stationName}</td><td>${unit.workName}</td><td>${unit.files.length}</td><td>${unit.count}</td><td>${unit.clients}</td>
       <td>${unit.energy.toFixed(2).replace('.', ',')}</td><td>${fmtBRL(unit.revenue)}</td><td>${unit.acdc.acCharges}</td><td>${unit.acdc.dcCharges}</td><td>${unit.acdc.acChargers}</td><td>${unit.acdc.dcChargers}</td><td>${fmtBRL(unit.avgTicket)}</td><td>${fmtDT(unit.lastDate)}</td><td><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir</button></td>
@@ -4402,7 +4413,7 @@ function renderGeral() {
     });
   }
 
-  const rankedUnits = stationRows.filter(unit => unit.count > 0 || unit.revenue > 0);
+  const rankedUnits = rankingStationRows.filter(unit => unit.count > 0 || unit.revenue > 0);
   const unitLabels = rankedUnits.map(unit => {
     const label = unit.stationName || unit.workName || '-';
     return label.length > 24 ? label.slice(0, 24) + '...' : label;
