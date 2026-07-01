@@ -353,6 +353,7 @@
     <div class="tabs">
       <button class="tab active" onclick="switchTab('geral',this)">Geral</button>
       <button class="tab" onclick="switchTab('uby',this)">UBY</button>
+      <button class="tab" onclick="switchTab('clube',this)">Clube UBY</button>
       <button class="tab" onclick="switchTab('financeiroGeral',this)">Financeiro geral</button>
     </div>
     <div class="controls" id="ctrlGeral">
@@ -367,6 +368,10 @@
     <div class="controls" id="ctrlFinanceiroGeral" style="display:none">
       <span>Consolidado financeiro das bases salvas</span>
       <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar financeiro</button>
+    </div>
+    <div class="controls" id="ctrlClube" style="display:none">
+      <span>Ranking por pontos: R$ 1 gasto = 1 ponto</span>
+      <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar clube</button>
     </div>
   </div>
 
@@ -444,7 +449,7 @@
     <p class="up-hint" style="font-size:11px;color:#4a6058;margin-top:3px">
       Use consolidar para somar vários carregadores no mesmo mês. Use substituir quando a planilha já for o fechamento completo.
     </p>
-    <input type="file" id="fileInput" accept=".xlsx,.xls" multiple>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple>
     <div class="file-chips" id="fileChips"></div>
     <div id="uploadFeedback"></div>
   </label>
@@ -549,6 +554,50 @@
           <table>
             <thead><tr><th>Estação</th><th>Obra</th><th>Arquivos</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Total AC</th><th>Total DC</th><th>Carreg. AC</th><th>Carreg. DC</th><th>Ticket medio</th><th>Ultima recarga</th><th>Abrir</th></tr></thead>
             <tbody id="generalUnitTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="tabClube" style="display:none">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/04_simbolo_badge.svg" alt="UBY"></div>
+          <div>
+            <div class="brand-name">Clube UBY</div>
+            <div class="brand-tag">Fidelidade, premiações e parcerias</div>
+          </div>
+        </div>
+        <h1>Ranking do Clube UBY</h1>
+        <p id="clubHeroMeta">Carregando ranking dos clientes...</p>
+      </div>
+      <div class="hero-formula" id="clubHeroFormula">
+        Cada R$ 1 gasto gera 1 ponto no clube.
+      </div>
+    </section>
+
+    <section class="kpis" id="clubKpis"></section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Premiações ativas</h2>
+        <div class="action-list" id="clubRewards"></div>
+      </div>
+      <div class="card">
+        <h2>Top 3 do clube</h2>
+        <div class="action-list" id="clubTop3"></div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Ranking de clientes</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Posição</th><th>Cliente</th><th>Telefone</th><th>E-mail</th><th>Pontos</th><th>Faturamento</th><th>kWh</th><th>Recargas</th><th>Última recarga</th><th>Benefício</th></tr></thead>
+            <tbody id="clubRankingTable"></tbody>
           </table>
         </div>
       </div>
@@ -1566,7 +1615,7 @@ function handleFiles(files) {
     return;
   }
   Array.from(files || [])
-    .filter(f => f?.name && /\.(xlsx|xls)$/i.test(String(f.name)))
+    .filter(f => f?.name && /\.(xlsx|xls|csv)$/i.test(String(f.name)))
     .forEach(f => {
       f.month = selectedMonth;
       f.importMode = importMode;
@@ -1827,6 +1876,39 @@ function detectRechargeLayout(rows = []) {
   for (let rowIndex = 0; rowIndex < scanRows.length; rowIndex++) {
     const headers = scanRows[rowIndex] || [];
     if (
+      hasHeader(headers, ['Aplicativo']) &&
+      hasHeader(headers, ['Motorista']) &&
+      hasHeader(headers, ['E-mail do motorista']) &&
+      hasHeader(headers, ['Início da Transação', 'Inicio da Transacao'])
+    ) {
+      return {
+        type: 'spott',
+        platform: 'Spott',
+        headerRow: rowIndex,
+        allowMultiMonth: false,
+        cols: {
+          date: findColumnIndex(headers, ['Data']),
+          station: findColumnIndex(headers, ['Local']),
+          company: findColumnIndex(headers, ['Empresa']),
+          app: findColumnIndex(headers, ['Aplicativo']),
+          driver: findColumnIndex(headers, ['Motorista']),
+          email: findColumnIndex(headers, ['E-mail do motorista', 'Email do motorista', 'E-mail']),
+          charger: findColumnIndex(headers, ['Carregador']),
+          energy: findColumnIndex(headers, ['Energia']),
+          totalValue: findColumnIndex(headers, ['Valor']),
+          vehicle: findColumnIndex(headers, ['Veículo', 'Veiculo']),
+          startLocal: findColumnIndex(headers, ['Início da Transação', 'Inicio da Transacao']),
+          endCharge: findColumnIndex(headers, ['Fim do Carregamento']),
+          endLocal: findColumnIndex(headers, ['Fim da Transação', 'Fim da Transacao']),
+          voucher: findColumnIndex(headers, ['Cupom']),
+          sponsor: findColumnIndex(headers, ['Patrocinador']),
+          duration: findColumnIndex(headers, ['Duração', 'Duracao']),
+          status: findColumnIndex(headers, ['Recargas', 'Status']),
+          phone: findColumnIndex(headers, ['Telefone', 'Celular', 'Telefone celular', 'Phone', 'Mobile', 'WhatsApp', 'Whatsapp'])
+        }
+      };
+    }
+    if (
       hasHeader(headers, ['E-mail']) &&
       hasHeader(headers, ['Estacao', 'Estação']) &&
       hasHeader(headers, ['ID da Transacao', 'ID da Transação']) &&
@@ -1887,6 +1969,40 @@ function rowHasData(row = []) {
   return row.some(value => String(value ?? '').trim() !== '');
 }
 
+function parseCsvRows(text = '') {
+  const rows = [];
+  let row = [];
+  let value = '';
+  let quoted = false;
+  const input = String(text || '').replace(/^\uFEFF/, '');
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+    const next = input[i + 1];
+    if (char === '"') {
+      if (quoted && next === '"') {
+        value += '"';
+        i++;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === ',' && !quoted) {
+      row.push(value);
+      value = '';
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && next === '\n') i++;
+      row.push(value);
+      if (row.some(cell => String(cell).trim() !== '')) rows.push(row);
+      row = [];
+      value = '';
+    } else {
+      value += char;
+    }
+  }
+  row.push(value);
+  if (row.some(cell => String(cell).trim() !== '')) rows.push(row);
+  return rows;
+}
+
 function rowCellText(row = [], index = -1) {
   return String(readCell(row, index) || '').trim();
 }
@@ -1905,6 +2021,53 @@ function normalizeGoGridStation(value = '') {
 }
 
 function parseRechargeRow(row = [], layout = {}, file = {}) {
+  if (layout.type === 'spott') {
+    const cols = layout.cols || {};
+    const email = rowCellText(row, cols.email);
+    const driver = rowCellText(row, cols.driver);
+    const station = rowCellText(row, cols.station);
+    const charger = rowCellText(row, cols.charger);
+    const startStr = rowCellText(row, cols.startLocal);
+    const endStr = rowCellText(row, cols.endLocal) || rowCellText(row, cols.endCharge);
+    const startDate = parseDate(startStr);
+    const endDate = parseDate(endStr);
+    const energy = parseNumber(readCell(row, cols.energy));
+    const revenue = parseNumber(readCell(row, cols.totalValue));
+    const vehicle = rowCellText(row, cols.vehicle);
+    if (!station && !driver && !email && !startStr && !energy && !revenue) return null;
+    const vehicleParts = vehicle.split(/\s+/).filter(Boolean);
+    return {
+      workId:        currentWorkId,
+      workName:      currentWorkName,
+      _file:         file.name,
+      sourcePlatform:'Spott',
+      id:            [station, charger, email || driver, startStr].filter(Boolean).join('|'),
+      station,
+      connType:      charger,
+      userName:      driver || (email ? email.split('@')[0] : ''),
+      userEmail:     email,
+      userPhone:     rowCellText(row, cols.phone),
+      startStr,
+      endStr,
+      startDate,
+      endDate,
+      duration:      rowCellText(row, cols.duration),
+      energyKWh:     energy,
+      revenue,
+      paymentType:   rowCellText(row, cols.app),
+      paymentStatus: rowCellText(row, cols.status),
+      idleTime:      '',
+      idleValue:     0,
+      voucher:       rowCellText(row, cols.voucher),
+      rating:        '',
+      reviewComment: '',
+      vehicleBrand:  vehicleParts[0] || '',
+      vehicleModel:  vehicleParts.slice(1).join(' '),
+      failureReason: '',
+      rawStatus:     rowCellText(row, cols.status)
+    };
+  }
+
   if (layout.type === 'gogrid') {
     const cols = layout.cols || {};
     const id = rowCellText(row, cols.transactionId);
@@ -1988,8 +2151,9 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
 
 function readFile(file) {
   setFeedback('⏳ Lendo planilha...', 'up-loading');
+  const isCsvFile = /\.csv$/i.test(String(file?.name || ''));
 
-  if (typeof XLSX === 'undefined') {
+  if (!isCsvFile && typeof XLSX === 'undefined') {
     setFeedback('❌ Biblioteca SheetJS não carregou. Verifique sua conexão e recarregue a página.', 'up-error');
     loadedFiles = loadedFiles.filter(f => f !== file);
     return;
@@ -1998,10 +2162,13 @@ function readFile(file) {
   const reader = new FileReader();
   reader.onload = async e => {
     try {
-      const wb   = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-      const ws   = wb.Sheets['Recargas'] || wb.Sheets[wb.SheetNames[0]];
-      if (!ws) throw new Error('Aba "Recargas" não encontrada no arquivo.');
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+      let rows = [];
+      if (isCsvFile) {
+        rows = parseCsvRows(new TextDecoder('utf-8').decode(e.target.result));
+      } else {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        rows = rechargeSheetRows(wb).rows;
+      }
       if (rows.length < 2) throw new Error('Planilha sem dados de recargas.');
 
       const layout = detectRechargeLayout(rows);
@@ -2011,7 +2178,7 @@ function readFile(file) {
       const reviewCommentCol = findColumnIndex(headers, ['Comentário', 'Comentario', 'Comentários', 'Comentarios', 'Comentário da avaliação', 'Comentario da avaliacao'], -1);
       const selectedMonth = file.month || document.getElementById('importMonth')?.value || '';
       const importedCharges = [];
-      if (layout.type === 'gogrid') {
+      if (layout.type === 'gogrid' || layout.type === 'spott') {
         for (let i = layout.headerRow + 1; i < rows.length; i++) {
           const r = rows[i];
           if (!r || !rowHasData(r)) continue;
@@ -2115,6 +2282,8 @@ function parseDate(s) {
   if (typeof s === 'number') return excelSerialToDate(s);
   const raw = String(s).trim();
   let m = raw.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +(m[6] || 0));
+  m = raw.match(/(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
   if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +(m[6] || 0));
   m = raw.match(/(\d{4})-(\d{2})-(\d{2})(?:[T\s]+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
   if (m) return new Date(+m[1], +m[2]-1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
@@ -4248,6 +4417,93 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
   return rows.sort((a, b) => Number(b.included) - Number(a.included) || b.revenue - a.revenue);
 }
 
+function clubClientRows(charges = []) {
+  const byClient = new Map();
+  charges.forEach(charge => {
+    const key = clientKeyFromCharge(charge);
+    if (!key) return;
+    if (!byClient.has(key)) {
+      byClient.set(key, {
+        key,
+        name: charge.userName || charge.userEmail || 'Cliente sem nome',
+        email: charge.userEmail || '',
+        phone: charge.userPhone || '',
+        revenue: 0,
+        energy: 0,
+        count: 0,
+        lastDate: null
+      });
+    }
+    const row = byClient.get(key);
+    if (!row.phone && charge.userPhone) row.phone = charge.userPhone;
+    if (!row.email && charge.userEmail) row.email = charge.userEmail;
+    if ((!row.name || row.name === 'Cliente sem nome') && (charge.userName || charge.userEmail)) row.name = charge.userName || charge.userEmail;
+    row.revenue += Number(charge.revenue || 0);
+    row.energy += Number(charge.energyKWh || 0);
+    row.count += 1;
+    if (!row.lastDate || (charge.startDate && charge.startDate > row.lastDate)) row.lastDate = charge.startDate;
+  });
+  return [...byClient.values()]
+    .map(row => ({ ...row, points: Math.floor(Math.max(0, row.revenue)) }))
+    .sort((a, b) => b.revenue - a.revenue || b.energy - a.energy || b.count - a.count);
+}
+
+function clubBenefitForPosition(position) {
+  if (position <= 3) return 'Top 3: 30% em alinhamento e balanceamento + 10% Muffatão';
+  return '10% em todos os serviços da rede Muffatão Autocenter';
+}
+
+function renderClub() {
+  const unitData = getGeneralUnitData();
+  const charges = getAllGeneralCharges(unitData).filter(charge => Number(charge.revenue || 0) > 0);
+  const rows = clubClientRows(charges);
+  const totalPoints = rows.reduce((sum, row) => sum + row.points, 0);
+  const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0);
+  const withPhone = rows.filter(row => row.phone).length;
+  const top3 = rows.slice(0, 3);
+
+  document.getElementById('clubHeroMeta').innerHTML = rows.length
+    ? `<strong>${rows.length}</strong> participante(s) com consumo pago<br>${fmtBRL(totalRevenue)} em faturamento elegível<br>${totalPoints.toLocaleString('pt-BR')} ponto(s) gerados`
+    : 'Nenhum cliente com faturamento pago para pontuar ainda.';
+  document.getElementById('clubHeroFormula').innerHTML =
+    '<strong>Regra atual</strong><br>R$ 1 gasto = 1 ponto no Clube UBY.<br>Top 3 ganham 30% de desconto em alinhamento e balanceamento.<br>Todos os participantes ganham 10% em serviços da rede Muffatão Autocenter.';
+
+  document.getElementById('clubKpis').innerHTML = `
+    <div class="card"><div class="label">Participantes</div><div class="value">${rows.length}</div><div class="sub">clientes com faturamento pago</div></div>
+    <div class="card"><div class="label">Pontos emitidos</div><div class="value">${totalPoints.toLocaleString('pt-BR')}</div><div class="sub">1 ponto por real gasto</div></div>
+    <div class="card"><div class="label">Receita elegível</div><div class="value">${fmtBRL(totalRevenue)}</div><div class="sub">base do ranking</div></div>
+    <div class="card"><div class="label">Com telefone</div><div class="value">${withPhone}</div><div class="sub">${rows.length ? fmtPct(withPhone / rows.length * 100) : '0,00%'} dos participantes</div></div>
+  `;
+
+  document.getElementById('clubRewards').innerHTML = `
+    <div class="action-row"><div><strong>Top 3</strong><span>30% de desconto em alinhamento e balanceamento.</span></div><b class="good">Ativo</b></div>
+    <div class="action-row"><div><strong>Todos os participantes</strong><span>10% de desconto em todos os serviços da rede Muffatão Autocenter.</span></div><b class="good">Ativo</b></div>
+  `;
+
+  document.getElementById('clubTop3').innerHTML = top3.length ? top3.map((row, index) => `
+    <div class="action-row">
+      <div><strong>${index + 1}. ${escapeHtml(row.name)}</strong><span>${row.points.toLocaleString('pt-BR')} ponto(s) · ${fmtBRL(row.revenue)} · ${row.phone ? `Tel: ${escapeHtml(row.phone)}` : 'sem telefone'}</span></div>
+      <b class="good">30%</b>
+    </div>
+  `).join('') : '<div class="note">Sem participantes elegíveis ainda.</div>';
+
+  document.getElementById('clubRankingTable').innerHTML = rows.length ? rows.map((row, index) => {
+    const position = index + 1;
+    return `<tr>
+      <td>${position}</td>
+      <td>${escapeHtml(row.name)}</td>
+      <td>${row.phone ? escapeHtml(row.phone) : '-'}</td>
+      <td>${row.email ? escapeHtml(row.email) : '-'}</td>
+      <td>${row.points.toLocaleString('pt-BR')}</td>
+      <td>${fmtBRL(row.revenue)}</td>
+      <td>${row.energy.toFixed(2).replace('.', ',')}</td>
+      <td>${row.count}</td>
+      <td>${fmtDT(row.lastDate)}</td>
+      <td>${escapeHtml(clubBenefitForPosition(position))}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem clientes elegíveis no clube.</td></tr>';
+}
+
 async function toggleUbyOperation(workId, key, checked) {
   syncGeneralRecordsFromLocal();
   const db = localRechargeDb();
@@ -4512,6 +4768,7 @@ function renderGeral() {
 function renderAll() {
   const visibleTab =
     document.getElementById('tabFinanceiroGeral').style.display === 'block' ? 'financeiroGeral' :
+    document.getElementById('tabClube').style.display === 'block' ? 'clube' :
     document.getElementById('tabUby').style.display === 'block' ? 'uby' :
     document.getElementById('tabMensal').style.display === 'block' ? 'mensal' :
     document.getElementById('tabAcumulado').style.display === 'block' ? 'acumulado' :
@@ -4535,10 +4792,12 @@ function renderAll() {
   renderFinanceiro();
   renderGeral();
   renderUbyOperation();
+  renderClub();
 
   document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${visibleTab}'`)));
   showTab(visibleTab);
   if (visibleTab === 'uby') renderUbyOperation();
+  if (visibleTab === 'clube') renderClub();
   if (visibleTab === 'detalhes') renderDetalhes();
   if (visibleTab === 'financeiro') renderFinanceiro();
   if (visibleTab === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
@@ -5150,23 +5409,26 @@ function renderDetalhes() {
 function showTab(name) {
   const isGeneral = name === 'geral';
   const isUby = name === 'uby';
+  const isClub = name === 'clube';
   const isGeneralFinance = name === 'financeiroGeral';
-  const isWorkReport = !isGeneral && !isUby && !isGeneralFinance && name !== 'none';
+  const isWorkReport = !isGeneral && !isUby && !isClub && !isGeneralFinance && name !== 'none';
   document.getElementById('tabGeral').style.display     = name === 'geral'     ? 'block' : 'none';
   document.getElementById('tabUby').style.display       = name === 'uby'       ? 'block' : 'none';
+  document.getElementById('tabClube').style.display     = name === 'clube'     ? 'block' : 'none';
   document.getElementById('tabFinanceiroGeral').style.display = name === 'financeiroGeral' ? 'block' : 'none';
   document.getElementById('tabMensal').style.display    = name === 'mensal'    ? 'block' : 'none';
   document.getElementById('tabAcumulado').style.display = name === 'acumulado' ? 'block' : 'none';
   document.getElementById('tabFinanceiro').style.display = name === 'financeiro' ? 'block' : 'none';
   document.getElementById('tabDetalhes').style.display  = name === 'detalhes'  ? 'block' : 'none';
   document.getElementById('ctrlGeral').style.display    = (isGeneral || isUby) ? 'flex'  : 'none';
+  document.getElementById('ctrlClube').style.display    = isClub ? 'flex' : 'none';
   document.getElementById('ctrlFinanceiroGeral').style.display = name === 'financeiroGeral' ? 'flex' : 'none';
   document.getElementById('ctrlMensal').style.display   = name === 'mensal'    ? 'flex'  : 'none';
   document.getElementById('ctrlAcc').style.display      = name === 'acumulado' ? 'flex'  : 'none';
   document.getElementById('ctrlFinanceiro').style.display = name === 'financeiro' ? 'flex' : 'none';
   document.getElementById('workReportTabs').style.display = isWorkReport ? 'flex' : 'none';
-  document.querySelector('.project-bar').style.display   = (isGeneral || isUby || isGeneralFinance) ? 'none' : '';
-  document.getElementById('uploadZone').style.display    = (isGeneral || isUby || isGeneralFinance) ? 'none' : '';
+  document.querySelector('.project-bar').style.display   = (isGeneral || isUby || isClub || isGeneralFinance) ? 'none' : '';
+  document.getElementById('uploadZone').style.display    = (isGeneral || isUby || isClub || isGeneralFinance) ? 'none' : '';
 }
 
 function hideAllTabs() { showTab('none'); }
@@ -5177,6 +5439,7 @@ function switchTab(name, btn) {
   showTab(name);
   if (name === 'geral') renderGeral();
   if (name === 'uby') renderUbyOperation();
+  if (name === 'clube') renderClub();
   if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
   if (name === 'detalhes') renderDetalhes();
   if (name === 'financeiro') renderFinanceiro();
