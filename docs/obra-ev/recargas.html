@@ -967,6 +967,7 @@ const WEATHER_LOCATIONS = [
   { key: 'londrina', name: 'Londrina', lat: -23.3045, lon: -51.1696, aliases: ['londrina', 'rio beach', 'santarem', 'sabar', 'araguaia'] },
   { key: 'cambe', name: 'Cambé', lat: -23.2758, lon: -51.2784, aliases: ['cambe', 'cambé', 'prata'] },
   { key: 'maringa', name: 'Maringá', lat: -23.4205, lon: -51.9333, aliases: ['maringa', 'maringá', 'robert koch', 'malassise r k', 'rk'] },
+  { key: 'cascavel', name: 'Cascavel', lat: -24.9555, lon: -53.4552, aliases: ['cascavel'] },
   { key: 'curitiba', name: 'Curitiba', lat: -25.4284, lon: -49.2733, aliases: ['curitiba'] },
   { key: 'sao-paulo', name: 'São Paulo', lat: -23.5505, lon: -46.6333, aliases: ['sao paulo', 'são paulo', 'sp'] }
 ];
@@ -1045,6 +1046,11 @@ function workOptions() {
         id,
         nome: detail.project.obraNome || id,
         cliente: detail.project.cliente || '',
+        local: detail.project.local || '',
+        cidade: detail.project.cidade || '',
+        uf: detail.project.uf || '',
+        weatherLat: detail.project.weatherLat || detail.project.latitude || detail.project.lat || '',
+        weatherLon: detail.project.weatherLon || detail.project.longitude || detail.project.lng || detail.project.lon || '',
         kw: Number(detail.project.qtdCarregadores || 1) * Number(detail.project.potenciaCarregador || 60)
       });
     }
@@ -3242,9 +3248,32 @@ async function fetchBrazilHolidays(year) {
   }
 }
 
+function validCoordinate(value) {
+  const n = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+function workWeatherLocation(work = currentWork()) {
+  const lat = validCoordinate(work?.weatherLat ?? work?.latitude ?? work?.lat);
+  const lon = validCoordinate(work?.weatherLon ?? work?.longitude ?? work?.lng ?? work?.lon);
+  if (lat !== null && lon !== null) {
+    return {
+      key: `custom-${work?.id || 'obra'}-${lat.toFixed(4)}-${lon.toFixed(4)}`,
+      name: work?.cidade || work?.local || work?.nome || 'Local da obra',
+      lat,
+      lon,
+      source: 'obra'
+    };
+  }
+  return null;
+}
+
 function calendarLocationForCharges(charges = []) {
+  const custom = workWeatherLocation();
+  if (custom) return custom;
   const scores = WEATHER_LOCATIONS.map(location => ({ ...location, score: 0 }));
-  const workText = safeText(`${currentWorkName} ${currentWork()?.local || ''} ${currentWork()?.cliente || ''}`);
+  const work = currentWork();
+  const workText = safeText(`${currentWorkName} ${work?.local || ''} ${work?.cidade || ''} ${work?.uf || ''} ${work?.cliente || ''}`);
   charges.forEach(charge => {
     const haystack = normalizeTextForInsight(`${charge.station || ''} ${charge.workName || ''} ${workText}`);
     scores.forEach(location => {
