@@ -510,6 +510,7 @@
     </section>
     <section class="section" style="margin-top:18px">
       <div class="card"><h2>Análise operacional</h2><div class="daily-metrics" id="usageGeneralOperationQuality"></div></div>
+      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics" id="usageGeneralNewClients"></div></div>
       <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageGeneralAbsentClients"></div></div>
     </section>
     <section class="section usage-grid" style="margin-top:18px">
@@ -664,6 +665,7 @@
     </section>
     <section class="section" style="margin-top:18px">
       <div class="card"><h2>Análise operacional</h2><div class="daily-metrics" id="usageOperationQuality"></div></div>
+      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics" id="usageNewClients"></div></div>
       <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageAbsentClients"></div></div>
     </section>
     <section class="section usage-grid" style="margin-top:18px">
@@ -1845,6 +1847,7 @@ function detectRechargeLayout(rows = []) {
           totalValue: findColumnIndex(headers, ['Valor Total']),
           energyValue: findColumnIndex(headers, ['Valor da Energia']),
           paymentType: findColumnIndex(headers, ['Forma de Pagamento']),
+          phone: findColumnIndex(headers, ['Telefone', 'Celular', 'Telefone celular', 'Phone', 'Mobile', 'WhatsApp', 'Whatsapp']),
           startLocal: findColumnIndex(headers, ['Inicio (Horario Local)', 'Início (Horário Local)']),
           endLocal: findColumnIndex(headers, ['Fim (Horario Local)', 'Fim (Horário Local)']),
           duration: findColumnIndex(headers, ['Duracao', 'Duração']),
@@ -1869,6 +1872,7 @@ function detectRechargeLayout(rows = []) {
     allowMultiMonth: false,
     cols: {
       voucher: findColumnIndex(headers, ['Voucher utilizado', 'Voucher'], 26),
+      phone: findColumnIndex(headers, ['Telefone', 'Celular', 'Telefone celular', 'Phone', 'Mobile', 'WhatsApp', 'Whatsapp']),
       rating: findColumnIndex(headers, ['AvaliaÃ§Ã£o', 'Avaliacao'], 27),
       reviewComment: findColumnIndex(headers, ['ComentÃ¡rio', 'Comentario', 'ComentÃ¡rios', 'Comentarios', 'ComentÃ¡rio da avaliaÃ§Ã£o', 'Comentario da avaliacao'], -1),
       vehicleBrand: findColumnIndex(headers, ['Marca', 'Marca do Veiculo', 'Marca do Veículo', 'Fabricante']),
@@ -1924,6 +1928,7 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
       connType:      rowCellText(row, cols.plug) ? `Plug ${rowCellText(row, cols.plug)}` : '',
       userName:      email ? email.split('@')[0] : '',
       userEmail:     email,
+      userPhone:     rowCellText(row, cols.phone),
       startStr,
       endStr,
       startDate,
@@ -1960,6 +1965,7 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
     connType:      String(row[3] || '').trim(),
     userName:      String(row[4] || '').trim(),
     userEmail:     String(row[5] || '').trim(),
+    userPhone:     String(readCell(row, cols.phone) || '').trim(),
     startStr, endStr,
     startDate,
     endDate,
@@ -3654,6 +3660,53 @@ function renderAbsentClientAlerts(prefix = 'usage', charges = []) {
   `;
 }
 
+function newClientRows(charges = [], historyCharges = charges) {
+  const firstByClient = {};
+  (historyCharges?.length ? historyCharges : charges)
+    .filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()))
+    .slice()
+    .sort((a, b) => a.startDate - b.startDate)
+    .forEach(charge => {
+      const key = clientKeyFromCharge(charge);
+      if (!key || firstByClient[key]) return;
+      firstByClient[key] = charge;
+    });
+  const periodKeys = new Set(charges.map(clientKeyFromCharge).filter(Boolean));
+  return Object.entries(firstByClient)
+    .filter(([key, charge]) => periodKeys.has(key) && charges.some(item => item === charge || rechargeUniqueKey(item) === rechargeUniqueKey(charge)))
+    .map(([, charge]) => ({
+      name: charge.userName || charge.userEmail || 'Cliente sem nome',
+      phone: charge.userPhone || '',
+      email: charge.userEmail || '',
+      firstDate: charge.startDate,
+      revenue: Number(charge.revenue || 0),
+      energy: Number(charge.energyKWh || 0)
+    }))
+    .sort((a, b) => b.firstDate - a.firstDate);
+}
+
+function renderNewClients(prefix = 'usage', charges = [], historyCharges = charges) {
+  const el = document.getElementById(`${prefix}NewClients`);
+  if (!el) return;
+  const rows = newClientRows(charges, historyCharges);
+  const withPhone = rows.filter(row => row.phone).length;
+  const topLines = rows.slice(0, 12).map(row => `
+    <div class="metric-line">
+      <strong>${escapeHtml(row.name)}</strong>
+      <span>${row.phone ? `Tel: ${escapeHtml(row.phone)}` : 'Telefone não informado'}${row.email ? ` · ${escapeHtml(row.email)}` : ''}</span>
+      <b>${fmtDT(row.firstDate)}</b>
+    </div>
+  `).join('');
+  el.innerHTML = `
+    <div class="metric-strip">
+      <div class="metric-mini ${rows.length ? 'good' : ''}"><span>Novos no período</span><strong>${rows.length}</strong><span>primeira recarga registrada</span></div>
+      <div class="metric-mini"><span>Com telefone</span><strong>${withPhone}</strong><span>${rows.length ? fmtPct(withPhone / rows.length * 100) : '0,00%'} da lista</span></div>
+      <div class="metric-mini"><span>Receita inicial</span><strong>${fmtBRL(rows.reduce((sum, row) => sum + row.revenue, 0))}</strong><span>${fmtKWh(rows.reduce((sum, row) => sum + row.energy, 0))}</span></div>
+    </div>
+    <div class="metric-lines">${topLines || '<div class="metric-line"><strong>Sem novos clientes</strong><span>Nenhum primeiro uso identificado neste período.</span><b>0</b></div>'}</div>
+  `;
+}
+
 function renderDailyOperationalMetrics(prefix = 'usage', charges = [], historyCharges = charges) {
   const el = document.getElementById(`${prefix}DailyMetrics`);
   if (!el) return;
@@ -3932,6 +3985,7 @@ function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = ch
   renderDailyOperationalMetrics(prefix, charges, historyCharges);
   renderRecentFailureDiagnostics(prefix, charges);
   renderOperationQuality(prefix, charges);
+  renderNewClients(prefix, charges, historyCharges);
   renderAbsentClientAlerts(prefix, historyCharges);
   renderOperationalCalendar(prefix, charges, historyCharges);
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
