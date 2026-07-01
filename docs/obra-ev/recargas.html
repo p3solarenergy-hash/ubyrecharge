@@ -161,6 +161,20 @@
     .kpi-feature.occ-green .value { color:#38C96F; }
     .kpi-feature.revenue-card { border-left-color:#57B7FF; background:linear-gradient(135deg,rgba(45,127,249,.24),#0B1524); }
     .kpi-feature.revenue-card .value { color:#57B7FF; }
+    .calendar-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:10px; }
+    .calendar-head { color:var(--p3-muted); font-size:11px; text-transform:uppercase; font-weight:700; letter-spacing:.5px; padding:0 4px; }
+    .calendar-day { min-height:142px; background:#0B1524; border:1px solid var(--p3-border); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:7px; }
+    .calendar-day.empty { opacity:.35; background:transparent; }
+    .calendar-day.good { border-left:4px solid #38C96F; }
+    .calendar-day.warn { border-left:4px solid var(--p3-warn); }
+    .calendar-day.down { border-left:4px solid #E64B4B; }
+    .calendar-day .day-num { display:flex; justify-content:space-between; gap:8px; color:var(--p3-text); font-weight:800; font-size:13px; }
+    .calendar-day .day-main { color:var(--p3-primary); font-size:17px; font-weight:800; line-height:1.1; }
+    .calendar-day .day-sub { color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .calendar-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:auto; }
+    .calendar-tag { background:rgba(45,127,249,.16); color:#BFD8FF; border:1px solid rgba(45,127,249,.25); border-radius:999px; padding:2px 7px; font-size:10px; line-height:1.4; }
+    .calendar-tag.warn { background:rgba(242,169,61,.16); color:#FFD66B; border-color:rgba(242,169,61,.25); }
+    .calendar-tag.muted { background:rgba(143,163,154,.10); color:var(--p3-muted); border-color:rgba(143,163,154,.18); }
 
     /* ── NOVO: Upload zone ── */
     .upload-zone {
@@ -312,6 +326,7 @@
       .general-split { grid-template-columns:1fr; }
       .metric-strip { grid-template-columns:1fr; }
       .decision-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .calendar-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
       .kpi-feature { grid-column:span 2; }
     }
     @media (max-width:960px) {
@@ -327,6 +342,7 @@
       .unit-card .unit-value,.unit-card .unit-sub { text-align:left; }
       .unit-actions { justify-content:flex-start; }
       .ai-insights { grid-template-columns:1fr; }
+      .calendar-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
   </style>
 </head>
@@ -492,6 +508,9 @@
       <div class="card"><h2>Análise operacional</h2><div class="daily-metrics" id="usageGeneralOperationQuality"></div></div>
       <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageGeneralAbsentClients"></div></div>
     </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Calendário operacional</h2><div id="usageGeneralCalendar"></div></div>
+    </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageGeneralDuration7"></canvas></div>
       <div class="card"><h2>Recargas nos últimos 7 dias</h2><canvas id="usageGeneralCount7"></canvas></div>
@@ -642,6 +661,9 @@
     <section class="section" style="margin-top:18px">
       <div class="card"><h2>Análise operacional</h2><div class="daily-metrics" id="usageOperationQuality"></div></div>
       <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageAbsentClients"></div></div>
+    </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Calendário operacional</h2><div id="usageCalendar"></div></div>
     </section>
     <section class="section section-3 usage-grid" style="margin-top:18px">
       <div class="card"><h2>Duração nos últimos 7 dias (h)</h2><canvas id="usageDuration7"></canvas></div>
@@ -3080,6 +3102,140 @@ function rangeRevenue(rows = [], days = 1, offsetDays = 0) {
   };
 }
 
+function dateKeyLocal(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function sameDayPreviousMonth(date) {
+  const prev = new Date(date.getFullYear(), date.getMonth() - 1, 1);
+  const day = Math.min(date.getDate(), daysInMonth(prev.getFullYear(), prev.getMonth() + 1));
+  prev.setDate(day);
+  return prev;
+}
+
+function easterDate(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function contextTagsForDate(date) {
+  const tags = [];
+  const day = date.getDate();
+  const month = date.getMonth() + 1;
+  const weekday = date.getDay();
+  const fixed = {
+    '1-1': 'Confraternização',
+    '4-21': 'Tiradentes',
+    '5-1': 'Dia do Trabalho',
+    '6-12': 'Dia dos Namorados',
+    '7-9': 'Feriado SP',
+    '9-7': 'Independência',
+    '10-12': 'N. Sra. Aparecida',
+    '11-2': 'Finados',
+    '11-15': 'República',
+    '11-20': 'Consciência Negra',
+    '12-25': 'Natal'
+  };
+  const fixedLabel = fixed[`${month}-${day}`];
+  if (fixedLabel) tags.push({ text: fixedLabel, type: 'warn' });
+  const easter = easterDate(date.getFullYear());
+  const movable = new Map([
+    [dateKeyLocal(addDays(easter, -48)), 'Carnaval'],
+    [dateKeyLocal(addDays(easter, -47)), 'Carnaval'],
+    [dateKeyLocal(addDays(easter, -2)), 'Sexta-feira Santa'],
+    [dateKeyLocal(easter), 'Páscoa'],
+    [dateKeyLocal(addDays(easter, 60)), 'Corpus Christi']
+  ]);
+  const movableLabel = movable.get(dateKeyLocal(date));
+  if (movableLabel) tags.push({ text: movableLabel, type: 'warn' });
+  if (weekday === 0 || weekday === 6) tags.push({ text: 'Fim de semana', type: 'muted' });
+  if (day >= 1 && day <= 7) tags.push({ text: 'Janela salário', type: 'muted' });
+  if (day >= 20 && day <= 25) tags.push({ text: 'Fim de mês', type: 'muted' });
+  if (day >= 10 && day <= 15) tags.push({ text: 'Vale/adiantamento', type: 'muted' });
+  tags.push({ text: 'Clima: integrar API', type: 'muted' });
+  return tags.slice(0, 5);
+}
+
+function calendarBoundsFromCharges(charges = []) {
+  const dated = charges.filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()));
+  if (!dated.length) return null;
+  const maxDate = new Date(Math.max(...dated.map(charge => charge.startDate)));
+  return {
+    year: maxDate.getFullYear(),
+    month: maxDate.getMonth()
+  };
+}
+
+function dailyMapForCalendar(charges = []) {
+  const map = {};
+  charges.forEach(charge => {
+    if (!charge.startDate || Number.isNaN(charge.startDate.getTime())) return;
+    const key = dateKeyLocal(charge.startDate);
+    if (!map[key]) map[key] = { revenue: 0, count: 0, energy: 0, failed: 0 };
+    map[key].revenue += Number(charge.revenue || 0);
+    map[key].count += 1;
+    map[key].energy += Number(charge.energyKWh || 0);
+    if (isFailedCharge(charge)) map[key].failed += 1;
+  });
+  return map;
+}
+
+function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharges = charges) {
+  const el = document.getElementById(`${prefix}Calendar`);
+  if (!el) return;
+  const bounds = calendarBoundsFromCharges(charges);
+  if (!bounds) {
+    el.innerHTML = '<div class="note">Sem datas validas para montar o calendario operacional.</div>';
+    return;
+  }
+  const monthCharges = charges.filter(charge => charge.startDate && charge.startDate.getFullYear() === bounds.year && charge.startDate.getMonth() === bounds.month);
+  const currentMap = dailyMapForCalendar(monthCharges);
+  const historyMap = dailyMapForCalendar(historyCharges);
+  const first = new Date(bounds.year, bounds.month, 1);
+  const totalDays = daysInMonth(bounds.year, bounds.month + 1);
+  const blanks = Array.from({ length: first.getDay() }, () => '<div class="calendar-day empty"></div>').join('');
+  const weekHeads = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(day => `<div class="calendar-head">${day}</div>`).join('');
+  const days = Array.from({ length: totalDays }, (_, index) => {
+    const date = new Date(bounds.year, bounds.month, index + 1);
+    const key = dateKeyLocal(date);
+    const item = currentMap[key] || { revenue: 0, count: 0, energy: 0, failed: 0 };
+    const prevDate = sameDayPreviousMonth(date);
+    const prev = historyMap[dateKeyLocal(prevDate)] || { revenue: 0, count: 0, energy: 0, failed: 0 };
+    const change = pctChange(item.revenue, prev.revenue);
+    const hasMovement = item.count > 0 || item.revenue > 0;
+    const cls = !hasMovement ? '' : (change >= 10 ? 'good' : (change <= -10 ? 'down' : 'warn'));
+    const changeText = prev.revenue > 0 || item.revenue > 0 ? `${change >= 0 ? '+' : ''}${fmtPct(change)} vs ${String(prevDate.getDate()).padStart(2,'0')}/${String(prevDate.getMonth()+1).padStart(2,'0')}` : 'sem base mês anterior';
+    const tags = contextTagsForDate(date).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
+    return `<div class="calendar-day ${cls}">
+      <div class="day-num"><span>${index + 1}</span><span>${item.failed ? `${item.failed} erro(s)` : ''}</span></div>
+      <div class="day-main">${fmtBRL(item.revenue)}</div>
+      <div class="day-sub">${item.count} recarga(s) · ${fmtKWh(item.energy)}</div>
+      <div class="day-sub">${changeText}</div>
+      <div class="calendar-tags">${tags}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="calendar-grid">${weekHeads}${blanks}${days}</div>`;
+}
+
 function pctChange(current = 0, previous = 0) {
   if (previous > 0) return (current - previous) / previous * 100;
   return current > 0 ? 100 : 0;
@@ -3410,7 +3566,16 @@ function renderGeneralDecisionCockpit(unitData = [], charges = [], stationRows =
 function usageSeries(charges = []) {
   const recent = recentCharges(charges, 7);
   const byDay = Object.fromEntries(recent.labels.map(label => [label, { duration: 0, count: 0, energy: 0, revenue: 0, idleValue: 0 }]));
-  const stayBuckets = { '<1h': 0, '1h-2h': 0, '2h-4h': 0, '>4h': 0 };
+  const stayBuckets = {
+    '<10min': 0,
+    '10-20min': 0,
+    '20-30min': 0,
+    '30-40min': 0,
+    '40min-1h': 0,
+    '1-2h': 0,
+    '2-4h': 0,
+    '4-6h+': 0
+  };
   const byHour = Object.fromEntries(Array.from({ length: 24 }, (_, h) => [String(h), 0]));
   const byCoupon = {};
   const noCoupon = { coupon: 'Sem cupom', count: 0, energy: 0, revenue: 0 };
@@ -3428,10 +3593,15 @@ function usageSeries(charges = []) {
       byDay[label].revenue += revenue;
       byDay[label].idleValue += idleValue;
     }
-    if (duration < 1) stayBuckets['<1h'] += 1;
-    else if (duration < 2) stayBuckets['1h-2h'] += 1;
-    else if (duration < 4) stayBuckets['2h-4h'] += 1;
-    else stayBuckets['>4h'] += 1;
+    const durationMin = duration * 60;
+    if (durationMin < 10) stayBuckets['<10min'] += 1;
+    else if (durationMin < 20) stayBuckets['10-20min'] += 1;
+    else if (durationMin < 30) stayBuckets['20-30min'] += 1;
+    else if (durationMin < 40) stayBuckets['30-40min'] += 1;
+    else if (durationMin < 60) stayBuckets['40min-1h'] += 1;
+    else if (duration < 2) stayBuckets['1-2h'] += 1;
+    else if (duration < 4) stayBuckets['2-4h'] += 1;
+    else stayBuckets['4-6h+'] += 1;
     byHour[String(charge.startDate.getHours())] += 1;
   });
   charges.forEach(charge => {
@@ -3500,6 +3670,7 @@ function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = ch
   renderRecentFailureDiagnostics(prefix, charges);
   renderOperationQuality(prefix, charges);
   renderAbsentClientAlerts(prefix, historyCharges);
+  renderOperationalCalendar(prefix, charges, historyCharges);
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
   renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
