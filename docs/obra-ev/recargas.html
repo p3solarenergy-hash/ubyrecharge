@@ -427,7 +427,11 @@
     </div>
     <div>
       <div class="project-state" id="storageState">Escolha a obra antes de anexar a planilha.</div>
-      <button type="button" class="btn-danger" id="clearRechargeBaseBtn" style="display:none;margin-top:8px">Excluir base salva desta obra</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button type="button" class="btn-danger" id="undoLastImportBtn" style="display:none">Desfazer última planilha</button>
+        <button type="button" class="btn-danger" id="clearSelectedMonthBtn" style="display:none">Excluir mês selecionado</button>
+        <button type="button" class="btn-danger" id="clearRechargeBaseBtn" style="display:none">Excluir base salva desta obra</button>
+      </div>
     </div>
   </div>
 
@@ -961,6 +965,7 @@ let ubyOperationOverrides = {};
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
+const RECARGAS_IMPORT_UNDO_KEY = 'uby-recargas-import-undo-v1';
 const CALENDAR_CONTEXT_CACHE_KEY = 'uby-recargas-calendar-context-v1';
 const CALENDAR_CONTEXT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const WEATHER_LOCATIONS = [
@@ -1328,6 +1333,7 @@ async function saveRechargeBase() {
   }
   if (!allCharges.length && !loadedFiles.length) {
     saveLocalRechargeBase();
+    await clearCloudRechargeBase();
     return;
   }
   const record = buildRechargeRecord();
@@ -1418,7 +1424,7 @@ function applyRechargeRecord(record, sourceLabel) {
   if (!allCharges.length) {
     uploadZone.classList.remove('compact');
     updateChips();
-    document.getElementById('clearRechargeBaseBtn').style.display = 'none';
+    updateCorrectionButtons();
     document.getElementById('tabsBar').style.display = 'flex';
     document.getElementById('emptyState').style.display = 'none';
     const targetName = currentStationReportName || currentWorkName;
@@ -1431,7 +1437,7 @@ function applyRechargeRecord(record, sourceLabel) {
   }
   uploadZone.classList.add('compact');
   updateChips();
-  document.getElementById('clearRechargeBaseBtn').style.display = 'inline-flex';
+  updateCorrectionButtons();
   document.getElementById('tabsBar').style.display = 'flex';
   document.getElementById('emptyState').style.display = 'none';
   renderAll();
@@ -1512,7 +1518,7 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
   document.getElementById('tabsBar').style.display = 'flex';
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('workReportTabs').style.display = 'flex';
-  document.getElementById('clearRechargeBaseBtn').style.display = allCharges.length ? 'inline-flex' : 'none';
+  updateCorrectionButtons();
   if (!allCharges.length) {
     uploadZone.classList.remove('compact');
     updateChips();
@@ -1581,19 +1587,105 @@ function removeFile(fileKey, name = '') {
     uploadZone.classList.remove('compact');
     document.getElementById('tabsBar').style.display    = 'flex';
     document.getElementById('emptyState').style.display = 'none';
-    document.getElementById('clearRechargeBaseBtn').style.display = 'none';
+    updateCorrectionButtons();
     renderGeral();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
     showTab('geral');
   } else {
-    document.getElementById('clearRechargeBaseBtn').style.display = 'inline-flex';
     renderAll();
+    updateCorrectionButtons();
   }
   saveRechargeBase();
 }
 
+function updateCorrectionButtons() {
+  const hasData = allCharges.length || loadedFiles.length;
+  const undo = readJson(RECARGAS_IMPORT_UNDO_KEY, null);
+  const undoBtn = document.getElementById('undoLastImportBtn');
+  const monthBtn = document.getElementById('clearSelectedMonthBtn');
+  const baseBtn = document.getElementById('clearRechargeBaseBtn');
+  if (undoBtn) undoBtn.style.display = undo?.workId === currentWorkId ? 'inline-flex' : 'none';
+  if (monthBtn) monthBtn.style.display = hasData ? 'inline-flex' : 'none';
+  if (baseBtn) baseBtn.style.display = hasData ? 'inline-flex' : 'none';
+}
+
+function storeImportUndo(label = 'última importação') {
+  tryWriteJson(RECARGAS_IMPORT_UNDO_KEY, {
+    workId: currentWorkId,
+    workName: currentWorkName,
+    label,
+    createdAt: new Date().toISOString(),
+    record: buildRechargeRecord()
+  });
+  updateCorrectionButtons();
+}
+
+function pruneLoadedFilesWithoutCharges() {
+  loadedFiles = loadedFiles.filter(fileItem => {
+    const fileMonth = fileItem?.month || '';
+    const fileKey = fileItem?.fileKey || fileSourceKey(fileMonth, fileItem?.name, fileItem?.station || '');
+    return allCharges.some(charge =>
+      ((charge._fileKey && charge._fileKey === fileKey) || (!charge._fileKey && charge._file === fileItem?.name)) && (!fileMonth || chargeMonthKey(charge) === fileMonth)
+    );
+  });
+}
+
+async function persistCorrection(message) {
+  pruneLoadedFilesWithoutCharges();
+  updateChips();
+  if (!allCharges.length) {
+    uploadZone.classList.remove('compact');
+    document.getElementById('tabsBar').style.display = 'flex';
+    document.getElementById('emptyState').style.display = 'none';
+    renderGeral();
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+    showTab('geral');
+  } else {
+    uploadZone.classList.add('compact');
+    renderAll();
+  }
+  updateCorrectionButtons();
+  setStorageState(`${message} Salvando no banco...`);
+  await saveRechargeBase();
+}
+
+async function undoLastImport() {
+  const undo = readJson(RECARGAS_IMPORT_UNDO_KEY, null);
+  if (!undo || undo.workId !== currentWorkId) {
+    alert('Não há importação recente para desfazer nesta obra.');
+    return;
+  }
+  const when = undo.createdAt ? new Date(undo.createdAt).toLocaleString('pt-BR') : 'agora';
+  if (!confirm(`Desfazer a última importação de ${currentWorkName}? O estado voltará para antes de ${when}.`)) return;
+  localStorage.removeItem(RECARGAS_IMPORT_UNDO_KEY);
+  applyRechargeRecord(undo.record, 'restauração');
+  updateCorrectionButtons();
+  setStorageState(`Última importação desfeita para <strong>${currentWorkName}</strong>. Salvando no banco...`);
+  await saveRechargeBase();
+}
+
+async function clearSelectedMonth() {
+  const mk = document.getElementById('monthSelector')?.value || document.getElementById('importMonth')?.value || '';
+  if (!mk) {
+    alert('Escolha o mês que deseja excluir.');
+    return;
+  }
+  const monthCharges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  if (!monthCharges.length) {
+    alert(`Não há recargas salvas em ${monthLabel(mk)} para esta obra.`);
+    return;
+  }
+  if (!confirm(`Excluir somente ${monthLabel(mk)} de ${currentWorkName}? Serão removidas ${monthCharges.length} recarga(s), mantendo os outros meses.`)) return;
+  storeImportUndo(`exclusão de ${monthLabel(mk)}`);
+  allCharges = allCharges.filter(charge => chargeMonthKey(charge) !== mk);
+  monthlyClosings = { ...monthlyClosings };
+  delete monthlyClosings[mk];
+  await persistCorrection(`Mês ${monthLabel(mk)} excluído de <strong>${currentWorkName}</strong>.`);
+}
+
 async function clearRechargeBase() {
   if (!confirm(`Excluir a base de recargas salva para ${currentWorkName}?`)) return;
+  storeImportUndo('exclusão da base completa');
   allCharges = [];
   loadedFiles = [];
   monthlyClosings = {};
@@ -1611,6 +1703,7 @@ async function clearRechargeBase() {
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('clearRechargeBaseBtn').style.display = 'none';
   updateChips();
+  updateCorrectionButtons();
   renderGeral();
   document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
   showTab('geral');
@@ -1938,6 +2031,7 @@ function readFile(file) {
       const importMode = file.importMode || document.getElementById('importMode')?.value || 'merge';
       const sourceStation = [...new Set(importedCharges.map(charge => charge.station).filter(Boolean))].join(' + ');
       const sourceKey = fileSourceKey(selectedMonth, file.name, sourceStation);
+      storeImportUndo(`${file.name} em ${monthLabel(selectedMonth)}`);
       file.fileKey = sourceKey;
       file.station = sourceStation;
       const fileMonth = dateMonths.length === 1 ? (dateMonths[0] || selectedMonth) : '';
@@ -1984,7 +2078,7 @@ function readFile(file) {
       updateChips();
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
-      document.getElementById('clearRechargeBaseBtn').style.display = 'inline-flex';
+      updateCorrectionButtons();
       renderAll();
       setStorageState(`Planilha importada para <strong>${currentWorkName}</strong>: ${importedCharges.length} recarga(s), ${fmtKWh(importedCharges.reduce((s,c)=>s+c.energyKWh,0))}, ${fmtBRL(importedCharges.reduce((s,c)=>s+c.revenue,0))}. Salvando no banco...`);
       await saveRechargeBase();
@@ -3063,11 +3157,10 @@ function chargeDayKeyFromDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 
-function dailyOperationalRows(charges = []) {
-  const dated = charges.filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()));
-  if (!dated.length) return [];
+function firstClientDayMap(charges = []) {
   const firstClientDay = {};
-  dated
+  charges
+    .filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()))
     .slice()
     .sort((a, b) => a.startDate - b.startDate)
     .forEach(charge => {
@@ -3075,6 +3168,13 @@ function dailyOperationalRows(charges = []) {
       if (!client) return;
       firstClientDay[client] ||= chargeDayKeyFromDate(charge.startDate);
     });
+  return firstClientDay;
+}
+
+function dailyOperationalRows(charges = [], historyCharges = charges) {
+  const dated = charges.filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()));
+  if (!dated.length) return [];
+  const firstClientDay = firstClientDayMap(historyCharges?.length ? historyCharges : charges);
   const byDay = {};
   dated.forEach(charge => {
     const key = chargeDayKeyFromDate(charge.startDate);
@@ -3327,16 +3427,22 @@ function calendarBoundsFromCharges(charges = []) {
   };
 }
 
-function dailyMapForCalendar(charges = []) {
+function dailyMapForCalendar(charges = [], historyCharges = charges) {
   const map = {};
+  const firstClientDay = firstClientDayMap(historyCharges?.length ? historyCharges : charges);
   charges.forEach(charge => {
     if (!charge.startDate || Number.isNaN(charge.startDate.getTime())) return;
     const key = dateKeyLocal(charge.startDate);
-    if (!map[key]) map[key] = { revenue: 0, count: 0, energy: 0, failed: 0 };
+    if (!map[key]) map[key] = { revenue: 0, count: 0, energy: 0, failed: 0, newClients: new Set() };
+    const client = clientKeyFromCharge(charge);
     map[key].revenue += Number(charge.revenue || 0);
     map[key].count += 1;
     map[key].energy += Number(charge.energyKWh || 0);
+    if (client && firstClientDay[client] === key) map[key].newClients.add(client);
     if (isFailedCharge(charge)) map[key].failed += 1;
+  });
+  Object.values(map).forEach(day => {
+    day.newClientCount = day.newClients?.size || 0;
   });
   return map;
 }
@@ -3350,8 +3456,8 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
     return;
   }
   const monthCharges = charges.filter(charge => charge.startDate && charge.startDate.getFullYear() === bounds.year && charge.startDate.getMonth() === bounds.month);
-  const currentMap = dailyMapForCalendar(monthCharges);
-  const historyMap = dailyMapForCalendar(historyCharges);
+  const currentMap = dailyMapForCalendar(monthCharges, historyCharges);
+  const historyMap = dailyMapForCalendar(historyCharges, historyCharges);
   const first = new Date(bounds.year, bounds.month, 1);
   const totalDays = daysInMonth(bounds.year, bounds.month + 1);
   const firstDay = new Date(bounds.year, bounds.month, 1);
@@ -3363,7 +3469,7 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
     const days = Array.from({ length: totalDays }, (_, index) => {
       const date = new Date(bounds.year, bounds.month, index + 1);
       const key = dateKeyLocal(date);
-      const item = currentMap[key] || { revenue: 0, count: 0, energy: 0, failed: 0 };
+      const item = currentMap[key] || { revenue: 0, count: 0, energy: 0, failed: 0, newClientCount: 0 };
       const prevDate = sameDayPreviousMonth(date);
       const prev = historyMap[dateKeyLocal(prevDate)] || { revenue: 0, count: 0, energy: 0, failed: 0 };
       const change = pctChange(item.revenue, prev.revenue);
@@ -3375,6 +3481,7 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
         <div class="day-num"><span>${index + 1}</span><span>${item.failed ? `${item.failed} erro(s)` : ''}</span></div>
         <div class="day-main">${fmtBRL(item.revenue)}</div>
         <div class="day-sub">${item.count} recarga(s) · ${fmtKWh(item.energy)}</div>
+        <div class="day-sub">${item.newClientCount ? `${item.newClientCount} cliente(s) novo(s)` : 'sem cliente novo'}</div>
         <div class="day-sub">${changeText}</div>
         <div class="calendar-tags">${tags}</div>
       </div>`;
@@ -3547,10 +3654,10 @@ function renderAbsentClientAlerts(prefix = 'usage', charges = []) {
   `;
 }
 
-function renderDailyOperationalMetrics(prefix = 'usage', charges = []) {
+function renderDailyOperationalMetrics(prefix = 'usage', charges = [], historyCharges = charges) {
   const el = document.getElementById(`${prefix}DailyMetrics`);
   if (!el) return;
-  const rows = dailyOperationalRows(charges);
+  const rows = dailyOperationalRows(charges, historyCharges);
   if (!rows.length) {
     el.innerHTML = '<div class="note">Sem datas validas para calcular ritmo diario.</div>';
     return;
@@ -3822,7 +3929,7 @@ function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = ch
   const daily = dailyFinancialSeries(charges);
   renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
   renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
-  renderDailyOperationalMetrics(prefix, charges);
+  renderDailyOperationalMetrics(prefix, charges, historyCharges);
   renderRecentFailureDiagnostics(prefix, charges);
   renderOperationQuality(prefix, charges);
   renderAbsentClientAlerts(prefix, historyCharges);
@@ -5022,6 +5129,8 @@ function openGeneralFinanceView() {
 
 initWorkSelector();
 document.getElementById('importMonth').value = new Date().toISOString().slice(0, 7);
+document.getElementById('undoLastImportBtn').addEventListener('click', undoLastImport);
+document.getElementById('clearSelectedMonthBtn').addEventListener('click', clearSelectedMonth);
 document.getElementById('clearRechargeBaseBtn').addEventListener('click', clearRechargeBase);
 Promise.all([loadRechargeBase(), refreshGeneralRechargeBases()]).then(openGeneralFinanceView);
 </script>
