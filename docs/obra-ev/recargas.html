@@ -151,6 +151,26 @@
     .action-row b { color:var(--p3-primary); font-size:14px; white-space:nowrap; }
     .action-row b.warn { color:var(--p3-warn); }
     .action-row b.good { color:#38C96F; }
+    .club-print-panel { margin-top:18px; border:1px solid rgba(84,180,255,.45); border-radius:12px; background:linear-gradient(135deg,#0B1728 0%,#102949 62%,#0B1728 100%); padding:20px; box-shadow:0 20px 50px rgba(0,0,0,.22); }
+    .club-print-head { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,.12); }
+    .club-print-title { color:#fff; font-size:24px; font-weight:900; letter-spacing:.02em; }
+    .club-print-sub { color:var(--p3-muted); font-size:12px; margin-top:4px; }
+    .club-print-meta { color:#BFEBD6; font-size:12px; text-align:right; line-height:1.5; }
+    .club-podium { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:end; margin-top:20px; }
+    .podium-place { position:relative; overflow:hidden; border:1px solid rgba(84,180,255,.35); border-radius:10px; background:rgba(4,13,26,.72); padding:18px; min-height:190px; display:flex; flex-direction:column; justify-content:space-between; }
+    .podium-place::before { content:""; position:absolute; inset:0 0 auto 0; height:5px; background:linear-gradient(90deg,#54B4FF,#2D7FF9); }
+    .podium-place.rank-1 { min-height:250px; border-color:rgba(255,214,107,.8); background:linear-gradient(180deg,rgba(84,48,9,.62),rgba(4,13,26,.78)); }
+    .podium-place.rank-1::before { background:linear-gradient(90deg,#FFD66B,#FFB23F); }
+    .podium-place.rank-2 { min-height:220px; }
+    .podium-place.rank-3 { min-height:205px; }
+    .podium-rank { color:#fff; font-size:13px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+    .podium-medal { font-size:38px; font-weight:900; color:#FFD66B; margin:6px 0 10px; }
+    .podium-name { color:#fff; font-size:18px; line-height:1.2; font-weight:900; min-height:44px; }
+    .podium-points { color:#2D7FF9; font-size:30px; font-weight:900; margin-top:14px; }
+    .podium-detail { color:#BFEBD6; font-size:12px; line-height:1.45; margin-top:8px; }
+    .podium-benefit { margin-top:12px; color:#FFE58B; font-size:12px; font-weight:800; }
+    .club-print-foot { margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px; color:#DCEBFF; font-size:13px; }
+    .club-print-foot div { border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:12px; background:rgba(255,255,255,.04); }
     .kpi-feature { grid-column:span 2; border-left:5px solid var(--p3-primary); background:linear-gradient(135deg,#102945,#0B1524); }
     .kpi-feature .value { font-size:clamp(34px,4vw,48px); }
     .kpi-feature.occ-red { border-left-color:#E64B4B; background:linear-gradient(135deg,rgba(230,75,75,.22),#0B1524); }
@@ -319,6 +339,13 @@
     .empty-state .ei { font-size:2.8rem; opacity:.3; margin-bottom:14px; }
 
     /* ── Responsive ── */
+    @media print {
+      body { background:#07111F; }
+      body * { visibility:hidden; }
+      #clubPrintPanel, #clubPrintPanel * { visibility:visible; }
+      #clubPrintPanel { position:absolute; left:0; top:0; width:100%; margin:0; box-shadow:none; }
+    }
+
     @media (max-width:1180px) {
       .kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
       .section-3 { grid-template-columns:1fr; }
@@ -343,6 +370,10 @@
       .unit-actions { justify-content:flex-start; }
       .ai-insights { grid-template-columns:1fr; }
       .calendar-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .club-print-head, .club-print-foot { grid-template-columns:1fr; display:grid; text-align:left; }
+      .club-print-meta { text-align:left; }
+      .club-podium { grid-template-columns:1fr; }
+      .podium-place, .podium-place.rank-1, .podium-place.rank-2, .podium-place.rank-3 { min-height:auto; }
     }
   </style>
 </head>
@@ -372,6 +403,7 @@
     <div class="controls" id="ctrlClube" style="display:none">
       <span>Ranking por pontos: R$ 1 gasto = 1 ponto</span>
       <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar clube</button>
+      <button class="btn-recalc" onclick="window.print()">Imprimir ranking</button>
     </div>
   </div>
 
@@ -445,11 +477,11 @@
   ════════════════════════════════════════ -->
   <label class="upload-zone" id="uploadZone">
     <span class="up-icon">📂</span>
-    <p>Arraste a planilha <strong>.xlsx</strong> exportada da plataforma ou <strong>clique para selecionar</strong></p>
+    <p>Arraste a planilha <strong>.xlsx, .xls ou .csv</strong> exportada da plataforma ou <strong>clique para selecionar</strong></p>
     <p class="up-hint" style="font-size:11px;color:#4a6058;margin-top:3px">
       Use consolidar para somar vários carregadores no mesmo mês. Use substituir quando a planilha já for o fechamento completo.
     </p>
-    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,text/csv,application/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple>
     <div class="file-chips" id="fileChips"></div>
     <div id="uploadFeedback"></div>
   </label>
@@ -579,6 +611,21 @@
     </section>
 
     <section class="kpis" id="clubKpis"></section>
+
+    <section class="club-print-panel" id="clubPrintPanel">
+      <div class="club-print-head">
+        <div>
+          <div class="club-print-title">Podio Clube UBY</div>
+          <div class="club-print-sub">Ranking para compartilhar no grupo</div>
+        </div>
+        <div class="club-print-meta" id="clubPrintMeta">Atualizando ranking...</div>
+      </div>
+      <div class="club-podium" id="clubPodium"></div>
+      <div class="club-print-foot">
+        <div><strong>Top 3</strong><br>30% de desconto em alinhamento e balanceamento.</div>
+        <div><strong>Todos do clube</strong><br>10% de desconto em todos os servicos da rede Muffatao Autocenter.</div>
+      </div>
+    </section>
 
     <section class="section" style="margin-top:18px">
       <div class="card">
@@ -1614,14 +1661,18 @@ function handleFiles(files) {
     setFeedback('Escolha o mes da planilha antes de subir o arquivo.', 'up-error');
     return;
   }
-  Array.from(files || [])
-    .filter(f => f?.name && /\.(xlsx|xls|csv)$/i.test(String(f.name)))
-    .forEach(f => {
-      f.month = selectedMonth;
-      f.importMode = importMode;
-      loadedFiles.push(f);
-      readFile(f);
-    });
+  const acceptedFiles = Array.from(files || [])
+    .filter(f => f?.name && /\.(xlsx|xls|csv)$/i.test(String(f.name)));
+  if (!acceptedFiles.length) {
+    setFeedback('Arquivo nao reconhecido. Envie .xlsx, .xls ou .csv exportado da plataforma.', 'up-error');
+    return;
+  }
+  acceptedFiles.forEach(f => {
+    f.month = selectedMonth;
+    f.importMode = importMode;
+    loadedFiles.push(f);
+    readFile(f);
+  });
 }
 
 function removeFile(fileKey, name = '') {
@@ -4479,6 +4530,37 @@ function renderClub() {
     <div class="action-row"><div><strong>Top 3</strong><span>30% de desconto em alinhamento e balanceamento.</span></div><b class="good">Ativo</b></div>
     <div class="action-row"><div><strong>Todos os participantes</strong><span>10% de desconto em todos os serviços da rede Muffatão Autocenter.</span></div><b class="good">Ativo</b></div>
   `;
+
+  const podiumOrder = [
+    { row: top3[1], position: 2, label: '2o lugar' },
+    { row: top3[0], position: 1, label: '1o lugar' },
+    { row: top3[2], position: 3, label: '3o lugar' }
+  ];
+  document.getElementById('clubPrintMeta').innerHTML = rows.length
+    ? `${rows.length} participante(s)<br>${fmtBRL(totalRevenue)} elegiveis<br>${totalPoints.toLocaleString('pt-BR')} ponto(s)`
+    : 'Sem participantes elegiveis ainda';
+  document.getElementById('clubPodium').innerHTML = podiumOrder.map(slot => {
+    if (!slot.row) {
+      return `<div class="podium-place rank-${slot.position}">
+        <div>
+          <div class="podium-rank">${slot.label}</div>
+          <div class="podium-medal">#${slot.position}</div>
+          <div class="podium-name">Aguardando cliente</div>
+        </div>
+        <div class="podium-detail">Sem faturamento elegivel para esta posicao.</div>
+      </div>`;
+    }
+    return `<div class="podium-place rank-${slot.position}">
+      <div>
+        <div class="podium-rank">${slot.label}</div>
+        <div class="podium-medal">#${slot.position}</div>
+        <div class="podium-name">${escapeHtml(slot.row.name)}</div>
+        <div class="podium-points">${slot.row.points.toLocaleString('pt-BR')} pts</div>
+        <div class="podium-detail">${fmtBRL(slot.row.revenue)} no periodo<br>${slot.row.count} recarga(s) - ${slot.row.energy.toFixed(2).replace('.', ',')} kWh${slot.row.phone ? `<br>Tel: ${escapeHtml(slot.row.phone)}` : ''}</div>
+      </div>
+      <div class="podium-benefit">30% em alinhamento e balanceamento</div>
+    </div>`;
+  }).join('');
 
   document.getElementById('clubTop3').innerHTML = top3.length ? top3.map((row, index) => `
     <div class="action-row">
