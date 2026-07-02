@@ -177,6 +177,13 @@
     .podium-benefit { margin-top:12px; color:#FFE58B; font-size:12px; font-weight:800; }
     .club-print-foot { margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px; color:#DCEBFF; font-size:13px; }
     .club-print-foot div { border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:12px; background:rgba(255,255,255,.04); }
+    .club-form-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+    .club-form-head h2 { margin:0; border:none; padding:0; }
+    .club-form-status { color:var(--p3-muted); font-size:12px; line-height:1.45; max-width:640px; }
+    .club-status-pill { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; padding:4px 9px; background:rgba(45,127,249,.14); color:#BFD8FF; border:1px solid rgba(45,127,249,.28); font-size:11px; font-weight:800; white-space:nowrap; }
+    .club-status-pill.good { background:rgba(56,201,111,.14); color:#BFEBD6; border-color:rgba(56,201,111,.32); }
+    .club-status-pill.warn { background:rgba(242,169,61,.16); color:#FFD66B; border-color:rgba(242,169,61,.32); }
+    .club-status-pill.muted { background:rgba(143,163,154,.10); color:var(--p3-muted); border-color:rgba(143,163,154,.18); }
     .kpi-feature { grid-column:span 2; border-left:5px solid var(--p3-primary); background:linear-gradient(135deg,#102945,#0B1524); }
     .kpi-feature .value { font-size:clamp(34px,4vw,48px); }
     .kpi-feature.occ-red { border-left-color:#E64B4B; background:linear-gradient(135deg,rgba(230,75,75,.22),#0B1524); }
@@ -490,7 +497,11 @@
     <div class="controls" id="ctrlClube" style="display:none">
       <span>Ranking por pontos: R$ 1 gasto = 1 ponto</span>
       <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar clube</button>
+      <button class="btn-recalc" onclick="syncClubParticipantsFromSheet()">Sincronizar formulario</button>
+      <button class="btn-recalc" onclick="document.getElementById('clubParticipantFileInput').click()">Importar CSV/Excel</button>
+      <a class="btn-recalc" href="https://docs.google.com/spreadsheets/d/19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws/edit?gid=1124525277#gid=1124525277" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Abrir planilha</a>
       <button class="btn-recalc" onclick="window.print()">Imprimir ranking</button>
+      <input type="file" id="clubParticipantFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" multiple style="display:none" onchange="handleClubParticipantFiles(Array.from(this.files)); this.value=''">
     </div>
   </div>
 
@@ -722,6 +733,25 @@
       <div class="card">
         <h2>Top 3 do clube</h2>
         <div class="action-list" id="clubTop3"></div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="club-form-head">
+          <div>
+            <h2>Participantes cadastrados no formulario</h2>
+            <div class="club-form-status" id="clubParticipantsStatus">Use a sincronizacao da planilha ou importe o CSV/Excel das respostas.</div>
+          </div>
+          <span class="club-status-pill muted" id="clubParticipantsSource">Fonte: formulario</span>
+        </div>
+        <section class="kpis" id="clubParticipantsKpis" style="margin-top:0"></section>
+        <div style="overflow-x:auto;margin-top:14px">
+          <table>
+            <thead><tr><th>Nome</th><th>WhatsApp</th><th>E-mail</th><th>Veiculo</th><th>Placa</th><th>Status</th><th>Pontos</th><th>Faturamento</th><th>Beneficio desejado</th><th>Cadastro</th></tr></thead>
+            <tbody id="clubParticipantsTable"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -1151,6 +1181,10 @@ let ubyOperationOverrides = {};
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
 const RECARGAS_IMPORT_UNDO_KEY = 'uby-recargas-import-undo-v1';
+const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
+const CLUB_FORM_SHEET_ID = '19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws';
+const CLUB_FORM_GID = '1124525277';
+const CLUB_FORM_CSV_URL = `https://docs.google.com/spreadsheets/d/${CLUB_FORM_SHEET_ID}/export?format=csv&gid=${CLUB_FORM_GID}`;
 const CALENDAR_CONTEXT_CACHE_KEY = 'uby-recargas-calendar-context-v1';
 const CALENDAR_CONTEXT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const WEATHER_LOCATIONS = [
@@ -4576,6 +4610,139 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
   return rows.sort((a, b) => Number(b.included) - Number(a.included) || b.revenue - a.revenue);
 }
 
+function normalizePhone(value = '') {
+  return safeText(value).replace(/\D+/g, '');
+}
+
+function clubParticipantKey(participant = {}) {
+  const email = safeText(participant.email).trim().toLowerCase();
+  if (email) return `email:${email}`;
+  const phone = normalizePhone(participant.phone);
+  if (phone) return `phone:${phone}`;
+  return `name:${normalizeHeaderName(participant.name || '')}`;
+}
+
+function clubParticipantKeys(participant = {}) {
+  return [
+    safeText(participant.email).trim().toLowerCase(),
+    normalizePhone(participant.phone),
+    normalizeHeaderName(participant.name || '')
+  ].filter(Boolean);
+}
+
+function clubParticipantsStore() {
+  const data = readJson(CLUB_PARTICIPANTS_LOCAL_KEY, { rows: [], updatedAt: '', source: '' });
+  if (Array.isArray(data)) return { rows: data, updatedAt: '', source: 'cache antigo' };
+  return { rows: Array.isArray(data?.rows) ? data.rows : [], updatedAt: data?.updatedAt || '', source: data?.source || '' };
+}
+
+function writeClubParticipantsStore(rows = [], source = 'manual') {
+  const clean = rows
+    .filter(row => row && (row.name || row.email || row.phone))
+    .sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0) || safeText(a.name).localeCompare(safeText(b.name), 'pt-BR'));
+  writeJson(CLUB_PARTICIPANTS_LOCAL_KEY, { rows: clean, updatedAt: new Date().toISOString(), source });
+}
+
+function headerValue(row = [], headers = [], aliases = []) {
+  const normalizedHeaders = headers.map(normalizeHeaderName);
+  const wanted = aliases.map(normalizeHeaderName);
+  let idx = normalizedHeaders.findIndex(header => wanted.includes(header));
+  if (idx < 0) idx = normalizedHeaders.findIndex(header => wanted.some(alias => header.includes(alias)));
+  return idx >= 0 ? safeText(row[idx]).trim() : '';
+}
+
+function yesLike(value = '') {
+  return /^(sim|aceito|concordo|ok|yes|aceita)/i.test(safeText(value).trim());
+}
+
+function clubParticipantFromFormRow(row = [], headers = []) {
+  const createdRaw = headerValue(row, headers, ['Carimbo de data/hora', 'Data', 'Timestamp']);
+  const createdAt = parseDate(createdRaw);
+  const participant = {
+    createdRaw,
+    createdAtMs: createdAt ? createdAt.getTime() : 0,
+    name: headerValue(row, headers, ['Nome completo', 'Nome']),
+    phone: headerValue(row, headers, ['WhatsApp (com DDD)', 'Whatsapp', 'WhatsApp', 'Telefone']),
+    email: headerValue(row, headers, ['E-mail', 'Email']),
+    vehicleModel: headerValue(row, headers, ['Modelo do veiculo', 'Modelo do veículo', 'Modelo do veculo', 'Veiculo', 'Veículo', 'Veculo']),
+    vehiclePlate: headerValue(row, headers, ['Placa do veiculo', 'Placa do veículo', 'Placa do veculo', 'Placa']),
+    attraction: headerValue(row, headers, ['O que mais te atrai em participar do Clube UBY?']),
+    desiredBenefit: headerValue(row, headers, ['Qual beneficio voce considera mais importante?', 'Qual benefício você considera mais importante?', 'Qual benefcio voc considera mais importante?']),
+    wantsRanking: headerValue(row, headers, ['Voce teria interesse em um ranking mensal de pontos do Clube UBY?', 'Você teria interesse em um ranking mensal de pontos do Clube UBY?']),
+    regionInterest: headerValue(row, headers, ['Em quais regioes voce gostaria que a UBY tivesse mais pontos de recarga?', 'Em quais regiões você gostaria que a UBY tivesse mais pontos de recarga?']),
+    indication: headerValue(row, headers, ['Voce indicaria algum comercio, condominio, empresa ou estacionamento para receber um ponto UBY?', 'Você indicaria algum comércio, condomínio, empresa ou estacionamento para receber um ponto UBY?']),
+    indicationContact: headerValue(row, headers, ['Se respondeu sim ou talvez, informe o local ou contato indicado.']),
+    regulation: headerValue(row, headers, ['Regulamento e participacao no Clube UBY', 'Regulamento e participação no Clube UBY']),
+    lgpd: headerValue(row, headers, ['Autorizacao de uso de dados (LGPD)', 'Autorização de uso de dados (LGPD)', 'Autorizaao de uso de dados (LGPD)', 'Autorizao de uso de dados (LGPD)', 'autorizaodeusodedadoslgpd'])
+  };
+  participant.acceptedRegulation = yesLike(participant.regulation);
+  participant.acceptedLgpd = yesLike(participant.lgpd);
+  participant.key = clubParticipantKey(participant);
+  return participant;
+}
+
+function clubParticipantsFromRows(rows = []) {
+  const firstHeader = rows.findIndex(row => Array.isArray(row) && row.some(cell => normalizeHeaderName(cell).includes('nomecompleto')));
+  const headerIndex = firstHeader >= 0 ? firstHeader : 0;
+  const headers = rows[headerIndex] || [];
+  return rows.slice(headerIndex + 1)
+    .filter(rowHasData)
+    .map(row => clubParticipantFromFormRow(row, headers))
+    .filter(row => row.name || row.email || row.phone);
+}
+
+function mergeClubParticipants(incoming = [], source = 'manual') {
+  const current = clubParticipantsStore().rows;
+  const byKey = new Map(current.map(row => [clubParticipantKey(row), row]));
+  incoming.forEach(row => {
+    const key = clubParticipantKey(row);
+    const previous = byKey.get(key);
+    if (!previous || Number(row.createdAtMs || 0) >= Number(previous.createdAtMs || 0)) {
+      byKey.set(key, { ...(previous || {}), ...row, key });
+    }
+  });
+  const rows = [...byKey.values()];
+  writeClubParticipantsStore(rows, source);
+  return rows;
+}
+
+async function syncClubParticipantsFromSheet() {
+  const status = document.getElementById('clubParticipantsStatus');
+  if (status) status.textContent = 'Sincronizando respostas do formulario...';
+  try {
+    const response = await fetch(`${CLUB_FORM_CSV_URL}&t=${Date.now()}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Google retornou ${response.status}`);
+    const text = await response.text();
+    const participants = clubParticipantsFromRows(parseCsvRows(text));
+    const merged = mergeClubParticipants(participants, 'Google Sheets');
+    if (status) status.textContent = `${participants.length} resposta(s) lida(s) da planilha. ${merged.length} participante(s) salvo(s) no Clube UBY.`;
+    renderClub();
+  } catch (err) {
+    if (status) status.textContent = `Nao consegui ler a planilha direto (${err.message}). Exporte as respostas em CSV ou Excel e use "Importar CSV/Excel".`;
+  }
+}
+
+async function handleClubParticipantFiles(files = []) {
+  if (!files.length) return;
+  const imported = [];
+  for (const file of files) {
+    const buffer = await file.arrayBuffer();
+    let rows = [];
+    if (/\.csv$/i.test(file.name) || /csv/i.test(file.type || '')) {
+      rows = parseCsvRows(new TextDecoder('utf-8').decode(buffer));
+    } else {
+      const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false, blankrows: false });
+    }
+    imported.push(...clubParticipantsFromRows(rows));
+  }
+  const merged = mergeClubParticipants(imported, 'importacao manual');
+  const status = document.getElementById('clubParticipantsStatus');
+  if (status) status.textContent = `${imported.length} participante(s) importado(s). Base do Clube UBY agora tem ${merged.length} cadastro(s).`;
+  renderClub();
+}
+
 function clubClientRows(charges = []) {
   const byClient = new Map();
   charges.forEach(charge => {
@@ -4616,6 +4783,13 @@ function renderClub() {
   const unitData = getGeneralUnitData();
   const charges = getUbyOperationCharges(unitData).filter(charge => Number(charge.revenue || 0) > 0);
   const rows = clubClientRows(charges);
+  const participantStore = clubParticipantsStore();
+  const participants = participantStore.rows;
+  const rankByKey = new Map();
+  rows.forEach(row => clubParticipantKeys(row).forEach(key => rankByKey.set(key, row)));
+  const matchedParticipants = participants.filter(participant => clubParticipantKeys(participant).some(key => rankByKey.has(key)));
+  const acceptedLgpd = participants.filter(participant => participant.acceptedLgpd).length;
+  const withVehicle = participants.filter(participant => participant.vehicleModel || participant.vehiclePlate).length;
   const totalPoints = rows.reduce((sum, row) => sum + row.points, 0);
   const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0);
   const withPhone = rows.filter(row => row.phone).length;
@@ -4638,6 +4812,45 @@ function renderClub() {
     <div class="action-row"><div><strong>Top 3</strong><span>30% de desconto em alinhamento e balanceamento.</span></div><b class="good">Ativo</b></div>
     <div class="action-row"><div><strong>Todos os participantes</strong><span>10% de desconto em todos os serviços da rede Muffatão Autocenter.</span></div><b class="good">Ativo</b></div>
   `;
+
+  const statusEl = document.getElementById('clubParticipantsStatus');
+  const sourceEl = document.getElementById('clubParticipantsSource');
+  if (statusEl) {
+    const updatedAt = participantStore.updatedAt ? fmtDT(new Date(participantStore.updatedAt)) : 'sem sincronizacao ainda';
+    statusEl.textContent = participants.length
+      ? `${participants.length} cadastro(s) carregado(s). Ultima atualizacao: ${updatedAt}.`
+      : 'Sem participantes cadastrados ainda. Sincronize a planilha do formulario ou importe o CSV/Excel.';
+  }
+  if (sourceEl) {
+    sourceEl.textContent = participantStore.source ? `Fonte: ${participantStore.source}` : 'Fonte: formulario';
+    sourceEl.className = `club-status-pill ${participants.length ? 'good' : 'muted'}`;
+  }
+  document.getElementById('clubParticipantsKpis').innerHTML = `
+    <div class="card"><div class="label">Cadastrados</div><div class="value">${participants.length}</div><div class="sub">respostas do formulario</div></div>
+    <div class="card"><div class="label">Com LGPD</div><div class="value">${acceptedLgpd}</div><div class="sub">${participants.length ? fmtPct(acceptedLgpd / participants.length * 100) : '0,00%'} da base</div></div>
+    <div class="card"><div class="label">Com veiculo</div><div class="value">${withVehicle}</div><div class="sub">modelo ou placa preenchida</div></div>
+    <div class="card"><div class="label">Com consumo UBY</div><div class="value">${matchedParticipants.length}</div><div class="sub">cruzados com ranking de pontos</div></div>
+  `;
+  document.getElementById('clubParticipantsTable').innerHTML = participants.length ? participants.map(participant => {
+    const rank = clubParticipantKeys(participant).map(key => rankByKey.get(key)).find(Boolean);
+    const status = !participant.acceptedLgpd ? { label: 'LGPD pendente', cls: 'warn' }
+      : rank ? { label: 'Ativo com consumo', cls: 'good' }
+      : { label: 'Cadastrado sem consumo', cls: 'muted' };
+    const vehicle = [participant.vehicleModel, participant.vehiclePlate].filter(Boolean).join(' - ') || '-';
+    const created = participant.createdAtMs ? fmtDT(new Date(participant.createdAtMs)) : (participant.createdRaw || '-');
+    return `<tr>
+      <td>${escapeHtml(participant.name || '-')}</td>
+      <td>${participant.phone ? escapeHtml(participant.phone) : '-'}</td>
+      <td>${participant.email ? escapeHtml(participant.email) : '-'}</td>
+      <td>${escapeHtml(vehicle)}</td>
+      <td>${participant.vehiclePlate ? escapeHtml(participant.vehiclePlate) : '-'}</td>
+      <td><span class="club-status-pill ${status.cls}">${status.label}</span></td>
+      <td>${rank ? rank.points.toLocaleString('pt-BR') : '0'}</td>
+      <td>${rank ? fmtBRL(rank.revenue) : fmtBRL(0)}</td>
+      <td>${participant.desiredBenefit ? escapeHtml(participant.desiredBenefit) : '-'}</td>
+      <td>${escapeHtml(created)}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem cadastros do formulario carregados.</td></tr>';
 
   const podiumOrder = [
     { row: top3[1], position: 2, label: '2o lugar' },
