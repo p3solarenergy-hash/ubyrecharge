@@ -3650,13 +3650,14 @@ function contextTagsForDate(date, external = {}) {
   if (day >= 10 && day <= 15) tags.push({ text: 'Vale/adiantamento', type: 'muted' });
   const weather = external.weather?.[dateKey];
   if (weather) {
-    if (weather.rain > 0.5) tags.push({ text: `Chuva ${weather.rain.toFixed(1).replace('.', ',')}mm`, type: 'warn' });
-    else tags.push({ text: weather.label, type: 'muted' });
-    if (Number.isFinite(weather.tMax)) tags.push({ text: `${Math.round(weather.tMin)}-${Math.round(weather.tMax)}°C`, type: 'muted' });
+    const rain = Number(weather.rain || 0);
+    if (rain >= 1) tags.push({ text: `Chuva ${rain.toFixed(1).replace('.', ',')}mm`, type: 'warn' });
+    else if (rain > 0) tags.push({ text: `Chuva leve ${rain.toFixed(1).replace('.', ',')}mm`, type: 'muted' });
+    else tags.push({ text: 'Sem chuva', type: 'muted' });
   } else if (external.loading) {
-    tags.push({ text: 'Clima carregando', type: 'muted' });
+    tags.push({ text: 'Chuva carregando', type: 'muted' });
   } else {
-    tags.push({ text: 'Clima indisponível', type: 'muted' });
+    tags.push({ text: 'Chuva indisponivel', type: 'muted' });
   }
   return tags.slice(0, 6);
 }
@@ -3824,7 +3825,7 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
   const build = (external = {}) => {
     const blanks = Array.from({ length: first.getDay() }, () => '<div class="calendar-day empty"></div>').join('');
     const weekHeads = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(day => `<div class="calendar-head">${day}</div>`).join('');
-    const locationLabel = external.location?.name ? `<div class="note" style="margin-bottom:10px">Clima via Open-Meteo: ${escapeHtml(external.location.name)}. Feriados via Nager.Date Brasil.</div>` : '';
+    const locationLabel = external.location?.name ? `<div class="note" style="margin-bottom:10px">Chuva via Open-Meteo: ${escapeHtml(external.location.name)}. Feriados via Nager.Date Brasil.</div>` : '';
     const days = Array.from({ length: totalDays }, (_, index) => {
       const date = new Date(bounds.year, bounds.month, index + 1);
       const key = dateKeyLocal(date);
@@ -5888,14 +5889,20 @@ function renderAcumulado() {
 
   // Ranking acumulado de usuários
   const byUserAcc = {};
-  allCharges.forEach(c => { byUserAcc[c.userName] = (byUserAcc[c.userName]||0)+c.revenue; });
-  const sortedAcc = Object.entries(byUserAcc).sort((a,b) => b[1]-a[1]);
-  const maxAcc    = sortedAcc[0]?.[1] || 1;
-  document.getElementById('userBarsAcc').innerHTML = sortedAcc.map(([name, r]) =>
+  allCharges.forEach(c => {
+    const name = c.userName || c.userEmail || 'Cliente sem nome';
+    const key = clientKeyFromCharge(c) || clientIdentityKey(name);
+    if (!byUserAcc[key]) byUserAcc[key] = { name, revenue: 0, count: 0 };
+    byUserAcc[key].revenue += Number(c.revenue || 0);
+    byUserAcc[key].count += 1;
+  });
+  const sortedAcc = Object.values(byUserAcc).sort((a,b) => b.revenue - a.revenue);
+  const maxAcc    = sortedAcc[0]?.revenue || 1;
+  document.getElementById('userBarsAcc').innerHTML = sortedAcc.map(user =>
     `<div class="user-row">
-       <span>${(name||'').split(' ').slice(0,2).join(' ')}</span>
-       <div class="track"><i style="width:${(r/maxAcc*100).toFixed(1)}%"></i></div>
-       <strong>${fmtBRL(r)}</strong>
+       <span>${escapeHtml((user.name||'').split(' ').slice(0,2).join(' '))}</span>
+       <div class="track"><i style="width:${(user.revenue/maxAcc*100).toFixed(1)}%"></i></div>
+       <strong>${fmtBRL(user.revenue)} <small style="color:var(--p3-muted);font-weight:600">· ${user.count} recarga(s)</small></strong>
      </div>`
   ).join('');
 }
