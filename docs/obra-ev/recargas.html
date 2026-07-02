@@ -4666,6 +4666,8 @@ function clubParticipantFromFormRow(row = [], headers = []) {
     name: headerValue(row, headers, ['Nome completo', 'Nome']),
     phone: headerValue(row, headers, ['WhatsApp (com DDD)', 'Whatsapp', 'WhatsApp', 'Telefone']),
     email: headerValue(row, headers, ['E-mail', 'Email']),
+    score: headerValue(row, headers, ['Pontuacao', 'Pontuação', 'Score']),
+    vehicleBrand: headerValue(row, headers, ['Marca do veiculo', 'Marca do veículo', 'Marca do veculo', 'Marca', 'Fabricante']),
     vehicleModel: headerValue(row, headers, ['Modelo do veiculo', 'Modelo do veículo', 'Modelo do veculo', 'Veiculo', 'Veículo', 'Veculo']),
     vehiclePlate: headerValue(row, headers, ['Placa do veiculo', 'Placa do veículo', 'Placa do veculo', 'Placa']),
     attraction: headerValue(row, headers, ['O que mais te atrai em participar do Clube UBY?']),
@@ -4772,6 +4774,8 @@ function normalizeClubParticipantObject(item = {}) {
     name: item.name || item.nome || '',
     phone: item.phone || item.whatsapp || item.telefone || '',
     email: item.email || item.mail || '',
+    score: item.score || item.pontuacao || item['pontuação'] || '',
+    vehicleBrand: item.vehicleBrand || item.marca || item.fabricante || '',
     vehicleModel: item.vehicleModel || item.veiculo || item.modelo || '',
     vehiclePlate: item.vehiclePlate || item.placa || '',
     attraction: item.attraction || item.atrativo || '',
@@ -4891,7 +4895,7 @@ function renderClub() {
   rows.forEach(row => clubParticipantKeys(row).forEach(key => rankByKey.set(key, row)));
   const matchedParticipants = participants.filter(participant => clubParticipantKeys(participant).some(key => rankByKey.has(key)));
   const acceptedLgpd = participants.filter(participant => participant.acceptedLgpd).length;
-  const withVehicle = participants.filter(participant => participant.vehicleModel || participant.vehiclePlate).length;
+  const withVehicle = participants.filter(participant => participant.vehicleBrand || participant.vehicleModel || participant.vehiclePlate).length;
   const totalPoints = rows.reduce((sum, row) => sum + row.points, 0);
   const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0);
   const withPhone = rows.filter(row => row.phone).length;
@@ -4931,7 +4935,7 @@ function renderClub() {
   document.getElementById('clubParticipantsKpis').innerHTML = `
     <div class="card"><div class="label">Cadastrados</div><div class="value">${participants.length}</div><div class="sub">respostas do formulario</div></div>
     <div class="card"><div class="label">Com LGPD</div><div class="value">${acceptedLgpd}</div><div class="sub">${participants.length ? fmtPct(acceptedLgpd / participants.length * 100) : '0,00%'} da base</div></div>
-    <div class="card"><div class="label">Com veiculo</div><div class="value">${withVehicle}</div><div class="sub">modelo ou placa preenchida</div></div>
+    <div class="card"><div class="label">Com veiculo</div><div class="value">${withVehicle}</div><div class="sub">marca, modelo ou placa preenchida</div></div>
     <div class="card"><div class="label">Com consumo UBY</div><div class="value">${matchedParticipants.length}</div><div class="sub">cruzados com ranking de pontos</div></div>
   `;
   document.getElementById('clubParticipantsTable').innerHTML = participants.length ? participants.map(participant => {
@@ -4939,7 +4943,7 @@ function renderClub() {
     const status = !participant.acceptedLgpd ? { label: 'LGPD pendente', cls: 'warn' }
       : rank ? { label: 'Ativo com consumo', cls: 'good' }
       : { label: 'Cadastrado sem consumo', cls: 'muted' };
-    const vehicle = [participant.vehicleModel, participant.vehiclePlate].filter(Boolean).join(' - ') || '-';
+    const vehicle = [participant.vehicleBrand, participant.vehicleModel].filter(Boolean).join(' ') || participant.vehiclePlate || '-';
     const created = participant.createdAtMs ? fmtDT(new Date(participant.createdAtMs)) : (participant.createdRaw || '-');
     return `<tr>
       <td>${escapeHtml(participant.name || '-')}</td>
