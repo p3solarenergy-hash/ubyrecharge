@@ -1584,7 +1584,10 @@ function applyStationReportFilter() {
   const stationName = currentStationReportName;
   allCharges = allCharges.filter(charge => sameStationName(charge.station, stationName));
   loadedFiles = loadedFiles.filter(file => !file.station || sameStationName(file.station, stationName));
-  monthlyClosings = {};
+  monthlyClosings = Object.fromEntries(Object.entries(monthlyClosings || {}).filter(([, closing]) => {
+    const stations = Array.isArray(closing?.stations) ? closing.stations : [];
+    return !stations.length || stations.some(station => sameStationName(station, stationName));
+  }));
 }
 
 function applyRechargeRecord(record, sourceLabel) {
@@ -2371,6 +2374,7 @@ function readFile(file) {
       }
       allCharges.push(...importedCharges);
       importedMonths.forEach(mk => {
+        if (monthlyClosings?.[mk]?.source === 'manual') return;
         const closing = buildMonthClosing(mk);
         if (closing) monthlyClosings = { ...monthlyClosings, [mk]: closing };
       });
@@ -2499,6 +2503,7 @@ function buildMonthClosing(mk) {
   const revenue = charges.reduce((sum, c) => sum + c.revenue, 0);
   const dates = charges.map(c => c.startDate).filter(Boolean).sort((a, b) => a - b);
   const files = [...new Set(charges.map(c => c._file).filter(Boolean))];
+  const stations = [...new Set(charges.map(c => c.station).filter(Boolean))];
   const power = getPower();
   const closedWindow = periodWindow(charges, mk, 'closed');
   const occInterval = occByInterval(charges, power, closedWindow);
@@ -2519,6 +2524,7 @@ function buildMonthClosing(mk) {
     power,
     firstDate: dates[0] ? dates[0].toISOString() : '',
     lastDate: dates[dates.length - 1] ? dates[dates.length - 1].toISOString() : '',
+    stations,
     files
   };
 }
@@ -2536,6 +2542,7 @@ function monthSummaryFromClosing(closing) {
     count: Number(closing.charges) || 0,
     clients: Number(closing.clients) || 0,
     avgTkt: Number(closing.averageTicket) || 0,
+    source: closing.source || 'latest_upload',
     fromClosing: true
   };
 }
@@ -2553,6 +2560,8 @@ function closingMatchesMonth(closing, mk = closing?.month) {
 }
 
 function monthSummaryForMonth(mk, power = getPower()) {
+  const closedSummary = monthSummaryFromClosing(monthlyClosings?.[mk]);
+  if (closedSummary?.source === 'manual') return closedSummary;
   const ch = allCharges.filter(c => chargeMonthKey(c) === mk);
   if (ch.length) {
     const revM = ch.reduce((s,c) => s+c.revenue, 0);
@@ -2562,7 +2571,7 @@ function monthSummaryForMonth(mk, power = getPower()) {
     const cln = new Set(ch.map(c => c.userEmail||c.userName)).size;
     return { label: monthLabel(mk), mk, rev: revM, energy: enerM, occI: occI.pct, occF: occF.pct, count: ch.length, clients: cln, avgTkt: ch.length ? revM/ch.length : 0, fromClosing: false };
   }
-  return monthSummaryFromClosing(monthlyClosings?.[mk]);
+  return closedSummary;
 }
 
 function renderMonthClosing(mk) {
