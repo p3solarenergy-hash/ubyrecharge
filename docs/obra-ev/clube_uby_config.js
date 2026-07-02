@@ -1,0 +1,1 @@
+window.UBY_CLUBE_FORM_ENDPOINT = "";

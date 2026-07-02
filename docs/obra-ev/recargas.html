@@ -499,6 +499,7 @@
       <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar clube</button>
       <button class="btn-recalc" onclick="syncClubParticipantsFromSheet()">Sincronizar formulario</button>
       <button class="btn-recalc" onclick="document.getElementById('clubParticipantFileInput').click()">Importar CSV/Excel</button>
+      <button class="btn-recalc" onclick="configureClubFormEndpoint()">Configurar endpoint</button>
       <a class="btn-recalc" href="https://docs.google.com/spreadsheets/d/19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws/edit?gid=1124525277#gid=1124525277" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Abrir planilha</a>
       <button class="btn-recalc" onclick="window.print()">Imprimir ranking</button>
       <input type="file" id="clubParticipantFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" multiple style="display:none" onchange="handleClubParticipantFiles(Array.from(this.files)); this.value=''">
@@ -1158,6 +1159,7 @@
 <script src="sidebar.js"></script>
 <script src="backup_guard.js"></script>
 <script src="supabase_config.js"></script>
+<script src="clube_uby_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase_bridge.js"></script>
 <script src="app_data.js"></script>
@@ -4706,19 +4708,119 @@ function mergeClubParticipants(incoming = [], source = 'manual') {
   return rows;
 }
 
+function clubFormEndpointUrl() {
+  return safeText(window.UBY_CLUBE_FORM_ENDPOINT || localStorage.getItem('uby-club-form-endpoint') || '').trim();
+}
+
+function configureClubFormEndpoint() {
+  const current = clubFormEndpointUrl();
+  const next = prompt('Cole aqui a URL /exec do Google Apps Script do Clube UBY:', current);
+  if (next === null) return;
+  const clean = safeText(next).trim();
+  if (clean) {
+    localStorage.setItem('uby-club-form-endpoint', clean);
+  } else {
+    localStorage.removeItem('uby-club-form-endpoint');
+  }
+  renderClub();
+}
+
+function fetchJsonp(url) {
+  return new Promise((resolve, reject) => {
+    const callback = `ubyClubFormCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement('script');
+    const sep = url.includes('?') ? '&' : '?';
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('tempo esgotado ao chamar endpoint'));
+    }, 15000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[callback];
+      script.remove();
+    }
+    window[callback] = payload => {
+      cleanup();
+      resolve(payload);
+    };
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('endpoint bloqueado ou indisponivel'));
+    };
+    script.src = `${url}${sep}callback=${encodeURIComponent(callback)}&t=${Date.now()}`;
+    document.head.appendChild(script);
+  });
+}
+
+async function fetchClubFormEndpoint(url) {
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const response = await fetch(`${url}${sep}t=${Date.now()}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`endpoint retornou ${response.status}`);
+    return await response.json();
+  } catch (err) {
+    return fetchJsonp(url);
+  }
+}
+
+function normalizeClubParticipantObject(item = {}) {
+  const createdRaw = item.createdRaw || item.createdAt || item.timestamp || item.carimbo || '';
+  const createdAt = parseDate(createdRaw);
+  const participant = {
+    createdRaw,
+    createdAtMs: item.createdAtMs || (createdAt ? createdAt.getTime() : 0),
+    name: item.name || item.nome || '',
+    phone: item.phone || item.whatsapp || item.telefone || '',
+    email: item.email || item.mail || '',
+    vehicleModel: item.vehicleModel || item.veiculo || item.modelo || '',
+    vehiclePlate: item.vehiclePlate || item.placa || '',
+    attraction: item.attraction || item.atrativo || '',
+    desiredBenefit: item.desiredBenefit || item.beneficio || '',
+    wantsRanking: item.wantsRanking || item.ranking || '',
+    regionInterest: item.regionInterest || item.regioes || '',
+    indication: item.indication || item.indicacao || '',
+    indicationContact: item.indicationContact || item.contatoIndicado || '',
+    regulation: item.regulation || item.regulamento || '',
+    lgpd: item.lgpd || item.autorizacaoLgpd || ''
+  };
+  participant.acceptedRegulation = item.acceptedRegulation ?? yesLike(participant.regulation);
+  participant.acceptedLgpd = item.acceptedLgpd ?? yesLike(participant.lgpd);
+  participant.key = clubParticipantKey(participant);
+  return participant;
+}
+
+function clubParticipantsFromEndpointPayload(payload) {
+  const data = Array.isArray(payload) ? payload : (payload?.participants || payload?.rows || []);
+  if (!Array.isArray(data)) return [];
+  if (data.length && Array.isArray(data[0])) return clubParticipantsFromRows(data);
+  return data.map(normalizeClubParticipantObject).filter(row => row.name || row.email || row.phone);
+}
+
 async function syncClubParticipantsFromSheet() {
   const status = document.getElementById('clubParticipantsStatus');
   if (status) status.textContent = 'Sincronizando respostas do formulario...';
+  const endpoint = clubFormEndpointUrl();
   try {
-    const response = await fetch(`${CLUB_FORM_CSV_URL}&t=${Date.now()}`, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`Google retornou ${response.status}`);
-    const text = await response.text();
-    const participants = clubParticipantsFromRows(parseCsvRows(text));
-    const merged = mergeClubParticipants(participants, 'Google Sheets');
-    if (status) status.textContent = `${participants.length} resposta(s) lida(s) da planilha. ${merged.length} participante(s) salvo(s) no Clube UBY.`;
+    let participants = [];
+    let source = 'Google Sheets';
+    if (endpoint) {
+      const payload = await fetchClubFormEndpoint(endpoint);
+      if (payload?.ok === false) throw new Error(payload.error || 'endpoint recusou a leitura');
+      participants = clubParticipantsFromEndpointPayload(payload);
+      source = payload?.source || 'Apps Script seguro';
+    } else {
+      const response = await fetch(`${CLUB_FORM_CSV_URL}&t=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Google retornou ${response.status}`);
+      const text = await response.text();
+      participants = clubParticipantsFromRows(parseCsvRows(text));
+    }
+    const merged = mergeClubParticipants(participants, source);
+    if (status) status.textContent = `${participants.length} resposta(s) lida(s) via ${source}. ${merged.length} participante(s) salvo(s) no Clube UBY.`;
     renderClub();
   } catch (err) {
-    if (status) status.textContent = `Nao consegui ler a planilha direto (${err.message}). Exporte as respostas em CSV ou Excel e use "Importar CSV/Excel".`;
+    if (status) status.textContent = endpoint
+      ? `Nao consegui ler o endpoint seguro (${err.message}). Revise a publicacao do Apps Script ou importe CSV/Excel.`
+      : `Nao consegui ler a planilha direto (${err.message}). Configure o endpoint seguro ou importe CSV/Excel.`;
   }
 }
 
@@ -4817,12 +4919,13 @@ function renderClub() {
   const sourceEl = document.getElementById('clubParticipantsSource');
   if (statusEl) {
     const updatedAt = participantStore.updatedAt ? fmtDT(new Date(participantStore.updatedAt)) : 'sem sincronizacao ainda';
+    const endpointMode = clubFormEndpointUrl() ? 'Endpoint seguro configurado.' : 'Endpoint seguro ainda nao configurado.';
     statusEl.textContent = participants.length
-      ? `${participants.length} cadastro(s) carregado(s). Ultima atualizacao: ${updatedAt}.`
-      : 'Sem participantes cadastrados ainda. Sincronize a planilha do formulario ou importe o CSV/Excel.';
+      ? `${participants.length} cadastro(s) carregado(s). Ultima atualizacao: ${updatedAt}. ${endpointMode}`
+      : `Sem participantes cadastrados ainda. ${endpointMode} Sincronize o formulario ou importe CSV/Excel.`;
   }
   if (sourceEl) {
-    sourceEl.textContent = participantStore.source ? `Fonte: ${participantStore.source}` : 'Fonte: formulario';
+    sourceEl.textContent = participantStore.source ? `Fonte: ${participantStore.source}` : (clubFormEndpointUrl() ? 'Fonte: endpoint seguro' : 'Fonte: formulario');
     sourceEl.className = `club-status-pill ${participants.length ? 'good' : 'muted'}`;
   }
   document.getElementById('clubParticipantsKpis').innerHTML = `
