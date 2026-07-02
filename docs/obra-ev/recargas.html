@@ -4364,6 +4364,17 @@ function getAllGeneralCharges(unitData) {
   })));
 }
 
+function getUbyOperationCharges(unitData = getGeneralUnitData()) {
+  return getUbyChargerRows(unitData)
+    .filter(row => row.included)
+    .flatMap(row => row.charges.map(charge => ({
+      ...charge,
+      workId: charge.workId || row.workId,
+      workName: charge.workName || row.workName,
+      station: charge.station || row.station
+    })));
+}
+
 function getGeneralStationRows(unitData) {
   const stationRows = [];
   unitData.forEach(unit => {
@@ -4506,7 +4517,7 @@ function clubBenefitForPosition(position) {
 
 function renderClub() {
   const unitData = getGeneralUnitData();
-  const charges = getAllGeneralCharges(unitData).filter(charge => Number(charge.revenue || 0) > 0);
+  const charges = getUbyOperationCharges(unitData).filter(charge => Number(charge.revenue || 0) > 0);
   const rows = clubClientRows(charges);
   const totalPoints = rows.reduce((sum, row) => sum + row.points, 0);
   const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0);
@@ -4514,13 +4525,13 @@ function renderClub() {
   const top3 = rows.slice(0, 3);
 
   document.getElementById('clubHeroMeta').innerHTML = rows.length
-    ? `<strong>${rows.length}</strong> participante(s) com consumo pago<br>${fmtBRL(totalRevenue)} em faturamento elegível<br>${totalPoints.toLocaleString('pt-BR')} ponto(s) gerados`
-    : 'Nenhum cliente com faturamento pago para pontuar ainda.';
+    ? `<strong>${rows.length}</strong> participante(s) UBY com consumo pago<br>${fmtBRL(totalRevenue)} em faturamento elegivel<br>${totalPoints.toLocaleString('pt-BR')} ponto(s) gerados`
+    : 'Nenhum cliente UBY com faturamento pago para pontuar ainda.';
   document.getElementById('clubHeroFormula').innerHTML =
-    '<strong>Regra atual</strong><br>R$ 1 gasto = 1 ponto no Clube UBY.<br>Top 3 ganham 30% de desconto em alinhamento e balanceamento.<br>Todos os participantes ganham 10% em serviços da rede Muffatão Autocenter.';
+    '<strong>Regra atual</strong><br>Somente carregadores marcados como operacao UBY entram no clube.<br>R$ 1 gasto = 1 ponto no Clube UBY.<br>Top 3 ganham 30% de desconto em alinhamento e balanceamento.<br>Todos os participantes ganham 10% em servicos da rede Muffatao Autocenter.';
 
   document.getElementById('clubKpis').innerHTML = `
-    <div class="card"><div class="label">Participantes</div><div class="value">${rows.length}</div><div class="sub">clientes com faturamento pago</div></div>
+    <div class="card"><div class="label">Participantes UBY</div><div class="value">${rows.length}</div><div class="sub">clientes com faturamento pago na operacao UBY</div></div>
     <div class="card"><div class="label">Pontos emitidos</div><div class="value">${totalPoints.toLocaleString('pt-BR')}</div><div class="sub">1 ponto por real gasto</div></div>
     <div class="card"><div class="label">Receita elegível</div><div class="value">${fmtBRL(totalRevenue)}</div><div class="sub">base do ranking</div></div>
     <div class="card"><div class="label">Com telefone</div><div class="value">${withPhone}</div><div class="sub">${rows.length ? fmtPct(withPhone / rows.length * 100) : '0,00%'} dos participantes</div></div>
@@ -4537,8 +4548,8 @@ function renderClub() {
     { row: top3[2], position: 3, label: '3o lugar' }
   ];
   document.getElementById('clubPrintMeta').innerHTML = rows.length
-    ? `${rows.length} participante(s)<br>${fmtBRL(totalRevenue)} elegiveis<br>${totalPoints.toLocaleString('pt-BR')} ponto(s)`
-    : 'Sem participantes elegiveis ainda';
+    ? `${rows.length} participante(s) UBY<br>${fmtBRL(totalRevenue)} elegiveis<br>${totalPoints.toLocaleString('pt-BR')} ponto(s)`
+    : 'Sem participantes UBY elegiveis ainda';
   document.getElementById('clubPodium').innerHTML = podiumOrder.map(slot => {
     if (!slot.row) {
       return `<div class="podium-place rank-${slot.position}">
@@ -4617,6 +4628,7 @@ async function toggleUbyOperation(workId, key, checked) {
   }
   renderUbyOperation();
   renderGeral();
+  renderClub();
 }
 
 function renderUbyOperation() {
