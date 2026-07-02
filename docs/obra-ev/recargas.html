@@ -416,12 +416,13 @@
       .upload-zone.compact .file-chips, .file-chips { grid-column:1/-1; justify-content:flex-start; width:100%; }
       .file-chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
 
-      .kpis { margin-top:14px; gap:10px; }
+      .kpis { margin-top:14px; gap:10px; grid-template-columns:repeat(2,minmax(0,1fr)); }
       .kpis .card, .card { border-radius:10px; padding:14px; min-height:auto; }
       .label { font-size:10px; letter-spacing:.55px; }
       .value { font-size:26px; overflow-wrap:anywhere; }
       .sub { font-size:10px; line-height:1.45; }
       .kpi-feature .value { font-size:36px; }
+      .kpi-feature { grid-column:1/-1; }
       .bar { height:8px; margin-top:8px; }
       .section, .section-3, .general-split, .acc-grid { gap:12px; margin-top:12px; }
 
@@ -1712,6 +1713,7 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
   document.querySelectorAll('.report-tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${target}'`)));
   showTab(target);
   if (target === 'detalhes') renderDetalhes();
+  requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }
 
 // ── Prevenção de drop fora da zona ────────────────────────
