@@ -157,12 +157,18 @@
     .club-print-sub { color:var(--p3-muted); font-size:12px; margin-top:4px; }
     .club-print-meta { color:#BFEBD6; font-size:12px; text-align:right; line-height:1.5; }
     .club-podium { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:end; margin-top:20px; }
-    .podium-place { position:relative; overflow:hidden; border:1px solid rgba(84,180,255,.35); border-radius:10px; background:rgba(4,13,26,.72); padding:18px; min-height:190px; display:flex; flex-direction:column; justify-content:space-between; }
-    .podium-place::before { content:""; position:absolute; inset:0 0 auto 0; height:5px; background:linear-gradient(90deg,#54B4FF,#2D7FF9); }
-    .podium-place.rank-1 { min-height:250px; border-color:rgba(255,214,107,.8); background:linear-gradient(180deg,rgba(84,48,9,.62),rgba(4,13,26,.78)); }
-    .podium-place.rank-1::before { background:linear-gradient(90deg,#FFD66B,#FFB23F); }
-    .podium-place.rank-2 { min-height:220px; }
-    .podium-place.rank-3 { min-height:205px; }
+    .podium-place { display:grid; grid-template-rows:auto auto; align-items:end; min-height:310px; }
+    .podium-content { position:relative; overflow:hidden; border:1px solid rgba(84,180,255,.35); border-radius:10px 10px 0 0; background:rgba(4,13,26,.72); padding:18px; min-height:172px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 14px 34px rgba(0,0,0,.22); }
+    .podium-content::before { content:""; position:absolute; inset:0 0 auto 0; height:5px; background:linear-gradient(90deg,#54B4FF,#2D7FF9); }
+    .podium-step { min-height:82px; border:1px solid rgba(84,180,255,.38); border-top:0; border-radius:0 0 10px 10px; background:linear-gradient(180deg,rgba(45,127,249,.34),rgba(7,18,33,.88)); display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.2); font-size:58px; font-weight:900; line-height:1; }
+    .podium-place.rank-1 { min-height:360px; }
+    .podium-place.rank-1 .podium-content { min-height:218px; border-color:rgba(255,214,107,.82); background:linear-gradient(180deg,rgba(84,48,9,.62),rgba(4,13,26,.78)); }
+    .podium-place.rank-1 .podium-content::before { background:linear-gradient(90deg,#FFD66B,#FFB23F); }
+    .podium-place.rank-1 .podium-step { min-height:122px; border-color:rgba(255,214,107,.55); background:linear-gradient(180deg,rgba(255,214,107,.52),rgba(84,48,9,.72)); color:rgba(255,255,255,.3); }
+    .podium-place.rank-2 { min-height:326px; }
+    .podium-place.rank-2 .podium-step { min-height:98px; }
+    .podium-place.rank-3 { min-height:296px; }
+    .podium-place.rank-3 .podium-step { min-height:70px; }
     .podium-rank { color:#fff; font-size:13px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
     .podium-medal { font-size:38px; font-weight:900; color:#FFD66B; margin:6px 0 10px; }
     .podium-name { color:#fff; font-size:18px; line-height:1.2; font-weight:900; min-height:44px; }
@@ -374,6 +380,8 @@
       .club-print-meta { text-align:left; }
       .club-podium { grid-template-columns:1fr; }
       .podium-place, .podium-place.rank-1, .podium-place.rank-2, .podium-place.rank-3 { min-height:auto; }
+      .podium-content, .podium-place.rank-1 .podium-content { min-height:auto; border-radius:10px 10px 0 0; }
+      .podium-step, .podium-place.rank-1 .podium-step, .podium-place.rank-2 .podium-step, .podium-place.rank-3 .podium-step { min-height:50px; }
     }
   </style>
 </head>
@@ -4553,23 +4561,29 @@ function renderClub() {
   document.getElementById('clubPodium').innerHTML = podiumOrder.map(slot => {
     if (!slot.row) {
       return `<div class="podium-place rank-${slot.position}">
-        <div>
-          <div class="podium-rank">${slot.label}</div>
-          <div class="podium-medal">#${slot.position}</div>
-          <div class="podium-name">Aguardando cliente</div>
+        <div class="podium-content">
+          <div>
+            <div class="podium-rank">${slot.label}</div>
+            <div class="podium-medal">#${slot.position}</div>
+            <div class="podium-name">Aguardando cliente</div>
+          </div>
+          <div class="podium-detail">Sem faturamento elegivel para esta posicao.</div>
         </div>
-        <div class="podium-detail">Sem faturamento elegivel para esta posicao.</div>
+        <div class="podium-step">${slot.position}</div>
       </div>`;
     }
     return `<div class="podium-place rank-${slot.position}">
-      <div>
-        <div class="podium-rank">${slot.label}</div>
-        <div class="podium-medal">#${slot.position}</div>
-        <div class="podium-name">${escapeHtml(slot.row.name)}</div>
-        <div class="podium-points">${slot.row.points.toLocaleString('pt-BR')} pts</div>
-        <div class="podium-detail">${fmtBRL(slot.row.revenue)} no periodo<br>${slot.row.count} recarga(s) - ${slot.row.energy.toFixed(2).replace('.', ',')} kWh${slot.row.phone ? `<br>Tel: ${escapeHtml(slot.row.phone)}` : ''}</div>
+      <div class="podium-content">
+        <div>
+          <div class="podium-rank">${slot.label}</div>
+          <div class="podium-medal">#${slot.position}</div>
+          <div class="podium-name">${escapeHtml(slot.row.name)}</div>
+          <div class="podium-points">${slot.row.points.toLocaleString('pt-BR')} pts</div>
+          <div class="podium-detail">${fmtBRL(slot.row.revenue)} no periodo<br>${slot.row.count} recarga(s) - ${slot.row.energy.toFixed(2).replace('.', ',')} kWh${slot.row.phone ? `<br>Tel: ${escapeHtml(slot.row.phone)}` : ''}</div>
+        </div>
+        <div class="podium-benefit">30% em alinhamento e balanceamento</div>
       </div>
-      <div class="podium-benefit">30% em alinhamento e balanceamento</div>
+      <div class="podium-step">${slot.position}</div>
     </div>`;
   }).join('');
 
