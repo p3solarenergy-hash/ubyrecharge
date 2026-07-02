@@ -383,6 +383,84 @@
       .podium-content, .podium-place.rank-1 .podium-content { min-height:auto; border-radius:10px 10px 0 0; }
       .podium-step, .podium-place.rank-1 .podium-step, .podium-place.rank-2 .podium-step, .podium-place.rank-3 .podium-step { min-height:50px; }
     }
+    @media (max-width:640px) {
+      body { font-size:13px; }
+      .wrap { width:100%; max-width:none; padding:10px 10px 64px; overflow-x:hidden; }
+      .hero { border-radius:12px; padding:18px 16px; gap:14px; align-items:start; }
+      .hero::after { width:170px; height:170px; right:-58px; top:-58px; }
+      .brand { gap:10px; margin-bottom:14px; }
+      .logo-mark { width:44px; height:44px; border-radius:10px; flex:0 0 44px; }
+      .brand-name { font-size:11px; letter-spacing:2px; }
+      .brand-tag { font-size:10px; letter-spacing:.6px; }
+      h1 { font-size:22px; line-height:1.16; }
+      h2 { font-size:15px; margin-bottom:12px; }
+      .meta, .formula, .hero-formula { font-size:12px; line-height:1.5; padding:12px; }
+
+      .tabs-bar { display:block; margin-bottom:14px; }
+      .tabs { width:100%; overflow-x:auto; scrollbar-width:thin; padding:4px; gap:4px; border-radius:12px; }
+      .tab { flex:0 0 auto; min-width:92px; padding:8px 12px; font-size:12px; white-space:nowrap; }
+      .controls { margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; align-items:stretch; }
+      .controls span { grid-column:1/-1; }
+      .ctl-select, .ctl-input, .btn-recalc, .btn-danger { width:100%; min-height:38px; font-size:12px; }
+      .ctl-input { min-width:0; }
+
+      .project-bar { padding:12px; gap:10px; margin-bottom:14px; }
+      .project-field label { font-size:10px; margin-bottom:4px; }
+      .project-field select, .project-field input { min-height:40px; font-size:12px; }
+      .project-state { font-size:11px; }
+
+      .upload-zone { padding:16px 14px; margin-bottom:14px; }
+      .upload-zone p { font-size:12px; line-height:1.45; }
+      .upload-zone.compact { display:grid; grid-template-columns:auto 1fr; align-items:start; gap:8px; padding:12px; }
+      .upload-zone.compact p { margin:0; }
+      .upload-zone.compact .file-chips, .file-chips { grid-column:1/-1; justify-content:flex-start; width:100%; }
+      .file-chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+
+      .kpis { margin-top:14px; gap:10px; }
+      .kpis .card, .card { border-radius:10px; padding:14px; min-height:auto; }
+      .label { font-size:10px; letter-spacing:.55px; }
+      .value { font-size:26px; overflow-wrap:anywhere; }
+      .sub { font-size:10px; line-height:1.45; }
+      .kpi-feature .value { font-size:36px; }
+      .bar { height:8px; margin-top:8px; }
+      .section, .section-3, .general-split, .acc-grid { gap:12px; margin-top:12px; }
+
+      .usage-grid .card { min-height:auto; }
+      .usage-grid canvas { height:190px !important; max-height:200px; }
+      .pie-card canvas { min-height:210px; max-height:230px; }
+      canvas { max-height:240px; }
+      .pay-grid, .metric-strip, .club-print-foot { grid-template-columns:1fr; }
+      .metric-mini { min-height:auto; }
+      .metric-line { grid-template-columns:1fr auto; gap:6px; }
+      .metric-line strong { grid-column:1/-1; }
+
+      .unit-card { padding:12px; gap:8px; }
+      .unit-card strong { font-size:13px; }
+      .unit-card .unit-value { font-size:16px; }
+      .unit-actions, .unit-actions .btn-open { width:100%; }
+      .btn-open { min-height:40px; padding:9px 12px; }
+      .action-row { grid-template-columns:1fr; gap:8px; padding:12px; }
+      .action-row b { justify-self:start; }
+
+      .club-print-panel { padding:14px; border-radius:10px; }
+      .club-print-title { font-size:20px; }
+      .club-podium { gap:12px; }
+      .podium-content { padding:14px; }
+      .podium-medal { font-size:32px; margin:4px 0 8px; }
+      .podium-name { min-height:0; font-size:16px; }
+      .podium-points { font-size:24px; }
+
+      .calendar-grid { grid-template-columns:1fr; gap:8px; }
+      .calendar-head { display:none; }
+      .calendar-day { min-height:auto; }
+
+      table { font-size:12px; }
+      div[style*="overflow-x:auto"] table { min-width:680px; }
+      th, td { padding:8px; }
+      .card > table td:first-child { width:56%; }
+      .card > div[style*="overflow-x:auto"] { margin-left:-6px; margin-right:-6px; padding:0 6px 6px; }
+      .empty-state { padding:44px 12px; }
+    }
   </style>
 </head>
 <body>
