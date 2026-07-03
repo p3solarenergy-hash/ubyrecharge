@@ -1657,6 +1657,9 @@ function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
   if (String(workId) === 'rio' || normalizeStationForCompare(workName).includes('rio beach') || normalized.includes('rio beach')) {
     return 'Rio Beach EV';
   }
+  if (normalized.includes('robert koch')) {
+    return 'UBY RECHARGE - POSTO ROBERT KOCH';
+  }
   return raw || workName || 'Estacao';
 }
 
@@ -1671,10 +1674,20 @@ function stationLooksRelatedToWork(station, workName) {
   const stationText = normalizeStationForCompare(station);
   const workText = normalizeStationForCompare(workName);
   if (!stationText || !workText) return true;
+  if (stationText.includes('robert koch') && (workText.includes('robert koch') || workText.includes('malassise') || workText.includes('r k'))) return true;
+  if (stationText.includes('santarem') && workText.includes('santarem')) return true;
+  if (stationText.includes('rio beach') && workText.includes('rio beach')) return true;
+  if (stationText.includes('araguaia') && workText.includes('araguaia')) return true;
+  if (stationText.includes('duim') && workText.includes('duim')) return true;
   if (stationText.includes(workText) || workText.includes(stationText)) return true;
   const workTokens = new Set(workText.split(' ').filter(token => token.length >= 4));
   const stationTokens = stationText.split(' ').filter(token => token.length >= 4);
   return stationTokens.some(token => workTokens.has(token));
+}
+
+function chargeBelongsToWork(charge = {}, workId = '', workName = '') {
+  const station = canonicalStationNameForWork(workId || charge.workId, charge.station, workName || charge.workName);
+  return stationLooksRelatedToWork(station, workName || workNameById(workId || charge.workId));
 }
 
 function stationMismatchMessage() {
@@ -1711,7 +1724,8 @@ function applyRechargeRecord(record, sourceLabel) {
   syncGeneralRecordsFromLocal();
   allCharges = (record?.charges || [])
     .map(hydrateCharge)
-    .filter(charge => !stationBlockedForWork(currentWorkId, charge.station));
+    .filter(charge => !stationBlockedForWork(currentWorkId, charge.station))
+    .filter(charge => chargeBelongsToWork(charge, currentWorkId, currentWorkName));
   monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
   financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
   ubyOperationOverrides = record?.ubyOperationOverrides || record?.summary?.ubyOperationOverrides || {};
@@ -2084,9 +2098,10 @@ function fileSourceKey(month = '', name = '', station = '') {
 function rechargeUniqueKey(charge = {}) {
   const id = safeText(charge.id).trim();
   if (id) return `id:${id}`;
+  const station = canonicalStationNameForWork(charge.workId, charge.station, charge.workName);
   return [
     'fallback',
-    safeText(charge.station).trim().toLowerCase(),
+    safeText(station || charge.station).trim().toLowerCase(),
     safeText(charge.connType).trim().toLowerCase(),
     safeText(charge.startStr || charge.startIso || charge.startDate?.toISOString?.()).trim(),
     safeText(charge.userEmail || charge.userName).trim().toLowerCase(),
@@ -2288,7 +2303,8 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
     const cols = layout.cols || {};
     const email = rowCellText(row, cols.email);
     const driver = rowCellText(row, cols.driver);
-    const station = rowCellText(row, cols.station);
+    const rawStation = rowCellText(row, cols.station);
+    const station = canonicalStationNameForWork(currentWorkId, rawStation, currentWorkName);
     const charger = rowCellText(row, cols.charger);
     const startStr = rowCellText(row, cols.startLocal);
     const endStr = rowCellText(row, cols.endLocal) || rowCellText(row, cols.endCharge);
@@ -2306,6 +2322,7 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
       sourcePlatform:'Spott',
       id:            [station, charger, email || driver, startStr].filter(Boolean).join('|'),
       station,
+      rawStation,
       connType:      charger,
       userName:      driver || (email ? email.split('@')[0] : ''),
       userEmail:     email,
@@ -2466,6 +2483,11 @@ function readFile(file) {
 
       const importMode = file.importMode || document.getElementById('importMode')?.value || 'merge';
       const sourceStation = [...new Set(importedCharges.map(charge => charge.station).filter(Boolean))].join(' + ');
+      const sourceStations = [...new Set(importedCharges.map(charge => charge.station).filter(Boolean))];
+      const mismatchedStations = sourceStations.filter(station => !stationLooksRelatedToWork(station, currentWorkName));
+      if (mismatchedStations.length) {
+        throw new Error(`A planilha parece ser da estacao ${mismatchedStations.join(' + ')}, mas a obra selecionada e ${currentWorkName}. Selecione a obra correta antes de subir.`);
+      }
       const sourceKey = fileSourceKey(selectedMonth, file.name, sourceStation);
       storeImportUndo(`${file.name} em ${monthLabel(selectedMonth)}`);
       file.fileKey = sourceKey;
@@ -4557,12 +4579,16 @@ function chargerKind(charge = {}) {
   const power = powerMatch ? Number(powerMatch[1].replace(',', '.')) : NaN;
   if (/\bDC\b|\bCCS\b|CHADEMO|FAST|RAPID|RAPID[OA]/.test(normalized)) return 'dc';
   if (/\bAC\b|TYPE\s*2|TIPO\s*2/.test(normalized)) return 'ac';
+  const station = normalizeStationForCompare(canonicalStationNameForWork(charge.workId, charge.station, charge.workName));
+  if (station.includes('robert koch')) return 'dc';
+  if (station.includes('rio beach') || station.includes('santarem')) return 'ac';
   if (Number.isFinite(power)) return power > 30 ? 'dc' : 'ac';
   return 'unknown';
 }
 
 function chargerKey(charge = {}) {
-  const key = `${charge.station || ''}|${charge.connType || ''}`.trim().toLowerCase();
+  const station = canonicalStationNameForWork(charge.workId, charge.station, charge.workName);
+  const key = `${station || charge.station || ''}|${charge.connType || ''}`.trim().toLowerCase();
   return key || `${charge.workId || ''}|sem-identificacao`;
 }
 
@@ -4627,7 +4653,8 @@ function getGeneralUnitData() {
     .map(record => {
       const charges = (record.charges || [])
         .map(hydrateCharge)
-        .filter(charge => !stationBlockedForWork(record.workId, charge.station));
+        .filter(charge => !stationBlockedForWork(record.workId, charge.station))
+        .filter(charge => chargeBelongsToWork(charge, record.workId, record.workName || workNameById(record.workId)));
       const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
       const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
       const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
