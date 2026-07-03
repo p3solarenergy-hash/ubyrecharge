@@ -1660,6 +1660,9 @@ function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
   if (normalized.includes('robert koch')) {
     return 'UBY RECHARGE - POSTO ROBERT KOCH';
   }
+  if (normalized.includes('sabara')) {
+    return 'SANTAREM EV SABARÁ';
+  }
   return raw || workName || 'Estacao';
 }
 
@@ -4806,7 +4809,11 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
     const groups = new Map();
     unit.charges.forEach(charge => {
       const stationName = canonicalStationNameForWork(unit.workId, charge.station || unit.stationName || unit.workName, unit.workName);
-      const key = String(unit.workId) === 'rio'
+      const stationKey = normalizeStationForCompare(stationName);
+      const groupAsSingleCharger = stationKey.includes('robert koch') || stationKey.includes('rio beach');
+      const key = groupAsSingleCharger
+        ? stationKey
+        : String(unit.workId) === 'rio'
         ? `${normalizeStationForCompare(stationName)}|${safeText(charge.connType || '').trim().toLowerCase()}`
         : ubyOperationKey(charge);
       if (!groups.has(key)) {
@@ -4816,6 +4823,7 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
           key,
           station: stationName,
           connType: charge.connType || '',
+          connTypes: new Set(),
           kind: chargerKind(charge),
           charges: [],
           energy: 0,
@@ -4827,6 +4835,8 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
       group.charges.push(charge);
       group.energy += Number(charge.energyKWh || 0);
       group.revenue += Number(charge.revenue || 0);
+      if (charge.connType) group.connTypes.add(charge.connType);
+      if (group.kind === 'unknown' && chargerKind(charge) !== 'unknown') group.kind = chargerKind(charge);
       const client = charge.userEmail || charge.userName;
       if (client) group.clients.add(client);
     });
@@ -4836,6 +4846,8 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
       const included = isUbyOperationCharge(group.charges[0], unit.ubyOperationOverrides);
       rows.push({
         ...group,
+        connType: group.connTypes?.size ? [...group.connTypes].join(' + ') : group.connType,
+        connTypes: undefined,
         clients: group.clients.size,
         included,
         ruleSource: hasOverride ? 'manual' : group.kind === 'dc' ? 'DC automatico' : 'fora por padrao'
