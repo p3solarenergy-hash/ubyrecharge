@@ -4857,7 +4857,7 @@ function headerValue(row = [], headers = [], aliases = []) {
 }
 
 function yesLike(value = '') {
-  return /^(sim|aceito|concordo|ok|yes|aceita)/i.test(safeText(value).trim());
+  return /^(sim|li|aceito|concordo|ok|yes|aceita|autorizo)/i.test(safeText(value).trim());
 }
 
 function clubParticipantFromFormRow(row = [], headers = []) {

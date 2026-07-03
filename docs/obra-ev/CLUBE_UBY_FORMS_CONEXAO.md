@@ -7,6 +7,8 @@
 - ID: `19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws`
 - Aba: `Respostas ao formulario 1`
 - GID: `1124525277`
+- Apps Script: https://script.google.com/home/projects/1mkAvRkHSO-f8mM04vUat2W3xhrkd50Jn-6N411GcF6C83HrUm3NakBbR/edit
+- Endpoint publicado: https://script.google.com/macros/s/AKfycbyyK0lC1ZEVr_USQ_uqzi55sIWsqrxF-hvKAjc8SbBv_Qr8195xN3o6YrFkgKj7eQDr/exec
 
 ## Publicar o conector seguro
 

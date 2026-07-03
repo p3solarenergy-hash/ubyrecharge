@@ -108,7 +108,7 @@ function getContains_(row, headers, pieces) {
 }
 
 function yesLike_(value) {
-  return /^(sim|aceito|concordo|ok|yes|autorizo)/i.test(String(value || "").trim());
+  return /^(sim|li|aceito|concordo|ok|yes|autorizo)/i.test(String(value || "").trim());
 }
 
 function normalizeHeader_(value) {
