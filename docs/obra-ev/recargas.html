@@ -476,8 +476,8 @@
 
   <div class="tabs-bar" id="tabsBar" style="display:none">
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('geral',this)">Geral</button>
-      <button class="tab" onclick="switchTab('uby',this)">UBY</button>
+      <button class="tab active" onclick="switchTab('uby',this)">UBY</button>
+      <button class="tab" onclick="switchTab('geral',this)">Geral</button>
       <button class="tab" onclick="switchTab('clube',this)">Clube UBY</button>
       <button class="tab" onclick="switchTab('financeiroGeral',this)">Financeiro geral</button>
     </div>
@@ -779,16 +779,30 @@
           <div class="logo-mark"><img src="assets/brand/04_simbolo_badge.svg" alt="UBY"></div>
           <div>
             <div class="brand-name">UBY Recharge</div>
-            <div class="brand-tag">Operação própria UBY</div>
+            <div class="brand-tag">Operacao propria UBY</div>
           </div>
         </div>
         <h1>Painel UBY</h1>
-        <div class="meta" id="ubyHeroMeta">Carregadores marcados como operação UBY. Por padrão, DC entra automaticamente.</div>
+        <div class="meta" id="ubyHeroMeta">Carregadores marcados como operacao UBY. Por padrao, DC entra automaticamente.</div>
       </div>
-      <div class="formula" id="ubyHeroFormula">Use o check para incluir ou retirar carregadores específicos da operação UBY.</div>
+      <div class="formula" id="ubyHeroFormula">Use o check para incluir ou retirar carregadores especificos da operacao UBY.</div>
     </section>
 
     <section class="grid kpis" id="kpiUby"></section>
+
+    <section class="decision-grid" id="ubyDecisionCockpit"></section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Unidades UBY em crescimento</h2>
+        <div class="sub" style="margin:-8px 0 12px">Comparacao: ultimos 7 dias vs 7 dias anteriores</div>
+        <div class="action-list" id="ubyGrowthRank"></div>
+      </div>
+      <div class="card">
+        <h2>Alertas da operacao UBY</h2>
+        <div class="action-list" id="ubyActionRank"></div>
+      </div>
+    </section>
 
     <section class="section" style="margin-top:18px">
       <div class="card">
@@ -801,9 +815,50 @@
       </div>
     </section>
 
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Receita diaria UBY</h2><canvas id="usageUbyRevenueDaily"></canvas></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Metricas dia a dia</h2><div class="daily-metrics" id="usageUbyDailyMetrics"></div></div>
+      <div class="card"><h2>Relatorio de erros</h2><div class="daily-metrics" id="usageUbyRecentOps"></div></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Analise operacional</h2><div class="daily-metrics" id="usageUbyOperationQuality"></div></div>
+      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics" id="usageUbyNewClients"></div></div>
+      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageUbyAbsentClients"></div></div>
+    </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Calendario operacional UBY</h2><div id="usageUbyCalendar"></div></div>
+    </section>
+    <section class="section section-3 usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Duracao nos ultimos 7 dias (h)</h2><canvas id="usageUbyDuration7"></canvas></div>
+      <div class="card"><h2>Recargas nos ultimos 7 dias</h2><canvas id="usageUbyCount7"></canvas></div>
+      <div class="card"><h2>Consumo nos ultimos 7 dias (kWh)</h2><canvas id="usageUbyEnergy7"></canvas></div>
+    </section>
+    <section class="section section-3 usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Tempo de permanencia</h2><canvas id="usageUbyStayBuckets"></canvas></div>
+      <div class="card pie-card"><h2>Cupons usados</h2><canvas id="usageUbyCoupons"></canvas><div class="coupon-summary" id="usageUbyCouponSummary"></div></div>
+      <div class="card pie-card"><h2>Receita por cupom</h2><canvas id="usageUbyCouponRevenue"></canvas></div>
+    </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Horarios mais populares</h2><canvas id="usageUbyPopularHours"></canvas></div>
+      <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageUbyIdleValueDaily"></canvas></div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Ranking de unidades UBY</h2>
+        <div class="unit-rank" id="ubyUnitRank"></div>
+      </div>
+      <div class="card">
+        <h2>Evolucao mensal UBY</h2>
+        <canvas id="chartUbyMonth" aria-label="Evolucao mensal UBY"></canvas>
+      </div>
+    </section>
+
     <section class="section" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1">
-        <h2>Classificação dos carregadores</h2>
+        <h2>Classificacao dos carregadores</h2>
         <div style="overflow-x:auto">
           <table>
             <thead><tr><th>UBY</th><th>Unidade</th><th>Carregador</th><th>Tipo</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>Origem da regra</th><th>Abrir</th></tr></thead>
@@ -1655,8 +1710,9 @@ function applyRechargeRecord(record, sourceLabel) {
     setStorageState(`Sem planilha salva para <strong>${targetName}</strong>. O Painel Geral continua disponivel.`);
     if (openingWorkReport) return;
     renderGeral();
+    renderUbyOperation();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
-    showTab('geral');
+    showTab('uby');
     return;
   }
   uploadZone.classList.add('compact');
@@ -1818,8 +1874,9 @@ function removeFile(fileKey, name = '') {
     document.getElementById('emptyState').style.display = 'none';
     updateCorrectionButtons();
     renderGeral();
+    renderUbyOperation();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
-    showTab('geral');
+    showTab('uby');
   } else {
     renderAll();
     updateCorrectionButtons();
@@ -1867,8 +1924,9 @@ async function persistCorrection(message) {
     document.getElementById('tabsBar').style.display = 'flex';
     document.getElementById('emptyState').style.display = 'none';
     renderGeral();
+    renderUbyOperation();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
-    showTab('geral');
+    showTab('uby');
   } else {
     uploadZone.classList.add('compact');
     renderAll();
@@ -1934,8 +1992,9 @@ async function clearRechargeBase() {
   updateChips();
   updateCorrectionButtons();
   renderGeral();
+  renderUbyOperation();
   document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
-  showTab('geral');
+  showTab('uby');
 }
 
 function updateChips() {
@@ -4160,14 +4219,14 @@ function actionForUnit(unit = {}, momentum = unitMomentum(unit)) {
   return { level: 'priority', label: 'Manter ritmo', detail: 'Operação estável. Monitorar recorrência e ticket médio.' };
 }
 
-function renderGeneralDecisionCockpit(unitData = [], charges = [], stationRows = []) {
-  const cockpit = document.getElementById('generalDecisionCockpit');
-  const growthEl = document.getElementById('generalGrowthRank');
-  const actionEl = document.getElementById('generalActionRank');
+function renderDecisionCockpit(cockpitId, growthId, actionId, unitData = [], charges = [], stationRows = [], emptyMessage = 'Suba as planilhas das unidades para o painel gerar decisao por crescimento, alerta e recorrencia.') {
+  const cockpit = document.getElementById(cockpitId);
+  const growthEl = document.getElementById(growthId);
+  const actionEl = document.getElementById(actionId);
   if (!cockpit || !growthEl || !actionEl) return;
   const activeUnits = stationRows.filter(unit => unit.count > 0 || unit.revenue > 0);
   if (!charges.length) {
-    cockpit.innerHTML = '<div class="decision-card warn" style="grid-column:1/-1"><div class="label">Cockpit</div><strong>Sem base consolidada</strong><p>Suba as planilhas das unidades para o painel gerar decisão por crescimento, alerta e recorrência.</p></div>';
+    cockpit.innerHTML = `<div class="decision-card warn" style="grid-column:1/-1"><div class="label">Cockpit</div><strong>Sem base consolidada</strong><p>${emptyMessage}</p></div>`;
     growthEl.innerHTML = '<div class="note">Sem dados para ranking de crescimento.</div>';
     actionEl.innerHTML = '<div class="note">Sem alertas enquanto não houver recargas salvas.</div>';
     return;
@@ -4231,6 +4290,22 @@ function renderGeneralDecisionCockpit(unitData = [], charges = [], stationRows =
       <b class="${action.level === 'warn' ? 'warn' : action.level === 'good' ? 'good' : ''}">${escapeHtml(action.label)}</b>
     </div>
   `).join('');
+}
+
+function renderGeneralDecisionCockpit(unitData = [], charges = [], stationRows = []) {
+  renderDecisionCockpit('generalDecisionCockpit', 'generalGrowthRank', 'generalActionRank', unitData, charges, stationRows);
+}
+
+function renderUbyDecisionCockpit(unitData = [], charges = [], stationRows = []) {
+  renderDecisionCockpit(
+    'ubyDecisionCockpit',
+    'ubyGrowthRank',
+    'ubyActionRank',
+    unitData,
+    charges,
+    stationRows,
+    'Marque carregadores UBY ou suba as planilhas das unidades UBY para gerar decisao por crescimento, alerta e recorrencia.'
+  );
 }
 
 function usageSeries(charges = []) {
@@ -5055,52 +5130,156 @@ async function toggleUbyOperation(workId, key, checked) {
   renderClub();
 }
 
+function summarizeUbyChargerRow(row, charges = row.charges || []) {
+  const hydrated = (charges || []).map(hydrateCharge);
+  const energy = hydrated.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const revenue = hydrated.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const clients = new Set(hydrated.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  const dates = hydrated.map(charge => charge.startDate).filter(Boolean);
+  return {
+    ...row,
+    stationName: row.station,
+    charges: hydrated,
+    count: hydrated.length,
+    energy,
+    revenue,
+    clients,
+    avgTicket: hydrated.length ? revenue / hydrated.length : 0,
+    lastDate: dates.length ? new Date(Math.max(...dates)) : null,
+    acdc: generalAcDcStats(hydrated)
+  };
+}
+
 function renderUbyOperation() {
-  const unitData = getGeneralUnitData();
-  const rows = getUbyChargerRows(unitData);
-  const included = rows.filter(row => row.included);
+  const sourceUnitData = getGeneralUnitData();
+  const sourceRows = getUbyChargerRows(sourceUnitData);
+  const sourceIncluded = sourceRows.filter(row => row.included);
+  const sourceUbyCharges = sourceIncluded.flatMap(row => row.charges);
+  const sourceMonths = [...new Set(sourceUbyCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
+  const currentGeneralMonth = sourceMonths[sourceMonths.length - 1] || '';
+  const generalViewMode = document.getElementById('generalViewMode')?.value || 'month';
+  const isMonthView = generalViewMode !== 'accumulated' && !!currentGeneralMonth;
+  const visibleRows = sourceRows.map(row => summarizeUbyChargerRow(
+    row,
+    isMonthView ? row.charges.filter(charge => chargeMonthKey(charge) === currentGeneralMonth) : row.charges
+  ));
+  const included = visibleRows.filter(row => row.included && row.count > 0);
+  included.sort((a, b) => b.revenue - a.revenue);
   const allUbyCharges = included.flatMap(row => row.charges);
   const revenue = included.reduce((sum, row) => sum + row.revenue, 0);
   const energy = included.reduce((sum, row) => sum + row.energy, 0);
   const clients = new Set(allUbyCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  const acdc = generalAcDcStats(allUbyCharges);
   const dcCount = included.filter(row => row.kind === 'dc').length;
   const acCount = included.filter(row => row.kind === 'ac').length;
   const totalCharges = allUbyCharges.length;
   const avgTicket = totalCharges ? revenue / totalCharges : 0;
+  const cleanStats = cleanOperationStats(allUbyCharges);
+  const dates = allUbyCharges.map(charge => charge.startDate).filter(Boolean);
+  const firstDate = dates.length ? new Date(Math.min(...dates)) : null;
+  const lastDate = dates.length ? new Date(Math.max(...dates)) : null;
+  const months = [...new Set(allUbyCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
+  let totalMaxKWh = 0;
+  const windows = [];
+  included.forEach(row => {
+    months.forEach(mk => {
+      const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === mk);
+      if (!monthCharges.length) return;
+      const window = periodWindow(monthCharges, mk, 'mtd');
+      windows.push(window);
+      totalMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window).maxKWh;
+    });
+  });
+  const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
+  const firstPeriod = windows.length ? new Date(Math.min(...windows.map(window => window.start).filter(Boolean))) : firstDate;
+  const lastPeriod = windows.length ? new Date(Math.max(...windows.map(window => window.end).filter(Boolean))) : lastDate;
+  const viewLabel = isMonthView ? `Mes atual (${monthLabel(currentGeneralMonth)})` : 'Acumulado UBY';
+  const occClass = totalOcc < 15 ? 'occ-red' : (totalOcc < 30 ? 'occ-yellow' : 'occ-green');
+  const occStatus = totalOcc < 15 ? 'abaixo do objetivo minimo de 15%' : (totalOcc < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
 
+  document.getElementById('generalSourceLabel').textContent = totalCharges
+    ? `${viewLabel}: ${included.length} carregador(es) UBY ativo(s)`
+    : 'Operacao UBY sem recargas no periodo selecionado';
   document.getElementById('ubyHeroMeta').innerHTML = included.length
-    ? `${included.length} carregador(es) UBY em ${new Set(included.map(row => row.workId)).size} unidade(s). DC entra por padrao; ajustes manuais ficam salvos.`
-    : 'Nenhum carregador marcado como operacao UBY ainda.';
-  document.getElementById('ubyHeroFormula').innerHTML =
-    `${fmtBRL(revenue)} de receita UBY | ${fmtKWh(energy)} | ${totalCharges} recarga(s) | ${dcCount} DC e ${acCount} AC`;
+    ? `Visao: <strong>${viewLabel}</strong><br>${included.length} carregador(es) UBY em ${new Set(included.map(row => row.workId)).size} unidade(s)<br>Periodo: <strong>${fmtDT(firstPeriod)}</strong> ate <strong>${fmtDT(lastPeriod)}</strong><br>DC entra por padrao; ajustes manuais ficam salvos.`
+    : 'Nenhum carregador UBY com recargas no periodo selecionado.';
+  document.getElementById('ubyHeroFormula').innerHTML = totalCharges
+    ? `<strong>${viewLabel}</strong><br>${fmtBRL(revenue)} de receita UBY<br>${fmtKWh(energy)} entregues<br><strong style="color:#57B7FF">${totalCharges} recarga(s) em ${included.length} carregador(es)</strong><br>AC: ${acdc.acCharges} recargas / DC: ${acdc.dcCharges}<br><span style="color:#A8C8BC">foco principal do negocio</span>`
+    : 'Marque carregadores UBY ou suba planilhas das unidades UBY para iniciar o painel.';
 
   document.getElementById('kpiUby').innerHTML = `
-    <div class="card"><div class="label">Receita UBY</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${included.length} carregador(es) marcados</div></div>
-    <div class="card"><div class="label">Energia UBY</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${totalCharges} recarga(s)</div></div>
-    <div class="card"><div class="label">Ticket medio</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas UBY</div></div>
-    <div class="card"><div class="label">Clientes UBY</div><div class="value">${clients}</div><div class="sub">clientes unicos</div></div>
+    <div class="card kpi-feature ${occClass}"><div class="label">Ocupacao UBY</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">${occStatus} - meta: 15% minimo / 30% ideal</div></div>
+    <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div></div>
+    <div class="card"><div class="label">Energia UBY</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida</div></div>
+    <div class="card"><div class="label">Ticket medio UBY</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas UBY</div></div>
+    <div class="card"><div class="label">Melhor unidade UBY</div><div class="value" style="font-size:18px;white-space:normal">${included[0]?.stationName || '-'}</div><div class="sub">${included[0] ? fmtBRL(included[0].revenue) : 'sem dados'}</div></div>
+    <div class="card kpi-feature revenue-card"><div class="label">Receita UBY</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${included.length} carregador(es) marcados</div></div>
+    <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
+    <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
+    <div class="card"><div class="label">Carregadores AC</div><div class="value">${acCount}</div><div class="sub">incluidos na operacao UBY</div></div>
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${dcCount}</div><div class="sub">incluidos na operacao UBY</div></div>
-    <div class="card"><div class="label">Carregadores AC</div><div class="value">${acCount}</div><div class="sub">incluidos manualmente</div></div>
   `;
 
-  const byUnit = new Map();
-  included.forEach(row => {
-    if (!byUnit.has(row.workId)) byUnit.set(row.workId, { name: row.workName, revenue: 0, energy: 0 });
-    const item = byUnit.get(row.workId);
-    item.revenue += row.revenue;
-    item.energy += row.energy;
-  });
-  const chartRows = [...byUnit.values()].sort((a, b) => b.revenue - a.revenue);
-  renderBarChart('chartUbyRevenueUnit', chartRows.map(row => row.name), chartRows.map(row => row.revenue), '#57B7FF', ' R$');
-  renderBarChart('chartUbyEnergyUnit', chartRows.map(row => row.name), chartRows.map(row => row.energy), '#2DBBD3', ' kWh');
+  renderUbyDecisionCockpit([], allUbyCharges, included);
+  renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges);
 
-  document.getElementById('ubyChargerTable').innerHTML = rows.length ? rows.map(row => `
+  const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
+  const chartLabels = chartRows.map(row => {
+    const label = row.stationName || row.workName || '-';
+    return label.length > 24 ? label.slice(0, 24) + '...' : label;
+  });
+  renderBarChart('chartUbyRevenueUnit', chartLabels, chartRows.map(row => row.revenue), '#57B7FF', ' R$');
+  renderBarChart('chartUbyEnergyUnit', chartLabels, chartRows.map(row => row.energy), '#2DBBD3', ' kWh');
+
+  document.getElementById('ubyUnitRank').innerHTML = chartRows.length ? chartRows.slice(0, 12).map(unit => `
+    <div class="unit-card">
+      <div><strong>${escapeHtml(unit.stationName || unit.workName)}</strong><span>Obra: ${escapeHtml(unit.workName)} - ${unit.clients} cliente(s)</span></div>
+      <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
+      <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">${unit.kind.toUpperCase()} - ${unit.connType || 'sem conector'}</div></div>
+      <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir estacao</button></div>
+    </div>
+  `).join('') : '<div class="note">Nenhuma unidade UBY com recargas no periodo.</div>';
+
+  const monthData = sourceMonths.map(mk => {
+    const monthCharges = sourceUbyCharges.filter(charge => chargeMonthKey(charge) === mk);
+    return {
+      label: monthLabel(mk),
+      revenue: monthCharges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0),
+      energy: monthCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0)
+    };
+  });
+  destroyChart('chartUbyMonth');
+  const monthCtx = document.getElementById('chartUbyMonth');
+  if (monthCtx) {
+    charts['chartUbyMonth'] = new Chart(monthCtx, {
+      type: 'line',
+      data: {
+        labels: monthData.map(row => row.label),
+        datasets: [
+          { label: 'Receita UBY', data: monthData.map(row => +row.revenue.toFixed(2)), borderColor: '#57B7FF', backgroundColor: 'rgba(87,183,255,.12)', tension: .35, fill: true, yAxisID: 'y' },
+          { label: 'kWh UBY', data: monthData.map(row => +row.energy.toFixed(2)), borderColor: '#2DBBD3', backgroundColor: 'rgba(45,187,211,.08)', tension: .35, yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8FA39A' } } },
+        scales: {
+          y: { beginAtZero: true, ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } },
+          y1: { beginAtZero: true, position: 'right', ticks: { color: '#8FA39A' }, grid: { drawOnChartArea: false } },
+          x: { ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } }
+        }
+      }
+    });
+  }
+
+  document.getElementById('ubyChargerTable').innerHTML = visibleRows.length ? visibleRows.map(row => `
     <tr>
       <td><input type="checkbox" ${row.included ? 'checked' : ''} onchange="toggleUbyOperation('${escapeAttr(row.workId)}','${escapeAttr(row.key)}',this.checked)"></td>
       <td>${escapeHtml(row.workName)}</td>
       <td>${escapeHtml(row.station)}<br><span style="color:var(--p3-muted)">${escapeHtml(row.connType || 'Sem conector')}</span></td>
       <td>${row.kind.toUpperCase()}</td>
-      <td>${row.charges.length}</td>
+      <td>${row.count}</td>
       <td>${row.energy.toFixed(2).replace('.', ',')}</td>
       <td>${fmtBRL(row.revenue)}</td>
       <td>${row.ruleSource}</td>
@@ -5114,12 +5293,13 @@ function showGeneralWhenCurrentWorkIsEmpty() {
   document.getElementById('tabsBar').style.display = 'flex';
   document.getElementById('emptyState').style.display = 'none';
   document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
-  showTab('geral');
+  showTab('uby');
 }
 
 async function refreshGeneralRechargeBases(forceCloud = false) {
   syncGeneralRecordsFromLocal();
   renderGeral();
+  renderUbyOperation();
   showGeneralWhenCurrentWorkIsEmpty();
   if (!window.UBY_SUPABASE?.loadAllRechargeBases) return;
   try {
@@ -5127,6 +5307,7 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
     if (records?.length) {
       mergeCloudRechargeRecords(records);
       renderGeral();
+      renderUbyOperation();
       showGeneralWhenCurrentWorkIsEmpty();
       if (forceCloud) setStorageState(`Painel geral atualizado com ${records.length} base(s) do Supabase.`);
     } else if (forceCloud) {
@@ -5292,7 +5473,7 @@ function renderAll() {
     document.getElementById('tabAcumulado').style.display === 'block' ? 'acumulado' :
     document.getElementById('tabFinanceiro').style.display === 'block' ? 'financeiro' :
     document.getElementById('tabDetalhes').style.display === 'block' ? 'detalhes' :
-    'geral';
+    'uby';
 
   // Sincroniza inputs de potência
   getPower();
