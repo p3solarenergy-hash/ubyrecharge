@@ -1644,6 +1644,17 @@ function sameStationName(a, b) {
   return !!left && !!right && left === right;
 }
 
+function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
+  const raw = safeText(stationName || fallbackName).trim();
+  const normalized = normalizeStationForCompare(raw);
+  const work = workOptions().find(item => String(item.id) === String(workId));
+  const workName = work?.nome || fallbackName || raw;
+  if (String(workId) === 'rio' || normalizeStationForCompare(workName).includes('rio beach') || normalized.includes('rio beach')) {
+    return 'Rio Beach EV';
+  }
+  return raw || workName || 'Estacao';
+}
+
 function stationBlockedForWork(workId, stationName) {
   const blockedTerms = RECHARGE_STATION_BLOCKLIST_BY_WORK[String(workId || '')] || [];
   if (!blockedTerms.length) return false;
@@ -1673,11 +1684,21 @@ function stationMismatchMessage() {
 function applyStationReportFilter() {
   if (!currentStationReportName) return;
   const stationName = currentStationReportName;
-  allCharges = allCharges.filter(charge => sameStationName(charge.station, stationName));
-  loadedFiles = loadedFiles.filter(file => !file.station || sameStationName(file.station, stationName));
+  allCharges = allCharges.filter(charge =>
+    sameStationName(charge.station, stationName) ||
+    sameStationName(canonicalStationNameForWork(currentWorkId, charge.station, currentWorkName), stationName)
+  );
+  loadedFiles = loadedFiles.filter(file =>
+    !file.station ||
+    sameStationName(file.station, stationName) ||
+    sameStationName(canonicalStationNameForWork(currentWorkId, file.station, currentWorkName), stationName)
+  );
   monthlyClosings = Object.fromEntries(Object.entries(monthlyClosings || {}).filter(([, closing]) => {
     const stations = Array.isArray(closing?.stations) ? closing.stations : [];
-    return !stations.length || stations.some(station => sameStationName(station, stationName));
+    return !stations.length || stations.some(station =>
+      sameStationName(station, stationName) ||
+      sameStationName(canonicalStationNameForWork(currentWorkId, station, currentWorkName), stationName)
+    );
   }));
 }
 
@@ -3639,6 +3660,12 @@ function dateKeyLocal(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 
+function parseLocalDateKey(key) {
+  const match = String(key || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
 function sameDayPreviousMonth(date) {
   const prev = new Date(date.getFullYear(), date.getMonth() - 1, 1);
   const day = Math.min(date.getDate(), daysInMonth(prev.getFullYear(), prev.getMonth() + 1));
@@ -3767,6 +3794,24 @@ async function fetchBrazilHolidays(year) {
   }
 }
 
+function parseWeatherDailyResponse(data = {}, location = {}) {
+  const map = {};
+  const daily = data?.daily || {};
+  (daily.time || []).forEach((date, index) => {
+    const rain = Number(daily.precipitation_sum?.[index] || 0);
+    const code = daily.weather_code?.[index];
+    map[date] = {
+      location: location.name,
+      rain,
+      code,
+      label: weatherCodeLabel(code),
+      tMax: Number(daily.temperature_2m_max?.[index]),
+      tMin: Number(daily.temperature_2m_min?.[index])
+    };
+  });
+  return map;
+}
+
 function validCoordinate(value) {
   const n = Number(String(value ?? '').replace(',', '.'));
   return Number.isFinite(n) ? n : null;
@@ -3816,23 +3861,27 @@ async function fetchWeatherContext(charges = [], startDate, endDate) {
     });
     const url = `https://archive-api.open-meteo.com/v1/archive?${params.toString()}`;
     const data = await cachedFetchJson(`weather-${location.key}-${dateKeyLocal(startDate)}-${dateKeyLocal(endDate)}`, url);
-    const map = {};
-    const daily = data?.daily || {};
-    (daily.time || []).forEach((date, index) => {
-      const rain = Number(daily.precipitation_sum?.[index] || 0);
-      const code = daily.weather_code?.[index];
-      map[date] = {
-        location: location.name,
-        rain,
-        code,
-        label: weatherCodeLabel(code),
-        tMax: Number(daily.temperature_2m_max?.[index]),
-        tMin: Number(daily.temperature_2m_min?.[index])
-      };
-    });
-    return { map, location };
+    const map = parseWeatherDailyResponse(data, location);
+    if (Object.keys(map).length) return { map, location };
+    throw new Error('Sem dados historicos de clima para o periodo');
   } catch (err) {
-    return { map: {}, location, error: err.message };
+    try {
+      const today = new Date();
+      const diffDays = Math.max(1, Math.ceil((today - startDate) / 86400000) + 2);
+      const params = new URLSearchParams({
+        latitude: String(location.lat),
+        longitude: String(location.lon),
+        past_days: String(Math.min(Math.max(diffDays, 1), 92)),
+        forecast_days: '16',
+        daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum',
+        timezone: 'America/Sao_Paulo'
+      });
+      const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+      const data = await cachedFetchJson(`weather-forecast-${location.key}-${dateKeyLocal(startDate)}-${dateKeyLocal(endDate)}`, url, 6 * 60 * 60 * 1000);
+      return { map: parseWeatherDailyResponse(data, location), location, fallback: true };
+    } catch (fallbackErr) {
+      return { map: {}, location, error: `${err.message}; ${fallbackErr.message}` };
+    }
   }
 }
 
@@ -3866,7 +3915,46 @@ function dailyMapForCalendar(charges = [], historyCharges = charges) {
   return map;
 }
 
-function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharges = charges) {
+function dailyMapForCalendarByDayOfMonth(charges = [], historyCharges = charges) {
+  const map = {};
+  const firstClientDay = firstClientDayMap(historyCharges?.length ? historyCharges : charges);
+  charges.forEach(charge => {
+    if (!charge.startDate || Number.isNaN(charge.startDate.getTime())) return;
+    const day = charge.startDate.getDate();
+    if (!map[day]) map[day] = { revenue: 0, count: 0, energy: 0, failed: 0, newClients: new Set(), months: new Set() };
+    const client = clientKeyFromCharge(charge);
+    map[day].revenue += Number(charge.revenue || 0);
+    map[day].count += 1;
+    map[day].energy += Number(charge.energyKWh || 0);
+    map[day].months.add(chargeMonthKey(charge));
+    if (client && firstClientDay[client] === dateKeyLocal(charge.startDate)) map[day].newClients.add(client);
+    if (isFailedCharge(charge)) map[day].failed += 1;
+  });
+  Object.values(map).forEach(day => {
+    day.newClientCount = day.newClients?.size || 0;
+    day.monthCount = [...(day.months || [])].filter(month => month !== 'unknown').length;
+  });
+  return map;
+}
+
+function weatherTagsForDayOfMonth(day, external = {}) {
+  const rows = Object.entries(external.weather || {})
+    .filter(([key]) => {
+      const date = parseLocalDateKey(key);
+      return date && date.getDate() === day;
+    })
+    .map(([, weather]) => weather);
+  if (!rows.length) {
+    if (external.loading) return [{ text: 'Chuva carregando', type: 'muted' }];
+    return [{ text: 'Chuva indisponivel', type: 'muted' }];
+  }
+  const rainy = rows.filter(weather => Number(weather.rain || 0) > 0);
+  const rainTotal = rainy.reduce((sum, weather) => sum + Number(weather.rain || 0), 0);
+  if (!rainy.length) return [{ text: 'Sem chuva nos dias', type: 'muted' }];
+  return [{ text: `Chuva em ${rainy.length} dia(s): ${rainTotal.toFixed(1).replace('.', ',')}mm`, type: rainTotal >= 5 ? 'warn' : 'muted' }];
+}
+
+function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharges = charges, options = {}) {
   const el = document.getElementById(`${prefix}Calendar`);
   if (!el) return;
   const bounds = calendarBoundsFromCharges(charges);
@@ -3874,17 +3962,48 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
     el.innerHTML = '<div class="note">Sem datas validas para montar o calendario operacional.</div>';
     return;
   }
+  const calendarMode = options.mode || 'month';
+  const isDayOfMonthAccumulated = calendarMode === 'dayOfMonthAccumulated';
   const monthCharges = charges.filter(charge => charge.startDate && charge.startDate.getFullYear() === bounds.year && charge.startDate.getMonth() === bounds.month);
   const currentMap = dailyMapForCalendar(monthCharges, historyCharges);
+  const dayOfMonthMap = dailyMapForCalendarByDayOfMonth(charges, historyCharges);
   const historyMap = dailyMapForCalendar(historyCharges, historyCharges);
   const first = new Date(bounds.year, bounds.month, 1);
   const totalDays = daysInMonth(bounds.year, bounds.month + 1);
   const firstDay = new Date(bounds.year, bounds.month, 1);
   const lastDay = new Date(bounds.year, bounds.month, totalDays);
+  const dated = charges.filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()));
+  const periodStart = dated.length ? new Date(Math.min(...dated.map(charge => charge.startDate))) : firstDay;
+  const periodEnd = dated.length ? new Date(Math.max(...dated.map(charge => charge.startDate))) : lastDay;
   const build = (external = {}) => {
+    const weekHeads = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'].map(day => `<div class="calendar-head">${day}</div>`).join('');
+    const locationLabel = external.location?.name
+      ? `<div class="note" style="margin-bottom:10px">Chuva via Open-Meteo: ${escapeHtml(external.location.name)}${external.fallback ? ' (fonte forecast)' : ''}. ${isDayOfMonthAccumulated ? 'Calendario acumulado por dia do mes.' : 'Feriados via Nager.Date Brasil.'}</div>`
+      : '';
+
+    if (isDayOfMonthAccumulated) {
+      const dayHeads = ['Dia','Receita','Recargas','kWh','Contexto'].map(day => `<div class="calendar-head">${day}</div>`).join('');
+      const days = Array.from({ length: 31 }, (_, index) => {
+        const day = index + 1;
+        const item = dayOfMonthMap[day] || { revenue: 0, count: 0, energy: 0, failed: 0, newClientCount: 0, monthCount: 0 };
+        const hasMovement = item.count > 0 || item.revenue > 0;
+        const avgDayRevenue = item.monthCount ? item.revenue / item.monthCount : 0;
+        const cls = !hasMovement ? '' : (avgDayRevenue >= 150 ? 'good' : (avgDayRevenue <= 30 ? 'down' : 'warn'));
+        const tags = weatherTagsForDayOfMonth(day, external).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
+        return `<div class="calendar-day ${cls}">
+          <div class="day-num"><span>Dia ${day}</span><span>${item.failed ? `${item.failed} erro(s)` : ''}</span></div>
+          <div class="day-main">${fmtBRL(item.revenue)}</div>
+          <div class="day-sub">${item.count} recarga(s) - ${fmtKWh(item.energy)}</div>
+          <div class="day-sub">${item.monthCount || 0} mes(es) com movimento</div>
+          <div class="day-sub">${item.newClientCount ? `${item.newClientCount} cliente(s) novo(s)` : 'sem cliente novo'}</div>
+          <div class="calendar-tags">${tags}</div>
+        </div>`;
+      }).join('');
+      el.innerHTML = `${locationLabel}<div class="calendar-grid">${dayHeads}${days}</div>`;
+      return;
+    }
+
     const blanks = Array.from({ length: first.getDay() }, () => '<div class="calendar-day empty"></div>').join('');
-    const weekHeads = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(day => `<div class="calendar-head">${day}</div>`).join('');
-    const locationLabel = external.location?.name ? `<div class="note" style="margin-bottom:10px">Chuva via Open-Meteo: ${escapeHtml(external.location.name)}. Feriados via Nager.Date Brasil.</div>` : '';
     const days = Array.from({ length: totalDays }, (_, index) => {
       const date = new Date(bounds.year, bounds.month, index + 1);
       const key = dateKeyLocal(date);
@@ -3894,12 +4013,12 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
       const change = pctChange(item.revenue, prev.revenue);
       const hasMovement = item.count > 0 || item.revenue > 0;
       const cls = !hasMovement ? '' : (change >= 10 ? 'good' : (change <= -10 ? 'down' : 'warn'));
-      const changeText = prev.revenue > 0 || item.revenue > 0 ? `${change >= 0 ? '+' : ''}${fmtPct(change)} vs ${String(prevDate.getDate()).padStart(2,'0')}/${String(prevDate.getMonth()+1).padStart(2,'0')}` : 'sem base mês anterior';
+      const changeText = prev.revenue > 0 || item.revenue > 0 ? `${change >= 0 ? '+' : ''}${fmtPct(change)} vs ${String(prevDate.getDate()).padStart(2,'0')}/${String(prevDate.getMonth()+1).padStart(2,'0')}` : 'sem base mes anterior';
       const tags = contextTagsForDate(date, external).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
       return `<div class="calendar-day ${cls}">
         <div class="day-num"><span>${index + 1}</span><span>${item.failed ? `${item.failed} erro(s)` : ''}</span></div>
         <div class="day-main">${fmtBRL(item.revenue)}</div>
-        <div class="day-sub">${item.count} recarga(s) · ${fmtKWh(item.energy)}</div>
+        <div class="day-sub">${item.count} recarga(s) - ${fmtKWh(item.energy)}</div>
         <div class="day-sub">${item.newClientCount ? `${item.newClientCount} cliente(s) novo(s)` : 'sem cliente novo'}</div>
         <div class="day-sub">${changeText}</div>
         <div class="calendar-tags">${tags}</div>
@@ -3910,14 +4029,13 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
   build({ loading: true });
   Promise.all([
     fetchBrazilHolidays(bounds.year),
-    fetchWeatherContext(charges, firstDay, lastDay)
+    fetchWeatherContext(charges, isDayOfMonthAccumulated ? periodStart : firstDay, isDayOfMonthAccumulated ? periodEnd : lastDay)
   ]).then(([holidays, weather]) => {
-    build({ holidays, weather: weather.map, location: weather.location });
+    build({ holidays, weather: weather.map, location: weather.location, fallback: weather.fallback });
   }).catch(() => {
     build({});
   });
 }
-
 function pctChange(current = 0, previous = 0) {
   if (previous > 0) return (current - previous) / previous * 100;
   return current > 0 ? 100 : 0;
@@ -4406,7 +4524,7 @@ function renderCouponSummary(id, details = []) {
   }).join('');
 }
 
-function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = charges) {
+function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = charges, options = {}) {
   const data = usageSeries(charges);
   const daily = dailyFinancialSeries(charges);
   renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
@@ -4416,7 +4534,7 @@ function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = ch
   renderOperationQuality(prefix, charges);
   renderNewClients(prefix, charges, historyCharges);
   renderAbsentClientAlerts(prefix, historyCharges);
-  renderOperationalCalendar(prefix, charges, historyCharges);
+  renderOperationalCalendar(prefix, charges, historyCharges, options.calendar || {});
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
   renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
@@ -4509,7 +4627,7 @@ function getGeneralUnitData() {
       const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
       const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
       const dates = charges.map(charge => charge.startDate).filter(Boolean);
-      const stations = [...new Set(charges.map(charge => charge.station).filter(Boolean))];
+      const stations = [...new Set(charges.map(charge => canonicalStationNameForWork(record.workId, charge.station, record.workName || workNameById(record.workId))).filter(Boolean))];
       const acdc = generalAcDcStats(charges);
       return {
         workId: record.workId,
@@ -4539,7 +4657,7 @@ function summarizeGeneralUnit(unit, charges) {
   const revenue = hydrated.reduce((sum, charge) => sum + charge.revenue, 0);
   const clients = new Set(hydrated.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
   const dates = hydrated.map(charge => charge.startDate).filter(Boolean);
-  const stations = [...new Set(hydrated.map(charge => charge.station).filter(Boolean))];
+  const stations = [...new Set(hydrated.map(charge => canonicalStationNameForWork(unit.workId, charge.station, unit.workName)).filter(Boolean))];
   return {
     ...unit,
     stationName: stations[0] || unit.stationName || unit.workName,
@@ -4589,7 +4707,7 @@ function getGeneralStationRows(unitData) {
   unitData.forEach(unit => {
     const byStation = new Map();
     unit.charges.forEach(charge => {
-      const stationName = safeText(charge.station || unit.stationName || unit.workName).trim() || unit.workName;
+      const stationName = canonicalStationNameForWork(unit.workId, charge.station || unit.stationName || unit.workName, unit.workName);
       if (!byStation.has(stationName)) byStation.set(stationName, []);
       byStation.get(stationName).push(charge);
     });
@@ -4608,7 +4726,11 @@ function getGeneralStationRows(unitData) {
         ...summary,
         stationName,
         stations: [stationName],
-        files: (unit.files || []).filter(file => !file.station || sameStationName(file.station, stationName))
+        files: (unit.files || []).filter(file =>
+          !file.station ||
+          sameStationName(file.station, stationName) ||
+          sameStationName(canonicalStationNameForWork(unit.workId, file.station, unit.workName), stationName)
+        )
       });
     });
   });
@@ -4651,13 +4773,16 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
   unitData.forEach(unit => {
     const groups = new Map();
     unit.charges.forEach(charge => {
-      const key = ubyOperationKey(charge);
+      const stationName = canonicalStationNameForWork(unit.workId, charge.station || unit.stationName || unit.workName, unit.workName);
+      const key = String(unit.workId) === 'rio'
+        ? `${normalizeStationForCompare(stationName)}|${safeText(charge.connType || '').trim().toLowerCase()}`
+        : ubyOperationKey(charge);
       if (!groups.has(key)) {
         groups.set(key, {
           workId: unit.workId,
           workName: unit.workName,
           key,
-          station: charge.station || unit.stationName || unit.workName,
+          station: stationName,
           connType: charge.connType || '',
           kind: chargerKind(charge),
           charges: [],
@@ -5221,7 +5346,9 @@ function renderUbyOperation() {
   `;
 
   renderUbyDecisionCockpit([], allUbyCharges, included);
-  renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges);
+  renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
+    calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated' }
+  });
 
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
   const chartLabels = chartRows.map(row => {
