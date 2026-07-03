@@ -2,6 +2,7 @@
 
 ## Planilha conectada
 
+- Forms: https://docs.google.com/forms/d/1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM/edit#responses
 - Planilha: Cadastro Clube UBY (respostas)
 - ID: `19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws`
 - Aba: `Respostas ao formulario 1`
@@ -9,7 +10,7 @@
 
 ## Publicar o conector seguro
 
-1. Abra a planilha de respostas do Forms.
+1. Abra o Forms acima em `Respostas` e clique no icone verde do Google Sheets para abrir/criar a planilha de respostas.
 2. Va em `Extensoes` > `Apps Script`.
 3. Cole o conteudo do arquivo `clube_uby_form_proxy.gs`.
 4. Salve o projeto como `Clube UBY - API Forms`.
@@ -69,3 +70,13 @@ Abra a URL `/exec` no navegador. A resposta esperada com sucesso e um JSON parec
 ```
 
 Depois teste no app pelo botao `Sincronizar formulario`.
+
+## Como o app cruza os dados
+
+O app salva as respostas do Forms na base local do Clube UBY e cruza cada cadastro com o ranking por:
+
+1. E-mail
+2. WhatsApp/telefone
+3. Nome normalizado
+
+Quando encontra correspondencia, o ranking passa a mostrar telefone, status do cadastro, LGPD, veiculo, placa e beneficio desejado junto dos pontos/faturamento.

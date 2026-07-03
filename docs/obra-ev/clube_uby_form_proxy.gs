@@ -1,3 +1,5 @@
+// Se este script estiver colado dentro da planilha de respostas do Forms,
+// ele usa a planilha ativa automaticamente. O ID abaixo fica como fallback.
 const SPREADSHEET_ID = "19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws";
 const SHEET_GID = 1124525277;
 const SHEET_NAME = "Respostas ao formulario 1";
@@ -34,7 +36,7 @@ function handleRequest_(event) {
 }
 
 function findResponseSheet_() {
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheets = spreadsheet.getSheets();
   const byId = sheets.find(sheet => Number(sheet.getSheetId()) === Number(SHEET_GID));
   if (byId) return byId;

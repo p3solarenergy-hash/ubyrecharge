@@ -500,7 +500,7 @@
       <button class="btn-recalc" onclick="syncClubParticipantsFromSheet()">Sincronizar formulario</button>
       <button class="btn-recalc" onclick="document.getElementById('clubParticipantFileInput').click()">Importar CSV/Excel</button>
       <button class="btn-recalc" onclick="configureClubFormEndpoint()">Configurar endpoint</button>
-      <a class="btn-recalc" href="https://docs.google.com/spreadsheets/d/19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws/edit?gid=1124525277#gid=1124525277" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Abrir planilha</a>
+      <a class="btn-recalc" href="https://docs.google.com/forms/d/1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM/edit#responses" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Abrir Forms</a>
       <button class="btn-recalc" onclick="window.print()">Imprimir ranking</button>
       <input type="file" id="clubParticipantFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" multiple style="display:none" onchange="handleClubParticipantFiles(Array.from(this.files)); this.value=''">
     </div>
@@ -761,7 +761,7 @@
         <h2>Ranking de clientes</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Posição</th><th>Cliente</th><th>Telefone</th><th>E-mail</th><th>Pontos</th><th>Faturamento</th><th>kWh</th><th>Recargas</th><th>Última recarga</th><th>Benefício</th></tr></thead>
+            <thead><tr><th>Posicao</th><th>Cliente</th><th>Cadastro</th><th>Telefone</th><th>E-mail</th><th>Veiculo</th><th>Pontos</th><th>Faturamento</th><th>kWh</th><th>Recargas</th><th>Ultima recarga</th><th>Beneficio</th></tr></thead>
             <tbody id="clubRankingTable"></tbody>
           </table>
         </div>
@@ -1239,6 +1239,8 @@ const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
 const RECARGAS_IMPORT_UNDO_KEY = 'uby-recargas-import-undo-v1';
 const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
+const CLUB_FORM_ID = '1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM';
+const CLUB_FORM_RESPONSES_URL = `https://docs.google.com/forms/d/${CLUB_FORM_ID}/edit#responses`;
 const CLUB_FORM_SHEET_ID = '19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws';
 const CLUB_FORM_GID = '1124525277';
 const CLUB_FORM_CSV_URL = `https://docs.google.com/spreadsheets/d/${CLUB_FORM_SHEET_ID}/export?format=csv&gid=${CLUB_FORM_GID}`;
@@ -4917,7 +4919,7 @@ function clubFormEndpointUrl() {
 
 function configureClubFormEndpoint() {
   const current = clubFormEndpointUrl();
-  const next = prompt('Cole aqui a URL /exec do Google Apps Script do Clube UBY:', current);
+  const next = prompt('Cole aqui a URL /exec do Google Apps Script publicado na planilha de respostas do Forms do Clube UBY:', current);
   if (next === null) return;
   const clean = safeText(next).trim();
   if (clean) {
@@ -4926,6 +4928,39 @@ function configureClubFormEndpoint() {
     localStorage.removeItem('uby-club-form-endpoint');
   }
   renderClub();
+}
+
+function clubParticipantLookup(participants = []) {
+  const map = new Map();
+  participants.forEach(participant => {
+    clubParticipantKeys(participant).forEach(key => {
+      if (!map.has(key)) map.set(key, participant);
+    });
+  });
+  return map;
+}
+
+function enrichClubClientRows(rows = [], participants = []) {
+  const byKey = clubParticipantLookup(participants);
+  return rows.map(row => {
+    const participant = clubParticipantKeys(row).map(key => byKey.get(key)).find(Boolean);
+    if (!participant) return { ...row, participant: null, registered: false };
+    const merged = {
+      ...row,
+      participant,
+      registered: true,
+      name: participant.name || row.name,
+      email: row.email || participant.email || '',
+      phone: row.phone || participant.phone || '',
+      vehicleBrand: participant.vehicleBrand || '',
+      vehicleModel: participant.vehicleModel || '',
+      vehiclePlate: participant.vehiclePlate || '',
+      desiredBenefit: participant.desiredBenefit || '',
+      acceptedLgpd: !!participant.acceptedLgpd,
+      createdAtMs: participant.createdAtMs || 0
+    };
+    return merged;
+  });
 }
 
 function fetchJsonp(url) {
@@ -5089,9 +5124,9 @@ function clubBenefitForPosition(position) {
 function renderClub() {
   const unitData = getGeneralUnitData();
   const charges = getUbyOperationCharges(unitData).filter(charge => Number(charge.revenue || 0) > 0);
-  const rows = clubClientRows(charges);
   const participantStore = clubParticipantsStore();
   const participants = participantStore.rows;
+  const rows = enrichClubClientRows(clubClientRows(charges), participants);
   const rankByKey = new Map();
   rows.forEach(row => clubParticipantKeys(row).forEach(key => rankByKey.set(key, row)));
   const matchedParticipants = participants.filter(participant => clubParticipantKeys(participant).some(key => rankByKey.has(key)));
@@ -5100,6 +5135,7 @@ function renderClub() {
   const totalPoints = rows.reduce((sum, row) => sum + row.points, 0);
   const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0);
   const withPhone = rows.filter(row => row.phone).length;
+  const registeredRows = rows.filter(row => row.registered).length;
   const top3 = rows.slice(0, 3);
 
   document.getElementById('clubHeroMeta').innerHTML = rows.length
@@ -5113,6 +5149,7 @@ function renderClub() {
     <div class="card"><div class="label">Pontos emitidos</div><div class="value">${totalPoints.toLocaleString('pt-BR')}</div><div class="sub">1 ponto por real gasto</div></div>
     <div class="card"><div class="label">Receita elegível</div><div class="value">${fmtBRL(totalRevenue)}</div><div class="sub">base do ranking</div></div>
     <div class="card"><div class="label">Com telefone</div><div class="value">${withPhone}</div><div class="sub">${rows.length ? fmtPct(withPhone / rows.length * 100) : '0,00%'} dos participantes</div></div>
+    <div class="card"><div class="label">Cadastro Forms</div><div class="value">${registeredRows}</div><div class="sub">${rows.length ? fmtPct(registeredRows / rows.length * 100) : '0,00%'} do ranking cruzado</div></div>
   `;
 
   document.getElementById('clubRewards').innerHTML = `
@@ -5206,11 +5243,17 @@ function renderClub() {
 
   document.getElementById('clubRankingTable').innerHTML = rows.length ? rows.map((row, index) => {
     const position = index + 1;
+    const registerStatus = row.registered
+      ? (row.acceptedLgpd ? 'Forms + LGPD' : 'Forms sem LGPD')
+      : 'Sem cadastro';
+    const vehicle = [row.vehicleBrand, row.vehicleModel].filter(Boolean).join(' ') || row.vehiclePlate || '-';
     return `<tr>
       <td>${position}</td>
       <td>${escapeHtml(row.name)}</td>
+      <td><span class="club-status-pill ${row.registered ? (row.acceptedLgpd ? 'good' : 'warn') : 'muted'}">${registerStatus}</span></td>
       <td>${row.phone ? escapeHtml(row.phone) : '-'}</td>
       <td>${row.email ? escapeHtml(row.email) : '-'}</td>
+      <td>${escapeHtml(vehicle)}</td>
       <td>${row.points.toLocaleString('pt-BR')}</td>
       <td>${fmtBRL(row.revenue)}</td>
       <td>${row.energy.toFixed(2).replace('.', ',')}</td>
@@ -5218,9 +5261,8 @@ function renderClub() {
       <td>${fmtDT(row.lastDate)}</td>
       <td>${escapeHtml(clubBenefitForPosition(position))}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem clientes elegíveis no clube.</td></tr>';
+  }).join('') : '<tr><td colspan="12" style="color:var(--p3-muted);text-align:center;padding:20px">Sem clientes elegiveis no clube.</td></tr>';
 }
-
 async function toggleUbyOperation(workId, key, checked) {
   syncGeneralRecordsFromLocal();
   const db = localRechargeDb();
