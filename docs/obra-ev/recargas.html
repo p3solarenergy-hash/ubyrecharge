@@ -1315,6 +1315,51 @@ function writeJson(key, value) {
   return result.ok;
 }
 
+function rechargeRecordHasData(record = {}) {
+  const summary = record.summary || {};
+  return Boolean(
+    (Array.isArray(record.charges) && record.charges.length) ||
+    (Array.isArray(record.files) && record.files.length) ||
+    Number(summary.totalCharges || summary.recharges || 0) > 0 ||
+    Number(summary.energy || summary.energyKWh || 0) > 0 ||
+    Number(summary.revenue || 0) > 0
+  );
+}
+
+function workHasRechargeHistory(workId) {
+  const id = String(workId || '').trim();
+  if (!id) return false;
+  const db = readJson(RECARGAS_LOCAL_KEY, {});
+  return rechargeRecordHasData(db[id]) || rechargeRecordHasData(allRechargeRecords[id]);
+}
+
+function completedWorkStatus(work = {}) {
+  const text = normalizeTextForInsight([
+    work.status,
+    work.status_exec,
+    work.statusExec,
+    work.projectStatus,
+    work.etapa,
+    work.kind
+  ].filter(Boolean).join(' '));
+  const pct = Number(work.pct ?? work.progresso ?? work.progress ?? work.percentual ?? 0);
+  return (
+    work.concluida === true ||
+    work.completed === true ||
+    pct >= 100 ||
+    text.includes('concluida') ||
+    text.includes('concluido') ||
+    text.includes('finalizada') ||
+    text.includes('finalizado') ||
+    text.includes('operacao') ||
+    text.includes('operacional')
+  );
+}
+
+function rechargeEligibleWork(work = {}) {
+  return completedWorkStatus(work) || workHasRechargeHistory(work.id);
+}
+
 function workOptions() {
   const byId = new Map();
   (appData.baseObras || []).forEach(work => byId.set(work.id, work));
@@ -1333,6 +1378,8 @@ function workOptions() {
         nome: detail.project.obraNome || id,
         cliente: detail.project.cliente || '',
         local: detail.project.local || '',
+        status: detail.project.statusExec || detail.project.status || '',
+        statusExec: detail.project.statusExec || detail.project.status || '',
         cidade: detail.project.cidade || '',
         uf: detail.project.uf || '',
         weatherLat: detail.project.weatherLat || detail.project.latitude || detail.project.lat || '',
@@ -1341,10 +1388,26 @@ function workOptions() {
       });
     }
   }
+  const rechargeSources = { ...readJson(RECARGAS_LOCAL_KEY, {}), ...allRechargeRecords };
+  Object.entries(rechargeSources).forEach(([workId, record]) => {
+    if (!workId || byId.has(workId) || !rechargeRecordHasData(record)) return;
+    byId.set(workId, {
+      id: workId,
+      nome: record.workName || record.summary?.workName || workId,
+      cliente: record.summary?.cliente || '',
+      status: 'Concluida',
+      statusExec: 'Concluida',
+      kw: Number(record.summary?.powerKw || record.summary?.kw || 0)
+    });
+  });
   if (!byId.has('malassise')) {
-    byId.set('malassise', { id: 'malassise', nome: 'Posto Robert Koch R.K.', cliente: 'Malassise Robert Koch', kw: 60 });
+    byId.set('malassise', { id: 'malassise', nome: 'Posto Robert Koch R.K.', cliente: 'Malassise Robert Koch', status: 'Concluida', statusExec: 'Concluida', kw: 60 });
+  } else {
+    byId.set('malassise', { ...byId.get('malassise'), status: 'Concluida', statusExec: 'Concluida' });
   }
-  return [...byId.values()].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || '')));
+  return [...byId.values()]
+    .filter(rechargeEligibleWork)
+    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || '')));
 }
 
 function currentWork() {
@@ -1679,6 +1742,8 @@ function stationLooksRelatedToWork(station, workName) {
   if (!stationText || !workText) return true;
   if (stationText.includes('robert koch') && (workText.includes('robert koch') || workText.includes('malassise') || workText.includes('r k'))) return true;
   if (stationText.includes('santarem') && workText.includes('santarem')) return true;
+  if (stationText.includes('jardins') && (workText.includes('centro') || workText.includes('santarem'))) return true;
+  if (stationText.includes('centro') && (workText.includes('jardins') || workText.includes('santarem'))) return true;
   if (stationText.includes('rio beach') && workText.includes('rio beach')) return true;
   if (stationText.includes('araguaia') && workText.includes('araguaia')) return true;
   if (stationText.includes('duim') && workText.includes('duim')) return true;
@@ -5541,6 +5606,7 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
     const records = await window.UBY_SUPABASE.loadAllRechargeBases();
     if (records?.length) {
       mergeCloudRechargeRecords(records);
+      initWorkSelector();
       renderGeral();
       renderUbyOperation();
       showGeneralWhenCurrentWorkIsEmpty();
