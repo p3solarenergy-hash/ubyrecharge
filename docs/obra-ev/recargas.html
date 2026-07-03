@@ -1244,6 +1244,9 @@ const CLUB_FORM_RESPONSES_URL = `https://docs.google.com/forms/d/${CLUB_FORM_ID}
 const CLUB_FORM_SHEET_ID = '19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws';
 const CLUB_FORM_GID = '1124525277';
 const CLUB_FORM_CSV_URL = `https://docs.google.com/spreadsheets/d/${CLUB_FORM_SHEET_ID}/export?format=csv&gid=${CLUB_FORM_GID}`;
+const CLUB_FORM_AUTO_SYNC_MAX_AGE_MS = 10 * 60 * 1000;
+let clubParticipantsSyncPromise = null;
+let clubParticipantsAutoSyncAttempted = false;
 const CALENDAR_CONTEXT_CACHE_KEY = 'uby-recargas-calendar-context-v1';
 const CALENDAR_CONTEXT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const WEATHER_LOCATIONS = [
@@ -5036,11 +5039,14 @@ function clubParticipantsFromEndpointPayload(payload) {
   return data.map(normalizeClubParticipantObject).filter(row => row.name || row.email || row.phone);
 }
 
-async function syncClubParticipantsFromSheet() {
+async function syncClubParticipantsFromSheet(options = {}) {
+  const silent = !!options.silent;
+  const force = !!options.force;
+  if (clubParticipantsSyncPromise && !force) return clubParticipantsSyncPromise;
   const status = document.getElementById('clubParticipantsStatus');
-  if (status) status.textContent = 'Sincronizando respostas do formulario...';
+  if (status && !silent) status.textContent = 'Sincronizando respostas do formulario...';
   const endpoint = clubFormEndpointUrl();
-  try {
+  clubParticipantsSyncPromise = (async () => {
     let participants = [];
     let source = 'Google Sheets';
     if (endpoint) {
@@ -5057,11 +5063,31 @@ async function syncClubParticipantsFromSheet() {
     const merged = mergeClubParticipants(participants, source);
     if (status) status.textContent = `${participants.length} resposta(s) lida(s) via ${source}. ${merged.length} participante(s) salvo(s) no Clube UBY.`;
     renderClub();
+    return merged;
+  })();
+  try {
+    return await clubParticipantsSyncPromise;
   } catch (err) {
     if (status) status.textContent = endpoint
       ? `Nao consegui ler o endpoint seguro (${err.message}). Revise a publicacao do Apps Script ou importe CSV/Excel.`
       : `Nao consegui ler a planilha direto (${err.message}). Configure o endpoint seguro ou importe CSV/Excel.`;
+    throw err;
+  } finally {
+    clubParticipantsSyncPromise = null;
   }
+}
+
+function ensureClubParticipantsAutoSync(force = false) {
+  const endpoint = clubFormEndpointUrl();
+  if (!endpoint) return;
+  const store = clubParticipantsStore();
+  const updatedAtMs = store.updatedAt ? new Date(store.updatedAt).getTime() : 0;
+  const stale = !updatedAtMs || (Date.now() - updatedAtMs) > CLUB_FORM_AUTO_SYNC_MAX_AGE_MS;
+  const shouldSync = force || !store.rows.length || stale;
+  if (!shouldSync || clubParticipantsSyncPromise) return;
+  if (!force && clubParticipantsAutoSyncAttempted && store.rows.length) return;
+  clubParticipantsAutoSyncAttempted = true;
+  syncClubParticipantsFromSheet({ silent: true }).catch(() => {});
 }
 
 async function handleClubParticipantFiles(files = []) {
@@ -5122,6 +5148,7 @@ function clubBenefitForPosition(position) {
 }
 
 function renderClub() {
+  ensureClubParticipantsAutoSync();
   const unitData = getGeneralUnitData();
   const charges = getUbyOperationCharges(unitData).filter(charge => Number(charge.revenue || 0) > 0);
   const participantStore = clubParticipantsStore();
