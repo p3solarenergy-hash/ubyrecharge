@@ -5408,7 +5408,7 @@ function renderClub() {
     </tr>`;
   }).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem cadastros do formulario carregados.</td></tr>';
 
-  const podiumRankLabel = position => `<span class="podium-ordinal">${position}<sup>o</sup></span><span>Lugar</span>`;
+  const podiumRankLabel = position => `<span class="podium-ordinal">${position}&ordm;</span><span>Lugar</span>`;
   const podiumOrder = [
     { row: top3[1], position: 2 },
     { row: top3[0], position: 1 },
