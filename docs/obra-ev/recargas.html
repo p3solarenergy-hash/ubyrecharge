@@ -1234,6 +1234,9 @@ let monthlyClosings = {};
 let financialSettings = {};
 let financeSaveTimer = null;
 let ubyOperationOverrides = {};
+let rechargeRecordsVersion = 0;
+let generalUnitDataCache = null;
+let localRechargeDbSignature = '';
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -1289,6 +1292,11 @@ let currentStationReportName = '';
 const RECHARGE_STATION_BLOCKLIST_BY_WORK = {
   malassise: ['posto prata', 'prata cambe', 'prata cambé', 'cambe', 'cambé']
 };
+
+function markRechargeRecordsDirty() {
+  rechargeRecordsVersion += 1;
+  generalUnitDataCache = null;
+}
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }
@@ -1520,6 +1528,11 @@ function syncGeneralRecordsFromLocal() {
   const db = localRechargeDb();
   const entries = Object.entries(db);
   if (!entries.length) return;
+  const signature = entries
+    .map(([workId, record]) => `${workId}:${record?.updatedAt || record?.summary?.updatedAt || ''}:${record?.summary?.charges ?? record?.charges?.length ?? 0}:${record?.summary?.revenue ?? ''}`)
+    .sort()
+    .join('|');
+  if (signature && signature === localRechargeDbSignature) return;
   const nextRecords = {};
   entries.forEach(([workId, record]) => {
     if (!record) return;
@@ -1536,6 +1549,8 @@ function syncGeneralRecordsFromLocal() {
     nextRecords[workId] = hydrated;
   });
   allRechargeRecords = nextRecords;
+  localRechargeDbSignature = signature;
+  markRechargeRecordsDirty();
 }
 
 function mergeCloudRechargeRecords(records) {
@@ -1558,6 +1573,7 @@ function mergeCloudRechargeRecords(records) {
     allRechargeRecords[workId] = hydratedRechargeRecord(normalized, workId);
     db[workId] = compactRechargeRecord(normalized);
   });
+  markRechargeRecordsDirty();
   writeJson(RECARGAS_LOCAL_KEY, db);
 }
 
@@ -1655,6 +1671,7 @@ function saveLocalRechargeBase(record = null) {
       if (!storageQuotaExceeded(compactSave.error)) throw compactSave.error;
       localStorage.removeItem(RECARGAS_LOCAL_KEY);
       allRechargeRecords = {};
+      markRechargeRecordsDirty();
       return { mode: 'none', error: compactSave.error };
     }
     syncGeneralRecordsFromLocal();
@@ -1683,6 +1700,7 @@ async function saveRechargeBase() {
   const record = buildRechargeRecord();
   const localSave = saveLocalRechargeBase(record);
   allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
+  markRechargeRecordsDirty();
   if (!record) return;
   if (!window.UBY_SUPABASE?.saveRechargeBase) {
     const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
@@ -1852,6 +1870,7 @@ async function loadRechargeBase() {
       db[currentWorkId] = compactRechargeRecord({ ...cloud, workName: cloud.summary?.workName || currentWorkName });
       writeJson(RECARGAS_LOCAL_KEY, db);
       allRechargeRecords[currentWorkId] = hydratedRechargeRecord(cloud, currentWorkId);
+      markRechargeRecordsDirty();
       applyRechargeRecord(cloud, 'Supabase');
     }
   } catch (err) {
@@ -4728,7 +4747,10 @@ function generalAcDcStats(charges = []) {
 
 function getGeneralUnitData() {
   syncGeneralRecordsFromLocal();
-  return Object.values(allRechargeRecords)
+  if (generalUnitDataCache?.version === rechargeRecordsVersion) {
+    return generalUnitDataCache.data;
+  }
+  const data = Object.values(allRechargeRecords)
     .map(record => {
       const charges = (record.charges || [])
         .map(hydrateCharge)
@@ -4760,6 +4782,8 @@ function getGeneralUnitData() {
     })
     .filter(unit => unit.count > 0)
     .sort((a, b) => b.revenue - a.revenue);
+  generalUnitDataCache = { version: rechargeRecordsVersion, data };
+  return data;
 }
 
 function summarizeGeneralUnit(unit, charges) {
@@ -5418,6 +5442,7 @@ async function toggleUbyOperation(workId, key, checked) {
   db[workId] = record;
   writeJson(RECARGAS_LOCAL_KEY, db);
   allRechargeRecords[workId] = record;
+  markRechargeRecordsDirty();
 
   if (workId === currentWorkId) {
     ubyOperationOverrides = overrides;
@@ -5607,20 +5632,39 @@ function showGeneralWhenCurrentWorkIsEmpty() {
   showTab('uby');
 }
 
+function renderVisibleOverviewViews() {
+  const visible = id => document.getElementById(id)?.style.display !== 'none';
+  if (visible('tabUby')) {
+    renderUbyOperation();
+    return;
+  }
+  if (visible('tabGeral')) {
+    renderGeral();
+    return;
+  }
+  if (visible('tabClube')) {
+    renderClub();
+    return;
+  }
+  if (visible('tabFinanceiroGeral')) {
+    renderGeneralFinance(getGeneralUnitData());
+  }
+}
+
 async function refreshGeneralRechargeBases(forceCloud = false) {
   syncGeneralRecordsFromLocal();
-  renderGeral();
-  renderUbyOperation();
   showGeneralWhenCurrentWorkIsEmpty();
+  if (forceCloud || !window.UBY_SUPABASE?.loadAllRechargeBases) {
+    renderVisibleOverviewViews();
+  }
   if (!window.UBY_SUPABASE?.loadAllRechargeBases) return;
   try {
     const records = await window.UBY_SUPABASE.loadAllRechargeBases();
     if (records?.length) {
       mergeCloudRechargeRecords(records);
       initWorkSelector();
-      renderGeral();
-      renderUbyOperation();
       showGeneralWhenCurrentWorkIsEmpty();
+      renderVisibleOverviewViews();
       if (forceCloud) setStorageState(`Painel geral atualizado com ${records.length} base(s) do Supabase.`);
     } else if (forceCloud) {
       setStorageState('Painel geral atualizado com as bases locais. Entre no Supabase para buscar o banco compartilhado.');
@@ -6472,12 +6516,22 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
+async function initializeRechargePage() {
+  const params = new URLSearchParams(location.search);
+  const shouldLoadWorkReport = Boolean(params.get('obra'));
+  if (shouldLoadWorkReport) {
+    await loadRechargeBase();
+  }
+  await refreshGeneralRechargeBases();
+  openGeneralFinanceView();
+}
+
 initWorkSelector();
 document.getElementById('importMonth').value = new Date().toISOString().slice(0, 7);
 document.getElementById('undoLastImportBtn').addEventListener('click', undoLastImport);
 document.getElementById('clearSelectedMonthBtn').addEventListener('click', clearSelectedMonth);
 document.getElementById('clearRechargeBaseBtn').addEventListener('click', clearRechargeBase);
-Promise.all([loadRechargeBase(), refreshGeneralRechargeBases()]).then(openGeneralFinanceView);
+initializeRechargePage();
 </script>
 </body>
 </html>
