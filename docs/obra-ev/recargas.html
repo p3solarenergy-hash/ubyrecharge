@@ -167,12 +167,20 @@
     .podium-place.rank-2 .podium-step { min-height:98px; }
     .podium-place.rank-3 { min-height:296px; }
     .podium-place.rank-3 .podium-step { min-height:70px; }
-    .podium-rank { color:#fff; font-size:13px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+    .podium-rank { color:#fff; font-size:13px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; display:flex; align-items:flex-start; gap:5px; }
+    .podium-rank sup { font-size:.62em; line-height:1; transform:translateY(-.1em); color:#FFE58B; }
+    .podium-ordinal { display:inline-flex; align-items:flex-start; gap:1px; }
     .podium-medal { font-size:38px; font-weight:900; color:#FFD66B; margin:6px 0 10px; }
     .podium-name { color:#fff; font-size:18px; line-height:1.2; font-weight:900; min-height:44px; }
     .podium-points { color:#2D7FF9; font-size:30px; font-weight:900; margin-top:14px; }
     .podium-detail { color:#BFEBD6; font-size:12px; line-height:1.45; margin-top:8px; }
     .podium-benefit { margin-top:12px; color:#FFE58B; font-size:12px; font-weight:800; }
+    .podium-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px; }
+    .podium-stat { border:1px solid rgba(255,255,255,.10); border-radius:8px; padding:8px; background:rgba(255,255,255,.04); min-width:0; }
+    .podium-stat strong { display:block; color:#fff; font-size:13px; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .podium-stat span { display:block; color:var(--p3-muted); font-size:10px; margin-top:3px; text-transform:uppercase; letter-spacing:.04em; }
+    .podium-phone { margin-top:8px; color:#DCEBFF; font-size:12px; }
+    .club-print-rule { margin-top:12px; border-left:3px solid #38C96F; padding:8px 10px; border-radius:8px; background:rgba(56,201,111,.10); color:#BFEBD6; font-size:12px; line-height:1.4; }
     .club-print-foot { margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px; color:#DCEBFF; font-size:13px; }
     .club-print-foot div { border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:12px; background:rgba(255,255,255,.04); }
     .club-form-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
@@ -713,11 +721,12 @@
       <div class="club-print-head">
         <div>
           <div class="club-print-title">Podio Clube UBY</div>
-          <div class="club-print-sub">Ranking para compartilhar no grupo</div>
+          <div class="club-print-sub">Ranking dos clientes da operacao UBY para compartilhar no grupo</div>
         </div>
         <div class="club-print-meta" id="clubPrintMeta">Atualizando ranking...</div>
       </div>
       <div class="club-podium" id="clubPodium"></div>
+      <div class="club-print-rule">Criterio do ranking: somente recargas pagas em carregadores marcados como UBY. Cada R$ 1 gasto gera 1 ponto no Clube UBY.</div>
       <div class="club-print-foot">
         <div><strong>Top 3</strong><br>30% de desconto em alinhamento e balanceamento.</div>
         <div><strong>Todos do clube</strong><br>10% de desconto em todos os servicos da rede Muffatao Autocenter.</div>
@@ -5399,10 +5408,11 @@ function renderClub() {
     </tr>`;
   }).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem cadastros do formulario carregados.</td></tr>';
 
+  const podiumRankLabel = position => `<span class="podium-ordinal">${position}<sup>o</sup></span><span>Lugar</span>`;
   const podiumOrder = [
-    { row: top3[1], position: 2, label: '2o lugar' },
-    { row: top3[0], position: 1, label: '1o lugar' },
-    { row: top3[2], position: 3, label: '3o lugar' }
+    { row: top3[1], position: 2 },
+    { row: top3[0], position: 1 },
+    { row: top3[2], position: 3 }
   ];
   document.getElementById('clubPrintMeta').innerHTML = rows.length
     ? `${rows.length} participante(s) UBY<br>${fmtBRL(totalRevenue)} elegiveis<br>${totalPoints.toLocaleString('pt-BR')} ponto(s)`
@@ -5412,7 +5422,7 @@ function renderClub() {
       return `<div class="podium-place rank-${slot.position}">
         <div class="podium-content">
           <div>
-            <div class="podium-rank">${slot.label}</div>
+            <div class="podium-rank">${podiumRankLabel(slot.position)}</div>
             <div class="podium-medal">#${slot.position}</div>
             <div class="podium-name">Aguardando cliente</div>
           </div>
@@ -5424,11 +5434,16 @@ function renderClub() {
     return `<div class="podium-place rank-${slot.position}">
       <div class="podium-content">
         <div>
-          <div class="podium-rank">${slot.label}</div>
+          <div class="podium-rank">${podiumRankLabel(slot.position)}</div>
           <div class="podium-medal">#${slot.position}</div>
           <div class="podium-name">${escapeHtml(slot.row.name)}</div>
           <div class="podium-points">${slot.row.points.toLocaleString('pt-BR')} pts</div>
-          <div class="podium-detail">${fmtBRL(slot.row.revenue)} no periodo<br>${slot.row.count} recarga(s) - ${slot.row.energy.toFixed(2).replace('.', ',')} kWh${slot.row.phone ? `<br>Tel: ${escapeHtml(slot.row.phone)}` : ''}</div>
+          <div class="podium-stats">
+            <div class="podium-stat"><strong>${fmtBRL(slot.row.revenue)}</strong><span>periodo</span></div>
+            <div class="podium-stat"><strong>${slot.row.count}</strong><span>recargas</span></div>
+            <div class="podium-stat"><strong>${slot.row.energy.toFixed(1).replace('.', ',')} kWh</strong><span>energia</span></div>
+          </div>
+          ${slot.row.phone ? `<div class="podium-phone">Tel: ${escapeHtml(slot.row.phone)}</div>` : ''}
         </div>
         <div class="podium-benefit">30% em alinhamento e balanceamento</div>
       </div>
