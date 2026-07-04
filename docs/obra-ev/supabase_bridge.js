@@ -1,6 +1,20 @@
 (function () {
   const config = window.UBY_SUPABASE_CONFIG || {};
-  const managedPrefixes = ["uby-obra-detalhe-", "uby-obras-dashboard", "uby-tarefas", "uby-auth-", "uby-engineering-", "uby-material-", "uby-activity", "uby-messages", "p3_obras_theme", "uby-sidebar"];
+  const managedPrefixes = [
+    "uby-obra-detalhe-",
+    "uby-obras-dashboard",
+    "uby-tarefas",
+    "uby-auth-",
+    "uby-engineering-",
+    "uby-material-",
+    "uby-activity",
+    "uby-messages",
+    "uby-recargas-",
+    "uby-club-",
+    "uby-calendar-",
+    "p3_obras_theme",
+    "uby-sidebar"
+  ];
 
   function configured() {
     return Boolean(config.enabled && config.url && config.anonKey && window.supabase);
@@ -293,6 +307,53 @@
     return { link, storagePath: path, fileName: file.name };
   }
 
+  function jsonArrayLength(value) {
+    return Array.isArray(value) ? value.length : 0;
+  }
+
+  async function insertAuditLog(sb, user, item) {
+    const { error } = await sb.from("app_audit_log").insert({
+      modulo: item.modulo || "recargas",
+      entidade_tipo: item.entidadeTipo || "obra_recargas_base",
+      entidade_id: item.entidadeId || null,
+      acao: item.acao || "update",
+      resumo: item.resumo || {},
+      usuario_id: user?.id || null,
+      usuario_email: user?.email || null
+    });
+    if (error) throw error;
+  }
+
+  async function archiveExistingRechargeBase(sb, user, workId, action, origin) {
+    const id = String(workId || "geral");
+    const { data, error } = await sb
+      .from("obra_recargas_base")
+      .select("obra_id,arquivos,recargas,resumo,updated_at")
+      .eq("obra_id", id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+
+    const files = data.arquivos || [];
+    const charges = data.recargas || [];
+    const summary = data.resumo || {};
+    const { error: historyError } = await sb.from("obra_recargas_historico").insert({
+      obra_id: id,
+      acao: action,
+      origem: origin,
+      arquivos: files,
+      recargas: charges,
+      resumo: summary,
+      recargas_count: jsonArrayLength(charges),
+      arquivos_count: jsonArrayLength(files),
+      usuario_id: user?.id || null,
+      usuario_email: user?.email || null,
+      base_updated_at: data.updated_at || null
+    });
+    if (historyError) throw historyError;
+    return { files: jsonArrayLength(files), charges: jsonArrayLength(charges), updatedAt: data.updated_at };
+  }
+
   async function saveRechargeBase(workId, payload) {
     const sb = client();
     if (!sb) throw new Error("Supabase ainda nao configurado.");
@@ -305,6 +366,7 @@
       monthlyClosings: payload?.monthlyClosings || payload?.summary?.monthlyClosings || {},
       financialSettings: payload?.financialSettings || payload?.summary?.financialSettings || {}
     };
+    const previous = await archiveExistingRechargeBase(sb, user, workId, "before_upsert", "saveRechargeBase");
     const { error } = await sb.from("obra_recargas_base").upsert({
       obra_id: String(workId || "geral"),
       arquivos: files,
@@ -313,7 +375,16 @@
       updated_at: new Date().toISOString()
     }, { onConflict: "obra_id" });
     if (error) throw error;
-    return { cloud: true, files: files.length, charges: charges.length };
+    await insertAuditLog(sb, user, {
+      entidadeId: String(workId || "geral"),
+      acao: "save_recharge_base",
+      resumo: {
+        previous,
+        next: { files: files.length, charges: charges.length },
+        workName: summary.workName || payload?.workName || ""
+      }
+    });
+    return { cloud: true, files: files.length, charges: charges.length, history: Boolean(previous) };
   }
 
   async function clearRechargeBase(workId) {
@@ -321,6 +392,7 @@
     if (!sb) throw new Error("Supabase ainda nao configurado.");
     const user = await currentUser();
     if (!user) throw new Error("Entre no Supabase antes de excluir recargas.");
+    const previous = await archiveExistingRechargeBase(sb, user, workId, "before_clear", "clearRechargeBase");
     const { error } = await sb.from("obra_recargas_base").upsert({
       obra_id: String(workId || "geral"),
       arquivos: [],
@@ -334,7 +406,12 @@
       updated_at: new Date().toISOString()
     }, { onConflict: "obra_id" });
     if (error) throw error;
-    return { cloud: true, files: 0, charges: 0 };
+    await insertAuditLog(sb, user, {
+      entidadeId: String(workId || "geral"),
+      acao: "clear_recharge_base",
+      resumo: { previous, next: { files: 0, charges: 0 } }
+    });
+    return { cloud: true, files: 0, charges: 0, history: Boolean(previous) };
   }
 
   async function loadRechargeBase(workId) {
