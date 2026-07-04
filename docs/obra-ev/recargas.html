@@ -1790,10 +1790,10 @@ function applyStationReportFilter() {
 
 function applyRechargeRecord(record, sourceLabel) {
   syncGeneralRecordsFromLocal();
-  allCharges = (record?.charges || [])
+  allCharges = dedupeChargesByUniqueKey((record?.charges || [])
     .map(hydrateCharge)
     .filter(charge => !stationBlockedForWork(currentWorkId, charge.station))
-    .filter(charge => chargeBelongsToWork(charge, currentWorkId, currentWorkName));
+    .filter(charge => chargeBelongsToWork(charge, currentWorkId, currentWorkName)));
   monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
   financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
   ubyOperationOverrides = record?.ubyOperationOverrides || record?.summary?.ubyOperationOverrides || {};
@@ -2165,17 +2165,28 @@ function fileSourceKey(month = '', name = '', station = '') {
 
 function rechargeUniqueKey(charge = {}) {
   const id = safeText(charge.id).trim();
-  if (id) return `id:${id}`;
+  const platform = normalizeStationForCompare(charge.sourcePlatform || charge.platform || '');
+  if (id && platform !== 'spott' && !id.includes('|')) return `id:${id}`;
   const station = canonicalStationNameForWork(charge.workId, charge.station, charge.workName);
   return [
     'fallback',
-    safeText(station || charge.station).trim().toLowerCase(),
-    safeText(charge.connType).trim().toLowerCase(),
+    platform === 'spott' ? 'spott' : safeText(station || charge.station).trim().toLowerCase(),
+    platform === 'spott' ? '' : safeText(charge.connType).trim().toLowerCase(),
     safeText(charge.startStr || charge.startIso || charge.startDate?.toISOString?.()).trim(),
     safeText(charge.userEmail || charge.userName).trim().toLowerCase(),
     Number(charge.energyKWh || 0).toFixed(3),
     Number(charge.revenue || 0).toFixed(2)
   ].join('|');
+}
+
+function dedupeChargesByUniqueKey(charges = []) {
+  const byKey = new Map();
+  charges.forEach(charge => {
+    const key = rechargeUniqueKey(charge);
+    if (!key) return;
+    byKey.set(key, charge);
+  });
+  return [...byKey.values()];
 }
 
 function excelSerialToDate(value) {
@@ -2583,7 +2594,7 @@ function readFile(file) {
         });
         duplicateCount = before - allCharges.length;
       }
-      allCharges.push(...importedCharges);
+      allCharges = dedupeChargesByUniqueKey([...allCharges, ...importedCharges]);
       importedMonths.forEach(mk => {
         if (monthlyClosings?.[mk]?.source === 'manual') return;
         const closing = buildMonthClosing(mk);
