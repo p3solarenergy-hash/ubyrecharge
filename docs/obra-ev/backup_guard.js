@@ -2,7 +2,22 @@
   const BACKUP_KEY = "uby-obras-backups-v1";
   const SESSION_KEY = "uby-obras-backup-session-v1";
   const DAILY_KEY = "uby-obras-backup-daily-v1";
-  const PREFIXES = ["uby-obra-detalhe-", "uby-obras-dashboard", "uby-tarefas", "uby-auth-", "uby-engineering-", "uby-material-", "uby-activity", "uby-messages", "uby-mercado", "p3_obras_theme", "uby-sidebar"];
+  const PREFIXES = [
+    "uby-obra-detalhe-",
+    "uby-obras-dashboard",
+    "uby-tarefas",
+    "uby-auth-",
+    "uby-engineering-",
+    "uby-material-",
+    "uby-activity",
+    "uby-messages",
+    "uby-mercado",
+    "uby-recargas-",
+    "uby-club-",
+    "uby-calendar-",
+    "p3_obras_theme",
+    "uby-sidebar"
+  ];
 
   function isManagedKey(key) {
     return PREFIXES.some(prefix => key.startsWith(prefix));
@@ -23,7 +38,12 @@
     const data = collect();
     const count = Object.keys(data).length;
     if (!count) return null;
-    const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || "[]");
+    let backups = [];
+    try {
+      backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || "[]");
+    } catch (err) {
+      backups = [];
+    }
     const backup = {
       createdAt: new Date().toISOString(),
       reason: reason || "automatico",
