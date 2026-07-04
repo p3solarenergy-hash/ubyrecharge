@@ -80,7 +80,18 @@
   function logout(target) {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(LEGACY_PROFILE_KEY);
-    location.href = target || LOGIN_PAGE;
+    const destination = target || LOGIN_PAGE;
+    const finish = () => { location.href = destination; };
+    try {
+      const signOut = window.UBY_SUPABASE?.signOut?.();
+      if (signOut && typeof signOut.finally === "function") {
+        signOut.finally(finish);
+        return;
+      }
+    } catch (err) {
+      console.warn("Nao foi possivel encerrar sessao Supabase:", err.message);
+    }
+    finish();
   }
 
   function can(module) {
@@ -102,6 +113,9 @@
   }
 
   function setProfile(id, target) {
+    if (!window.UBY_SUPABASE_CONFIG?.devLoginEnabled) {
+      throw new Error("Login local desativado. Use o acesso real pelo Supabase.");
+    }
     const profile = fallbackProfiles[id] || fallbackProfiles.admin;
     writeSession({ id, email: "", nome: profile.label, perfil: id === "engenharia" ? "engenharia" : "admin" });
     location.href = target || (profile.role === "engineering" ? "engenharia.html" : "index.html");

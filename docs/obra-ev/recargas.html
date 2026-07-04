@@ -7,8 +7,6 @@
   <link rel="icon" type="image/svg+xml" href="assets/brand/04_simbolo_badge.svg">
   <link rel="stylesheet" href="sidebar.css">
   <link rel="stylesheet" href="brand.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     /* ── Design system UBY (original) ── */
     :root {
@@ -1219,6 +1217,7 @@
 <script src="supabase_bridge.js"></script>
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 UBY_AUTH.require('recargas');
 /* ============================================================
@@ -1243,6 +1242,7 @@ let localRechargeDbSignature = '';
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
 const RECARGAS_IMPORT_UNDO_KEY = 'uby-recargas-import-undo-v1';
+const XLSX_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
 const CLUB_FORM_ID = '1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM';
 const CLUB_FORM_RESPONSES_URL = `https://docs.google.com/forms/d/${CLUB_FORM_ID}/edit#responses`;
@@ -1291,6 +1291,7 @@ const appData = window.UBY_APP_DATA || {};
 let currentWorkId = new URLSearchParams(location.search).get('obra') || localStorage.getItem('uby-recargas-current-work') || 'rio';
 let currentWorkName = '';
 let currentStationReportName = '';
+let spreadsheetLibraryPromise = null;
 const RECHARGE_STATION_BLOCKLIST_BY_WORK = {
   malassise: ['posto prata', 'prata cambe', 'prata cambé', 'cambe', 'cambé']
 };
@@ -1298,6 +1299,31 @@ const RECHARGE_STATION_BLOCKLIST_BY_WORK = {
 function markRechargeRecordsDirty() {
   rechargeRecordsVersion += 1;
   generalUnitDataCache = null;
+}
+
+function loadScriptOnce(src, globalName) {
+  if (globalName && window[globalName]) return Promise.resolve(window[globalName]);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-src="${src}"]`);
+    if (existing) {
+      existing.addEventListener('load', () => resolve(globalName ? window[globalName] : true), { once: true });
+      existing.addEventListener('error', reject, { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.dataset.src = src;
+    script.onload = () => resolve(globalName ? window[globalName] : true);
+    script.onerror = () => reject(new Error(`Nao foi possivel carregar ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+function ensureSpreadsheetLibrary() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  spreadsheetLibraryPromise = spreadsheetLibraryPromise || loadScriptOnce(XLSX_CDN_URL, 'XLSX');
+  return spreadsheetLibraryPromise;
 }
 
 function readJson(key, fallback) {
@@ -2540,12 +2566,6 @@ function readFile(file) {
   setFeedback('⏳ Lendo planilha...', 'up-loading');
   const isCsvFile = /\.csv$/i.test(String(file?.name || ''));
 
-  if (!isCsvFile && typeof XLSX === 'undefined') {
-    setFeedback('❌ Biblioteca SheetJS não carregou. Verifique sua conexão e recarregue a página.', 'up-error');
-    loadedFiles = loadedFiles.filter(f => f !== file);
-    return;
-  }
-
   const reader = new FileReader();
   reader.onload = async e => {
     try {
@@ -2553,6 +2573,8 @@ function readFile(file) {
       if (isCsvFile) {
         rows = parseCsvRows(new TextDecoder('utf-8').decode(e.target.result));
       } else {
+        setFeedback('⏳ Preparando leitor de Excel...', 'up-loading');
+        await ensureSpreadsheetLibrary();
         const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
         rows = rechargeSheetRows(wb).rows;
       }
