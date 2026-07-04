@@ -458,6 +458,28 @@
     }));
   }
 
+  async function loadAllRechargeSummaries() {
+    const sb = client();
+    if (!sb) return [];
+    const user = await currentUser();
+    if (!user) return [];
+    const { data, error } = await sb
+      .from("obra_recargas_base")
+      .select("obra_id,arquivos,resumo,updated_at")
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    return (data || []).map(row => ({
+      workId: row.obra_id,
+      files: row.arquivos || [],
+      charges: [],
+      summaryOnly: true,
+      monthlyClosings: row.resumo?.monthlyClosings || {},
+      financialSettings: row.resumo?.financialSettings || {},
+      summary: row.resumo || {},
+      updatedAt: row.updated_at
+    }));
+  }
+
   window.UBY_SUPABASE = {
     configured,
     client,
@@ -475,6 +497,7 @@
     saveRechargeBase,
     clearRechargeBase,
     loadRechargeBase,
-    loadAllRechargeBases
+    loadAllRechargeBases,
+    loadAllRechargeSummaries
   };
 })();

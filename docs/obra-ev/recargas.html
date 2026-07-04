@@ -1570,8 +1570,13 @@ function mergeCloudRechargeRecords(records) {
       ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
-    allRechargeRecords[workId] = hydratedRechargeRecord(normalized, workId);
-    db[workId] = compactRechargeRecord(normalized);
+    const existing = allRechargeRecords[workId];
+    const keepExistingCharges = record.summaryOnly && existing?.charges?.length;
+    const merged = keepExistingCharges
+      ? { ...normalized, charges: existing.charges, files: normalized.files.length ? normalized.files : existing.files || [] }
+      : normalized;
+    allRechargeRecords[workId] = hydratedRechargeRecord(merged, workId);
+    db[workId] = compactRechargeRecord(merged);
   });
   markRechargeRecordsDirty();
   writeJson(RECARGAS_LOCAL_KEY, db);
@@ -1585,11 +1590,13 @@ function rechargeSummary() {
   const energy = allCharges.reduce((sum, charge) => sum + charge.energyKWh, 0);
   const revenue = allCharges.reduce((sum, charge) => sum + charge.revenue, 0);
   const dates = allCharges.map(charge => charge.startDate).filter(Boolean);
+  const clients = new Set(allCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
   return {
     workId: currentWorkId,
     workName: currentWorkName,
     charges: allCharges.length,
     files: loadedFiles.length,
+    clients,
     monthlyClosings,
     financialSettings,
     ubyOperationOverrides,
@@ -4756,10 +4763,15 @@ function getGeneralUnitData() {
         .map(hydrateCharge)
         .filter(charge => !stationBlockedForWork(record.workId, charge.station))
         .filter(charge => chargeBelongsToWork(charge, record.workId, record.workName || workNameById(record.workId)));
-      const energy = charges.reduce((sum, charge) => sum + charge.energyKWh, 0);
-      const revenue = charges.reduce((sum, charge) => sum + charge.revenue, 0);
-      const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
-      const dates = charges.map(charge => charge.startDate).filter(Boolean);
+      const summary = record.summary || {};
+      const summaryCount = Number(summary.charges || 0);
+      const hasDetailCharges = charges.length > 0;
+      const energy = hasDetailCharges ? charges.reduce((sum, charge) => sum + charge.energyKWh, 0) : Number(summary.energyKWh || 0);
+      const revenue = hasDetailCharges ? charges.reduce((sum, charge) => sum + charge.revenue, 0) : Number(summary.revenue || 0);
+      const clients = hasDetailCharges ? new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size : Number(summary.clients || 0);
+      const dates = hasDetailCharges
+        ? charges.map(charge => charge.startDate).filter(Boolean)
+        : [summary.firstDate ? new Date(summary.firstDate) : null, summary.lastDate ? new Date(summary.lastDate) : null].filter(Boolean);
       const stations = [...new Set(charges.map(charge => canonicalStationNameForWork(record.workId, charge.station, record.workName || workNameById(record.workId))).filter(Boolean))];
       const acdc = generalAcDcStats(charges);
       return {
@@ -4770,11 +4782,11 @@ function getGeneralUnitData() {
         files: record.files || [],
         charges,
         ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
-        count: charges.length,
+        count: hasDetailCharges ? charges.length : summaryCount,
         energy,
         revenue,
         clients,
-        avgTicket: charges.length ? revenue / charges.length : 0,
+        avgTicket: (hasDetailCharges ? charges.length : summaryCount) ? revenue / (hasDetailCharges ? charges.length : summaryCount) : 0,
         lastDate: dates.length ? new Date(Math.max(...dates)) : null,
         acdc,
         updatedAt: record.updatedAt || ''
@@ -5659,6 +5671,17 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
   }
   if (!window.UBY_SUPABASE?.loadAllRechargeBases) return;
   try {
+    if (window.UBY_SUPABASE.loadAllRechargeSummaries) {
+      const summaries = await window.UBY_SUPABASE.loadAllRechargeSummaries();
+      if (summaries?.length) {
+        mergeCloudRechargeRecords(summaries);
+        initWorkSelector();
+        showGeneralWhenCurrentWorkIsEmpty();
+        if (document.getElementById('tabUby')?.style.display === 'none') {
+          renderVisibleOverviewViews();
+        }
+      }
+    }
     const records = await window.UBY_SUPABASE.loadAllRechargeBases();
     if (records?.length) {
       mergeCloudRechargeRecords(records);
