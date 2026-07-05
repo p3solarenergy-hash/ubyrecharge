@@ -134,6 +134,51 @@
     .metric-line b { color:var(--p3-primary); font-weight:700; white-space:nowrap; }
     .metric-line .warn { color:var(--p3-warn); }
     .metric-line .good { color:#38C96F; }
+    .visual-summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin:18px 0; }
+    .visual-card { position:relative; min-height:132px; overflow:hidden; border-radius:8px; border:1px solid rgba(84,180,255,.26); background:linear-gradient(135deg,#102945,#0B1524 64%,#0E2035); color:var(--p3-text); box-shadow:var(--p3-shadow); padding:18px 16px; display:flex; flex-direction:column; justify-content:space-between; }
+    .visual-card::before { content:""; position:absolute; inset:auto 0 0 0; height:4px; background:#57B7FF; opacity:.95; }
+    .visual-card::after { content:""; position:absolute; right:-18px; top:-10px; width:120px; height:120px; background:var(--visual-img) center/contain no-repeat; opacity:.08; filter:grayscale(1) brightness(2.1); }
+    .visual-card .visual-title { position:relative; z-index:1; color:#BFEAD8; font-size:14px; font-weight:900; line-height:1.25; max-width:72%; }
+    .visual-card .visual-value { position:relative; z-index:1; color:#57B7FF; font-size:24px; font-weight:900; line-height:1; }
+    .visual-card .visual-sub { position:relative; z-index:1; color:var(--p3-muted); font-size:11px; margin-top:6px; line-height:1.35; }
+    .visual-card .visual-trend { position:absolute; right:12px; bottom:16px; z-index:1; display:grid; place-items:center; width:26px; height:26px; border-radius:999px; color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.28); font-weight:900; font-size:15px; }
+    .visual-card.warn { background:linear-gradient(135deg,#102945,#0B1524 64%,#1B2330); border-color:rgba(255,214,107,.28); }
+    .visual-card.warn::before { background:#FFD66B; }
+    .visual-card.warn .visual-value { color:#FFD66B; }
+    .visual-card.warn .visual-trend { color:#FFE4A0; background:rgba(242,169,61,.16); border-color:rgba(242,169,61,.3); }
+    .visual-card.bad { background:linear-gradient(135deg,#1B273C,#0B1524 64%,#261926); border-color:rgba(230,75,75,.34); }
+    .visual-card.bad::before { background:#E64B4B; }
+    .visual-card.bad .visual-value { color:#FF7A7A; }
+    .visual-card.bad .visual-trend { color:#FFD0D0; background:rgba(230,75,75,.16); border-color:rgba(230,75,75,.32); }
+    .day-compare-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; }
+    .day-kpi-card { position:relative; overflow:hidden; min-height:118px; border:1px solid rgba(84,180,255,.28); border-radius:12px; background:linear-gradient(135deg,#102945,#0B1524); padding:14px; box-shadow:var(--p3-shadow); }
+    .day-kpi-card::after { content:""; position:absolute; right:-28px; bottom:-36px; width:104px; height:104px; border-radius:50%; background:rgba(87,183,255,.08); }
+    .day-kpi-card > * { position:relative; z-index:1; }
+    .day-kpi-card .label { min-height:0; }
+    .day-kpi-card strong { display:block; color:#fff; font-size:24px; margin-top:7px; line-height:1.1; }
+    .day-kpi-card small { display:block; color:var(--p3-muted); margin-top:6px; font-size:11px; line-height:1.35; }
+    .trend-badge { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:4px 8px; font-size:11px; font-weight:900; margin-top:10px; border:1px solid rgba(255,255,255,.12); }
+    .trend-badge.up { color:#BFEBD6; background:rgba(56,201,111,.14); border-color:rgba(56,201,111,.32); }
+    .trend-badge.down { color:#FFD0D0; background:rgba(230,75,75,.14); border-color:rgba(230,75,75,.32); }
+    .trend-badge.flat { color:#FFD66B; background:rgba(242,169,61,.14); border-color:rgba(242,169,61,.32); }
+    .kpi-trend { display:inline-flex; align-items:center; gap:5px; width:max-content; max-width:100%; border-radius:999px; padding:3px 8px; margin-top:8px; font-size:11px; font-weight:900; border:1px solid rgba(255,255,255,.12); }
+    .kpi-trend.up { color:#BFEBD6; background:rgba(56,201,111,.14); border-color:rgba(56,201,111,.32); }
+    .kpi-trend.down { color:#FFD0D0; background:rgba(230,75,75,.14); border-color:rgba(230,75,75,.32); }
+    .kpi-trend.flat { color:#FFD66B; background:rgba(242,169,61,.14); border-color:rgba(242,169,61,.32); }
+    .weekday-report { margin-top:18px; }
+    .weekday-bars { display:grid; gap:8px; }
+    .weekday-bar { display:grid; grid-template-columns:46px 1fr 104px; gap:10px; align-items:center; color:var(--p3-muted); font-size:12px; }
+    .weekday-bar strong { color:var(--p3-text); }
+    .weekday-bar .track { height:11px; border-radius:999px; background:#1C314A; overflow:hidden; }
+    .weekday-bar i { display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#2D7FF9,#57B7FF); }
+    .weekday-bar i.occ-red { background:linear-gradient(90deg,#E64B4B,#FF7A7A); }
+    .weekday-bar i.occ-yellow { background:linear-gradient(90deg,#F2A93D,#FFD66B); }
+    .weekday-bar i.occ-green { background:linear-gradient(90deg,#22B66E,#57D990); }
+    .weekday-best { display:grid; gap:8px; margin-top:12px; color:var(--p3-muted); font-size:12px; }
+    .weekday-best strong { color:#FFD66B; font-size:15px; }
+    .weekday-table tr.best-day td:first-child { color:#FFD66B; font-weight:900; }
+    .weekday-table td strong { display:block; color:var(--p3-text); }
+    .weekday-table td small { display:block; color:var(--p3-muted); margin-top:2px; }
     .decision-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-top:18px; }
     .decision-card { background:#0B1524; border:1px solid var(--p3-border); border-radius:12px; padding:16px; min-height:150px; box-shadow:var(--p3-shadow); }
     .decision-card.priority { border-left:4px solid var(--p3-primary); }
@@ -380,6 +425,8 @@
       .acc-grid { grid-template-columns:1fr; }
       .general-split { grid-template-columns:1fr; }
       .metric-strip { grid-template-columns:1fr; }
+      .visual-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .day-compare-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .decision-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .calendar-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
       .kpi-feature { grid-column:span 2; }
@@ -453,6 +500,14 @@
       .pie-card canvas { min-height:210px; max-height:230px; }
       canvas { max-height:240px; }
       .pay-grid, .metric-strip, .club-print-foot { grid-template-columns:1fr; }
+      .visual-summary { grid-template-columns:1fr 1fr; gap:8px; }
+      .visual-card { min-height:118px; padding:14px 12px; }
+      .visual-card .visual-title { font-size:12px; }
+      .visual-card .visual-value { font-size:19px; }
+      .day-compare-grid { grid-template-columns:1fr 1fr; gap:8px; }
+      .day-kpi-card { min-height:112px; padding:12px; }
+      .day-kpi-card strong { font-size:20px; }
+      .weekday-bar { grid-template-columns:38px 1fr 82px; gap:8px; }
       .metric-mini { min-height:auto; }
       .metric-line { grid-template-columns:1fr auto; gap:6px; }
       .metric-line strong { grid-column:1/-1; }
@@ -628,7 +683,12 @@
       <div class="formula" id="generalHeroFormula">Atualize as bases individuais para refletir o painel geral.</div>
     </section>
 
+    <section class="visual-summary" id="generalVisualSummary"></section>
+
     <section class="grid kpis" id="kpiGeneral"></section>
+
+    <section class="day-compare-grid" id="usageGeneralDayCompare"></section>
+    <section class="section weekday-report" id="usageGeneralWeekdayReport"></section>
 
     <section class="decision-grid" id="generalDecisionCockpit"></section>
 
@@ -886,7 +946,12 @@
       <div class="formula" id="ubyHeroFormula">Use o check para incluir ou retirar carregadores especificos da operacao UBY.</div>
     </section>
 
+    <section class="visual-summary" id="ubyVisualSummary"></section>
+
     <section class="grid kpis" id="kpiUby"></section>
+
+    <section class="day-compare-grid" id="usageUbyDayCompare"></section>
+    <section class="section weekday-report" id="usageUbyWeekdayReport"></section>
 
     <section class="decision-grid" id="ubyDecisionCockpit"></section>
 
@@ -1020,8 +1085,12 @@
       <div class="formula" id="heroFormula">—</div>
     </section>
 
+    <section class="visual-summary" id="monthlyVisualSummary"></section>
+
     <!-- KPIs -->
     <section class="grid kpis" id="kpiGrid"></section>
+
+    <section class="section weekday-report" id="weekdayOccupancyMensal"></section>
 
     <section class="section usage-grid" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Receita diária do período</h2><canvas id="usageRevenueDaily"></canvas></div>
@@ -1164,7 +1233,11 @@
   ════════════════════════════════════════ -->
   <div id="tabAcumulado" style="display:none">
 
+    <section class="visual-summary" id="accVisualSummary"></section>
+
     <section class="grid kpis" style="margin-top:0" id="kpiAcc"></section>
+
+    <section class="section weekday-report" id="weekdayOccupancyAcc"></section>
 
     <div class="acc-grid">
       <div class="card"><h2>Receita mensal (R$)</h2>
@@ -3993,6 +4066,297 @@ function dailyOperationalRows(charges = [], historyCharges = charges) {
   return rows;
 }
 
+const WEEKDAY_LABELS_BR = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+const WEEKDAY_ORDER_BR = [1, 2, 3, 4, 5, 6, 0];
+
+function signedMoney(value) {
+  const n = Number(value || 0);
+  return `${n >= 0 ? '+' : '-'}${fmtBRL(Math.abs(n))}`;
+}
+
+function signedNumber(value, suffix = '') {
+  const n = Number(value || 0);
+  const abs = Math.abs(n);
+  const formatted = Number.isInteger(abs) ? String(abs) : abs.toFixed(2).replace('.', ',');
+  return `${n >= 0 ? '+' : '-'}${formatted}${suffix}`;
+}
+
+function trendInfo(value, formatter = signedNumber) {
+  const n = Number(value || 0);
+  const cls = n > 0.009 ? 'up' : (n < -0.009 ? 'down' : 'flat');
+  const arrow = cls === 'up' ? '&#8593;' : (cls === 'down' ? '&#8595;' : '&#8594;');
+  return { cls, arrow, text: formatter(n) };
+}
+
+function kpiDayTrend(charges = [], metric = 'revenue', historyCharges = charges) {
+  const rows = dailyOperationalRows(charges, historyCharges);
+  if (rows.length < 2) return '';
+  const last = rows[rows.length - 1];
+  const previous = rows[rows.length - 2];
+  const current = Number(last?.[metric] || 0);
+  const before = Number(previous?.[metric] || 0);
+  const diff = current - before;
+  const formatter = metric === 'revenue' ? signedMoney : (metric === 'energy' ? value => signedNumber(value, ' kWh') : value => signedNumber(value));
+  const trend = trendInfo(diff, formatter);
+  return `<span class="kpi-trend ${trend.cls}">${trend.arrow} ${trend.text} vs ${previous.label}</span>`;
+}
+
+function renderVisualSummary(elId, charges = [], options = {}) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const total = charges.length;
+  const revenue = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const clients = new Set(charges.map(charge => clientKeyFromCharge(charge)).filter(Boolean)).size;
+  const occ = options.occ || occByInterval(charges, options.power, options.bounds);
+  const cleanStats = cleanOperationStats(charges);
+  const rows = dailyOperationalRows(charges, options.historyCharges || charges);
+  const last = rows[rows.length - 1] || {};
+  const prev = rows[rows.length - 2] || {};
+  const revenueDiff = Number(last.revenue || 0) - Number(prev.revenue || 0);
+  const countDiff = Number(last.count || 0) - Number(prev.count || 0);
+  const energyDiff = Number(last.energy || 0) - Number(prev.energy || 0);
+  const occState = occ.pct < 15 ? 'bad' : (occ.pct < 30 ? 'warn' : '');
+  const trendGlyph = value => value > 0 ? '&#8599;' : (value < 0 ? '&#8600;' : '&#8594;');
+  const imgBolt = "url('assets/brand/05_simbolo_raio.svg')";
+  const imgBadge = "url('assets/brand/04_simbolo_badge.svg')";
+  const cards = [
+    { title: 'Ocupacao semanal', value: fmtPct(occ.pct), sub: 'base do periodo selecionado', trend: trendGlyph(occ.pct - 15), cls: occState, img: imgBolt },
+    { title: 'Faturamento', value: fmtBRL(revenue), sub: `${signedMoney(revenueDiff)} vs dia anterior`, trend: trendGlyph(revenueDiff), cls: revenueDiff < 0 ? 'bad' : '', img: imgBadge },
+    { title: 'Consumo de energia', value: fmtKWh(energy), sub: `${signedNumber(energyDiff, ' kWh')} vs dia anterior`, trend: trendGlyph(energyDiff), cls: energyDiff < 0 ? 'warn' : '', img: imgBolt },
+    { title: 'Clientes atendidos', value: String(clients), sub: `${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, trend: trendGlyph(clients), cls: '', img: imgBadge },
+    { title: 'Total de transacoes', value: String(total), sub: `${signedNumber(countDiff)} vs dia anterior`, trend: trendGlyph(countDiff), cls: countDiff < 0 ? 'warn' : '', img: imgBolt }
+  ];
+  el.innerHTML = cards.map(card => `
+    <div class="visual-card ${card.cls || ''}" style="--visual-img:${card.img}">
+      <div class="visual-title">${card.title}</div>
+      <div>
+        <div class="visual-value">${card.value}</div>
+        <div class="visual-sub">${card.sub}</div>
+      </div>
+      <div class="visual-trend">${card.trend}</div>
+    </div>
+  `).join('');
+}
+
+function renderDayComparison(prefix = 'usage', charges = [], historyCharges = charges) {
+  const el = document.getElementById(`${prefix}DayCompare`);
+  if (!el) return;
+  const rows = dailyOperationalRows(charges, historyCharges);
+  if (!rows.length) {
+    el.innerHTML = '';
+    return;
+  }
+  const last = rows[rows.length - 1];
+  const previous = rows[rows.length - 2] || { label: 'dia anterior', revenue: 0, count: 0, energy: 0, clientCount: 0, failed: 0 };
+  const metrics = [
+    { label: 'Faturamento do dia', value: fmtBRL(last.revenue), diff: last.revenue - previous.revenue, formatter: signedMoney, sub: `${last.label} vs ${previous.label}` },
+    { label: 'Transacoes', value: String(last.count), diff: last.count - previous.count, formatter: value => signedNumber(value), sub: `${last.newClientCount || 0} cliente(s) novo(s)` },
+    { label: 'Energia entregue', value: fmtKWh(last.energy), diff: last.energy - previous.energy, formatter: value => signedNumber(value, ' kWh'), sub: `${last.clientCount || 0} cliente(s) no dia` },
+    { label: 'Falhas do dia', value: String(last.failed || 0), diff: (last.failed || 0) - (previous.failed || 0), formatter: value => signedNumber(value), sub: 'queda em falhas e melhor' }
+  ];
+  el.innerHTML = metrics.map(metric => {
+    const trend = trendInfo(metric.diff, metric.formatter);
+    const trendClass = metric.label === 'Falhas do dia'
+      ? (metric.diff < 0 ? 'up' : (metric.diff > 0 ? 'down' : 'flat'))
+      : trend.cls;
+    return `
+      <div class="day-kpi-card">
+        <div class="label">${metric.label}</div>
+        <strong>${metric.value}</strong>
+        <small>${metric.sub}</small>
+        <span class="trend-badge ${trendClass}">${trend.arrow} ${trend.text}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function weekdayReportRows(charges = [], historyCharges = charges) {
+  const firstClientDay = firstClientDayMap(historyCharges?.length ? historyCharges : charges);
+  const groups = {};
+  WEEKDAY_ORDER_BR.forEach(idx => {
+    groups[idx] = { idx, label: WEEKDAY_LABELS_BR[idx], dates: new Set(), revenue: 0, energy: 0, count: 0, clients: new Set(), newClients: new Set(), failed: 0 };
+  });
+  charges
+    .filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()))
+    .forEach(charge => {
+      const idx = charge.startDate.getDay();
+      const group = groups[idx] || (groups[idx] = { idx, label: WEEKDAY_LABELS_BR[idx], dates: new Set(), revenue: 0, energy: 0, count: 0, clients: new Set(), newClients: new Set(), failed: 0 });
+      const key = chargeDayKeyFromDate(charge.startDate);
+      const client = clientKeyFromCharge(charge);
+      group.dates.add(key);
+      group.revenue += Number(charge.revenue || 0);
+      group.energy += Number(charge.energyKWh || 0);
+      group.count += 1;
+      if (client) group.clients.add(client);
+      if (client && firstClientDay[client] === key) group.newClients.add(client);
+      if (isFailedCharge(charge)) group.failed += 1;
+    });
+  return WEEKDAY_ORDER_BR.map(idx => {
+    const row = groups[idx];
+    const days = row.dates.size || 0;
+    const validCount = Math.max(0, row.count - row.failed);
+    return {
+      ...row,
+      days,
+      clientCount: row.clients.size,
+      newClientCount: row.newClients.size,
+      avgRevenue: days ? row.revenue / days : 0,
+      avgTicket: validCount ? row.revenue / validCount : 0
+    };
+  });
+}
+
+function renderWeekdayReport(prefix = 'usage', charges = [], historyCharges = charges) {
+  const el = document.getElementById(`${prefix}WeekdayReport`);
+  if (!el) return;
+  const rows = weekdayReportRows(charges, historyCharges);
+  const activeRows = rows.filter(row => row.count || row.revenue || row.energy);
+  if (!activeRows.length) {
+    el.innerHTML = '';
+    return;
+  }
+  const best = activeRows.slice().sort((a, b) => b.avgRevenue - a.avgRevenue)[0];
+  const maxRevenue = Math.max(...activeRows.map(row => row.avgRevenue), 1);
+  const bars = rows.map(row => {
+    const pct = Math.max(2, Math.min(100, row.avgRevenue / maxRevenue * 100));
+    return `
+      <div class="weekday-bar">
+        <strong>${row.label}</strong>
+        <span class="track"><i style="width:${pct}%"></i></span>
+        <span>${fmtBRL(row.avgRevenue)}</span>
+      </div>
+    `;
+  }).join('');
+  const tableRows = rows.map(row => `
+    <tr class="${row.idx === best.idx ? 'best-day' : ''}">
+      <td>${row.label}</td>
+      <td>${row.days}</td>
+      <td>${row.count}</td>
+      <td>${row.clientCount}</td>
+      <td>${fmtKWh(row.energy)}</td>
+      <td>${fmtBRL(row.revenue)}</td>
+      <td>${fmtBRL(row.avgRevenue)}</td>
+      <td>${fmtBRL(row.avgTicket)}</td>
+    </tr>
+  `).join('');
+  el.innerHTML = `
+    <div class="card">
+      <h2>Dinamica por dia da semana</h2>
+      <div class="weekday-bars">${bars}</div>
+      <div class="weekday-best">
+        <strong>Melhor dia medio: ${best.label}</strong>
+        <span>${fmtBRL(best.avgRevenue)} por dia com movimento, ${best.count} recarga(s) no periodo.</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Relatorio do dia da semana</h2>
+      <div style="overflow-x:auto">
+        <table class="weekday-table">
+          <thead><tr><th>Dia</th><th>Dias</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Media/dia</th><th>Ticket</th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function weekdayOccupancyRows(charges = [], power = getPower()) {
+  const groups = {};
+  WEEKDAY_ORDER_BR.forEach(idx => {
+    groups[idx] = { idx, label: WEEKDAY_LABELS_BR[idx], dates: new Set(), revenue: 0, energy: 0, count: 0, clients: new Set(), failed: 0 };
+  });
+  charges
+    .filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()))
+    .forEach(charge => {
+      const idx = charge.startDate.getDay();
+      const group = groups[idx] || (groups[idx] = { idx, label: WEEKDAY_LABELS_BR[idx], dates: new Set(), revenue: 0, energy: 0, count: 0, clients: new Set(), failed: 0 });
+      const client = clientKeyFromCharge(charge);
+      group.dates.add(chargeDayKeyFromDate(charge.startDate));
+      group.revenue += Number(charge.revenue || 0);
+      group.energy += Number(charge.energyKWh || 0);
+      group.count += 1;
+      if (client) group.clients.add(client);
+      if (isFailedCharge(charge)) group.failed += 1;
+    });
+  return WEEKDAY_ORDER_BR.map(idx => {
+    const row = groups[idx];
+    const days = row.dates.size || 0;
+    const validCount = Math.max(0, row.count - row.failed);
+    const maxKWh = Math.max(Number(power) || 0, 0) * 24 * days;
+    const occ = maxKWh > 0 ? row.energy / maxKWh * 100 : 0;
+    return {
+      ...row,
+      days,
+      clientCount: row.clients.size,
+      validCount,
+      occ,
+      avgRevenue: days ? row.revenue / days : 0,
+      avgKwh: validCount ? row.energy / validCount : 0,
+      avgTicket: validCount ? row.revenue / validCount : 0
+    };
+  });
+}
+
+function occClassForPct(pct = 0) {
+  return pct < 15 ? 'occ-red' : (pct < 30 ? 'occ-yellow' : 'occ-green');
+}
+
+function renderWeekdayOccupancyReport(elId, charges = [], power = getPower(), title = 'Dinamica semanal de ocupacao') {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const rows = weekdayOccupancyRows(charges, power);
+  const activeRows = rows.filter(row => row.days || row.count || row.energy || row.revenue);
+  if (!activeRows.length) {
+    el.innerHTML = '';
+    return;
+  }
+  const best = activeRows.slice().sort((a, b) => b.occ - a.occ || b.revenue - a.revenue)[0];
+  const worst = activeRows.slice().sort((a, b) => a.occ - b.occ || a.revenue - b.revenue)[0];
+  const maxOcc = Math.max(...activeRows.map(row => row.occ), 1);
+  const bars = rows.map(row => {
+    const width = row.days ? Math.max(2, Math.min(100, row.occ / maxOcc * 100)) : 0;
+    return `
+      <div class="weekday-bar">
+        <strong>${row.label}</strong>
+        <span class="track"><i class="${occClassForPct(row.occ)}" style="width:${width.toFixed(1)}%"></i></span>
+        <span>${fmtPct(row.occ)} · ${row.count} rec.</span>
+      </div>
+    `;
+  }).join('');
+  const tableRows = rows.map(row => `
+    <tr class="${row.idx === best.idx ? 'best-day' : ''}">
+      <td>${row.label}</td>
+      <td>${row.days}</td>
+      <td><strong>${fmtPct(row.occ)}</strong><small>${fmtKWh(row.energy)}</small></td>
+      <td>${row.count}</td>
+      <td>${row.clientCount}</td>
+      <td>${fmtBRL(row.revenue)}</td>
+      <td>${fmtBRL(row.avgRevenue)}</td>
+      <td>${fmtBRL(row.avgTicket)}</td>
+    </tr>
+  `).join('');
+  el.innerHTML = `
+    <div class="card">
+      <h2>${title}</h2>
+      <div class="weekday-bars">${bars}</div>
+      <div class="weekday-best">
+        <strong>Melhor ocupacao: ${best.label} (${fmtPct(best.occ)})</strong>
+        <span>Pior dia: ${worst.label} (${fmtPct(worst.occ)}). A leitura usa os dias com movimento no periodo selecionado.</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Relatorio semanal</h2>
+      <div style="overflow-x:auto">
+        <table class="weekday-table">
+          <thead><tr><th>Dia</th><th>Dias</th><th>Ocupacao</th><th>Recargas</th><th>Clientes</th><th>Receita</th><th>Media/dia</th><th>Ticket</th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 function rangeRevenue(rows = [], days = 1, offsetDays = 0) {
   if (!rows.length) return { revenue: 0, count: 0, newClients: 0 };
   const last = rows[rows.length - 1].date;
@@ -4887,6 +5251,8 @@ function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = ch
   const daily = dailyFinancialSeries(charges);
   renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
   renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
+  renderDayComparison(prefix, charges, historyCharges);
+  renderWeekdayOccupancyReport(`${prefix}WeekdayReport`, charges, getPower(), 'Dinamica semanal de ocupacao');
   renderDailyOperationalMetrics(prefix, charges, historyCharges);
   renderRecentFailureDiagnostics(prefix, charges);
   renderOperationQuality(prefix, charges);
@@ -5965,6 +6331,9 @@ function renderUbyOperation() {
   const totalCharges = allUbyCharges.length;
   const avgTicket = totalCharges ? revenue / totalCharges : 0;
   const cleanStats = cleanOperationStats(allUbyCharges);
+  const trendRevenue = kpiDayTrend(allUbyCharges, 'revenue', sourceUbyCharges);
+  const trendCharges = kpiDayTrend(allUbyCharges, 'count', sourceUbyCharges);
+  const trendEnergy = kpiDayTrend(allUbyCharges, 'energy', sourceUbyCharges);
   const dates = allUbyCharges.map(charge => charge.startDate).filter(Boolean);
   const firstDate = dates.length ? new Date(Math.min(...dates)) : null;
   const lastDate = dates.length ? new Date(Math.max(...dates)) : null;
@@ -5999,17 +6368,18 @@ function renderUbyOperation() {
 
   document.getElementById('kpiUby').innerHTML = `
     <div class="card kpi-feature ${occClass}"><div class="label">Ocupacao UBY</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">${occStatus} - meta: 15% minimo / 30% ideal</div></div>
-    <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div></div>
-    <div class="card"><div class="label">Energia UBY</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida</div></div>
+    <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div>${trendCharges}</div>
+    <div class="card"><div class="label">Energia UBY</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida</div>${trendEnergy}</div>
     <div class="card"><div class="label">Ticket medio UBY</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas UBY</div></div>
     <div class="card"><div class="label">Melhor unidade UBY</div><div class="value" style="font-size:18px;white-space:normal">${included[0]?.stationName || '-'}</div><div class="sub">${included[0] ? fmtBRL(included[0].revenue) : 'sem dados'}</div></div>
-    <div class="card kpi-feature revenue-card"><div class="label">Receita UBY</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${included.length} carregador(es) marcados</div></div>
+    <div class="card kpi-feature revenue-card"><div class="label">Receita UBY</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${included.length} carregador(es) marcados</div>${trendRevenue}</div>
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
     <div class="card"><div class="label">Carregadores AC</div><div class="value">${acCount}</div><div class="sub">incluidos na operacao UBY</div></div>
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${dcCount}</div><div class="sub">incluidos na operacao UBY</div></div>
   `;
 
+  renderVisualSummary('ubyVisualSummary', allUbyCharges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceUbyCharges });
   renderUbyDecisionCockpit([], allUbyCharges, included);
   renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated' }
@@ -6166,6 +6536,9 @@ function renderGeral() {
   const lastDate = dates.length ? new Date(Math.max(...dates)) : null;
   const avgTicket = totalCharges ? revenue / totalCharges : 0;
   const cleanStats = cleanOperationStats(charges);
+  const trendRevenue = kpiDayTrend(charges, 'revenue', sourceCharges);
+  const trendCharges = kpiDayTrend(charges, 'count', sourceCharges);
+  const trendEnergy = kpiDayTrend(charges, 'energy', sourceCharges);
   let totalMaxKWh = 0;
   const generalWindows = [];
   unitData.forEach(unit => {
@@ -6197,16 +6570,17 @@ function renderGeral() {
 
   document.getElementById('kpiGeneral').innerHTML = `
     <div class="card kpi-feature ${occClass}"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">${occStatus} · meta: 15% minimo / 30% ideal</div></div>
-    <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div></div>
-    <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida</div></div>
+    <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div>${trendCharges}</div>
+    <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida</div>${trendEnergy}</div>
     <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
     <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.stationName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
-    <div class="card kpi-feature revenue-card"><div class="label">Receita total</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${units} unidade(s) · ranking por faturamento</div></div>
+    <div class="card kpi-feature revenue-card"><div class="label">Receita total</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${units} unidade(s) · ranking por faturamento</div>${trendRevenue}</div>
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
     <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
   `;
+  renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
   renderUsageInsights(charges, 'usageGeneral', sourceCharges);
   renderGeneralFinance(sourceUnitData);
@@ -6336,14 +6710,18 @@ function renderMensal() {
   const charges = filterChargesByWindow(monthCharges, window);
   renderUsageInsights(monthCharges, 'usage', allCharges);
   if (!charges.length) {
+    renderVisualSummary('monthlyVisualSummary', [], { historyCharges: allCharges });
+    renderWeekdayOccupancyReport('weekdayOccupancyMensal', [], getPower(), `Dinamica semanal - ${monthLabel(mk)}`);
     setStorageState(`Sem recargas em ${periodModeLabel(window.mode)} para <strong>${currentWorkName}</strong>.`);
     renderMonthClosing(mk);
     return;
   }
 
   renderHero(charges, mk, window);
+  renderVisualSummary('monthlyVisualSummary', charges, { bounds: window, historyCharges: allCharges });
   renderKPIs(charges, mk, window);
   enhanceIndividualKpis();
+  renderWeekdayOccupancyReport('weekdayOccupancyMensal', charges, getPower(), `Dinamica semanal - ${monthLabel(mk)}`);
   renderPaymentChart(charges);
   renderUserPieChart(charges);
   renderUserBars(charges, 'userBars');
@@ -6390,11 +6768,14 @@ function renderKPIs(charges, mk, window) {
   const proj    = dMonth / Math.max(days, 1);
   const occClass = occ.pct < 15 ? 'occ-red' : (occ.pct < 30 ? 'occ-yellow' : 'occ-green');
   const occStatus = occ.pct < 15 ? 'abaixo do objetivo minimo de 15%' : (occ.pct < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
+  const trendRevenue = kpiDayTrend(charges, 'revenue');
+  const trendCharges = kpiDayTrend(charges, 'count');
+  const trendEnergy = kpiDayTrend(charges, 'energy');
 
   document.getElementById('kpiGrid').innerHTML = `
     <div class="card"><div class="label">Receita total</div>
       <div class="value">${fmtBRL(rev)}</div>
-      <div class="sub">projeção ${fmtBRL(rev * proj)}</div></div>
+      <div class="sub">projeção ${fmtBRL(rev * proj)}</div>${trendRevenue}</div>
     <div class="card"><div class="label">Ocupação real</div>
       <div class="value">${fmtPct(occ.pct)}</div>
       <div class="bar"><span style="width:${Math.min(occ.pct,100).toFixed(1)}%"></span></div>
@@ -6407,10 +6788,10 @@ function renderKPIs(charges, mk, window) {
       <div class="sub">receita ÷ energia</div></div>
     <div class="card"><div class="label">Total recargas</div>
       <div class="value">${charges.length}</div>
-      <div class="sub">${clients} clientes únicos</div></div>
+      <div class="sub">${clients} clientes únicos</div>${trendCharges}</div>
     <div class="card"><div class="label">Energia entregue</div>
       <div class="value">${fmtKWh(energy)}</div>
-      <div class="sub">projeção ${fmtKWh(energy * proj)}</div></div>
+      <div class="sub">projeção ${fmtKWh(energy * proj)}</div>${trendEnergy}</div>
   `;
 }
 
@@ -6604,6 +6985,22 @@ function median(values = []) {
   return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
 }
 
+function dominantBenchmarkKind(charges = []) {
+  const counts = { ac: 0, dc: 0 };
+  charges.forEach(charge => {
+    const kind = chargerKind(charge);
+    if (kind === 'ac' || kind === 'dc') counts[kind] += 1;
+  });
+  if (!counts.ac && !counts.dc) return 'unknown';
+  return counts.dc > counts.ac ? 'dc' : 'ac';
+}
+
+function benchmarkKindLabel(kind) {
+  if (kind === 'ac') return 'AC';
+  if (kind === 'dc') return 'DC';
+  return 'geral';
+}
+
 function normalizeTextForInsight(value) {
   return safeText(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
@@ -6655,16 +7052,25 @@ function buildReviewAiInsights(charges, reviewData = {}) {
     [/(vaga|bloqueado|fila|ocupado|entrada|sinalizacao|localizacao)/, 'acesso e vaga'],
     [/(erro|falha|travou|indisponivel|nao funcionou|problema)/, 'falha operacional']
   ].filter(([regex]) => regex.test(allCommentText)).map(([, label]) => label);
+  const benchmarkKind = dominantBenchmarkKind(charges);
+  const benchmarkCharges = benchmarkKind === 'unknown' ? charges : charges.filter(charge => chargerKind(charge) === benchmarkKind);
+  const benchmarkTotal = benchmarkCharges.length || total;
+  const benchmarkRevenue = benchmarkCharges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const benchmarkEnergy = benchmarkCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const benchmarkAvgTicket = benchmarkTotal ? benchmarkRevenue / benchmarkTotal : avgTicket;
+  const benchmarkAvgKwh = benchmarkTotal ? benchmarkEnergy / benchmarkTotal : avgKwh;
+  const benchmarkLabel = benchmarkKindLabel(benchmarkKind);
   const peers = getGeneralUnitData()
     .filter(unit => unit.workId !== currentWorkId)
     .map(unit => {
       const monthCharges = mk && mk !== 'unknown' ? unit.charges.filter(charge => chargeMonthKey(charge) === mk) : unit.charges;
-      const rev = monthCharges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
-      const kwh = monthCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+      const comparableCharges = benchmarkKind === 'unknown' ? monthCharges : monthCharges.filter(charge => chargerKind(charge) === benchmarkKind);
+      const rev = comparableCharges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+      const kwh = comparableCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
       return {
-        count: monthCharges.length,
-        ticket: monthCharges.length ? rev / monthCharges.length : 0,
-        kwhSession: monthCharges.length ? kwh / monthCharges.length : 0
+        count: comparableCharges.length,
+        ticket: comparableCharges.length ? rev / comparableCharges.length : 0,
+        kwhSession: comparableCharges.length ? kwh / comparableCharges.length : 0
       };
     })
     .filter(unit => unit.count > 0);
@@ -6685,13 +7091,13 @@ function buildReviewAiInsights(charges, reviewData = {}) {
   if (themes.length) {
     insights.push(reviewInsightCard('Tema recorrente dos comentários', `${comments.length} comentário(s) citam sinais ligados a ${themes.slice(0, 3).join(', ')}.`, 'Abrir tarefa operacional para o tema mais citado e comparar a nota após a próxima semana.', 'warn'));
   }
-  if (peerTicket && avgTicket < peerTicket * 0.85) {
-    insights.push(reviewInsightCard('Ticket abaixo do benchmark interno', `Ticket médio ${fmtBRL(avgTicket)} contra mediana interna ${fmtBRL(peerTicket)} nas outras unidades salvas.`, 'Avaliar tarifa, permanência e comunicação para aumentar sessões de maior valor.', 'warn'));
-  } else if (peerTicket && avgTicket > peerTicket * 1.15) {
-    insights.push(reviewInsightCard('Ticket acima do benchmark interno', `Ticket médio ${fmtBRL(avgTicket)} contra mediana interna ${fmtBRL(peerTicket)}.`, 'Replicar posicionamento comercial deste ponto nos carregadores similares.', 'good'));
+  if (peerTicket && benchmarkAvgTicket < peerTicket * 0.85) {
+    insights.push(reviewInsightCard('Ticket abaixo do benchmark interno', `Ticket ${benchmarkLabel} ${fmtBRL(benchmarkAvgTicket)} contra mediana interna ${fmtBRL(peerTicket)} nas unidades comparaveis.`, 'Avaliar tarifa, permanencia e comunicacao para aumentar sessoes de maior valor.', 'warn'));
+  } else if (peerTicket && benchmarkAvgTicket > peerTicket * 1.15) {
+    insights.push(reviewInsightCard('Ticket acima do benchmark interno', `Ticket ${benchmarkLabel} ${fmtBRL(benchmarkAvgTicket)} contra mediana interna ${fmtBRL(peerTicket)} nas unidades comparaveis.`, 'Replicar posicionamento comercial deste ponto nos carregadores similares.', 'good'));
   }
-  if (peerKwh && avgKwh < peerKwh * 0.8) {
-    insights.push(reviewInsightCard('Sessões curtas versus mercado interno', `Média de ${avgKwh.toFixed(1).replace('.', ',')} kWh/sessão contra ${peerKwh.toFixed(1).replace('.', ',')} kWh/sessão nas demais unidades.`, 'Testar convênio local ou comunicação de permanência para aumentar kWh por sessão.', 'warn'));
+  if (peerKwh && benchmarkAvgKwh < peerKwh * 0.8) {
+    insights.push(reviewInsightCard('Sessoes curtas versus mercado interno', `Media ${benchmarkLabel} de ${benchmarkAvgKwh.toFixed(1).replace('.', ',')} kWh/sessao contra ${peerKwh.toFixed(1).replace('.', ',')} kWh/sessao nas unidades comparaveis.`, 'Testar convenio local ou comunicacao de permanencia para aumentar kWh por sessao.', 'warn'));
   }
   if (occ.pct < 5 && total >= 5) {
     insights.push(reviewInsightCard('Demanda baixa para o ativo', `Ocupação real ${fmtPct(occ.pct)} com ${total} recargas. Há capacidade ociosa relevante.`, peak ? `Concentrar campanha fora do pico ${peak[0]}, evitando desconto onde já existe demanda.` : 'Criar ação local de aquisição antes de mexer em preço.', 'warn'));
@@ -6827,7 +7233,11 @@ function renderAcumulado() {
       <div class="sub">base mês completo por mês</div></div>
   `;
 
+  renderVisualSummary('accVisualSummary', allCharges, { occ: { pct: totalOcc, energy, power, hours: 0, maxKWh: 0 }, historyCharges: allCharges });
+
   // Gráficos simples
+  renderWeekdayOccupancyReport('weekdayOccupancyAcc', allCharges, power, 'Dinamica semanal acumulada');
+
   const axBase = {
     x: { ticks:{color:'#8FA39A',font:{size:11}}, grid:{color:'#24364E'} },
     y: { beginAtZero:true, ticks:{color:'#8FA39A',font:{size:11}}, grid:{color:'#24364E'} }
