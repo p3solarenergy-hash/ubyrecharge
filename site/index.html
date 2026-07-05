@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UBY Recharge — Carregue o futuro</title>
+  <meta name="description" content="A rede de carregadores elétricos mais inteligente do Brasil. Carregue onde quiser, quando quiser.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #00E676;
+      --green2:  #00C853;
+      --green3:  #69F0AE;
+      --dark:    #050D0A;
+      --dark2:   #0A1810;
+      --dark3:   #0F2218;
+      --card:    #0D1F14;
+      --card2:   #102217;
+      --border:  rgba(0,230,118,.12);
+      --border2: rgba(0,230,118,.22);
+      --text:    #E8F5E9;
+      --muted:   #6B8F72;
+      --white:   #FFFFFF;
+      --radius:  14px;
+      --shadow:  0 4px 24px rgba(0,0,0,.55);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--dark);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+
+    /* ── Helpers ──────────────────────────────────────────────── */
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 0 28px;
+    }
+
+    .tag {
+      display: inline-block;
+      background: rgba(0,230,118,.1);
+      border: 1px solid var(--border2);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border-radius: 999px;
+      padding: 5px 14px;
+      margin-bottom: 18px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      transition: transform .18s, box-shadow .18s, background .18s;
+      border: none;
+      white-space: nowrap;
+    }
+    .btn:hover { transform: translateY(-2px); }
+
+    .btn-primary {
+      background: var(--green);
+      color: #050D0A;
+      padding: 14px 28px;
+      box-shadow: 0 0 24px rgba(0,230,118,.35);
+    }
+    .btn-primary:hover { background: var(--green3); box-shadow: 0 0 36px rgba(0,230,118,.55); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--green);
+      padding: 13px 26px;
+      border: 1.5px solid var(--border2);
+    }
+    .btn-outline:hover { background: rgba(0,230,118,.08); border-color: var(--green); }
+
+    .section-head {
+      text-align: center;
+      max-width: 680px;
+      margin: 0 auto 64px;
+    }
+
+    h2.section-title {
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 16px;
+    }
+
+    .section-sub {
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    /* ── NAV ──────────────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 0 28px;
+      background: rgba(5,13,10,.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      height: 68px;
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 1160px;
+      margin: 0 auto;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-logo-mark {
+      width: 36px;
+      height: 36px;
+      background: var(--green);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+    }
+
+    .nav-logo-mark svg { width: 20px; height: 20px; }
+
+    .nav-brand {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.5px;
+    }
+    .nav-brand span { color: var(--green); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      transition: color .15s;
+    }
+    .nav-links a:hover { color: var(--white); }
+
+    .nav-cta { display: flex; align-items: center; gap: 12px; }
+
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 4px;
+    }
+    .hamburger span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: .3s;
+    }
+
+    /* ── HERO ─────────────────────────────────────────────────── */
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      padding-top: 68px;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,230,118,.12) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 80% 80%, rgba(0,200,83,.08) 0%, transparent 60%);
+    }
+
+    .hero-grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,230,118,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,230,118,.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+      width: 100%;
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 80px 28px;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,230,118,.08);
+      border: 1px solid var(--border2);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--green);
+      margin-bottom: 24px;
+    }
+
+    .hero-eyebrow-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .5; transform: scale(.7); }
+    }
+
+    h1.hero-title {
+      font-size: clamp(36px, 5.5vw, 68px);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -1.5px;
+      margin-bottom: 24px;
+    }
+
+    h1.hero-title .highlight {
+      color: var(--green);
+      position: relative;
+    }
+
+    .hero-desc {
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 500px;
+      margin-bottom: 40px;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 52px;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 36px;
+      flex-wrap: wrap;
+    }
+
+    .hero-stat-item { }
+    .hero-stat-num {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--white);
+      line-height: 1;
+    }
+    .hero-stat-num span { color: var(--green); }
+    .hero-stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* Hero visual */
+    .hero-visual {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .hero-card {
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: 24px;
+      padding: 32px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 0 80px rgba(0,230,118,.12), var(--shadow);
+      position: relative;
+    }
+
+    .charger-icon {
+      width: 80px;
+      height: 80px;
+      background: rgba(0,230,118,.1);
+      border: 2px solid var(--border2);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+    }
+
+    .charger-icon svg {
+      width: 44px;
+      height: 44px;
+      color: var(--green);
+    }
+
+    .charge-progress {
+      margin-bottom: 20px;
+    }
+
+    .charge-progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .charge-progress-label .pct { color: var(--green); font-weight: 700; }
+
+    .progress-bar {
+      height: 10px;
+      background: rgba(255,255,255,.06);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 72%;
+      background: linear-gradient(90deg, var(--green2), var(--green));
+      border-radius: 999px;
+      position: relative;
+      animation: fillBar 2.5s ease-out forwards;
+    }
+    @keyframes fillBar {
+      from { width: 0%; }
+      to { width: 72%; }
+    }
+    .progress-fill::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--green);
+    }
+
+    .charge-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .charge-info-item {
+      background: rgba(0,230,118,.05);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .charge-info-item .ci-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .charge-info-item .ci-value { font-size: 18px; font-weight: 700; color: var(--white); margin-top: 3px; }
+
+    .charge-station {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(0,230,118,.05);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .station-dot {
+      width: 10px;
+      height: 10px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+      flex-shrink: 0;
+    }
+    .station-name { font-size: 13px; font-weight: 600; }
+    .station-addr { font-size: 11px; color: var(--muted); }
+    .station-kw { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--green); }
+
+    /* Floating badges */
+    .float-badge {
+      position: absolute;
+      background: var(--card2);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: var(--shadow);
+    }
+    .float-badge.top-left {
+      top: -20px;
+      left: -40px;
+    }
+    .float-badge.bottom-right {
+      bottom: -18px;
+      right: -30px;
+    }
+    .float-badge .fb-green { color: var(--green); }
+
+    /* ── LOGOS / PARTNERS ─────────────────────────────────────── */
+    #logos {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logos-label {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+
+    .logos-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 48px;
+      flex-wrap: wrap;
+    }
+
+    .logo-item {
+      opacity: .4;
+      filter: grayscale(1);
+      transition: opacity .2s, filter .2s;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .logo-item:hover { opacity: .8; filter: grayscale(0); }
+
+    /* ── HOW IT WORKS ─────────────────────────────────────────── */
+    #como-funciona {
+      padding: 100px 0;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      position: relative;
+    }
+
+    .steps::before {
+      content: '';
+      position: absolute;
+      top: 36px;
+      left: calc(12.5% + 20px);
+      right: calc(12.5% + 20px);
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border2), var(--border2), transparent);
+    }
+
+    .step {
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .step-number {
+      width: 72px;
+      height: 72px;
+      background: var(--card);
+      border: 2px solid var(--border2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--green);
+      position: relative;
+    }
+
+    .step-number::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,230,118,.1), transparent 70%);
+    }
+
+    .step h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--white);
+    }
+
+    .step p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── FEATURES ─────────────────────────────────────────────── */
+    #vantagens {
+      padding: 100px 0;
+      background: linear-gradient(180deg, transparent 0%, rgba(0,230,118,.02) 50%, transparent 100%);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color .2s, transform .2s;
+    }
+    .feature-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-4px);
+    }
+
+    .feature-icon {
+      width: 52px;
+      height: 52px;
+      background: rgba(0,230,118,.08);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+
+    .feature-card h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ── NETWORK / MAP ────────────────────────────────────────── */
+    #rede {
+      padding: 100px 0;
+    }
+
+    .network-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .network-text {}
+    .network-text h2 {
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+    .network-text p {
+      color: var(--muted);
+      font-size: 17px;
+      margin-bottom: 32px;
+      line-height: 1.7;
+    }
+
+    .network-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      text-align: center;
+    }
+    .kpi-num {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--green);
+      line-height: 1;
+    }
+    .kpi-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Map visual */
+    .map-visual {
+      position: relative;
+    }
+
+    .map-card {
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 0 60px rgba(0,230,118,.08), var(--shadow);
+    }
+
+    .map-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .map-dots { display: flex; gap: 6px; }
+    .map-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .md-r { background: #ff5f57; }
+    .md-y { background: #febc2e; }
+    .md-g { background: #28c840; }
+    .map-title { font-size: 13px; color: var(--muted); }
+
+    .map-body {
+      position: relative;
+      height: 320px;
+      background:
+        radial-gradient(ellipse 70% 70% at 50% 50%, rgba(0,230,118,.05) 0%, transparent 70%),
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,230,118,.04) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,230,118,.04) 40px);
+      background-color: #070F0B;
+    }
+
+    .map-pin {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+    }
+    .map-pin-dot {
+      width: 14px;
+      height: 14px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(0,230,118,.25), 0 0 16px rgba(0,230,118,.5);
+      animation: pinPulse 2.5s ease-in-out infinite;
+    }
+    @keyframes pinPulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(0,230,118,.25), 0 0 16px rgba(0,230,118,.5); }
+      50% { box-shadow: 0 0 0 8px rgba(0,230,118,.1), 0 0 28px rgba(0,230,118,.6); }
+    }
+    .map-pin-label {
+      background: var(--card2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-top: 5px;
+      white-space: nowrap;
+    }
+
+    /* ── PLANS ────────────────────────────────────────────────── */
+    #planos {
+      padding: 100px 0;
+      background: linear-gradient(180deg, transparent 0%, rgba(0,230,118,.02) 50%, transparent 100%);
+    }
+
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .plan-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      position: relative;
+      transition: transform .2s;
+    }
+    .plan-card:hover { transform: translateY(-4px); }
+
+    .plan-card.featured {
+      border-color: var(--green);
+      box-shadow: 0 0 40px rgba(0,230,118,.15);
+    }
+
+    .plan-badge {
+      position: absolute;
+      top: -13px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--green);
+      color: #050D0A;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-radius: 999px;
+      padding: 4px 16px;
+      white-space: nowrap;
+    }
+
+    .plan-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .plan-price {
+      font-size: 40px;
+      font-weight: 900;
+      color: var(--white);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .plan-price sup { font-size: 20px; font-weight: 700; vertical-align: top; margin-top: 8px; }
+    .plan-price sub { font-size: 14px; font-weight: 500; color: var(--muted); }
+    .plan-desc { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+
+    .plan-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .plan-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+    }
+    .plan-features li .check { color: var(--green); flex-shrink: 0; font-size: 16px; }
+    .plan-features li .cross { color: var(--muted); flex-shrink: 0; font-size: 16px; }
+
+    /* ── APP DOWNLOAD ─────────────────────────────────────────── */
+    #app {
+      padding: 100px 0;
+    }
+
+    .app-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+
+    .app-text h2 {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+    .app-text p {
+      font-size: 17px;
+      color: var(--muted);
+      margin-bottom: 36px;
+      line-height: 1.7;
+    }
+
+    .store-btns {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .store-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      padding: 12px 20px;
+      transition: border-color .2s, transform .2s;
+    }
+    .store-btn:hover { border-color: var(--green); transform: translateY(-2px); }
+    .store-btn-icon { font-size: 28px; }
+    .store-btn-text {}
+    .store-btn-sub { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .store-btn-name { font-size: 15px; font-weight: 700; color: var(--white); }
+
+    .app-screens {
+      position: relative;
+      height: 460px;
+    }
+
+    .phone-mockup {
+      position: absolute;
+      width: 220px;
+      background: var(--card);
+      border: 2px solid var(--border2);
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow: 0 0 60px rgba(0,230,118,.1), var(--shadow);
+    }
+    .phone-notch {
+      width: 80px;
+      height: 22px;
+      background: var(--dark);
+      border-radius: 0 0 14px 14px;
+      margin: 0 auto;
+    }
+    .phone-screen {
+      padding: 16px;
+      min-height: 320px;
+      background: var(--dark2);
+    }
+
+    .phone-main {
+      left: 50%;
+      top: 0;
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+    .phone-left {
+      left: 0;
+      top: 60px;
+      transform: rotate(-8deg);
+      opacity: .65;
+      z-index: 1;
+    }
+    .phone-right {
+      right: 0;
+      top: 60px;
+      transform: rotate(8deg);
+      opacity: .65;
+      z-index: 1;
+    }
+
+    .screen-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .screen-time { font-size: 11px; color: var(--muted); }
+    .screen-title { font-size: 15px; font-weight: 700; }
+
+    .screen-charger-card {
+      background: rgba(0,230,118,.06);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .scc-name { font-size: 12px; font-weight: 700; }
+    .scc-addr { font-size: 10px; color: var(--muted); margin-bottom: 8px; }
+    .scc-row { display: flex; justify-content: space-between; align-items: center; }
+    .scc-kw { font-size: 13px; font-weight: 700; color: var(--green); }
+    .scc-status {
+      font-size: 10px;
+      background: rgba(0,230,118,.12);
+      color: var(--green);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-weight: 600;
+    }
+
+    /* ── TESTIMONIALS ─────────────────────────────────────────── */
+    #depoimentos {
+      padding: 100px 0;
+    }
+
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .testimonial-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color .2s;
+    }
+    .testimonial-card:hover { border-color: var(--border2); }
+
+    .testimonial-stars {
+      color: var(--green);
+      font-size: 16px;
+      margin-bottom: 16px;
+      letter-spacing: 2px;
+    }
+
+    .testimonial-text {
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      margin-bottom: 20px;
+      font-style: italic;
+    }
+
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .author-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--green2), var(--dark3));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .author-name { font-size: 14px; font-weight: 600; color: var(--white); }
+    .author-role { font-size: 12px; color: var(--muted); }
+
+    /* ── FAQ ──────────────────────────────────────────────────── */
+    #faq {
+      padding: 100px 0;
+    }
+
+    .faq-list {
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .faq-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      transition: color .15s;
+    }
+    .faq-question:hover { color: var(--green); }
+
+    .faq-arrow {
+      font-size: 18px;
+      color: var(--muted);
+      transition: transform .25s;
+      flex-shrink: 0;
+    }
+    .faq-item.open .faq-arrow { transform: rotate(180deg); color: var(--green); }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .35s ease, padding .25s;
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .faq-item.open .faq-answer {
+      max-height: 300px;
+      padding: 0 24px 20px;
+    }
+
+    /* ── CTA BAND ─────────────────────────────────────────────── */
+    #cta-band {
+      padding: 80px 0;
+    }
+
+    .cta-card {
+      background: linear-gradient(135deg, #0A2018 0%, #0F2F1E 100%);
+      border: 1px solid var(--border2);
+      border-radius: 24px;
+      padding: 72px 60px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 80px rgba(0,230,118,.1);
+    }
+    .cta-card::before {
+      content: '';
+      position: absolute;
+      top: -80px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(0,230,118,.2), transparent 70%);
+    }
+
+    .cta-card h2 {
+      font-size: clamp(28px, 4vw, 46px);
+      font-weight: 900;
+      line-height: 1.2;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .cta-card p {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      position: relative;
+    }
+    .cta-actions {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      position: relative;
+    }
+
+    /* ── FOOTER ───────────────────────────────────────────────── */
+    footer {
+      background: var(--dark2);
+      border-top: 1px solid var(--border);
+      padding: 64px 0 32px;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 48px;
+    }
+
+    .footer-brand-desc {
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 16px;
+      line-height: 1.7;
+      max-width: 280px;
+    }
+
+    .footer-socials {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .social-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      transition: border-color .15s;
+    }
+    .social-btn:hover { border-color: var(--green); }
+
+    .footer-col h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--white);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
+    }
+    .footer-links {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      list-style: none;
+    }
+    .footer-links a {
+      font-size: 14px;
+      color: var(--muted);
+      transition: color .15s;
+    }
+    .footer-links a:hover { color: var(--green); }
+
+    .footer-bottom {
+      border-top: 1px solid var(--border);
+      padding-top: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .footer-copy { font-size: 13px; color: var(--muted); }
+    .footer-legal { display: flex; gap: 24px; }
+    .footer-legal a { font-size: 13px; color: var(--muted); transition: color .15s; }
+    .footer-legal a:hover { color: var(--green); }
+
+    /* ── SCROLL REVEAL ────────────────────────────────────────── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity .65s ease, transform .65s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* ── RESPONSIVE ───────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .nav-links, .nav-cta { display: none; }
+      .hamburger { display: flex; }
+
+      .hero-inner { grid-template-columns: 1fr; text-align: center; }
+      .hero-desc { margin: 0 auto 40px; }
+      .hero-actions { justify-content: center; }
+      .hero-stats { justify-content: center; }
+      .hero-visual { display: none; }
+
+      .steps { grid-template-columns: repeat(2, 1fr); }
+      .steps::before { display: none; }
+
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+
+      .network-layout { grid-template-columns: 1fr; }
+
+      .plans-grid { grid-template-columns: 1fr; max-width: 420px; margin: 0 auto; }
+
+      .app-layout { grid-template-columns: 1fr; }
+      .app-screens { display: none; }
+      .store-btns { justify-content: center; }
+      .app-text { text-align: center; }
+
+      .testimonials-grid { grid-template-columns: 1fr; max-width: 500px; margin: 0 auto; }
+
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+
+      .cta-card { padding: 52px 32px; }
+    }
+
+    @media (max-width: 560px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr; }
+      .footer-bottom { flex-direction: column; text-align: center; }
+    }
+
+    /* Mobile nav */
+    .mobile-nav {
+      display: none;
+      position: fixed;
+      top: 68px;
+      left: 0;
+      right: 0;
+      background: var(--dark);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 28px 28px;
+      z-index: 99;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .mobile-nav.open { display: flex; }
+    .mobile-nav a {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--muted);
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .mobile-nav a:last-child { border-bottom: none; color: var(--green); font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════
+     NAV
+════════════════════════════════════════════════════════ -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <div class="nav-logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#050D0A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+      </div>
+      <span class="nav-brand">UBY <span>Recharge</span></span>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="#como-funciona">Como funciona</a></li>
+      <li><a href="#vantagens">Vantagens</a></li>
+      <li><a href="#rede">Nossa rede</a></li>
+      <li><a href="#planos">Planos</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ul>
+
+    <div class="nav-cta">
+      <a href="#contato" class="btn btn-outline" style="padding:9px 18px;font-size:13px;">Fale conosco</a>
+      <a href="#app" class="btn btn-primary" style="padding:9px 18px;font-size:13px;">Baixar app</a>
+    </div>
+
+    <button class="hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<div class="mobile-nav" id="mobileNav">
+  <a href="#como-funciona" onclick="closeMobileNav()">Como funciona</a>
+  <a href="#vantagens" onclick="closeMobileNav()">Vantagens</a>
+  <a href="#rede" onclick="closeMobileNav()">Nossa rede</a>
+  <a href="#planos" onclick="closeMobileNav()">Planos</a>
+  <a href="#faq" onclick="closeMobileNav()">FAQ</a>
+  <a href="#app" onclick="closeMobileNav()">⚡ Baixar o app</a>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════
+     HERO
+════════════════════════════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid-overlay"></div>
+
+  <div class="hero-inner">
+    <div class="hero-content">
+      <div class="hero-eyebrow">
+        <div class="hero-eyebrow-dot"></div>
+        Rede ativa em todo o Brasil
+      </div>
+
+      <h1 class="hero-title">
+        Carregue seu<br>
+        elétrico com<br>
+        <span class="highlight">inteligência</span>
+      </h1>
+
+      <p class="hero-desc">
+        UBY Recharge é a rede de carregadores rápidos para veículos elétricos mais
+        conectada do Brasil. Encontre um ponto em segundos, carregue e vá.
+      </p>
+
+      <div class="hero-actions">
+        <a href="#app" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Começar agora
+        </a>
+        <a href="#como-funciona" class="btn btn-outline">Ver como funciona</a>
+      </div>
+
+      <div class="hero-stats">
+        <div class="hero-stat-item">
+          <div class="hero-stat-num">+<span>120</span></div>
+          <div class="hero-stat-label">Pontos de carga</div>
+        </div>
+        <div class="hero-stat-item">
+          <div class="hero-stat-num"><span>22</span>–<span>150</span> kW</div>
+          <div class="hero-stat-label">Potência disponível</div>
+        </div>
+        <div class="hero-stat-item">
+          <div class="hero-stat-num"><span>98</span>%</div>
+          <div class="hero-stat-label">Disponibilidade</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero visual card -->
+    <div class="hero-visual">
+      <div class="float-badge top-left">
+        ⚡ <span class="fb-green">Carregando agora</span> — 3 pontos próximos
+      </div>
+
+      <div class="hero-card">
+        <div class="charger-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--green)">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </div>
+
+        <div class="charge-progress">
+          <div class="charge-progress-label">
+            <span>Carregando...</span>
+            <span class="pct">72%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+        </div>
+
+        <div class="charge-info">
+          <div class="charge-info-item">
+            <div class="ci-label">Energia</div>
+            <div class="ci-value">28.4 kWh</div>
+          </div>
+          <div class="charge-info-item">
+            <div class="ci-label">Tempo</div>
+            <div class="ci-value">38 min</div>
+          </div>
+          <div class="charge-info-item">
+            <div class="ci-label">Potência</div>
+            <div class="ci-value">50 kW</div>
+          </div>
+          <div class="charge-info-item">
+            <div class="ci-label">Custo</div>
+            <div class="ci-value">R$ 14,20</div>
+          </div>
+        </div>
+
+        <div class="charge-station">
+          <div class="station-dot"></div>
+          <div>
+            <div class="station-name">UBY — Shopping Morumbi</div>
+            <div class="station-addr">São Paulo, SP</div>
+          </div>
+          <div class="station-kw">50 kW</div>
+        </div>
+      </div>
+
+      <div class="float-badge bottom-right">
+        ✓ Sessão concluída · <span class="fb-green">R$ 19,50</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     LOGOS / PARCEIROS
+════════════════════════════════════════════════════════ -->
+<section id="logos">
+  <div class="container">
+    <p class="logos-label">Presente nos maiores destinos</p>
+    <div class="logos-row">
+      <div class="logo-item">Shopping Morumbi</div>
+      <div class="logo-item">Hiper Hippo</div>
+      <div class="logo-item">Condomínio Verde</div>
+      <div class="logo-item">Grupo Araguaia</div>
+      <div class="logo-item">Rio Beach Hotel</div>
+      <div class="logo-item">Malassise</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     COMO FUNCIONA
+════════════════════════════════════════════════════════ -->
+<section id="como-funciona">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">Como funciona</div>
+      <h2 class="section-title">Tão simples quanto parece</h2>
+      <p class="section-sub">Em 4 passos você já está carregando seu veículo elétrico com a UBY Recharge.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-number">1</div>
+        <h3>Baixe o app</h3>
+        <p>Disponível para iOS e Android. Crie sua conta em menos de 2 minutos.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-number">2</div>
+        <h3>Encontre um ponto</h3>
+        <p>Veja no mapa os carregadores disponíveis mais próximos em tempo real.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-number">3</div>
+        <h3>Conecte e carregue</h3>
+        <p>Conecte o cabo, libere a sessão pelo app e acompanhe o carregamento.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-number">4</div>
+        <h3>Pague e vá</h3>
+        <p>Pagamento automático pelo app. Sem filas, sem fichas, sem estresse.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     VANTAGENS
+════════════════════════════════════════════════════════ -->
+<section id="vantagens">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">Vantagens</div>
+      <h2 class="section-title">Por que escolher a UBY?</h2>
+      <p class="section-sub">Tecnologia, conveniência e suporte 24h para sua jornada elétrica.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">⚡</div>
+        <h3>Carga rápida DC</h3>
+        <p>Carregadores de até 150 kW que adicionam 100 km de autonomia em menos de 15 minutos.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">📍</div>
+        <h3>Rede em expansão</h3>
+        <p>Mais de 120 pontos ativos nos principais shoppings, condomínios e postos do Brasil.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">💳</div>
+        <h3>Pagamento fácil</h3>
+        <p>Pix, cartão de crédito ou saldo pré-pago. Escolha como quiser, pague pelo app.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">📊</div>
+        <h3>Monitoramento em tempo real</h3>
+        <p>Acompanhe kWh, tempo restante, custo e histórico de sessões diretamente no app.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🔌</div>
+        <h3>Múltiplos conectores</h3>
+        <p>CCS2, CHAdeMO e Type 2 — compatível com todos os principais veículos elétricos do mercado.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🛡️</div>
+        <h3>Suporte 24 horas</h3>
+        <p>Central de atendimento disponível todos os dias. Qualquer problema, resolvemos agora.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     REDE / MAP
+════════════════════════════════════════════════════════ -->
+<section id="rede">
+  <div class="container">
+    <div class="network-layout">
+      <div class="network-text reveal">
+        <div class="tag">Nossa rede</div>
+        <h2>Carregadores onde você está</h2>
+        <p>A UBY Recharge está nos lugares que você já frequenta — shoppings, condomínios, hotéis e rodovias. Nossa rede cresce toda semana.</p>
+
+        <div class="network-kpis">
+          <div class="kpi">
+            <div class="kpi-num">120+</div>
+            <div class="kpi-label">Pontos</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-num">8</div>
+            <div class="kpi-label">Estados</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-num">98%</div>
+            <div class="kpi-label">Uptime</div>
+          </div>
+        </div>
+
+        <a href="#app" class="btn btn-primary">Ver mapa completo</a>
+      </div>
+
+      <div class="map-visual reveal">
+        <div class="map-card">
+          <div class="map-header">
+            <div class="map-dots">
+              <div class="map-dot md-r"></div>
+              <div class="map-dot md-y"></div>
+              <div class="map-dot md-g"></div>
+            </div>
+            <span class="map-title">UBY Recharge — Mapa da rede</span>
+          </div>
+          <div class="map-body">
+            <div class="map-pin" style="left:48%;top:38%">
+              <div class="map-pin-dot"></div>
+              <div class="map-pin-label">São Paulo</div>
+            </div>
+            <div class="map-pin" style="left:30%;top:55%">
+              <div class="map-pin-dot"></div>
+              <div class="map-pin-label">Curitiba</div>
+            </div>
+            <div class="map-pin" style="left:60%;top:25%">
+              <div class="map-pin-dot"></div>
+              <div class="map-pin-label">Rio de Janeiro</div>
+            </div>
+            <div class="map-pin" style="left:75%;top:15%">
+              <div class="map-pin-dot"></div>
+              <div class="map-pin-label">Belo Horizonte</div>
+            </div>
+            <div class="map-pin" style="left:20%;top:35%">
+              <div class="map-pin-dot"></div>
+              <div class="map-pin-label">Porto Alegre</div>
+            </div>
+            <div class="map-pin" style="left:55%;top:10%">
+              <div class="map-pin-dot"></div>
+              <div class="map-pin-label">Brasília</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     PLANOS
+════════════════════════════════════════════════════════ -->
+<section id="planos">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">Planos</div>
+      <h2 class="section-title">Simples e transparente</h2>
+      <p class="section-sub">Pague apenas o que usar ou assine um plano e economize todo mês.</p>
+    </div>
+
+    <div class="plans-grid">
+      <!-- Free -->
+      <div class="plan-card reveal">
+        <div class="plan-name">Avulso</div>
+        <div class="plan-price"><sup>R$</sup> 2,<span style="font-size:22px">50</span><sub>/kWh</sub></div>
+        <div class="plan-desc">Sem mensalidade. Pague por kWh carregado.</div>
+        <ul class="plan-features">
+          <li><span class="check">✓</span> Acesso a todos os pontos</li>
+          <li><span class="check">✓</span> App completo</li>
+          <li><span class="check">✓</span> Suporte via chat</li>
+          <li><span class="cross">✗</span> Reserva antecipada</li>
+          <li><span class="cross">✗</span> Desconto por volume</li>
+        </ul>
+        <a href="#app" class="btn btn-outline" style="width:100%;justify-content:center;">Começar grátis</a>
+      </div>
+
+      <!-- Pro (featured) -->
+      <div class="plan-card featured reveal">
+        <div class="plan-badge">Mais popular</div>
+        <div class="plan-name">UBY Plus</div>
+        <div class="plan-price"><sup>R$</sup> 89<sub>/mês</sub></div>
+        <div class="plan-desc">R$ 1,80/kWh + 50 kWh inclusos todo mês.</div>
+        <ul class="plan-features">
+          <li><span class="check">✓</span> 50 kWh mensais inclusos</li>
+          <li><span class="check">✓</span> R$ 1,80/kWh excedente</li>
+          <li><span class="check">✓</span> Reserva de carregador</li>
+          <li><span class="check">✓</span> Suporte prioritário 24h</li>
+          <li><span class="check">✓</span> Histórico e relatórios</li>
+        </ul>
+        <a href="#app" class="btn btn-primary" style="width:100%;justify-content:center;">Assinar agora</a>
+      </div>
+
+      <!-- Business -->
+      <div class="plan-card reveal">
+        <div class="plan-name">Empresas</div>
+        <div class="plan-price" style="font-size:28px;padding-top:6px;">Sob<br>consulta</div>
+        <div class="plan-desc">Para frotas, condomínios e estacionamentos.</div>
+        <ul class="plan-features">
+          <li><span class="check">✓</span> Dashboard de gestão de frota</li>
+          <li><span class="check">✓</span> Faturamento centralizado</li>
+          <li><span class="check">✓</span> Carregadores dedicados</li>
+          <li><span class="check">✓</span> SLA garantido</li>
+          <li><span class="check">✓</span> Gerente de conta exclusivo</li>
+        </ul>
+        <a href="#contato" class="btn btn-outline" style="width:100%;justify-content:center;">Falar com vendas</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     APP DOWNLOAD
+════════════════════════════════════════════════════════ -->
+<section id="app">
+  <div class="container">
+    <div class="app-layout">
+      <div class="app-text reveal">
+        <div class="tag">Aplicativo</div>
+        <h2>Tudo no seu bolso, sempre conectado</h2>
+        <p>Com o app UBY Recharge você localiza pontos, inicia sessões, acompanha o carregamento em tempo real e controla seus gastos — tudo em um lugar só.</p>
+
+        <div class="store-btns">
+          <a href="#" class="store-btn">
+            <div class="store-btn-icon">🍎</div>
+            <div class="store-btn-text">
+              <div class="store-btn-sub">Baixar na</div>
+              <div class="store-btn-name">App Store</div>
+            </div>
+          </a>
+          <a href="#" class="store-btn">
+            <div class="store-btn-icon">▶</div>
+            <div class="store-btn-text">
+              <div class="store-btn-sub">Disponível no</div>
+              <div class="store-btn-name">Google Play</div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <!-- Phone mockups -->
+      <div class="app-screens reveal">
+        <!-- Left phone -->
+        <div class="phone-mockup phone-left" style="width:180px">
+          <div class="phone-notch" style="width:60px;height:18px"></div>
+          <div class="phone-screen" style="padding:12px;min-height:280px">
+            <div class="screen-header" style="margin-bottom:12px">
+              <span class="screen-time">Mapa</span>
+            </div>
+            <div style="background:rgba(0,230,118,.04);border:1px solid var(--border);border-radius:8px;height:160px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;">📍 3 pontos próximos</div>
+          </div>
+        </div>
+
+        <!-- Main phone -->
+        <div class="phone-mockup phone-main" style="width:220px">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="screen-header">
+              <span class="screen-time">9:41</span>
+              <span class="screen-title">UBY Recharge</span>
+            </div>
+
+            <div class="screen-charger-card">
+              <div class="scc-name">Shopping Morumbi · Vaga 3</div>
+              <div class="scc-addr">São Paulo, SP</div>
+              <div class="scc-row">
+                <span class="scc-kw">⚡ 50 kW DC</span>
+                <span class="scc-status">Disponível</span>
+              </div>
+            </div>
+
+            <div class="screen-charger-card" style="opacity:.6">
+              <div class="scc-name">Condomínio Verde · B2</div>
+              <div class="scc-addr">São Paulo, SP · 1,2 km</div>
+              <div class="scc-row">
+                <span class="scc-kw">⚡ 22 kW AC</span>
+                <span class="scc-status" style="background:rgba(255,200,0,.1);color:#F2C94C">Em uso</span>
+              </div>
+            </div>
+
+            <div style="margin-top:14px">
+              <div style="background:var(--green);color:#050D0A;font-weight:700;font-size:13px;text-align:center;border-radius:9px;padding:11px;">
+                ⚡ Iniciar sessão
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right phone -->
+        <div class="phone-mockup phone-right" style="width:180px">
+          <div class="phone-notch" style="width:60px;height:18px"></div>
+          <div class="phone-screen" style="padding:12px;min-height:280px">
+            <div class="screen-header" style="margin-bottom:12px">
+              <span class="screen-time">Histórico</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="background:rgba(0,230,118,.04);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:10px">
+                <div style="color:var(--green);font-weight:700">+28.4 kWh</div>
+                <div style="color:var(--muted)">13/06 · R$ 51,12</div>
+              </div>
+              <div style="background:rgba(0,230,118,.04);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:10px">
+                <div style="color:var(--green);font-weight:700">+14.1 kWh</div>
+                <div style="color:var(--muted)">10/06 · R$ 25,38</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     DEPOIMENTOS
+════════════════════════════════════════════════════════ -->
+<section id="depoimentos">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">Depoimentos</div>
+      <h2 class="section-title">Quem já carrega com a UBY</h2>
+      <p class="section-sub">Milhares de motoristas elétricos confiam na nossa rede todo dia.</p>
+    </div>
+
+    <div class="testimonials-grid">
+      <div class="testimonial-card reveal">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"Simplesmente o melhor app de recarga que já usei. Encontro ponto sempre perto de casa e o processo é super rápido e sem dor de cabeça."</p>
+        <div class="testimonial-author">
+          <div class="author-avatar">ML</div>
+          <div>
+            <div class="author-name">Marcelo Lima</div>
+            <div class="author-role">BYD Han · São Paulo</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="testimonial-card reveal">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"Uso o plano UBY Plus e a economia é real. Antigamente gastava muito mais em postos. Agora carrego em casa e complemento com a UBY."</p>
+        <div class="testimonial-author">
+          <div class="author-avatar">CR</div>
+          <div>
+            <div class="author-name">Camila Rodrigues</div>
+            <div class="author-role">Volvo XC40 · Curitiba</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="testimonial-card reveal">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"Como gestor de frota, o plano Empresas mudou nossa operação. Dashboard completo, faturamento centralizado e suporte que realmente responde."</p>
+        <div class="testimonial-author">
+          <div class="author-avatar">FS</div>
+          <div>
+            <div class="author-name">Felipe Souza</div>
+            <div class="author-role">Gestor de frota · Rio de Janeiro</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     FAQ
+════════════════════════════════════════════════════════ -->
+<section id="faq">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">FAQ</div>
+      <h2 class="section-title">Perguntas frequentes</h2>
+    </div>
+
+    <div class="faq-list">
+      <div class="faq-item reveal">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          Quais tipos de conectores a UBY Recharge suporta?
+          <span class="faq-arrow">▼</span>
+        </div>
+        <div class="faq-answer">Suportamos CCS2 (padrão europeu/brasileiro), CHAdeMO e Type 2 AC. A maioria dos veículos elétricos vendidos no Brasil é compatível com pelo menos um dos nossos conectores.</div>
+      </div>
+
+      <div class="faq-item reveal">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          Como funciona o pagamento?
+          <span class="faq-arrow">▼</span>
+        </div>
+        <div class="faq-answer">Você pode pagar via Pix, cartão de crédito ou débito diretamente no app. Também aceitamos saldo pré-pago na carteira UBY, que garante tarifas mais vantajosas.</div>
+      </div>
+
+      <div class="faq-item reveal">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          Posso cancelar a sessão de recarga antes de terminar?
+          <span class="faq-arrow">▼</span>
+        </div>
+        <div class="faq-answer">Sim! Você pode encerrar a sessão a qualquer momento pelo app. Será cobrado apenas o kWh consumido até o momento do encerramento.</div>
+      </div>
+
+      <div class="faq-item reveal">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          O que acontece se o carregador apresentar problema durante minha recarga?
+          <span class="faq-arrow">▼</span>
+        </div>
+        <div class="faq-answer">Nossa central de suporte fica disponível 24h por dia, 7 dias por semana. Em caso de falha, você não é cobrado pela sessão interrompida e nossa equipe é acionada automaticamente para resolver o problema.</div>
+      </div>
+
+      <div class="faq-item reveal">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          Como instalar carregadores UBY no meu estabelecimento?
+          <span class="faq-arrow">▼</span>
+        </div>
+        <div class="faq-answer">Entre em contato pelo formulário de Empresas ou nos chame pelo WhatsApp. Nossa equipe faz um estudo de viabilidade gratuito e cuida de todo o processo de instalação, homologação e operação.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     CTA BAND
+════════════════════════════════════════════════════════ -->
+<section id="cta-band">
+  <div class="container">
+    <div class="cta-card reveal">
+      <h2>Pronto para carregar<br>o futuro?</h2>
+      <p>Baixe o app, encontre o ponto mais próximo e comece agora mesmo.</p>
+      <div class="cta-actions">
+        <a href="#app" class="btn btn-primary" style="font-size:16px;padding:16px 32px;">
+          ⚡ Baixar o app UBY
+        </a>
+        <a href="#contato" class="btn btn-outline" style="font-size:16px;padding:15px 32px;">
+          Falar com a equipe
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════ -->
+<footer id="contato">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="#" class="nav-logo" style="display:inline-flex">
+          <div class="nav-logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#050D0A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+          <span class="nav-brand">UBY <span>Recharge</span></span>
+        </a>
+        <p class="footer-brand-desc">A rede de carregadores elétricos mais inteligente do Brasil. Carregue onde quiser, quando quiser.</p>
+        <div class="footer-socials">
+          <a class="social-btn" href="#" aria-label="Instagram">📸</a>
+          <a class="social-btn" href="#" aria-label="LinkedIn">💼</a>
+          <a class="social-btn" href="#" aria-label="WhatsApp">💬</a>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Produto</h4>
+        <ul class="footer-links">
+          <li><a href="#como-funciona">Como funciona</a></li>
+          <li><a href="#vantagens">Vantagens</a></li>
+          <li><a href="#rede">Nossa rede</a></li>
+          <li><a href="#planos">Planos</a></li>
+          <li><a href="#app">Baixar app</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Empresa</h4>
+        <ul class="footer-links">
+          <li><a href="#">Sobre a UBY</a></li>
+          <li><a href="#">P3 Energy</a></li>
+          <li><a href="#">Carreiras</a></li>
+          <li><a href="#">Imprensa</a></li>
+          <li><a href="#">Blog</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Contato</h4>
+        <ul class="footer-links">
+          <li><a href="mailto:contato@ubyrecharge.com.br">contato@ubyrecharge.com.br</a></li>
+          <li><a href="#">WhatsApp</a></li>
+          <li><a href="#">Central de ajuda</a></li>
+          <li><a href="#">Instalar em meu local</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p class="footer-copy">© 2025 UBY Recharge — P3 Energy. Todos os direitos reservados.</p>
+      <div class="footer-legal">
+        <a href="#">Privacidade</a>
+        <a href="#">Termos de uso</a>
+        <a href="#">Cookies</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+<!-- ════════════════════════════════════════════════════════
+     JS
+════════════════════════════════════════════════════════ -->
+<script>
+  // Mobile nav
+  const hamburger = document.getElementById('hamburger');
+  const mobileNav = document.getElementById('mobileNav');
+
+  hamburger.addEventListener('click', () => {
+    mobileNav.classList.toggle('open');
+  });
+
+  function closeMobileNav() {
+    mobileNav.classList.remove('open');
+  }
+
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        setTimeout(() => e.target.classList.add('visible'), i * 80);
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1 });
+  reveals.forEach(el => io.observe(el));
+
+  // FAQ toggle
+  function toggleFaq(btn) {
+    const item = btn.parentElement;
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+    if (!isOpen) item.classList.add('open');
+  }
+
+  // Nav scroll effect
+  const nav = document.querySelector('nav');
+  window.addEventListener('scroll', () => {
+    nav.style.background = window.scrollY > 40
+      ? 'rgba(5,13,10,.96)'
+      : 'rgba(5,13,10,.85)';
+  });
+</script>
+
+</body>
+</html>
