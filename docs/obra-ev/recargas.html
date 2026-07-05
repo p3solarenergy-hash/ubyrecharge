@@ -111,7 +111,7 @@
     .pie-card canvas { min-height:260px; max-height:300px; }
     canvas { width:100%; max-height:320px; }
     .coupon-summary { display:grid; gap:8px; margin-top:12px; }
-    .coupon-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(3,auto); gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--p3-border); color:var(--p3-muted); font-size:11px; }
+    .coupon-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(4,auto); gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--p3-border); color:var(--p3-muted); font-size:11px; }
     .coupon-row strong { color:var(--p3-text); font-size:12px; overflow-wrap:anywhere; }
     .coupon-row span { white-space:nowrap; }
     .ai-insights { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:16px; }
@@ -2242,6 +2242,21 @@ function normalizedCouponLabel(rawCoupon = '', charge = {}) {
 
 function couponLabelForCharge(charge = {}) {
   return normalizedCouponLabel(charge.voucher || charge.coupon || charge.couponCode, charge);
+}
+
+function couponDiscountPct(label = '') {
+  const code = normalizeCouponCode(label);
+  if (code.includes('CLUBEUBY') || code === 'UBY10' || code === 'CLUBE10') return 10;
+  if (code.includes('PARCEIROUBY') || code === 'UBY15' || code === 'PARCEIRO15') return 15;
+  if (code === 'UBY8') return 8;
+  if (code === 'UBY5') return 5;
+  return 0;
+}
+
+function estimatedCouponDiscount(charge = {}, label = couponLabelForCharge(charge)) {
+  const pct = couponDiscountPct(label);
+  const revenue = Number(charge.revenue || 0);
+  return pct > 0 && revenue > 0 ? revenue * pct / (100 - pct) : 0;
 }
 
 function normalizeHeaderName(value) {
@@ -4672,7 +4687,7 @@ function usageSeries(charges = []) {
   };
   const byHour = Object.fromEntries(Array.from({ length: 24 }, (_, h) => [String(h), 0]));
   const byCoupon = {};
-  const noCoupon = { coupon: 'Sem cupom', count: 0, energy: 0, revenue: 0 };
+  const noCoupon = { coupon: 'Sem cupom', count: 0, energy: 0, revenue: 0, discount: 0 };
 
   recent.charges.forEach(charge => {
     const label = chargeDayLabel(charge);
@@ -4703,10 +4718,11 @@ function usageSeries(charges = []) {
     const revenue = Number(charge.revenue || 0);
     const coupon = couponLabelForCharge(charge);
     if (coupon) {
-      if (!byCoupon[coupon]) byCoupon[coupon] = { coupon, count: 0, energy: 0, revenue: 0 };
+      if (!byCoupon[coupon]) byCoupon[coupon] = { coupon, count: 0, energy: 0, revenue: 0, discount: 0 };
       byCoupon[coupon].count += 1;
       byCoupon[coupon].energy += energy;
       byCoupon[coupon].revenue += revenue;
+      byCoupon[coupon].discount += estimatedCouponDiscount(charge, coupon);
     } else {
       noCoupon.count += 1;
       noCoupon.energy += energy;
@@ -4746,10 +4762,13 @@ function renderCouponSummary(id, details = []) {
   el.innerHTML = details.slice(0, 6).map(item => {
     const avgTicket = item.count ? item.revenue / item.count : 0;
     const share = totalCount ? item.count / totalCount * 100 : 0;
+    const discount = Number(item.discount || 0);
+    const discountText = discount > 0 ? `desc. ${fmtBRL(discount)}` : 'sem desconto';
     return `<div class="coupon-row">
       <strong>${escapeHtml(item.coupon)}</strong>
       <span>${item.count} uso(s) Â· ${fmtPct(share)}</span>
       <span>${fmtKWh(item.energy)}</span>
+      <span>${discountText}</span>
       <span>${fmtBRL(item.revenue)} · ticket ${fmtBRL(avgTicket)}</span>
     </div>`;
   }).join('');
