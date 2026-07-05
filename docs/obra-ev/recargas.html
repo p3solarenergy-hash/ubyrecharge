@@ -2222,8 +2222,9 @@ function normalizedCouponLabel(rawCoupon = '', charge = {}) {
   const raw = safeText(rawCoupon).trim();
   if (!raw || raw === '---' || /^-+$/.test(raw)) return '';
   const code = normalizeCouponCode(raw);
-  if (code.includes('CLUBEUBY') || code === 'UBY10' || code === 'CLUBE10') return 'CLUBEUBY 10%';
-  if (code.includes('PARCEIROUBY') || code === 'UBY15' || code === 'PARCEIRO15') return 'PARCEIROUBY 15%';
+  if (code === 'UBY10' || code === 'UBY15' || code === 'UBY8' || code === 'UBY5') return code;
+  if (code.includes('CLUBEUBY') || code === 'CLUBE10') return 'CLUBEUBY 10%';
+  if (code.includes('PARCEIROUBY') || code === 'PARCEIRO15') return 'PARCEIROUBY 15%';
   if (code === '10' || code === '10PERCENT' || code === '10PORCENTO') return 'CLUBEUBY 10%';
   if (code === '15' || code === '15PERCENT' || code === '15PORCENTO') return 'PARCEIROUBY 15%';
 
