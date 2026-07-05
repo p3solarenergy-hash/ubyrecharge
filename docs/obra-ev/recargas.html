@@ -1924,6 +1924,9 @@ function stationMismatchMessage() {
 function applyStationReportFilter() {
   if (!currentStationReportName) return;
   const stationName = currentStationReportName;
+  const originalCharges = [...allCharges];
+  const originalFiles = [...loadedFiles];
+  const originalClosings = { ...(monthlyClosings || {}) };
   allCharges = allCharges.filter(charge =>
     sameStationName(charge.station, stationName) ||
     sameStationName(canonicalStationNameForWork(currentWorkId, charge.station, currentWorkName), stationName)
@@ -1940,6 +1943,13 @@ function applyStationReportFilter() {
       sameStationName(canonicalStationNameForWork(currentWorkId, station, currentWorkName), stationName)
     );
   }));
+  if (!allCharges.length && originalCharges.length) {
+    allCharges = originalCharges;
+    loadedFiles = originalFiles;
+    monthlyClosings = originalClosings;
+    currentStationReportName = '';
+    setStorageState(`Filtro de estacao ignorado para preservar a base completa de <strong>${currentWorkName}</strong>.`, true);
+  }
 }
 
 function applyRechargeRecord(record, sourceLabel) {
@@ -2040,10 +2050,16 @@ function initWorkSelector() {
   });
 }
 
+function shouldOpenFullRechargeWork(workId, stationName = '') {
+  const workName = workNameById(workId);
+  const text = normalizeStationForCompare(`${workId || ''} ${stationName || ''} ${workName || ''}`);
+  return String(workId) === 'malassise' || text.includes('robert koch') || text.includes('malassise');
+}
+
 async function openWorkReport(workId, target = 'mensal', stationName = '') {
   const selector = document.getElementById('workSelector');
   currentWorkId = String(workId || currentWorkId);
-  currentStationReportName = safeText(stationName).trim();
+  currentStationReportName = shouldOpenFullRechargeWork(currentWorkId, stationName) ? '' : safeText(stationName).trim();
   localStorage.setItem('uby-recargas-current-work', currentWorkId);
   if (selector) selector.value = currentWorkId;
   currentWorkName = currentWork().nome || currentWorkId;
