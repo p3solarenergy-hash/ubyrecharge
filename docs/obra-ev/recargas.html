@@ -993,7 +993,7 @@
         <h2>Mensal e acumulado</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Mês</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket médio</th><th>Ocup. intervalo</th><th>Ocup. mês cheio</th></tr></thead>
+            <thead><tr><th>Mês</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket médio</th><th>Ocup. até dia</th><th>Ocup. mês cheio</th></tr></thead>
             <tbody id="monthlyTable"></tbody>
           </table>
         </div>
@@ -1091,7 +1091,7 @@
         <h2>Histórico mensal completo</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Mês</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket médio</th><th>Ocup. intervalo</th><th>Ocup. mês cheio</th></tr></thead>
+            <thead><tr><th>Mês</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket médio</th><th>Ocup. até dia</th><th>Ocup. mês cheio</th></tr></thead>
             <tbody id="accMonthTable"></tbody>
           </table>
         </div>
@@ -2203,6 +2203,46 @@ function parseNumber(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizeCouponCode(value = '') {
+  return safeText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\([^)]*\)/g, '')
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+function couponLabelFromDiscountPct(pct = 0) {
+  if (Math.abs(pct - 10) <= 1.2) return 'CLUBEUBY 10%';
+  if (Math.abs(pct - 15) <= 1.2) return 'PARCEIROUBY 15%';
+  return '';
+}
+
+function normalizedCouponLabel(rawCoupon = '', charge = {}) {
+  const raw = safeText(rawCoupon).trim();
+  if (!raw || raw === '---' || /^-+$/.test(raw)) return '';
+  const code = normalizeCouponCode(raw);
+  if (code.includes('CLUBEUBY') || code === 'UBY10' || code === 'CLUBE10') return 'CLUBEUBY 10%';
+  if (code.includes('PARCEIROUBY') || code === 'UBY15' || code === 'PARCEIRO15') return 'PARCEIROUBY 15%';
+  if (code === '10' || code === '10PERCENT' || code === '10PORCENTO') return 'CLUBEUBY 10%';
+  if (code === '15' || code === '15PERCENT' || code === '15PORCENTO') return 'PARCEIROUBY 15%';
+
+  const numeric = parseNumber(raw);
+  const revenue = Number(charge.revenue || 0);
+  if (numeric > 0 && revenue > 0) {
+    const discountPct = numeric / (revenue + numeric) * 100;
+    const inferred = couponLabelFromDiscountPct(discountPct);
+    if (inferred) return inferred;
+    return `Cupom fora da regra (${fmtPct(discountPct)})`;
+  }
+  if (code) return 'Cupom fora da regra';
+  return '';
+}
+
+function couponLabelForCharge(charge = {}) {
+  return normalizedCouponLabel(charge.voucher || charge.coupon || charge.couponCode, charge);
+}
+
 function normalizeHeaderName(value) {
   return safeText(value)
     .normalize('NFD')
@@ -2480,7 +2520,7 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
       paymentStatus: rowCellText(row, cols.status),
       idleTime:      '',
       idleValue:     0,
-      voucher:       rowCellText(row, cols.voucher),
+      voucher:       normalizedCouponLabel(rowCellText(row, cols.voucher), { revenue }),
       rating:        '',
       reviewComment: '',
       vehicleBrand:  vehicleParts[0] || '',
@@ -2525,7 +2565,7 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
       paymentStatus: /andamento/i.test(paymentType) ? 'Carga em andamento' : (paymentType ? 'Pago' : ''),
       idleTime:      '',
       idleValue:     parseNumber(readCell(row, cols.idleValue)),
-      voucher:       couponLabelFromGoGrid(row, cols),
+      voucher:       normalizedCouponLabel(couponLabelFromGoGrid(row, cols), { revenue }),
       rating:        '',
       reviewComment: '',
       socInitial:    rowCellText(row, cols.socInitial),
@@ -2561,7 +2601,7 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
     paymentStatus: String(row[21] || '').trim(),
     idleTime:      String(row[24] || ''),
     idleValue:     parseNumber(row[25]),
-    voucher:       String(readCell(row, cols.voucher) || '').trim(),
+    voucher:       normalizedCouponLabel(readCell(row, cols.voucher), { revenue: parseNumber(row[18]) }),
     rating:        String(readCell(row, cols.rating) || '').trim(),
     reviewComment: String(readCell(row, cols.reviewComment) || '').trim(),
     vehicleBrand:  String(readCell(row, cols.vehicleBrand) || '').trim(),
@@ -2786,8 +2826,8 @@ function buildMonthClosing(mk) {
   const files = [...new Set(charges.map(c => c._file).filter(Boolean))];
   const stations = [...new Set(charges.map(c => c.station).filter(Boolean))];
   const power = getPower();
-  const closedWindow = periodWindow(charges, mk, 'closed');
-  const occInterval = occByInterval(charges, power, closedWindow);
+  const monthToDateWindow = periodWindow(charges, mk, 'mtd');
+  const occInterval = occByInterval(charges, power, monthToDateWindow);
   const occFull = occByFullMonth(charges, mk);
   return {
     month: mk,
@@ -2805,6 +2845,7 @@ function buildMonthClosing(mk) {
     power,
     firstDate: dates[0] ? dates[0].toISOString() : '',
     lastDate: dates[dates.length - 1] ? dates[dates.length - 1].toISOString() : '',
+    intervalHours: monthToDateWindow.hours,
     stations,
     files
   };
@@ -2813,18 +2854,42 @@ function buildMonthClosing(mk) {
 function monthSummaryFromClosing(closing) {
   if (!closing) return null;
   if (!closingMatchesMonth(closing, closing.month)) return null;
+  const occupancy = occupancyFromClosing(closing);
   return {
     label: monthLabel(closing.month),
     mk: closing.month,
     rev: Number(closing.revenue) || 0,
     energy: Number(closing.energyKWh) || 0,
-    occI: Number(closing.occupancyIntervalPct) || 0,
-    occF: Number(closing.occupancyFullMonthPct) || 0,
+    occI: occupancy.intervalPct,
+    occF: occupancy.fullMonthPct,
     count: Number(closing.charges) || 0,
     clients: Number(closing.clients) || 0,
     avgTkt: Number(closing.averageTicket) || 0,
     source: closing.source || 'latest_upload',
     fromClosing: true
+  };
+}
+
+function occupancyFromClosing(closing = {}) {
+  const energy = Number(closing.energyKWh || 0);
+  const power = Number(closing.power || getPower());
+  const mk = closing.month || '';
+  const last = parseDate(closing.lastDate);
+  if (!energy || !power || !mk) {
+    return {
+      intervalPct: Number(closing.occupancyIntervalPct) || 0,
+      fullMonthPct: Number(closing.occupancyFullMonthPct) || 0
+    };
+  }
+  const monthStart = monthStartDate(mk);
+  const monthEnd = monthEndDate(mk);
+  const end = last && last < monthEnd ? last : monthEnd;
+  const intervalHours = Math.max((end - monthStart) / 3_600_000, 0);
+  const [y, m] = mk.split('-');
+  const fullMonthHours = daysInMonth(y, m) * 24;
+  return {
+    intervalPct: intervalHours > 0 ? energy / (power * intervalHours) * 100 : 0,
+    fullMonthPct: fullMonthHours > 0 ? energy / (power * fullMonthHours) * 100 : 0
   };
 }
 
@@ -2847,7 +2912,7 @@ function monthSummaryForMonth(mk, power = getPower()) {
   if (ch.length) {
     const revM = ch.reduce((s,c) => s+c.revenue, 0);
     const enerM = ch.reduce((s,c) => s+c.energyKWh, 0);
-    const occI = occByInterval(ch, power, periodWindow(ch, mk, 'closed'));
+    const occI = occByInterval(ch, power, periodWindow(ch, mk, 'mtd'));
     const occF = occByFullMonth(ch, mk);
     const cln = new Set(ch.map(c => c.userEmail||c.userName)).size;
     return { label: monthLabel(mk), mk, rev: revM, energy: enerM, occI: occI.pct, occF: occF.pct, count: ch.length, clients: cln, avgTkt: ch.length ? revM/ch.length : 0, fromClosing: false };
@@ -4635,7 +4700,7 @@ function usageSeries(charges = []) {
   charges.forEach(charge => {
     const energy = Number(charge.energyKWh || 0);
     const revenue = Number(charge.revenue || 0);
-    const coupon = safeText(charge.voucher || charge.coupon || charge.couponCode).trim();
+    const coupon = couponLabelForCharge(charge);
     if (coupon) {
       if (!byCoupon[coupon]) byCoupon[coupon] = { coupon, count: 0, energy: 0, revenue: 0 };
       byCoupon[coupon].count += 1;
@@ -6225,7 +6290,7 @@ function buildReviewAiInsights(charges, reviewData = {}) {
   const window = mk && mk !== 'unknown' ? periodWindow(charges, mk, 'mtd') : periodBounds(charges);
   const occ = occByInterval(charges, undefined, window);
   const idleCount = charges.filter(charge => idleToMin(charge.idleTime) >= 10).length;
-  const couponCharges = charges.filter(charge => safeText(charge.voucher).trim());
+  const couponCharges = charges.filter(charge => couponLabelForCharge(charge));
   const couponRevenue = couponCharges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
   const paymentIssues = charges.filter(charge => {
     const status = normalizeTextForInsight(charge.paymentStatus);
