@@ -190,6 +190,15 @@
     .club-status-pill.good { background:rgba(56,201,111,.14); color:#BFEBD6; border-color:rgba(56,201,111,.32); }
     .club-status-pill.warn { background:rgba(242,169,61,.16); color:#FFD66B; border-color:rgba(242,169,61,.32); }
     .club-status-pill.muted { background:rgba(143,163,154,.10); color:var(--p3-muted); border-color:rgba(143,163,154,.18); }
+    .partner-form-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
+    .partner-field { display:grid; gap:6px; }
+    .partner-field label { color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; }
+    .partner-field textarea { min-height:74px; resize:vertical; }
+    .partner-field.wide { grid-column:span 2; }
+    .partner-field.full { grid-column:1/-1; }
+    .partner-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+    .partner-table-actions { display:flex; gap:6px; flex-wrap:wrap; }
+    .partner-table-actions button { min-height:30px; padding:6px 10px; }
     .kpi-feature { grid-column:span 2; border-left:5px solid var(--p3-primary); background:linear-gradient(135deg,#102945,#0B1524); }
     .kpi-feature .value { font-size:clamp(34px,4vw,48px); }
     .kpi-feature.occ-red { border-left-color:#E64B4B; background:linear-gradient(135deg,rgba(230,75,75,.22),#0B1524); }
@@ -463,6 +472,9 @@
       .podium-medal { font-size:32px; margin:4px 0 8px; }
       .podium-name { min-height:0; font-size:16px; }
       .podium-points { font-size:24px; }
+      .partner-form-grid { grid-template-columns:1fr 1fr; }
+      .partner-field.wide, .partner-field.full { grid-column:1/-1; }
+      .partner-table-actions { flex-direction:column; }
 
       .calendar-grid { grid-template-columns:1fr; gap:8px; }
       .calendar-head { display:none; }
@@ -741,6 +753,85 @@
       <div class="card">
         <h2>Top 3 do clube</h2>
         <div class="action-list" id="clubTop3"></div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="club-form-head">
+          <div>
+            <h2>Parceiros comerciais</h2>
+            <div class="club-form-status">Controle dos parceiros do Clube UBY, beneficios combinados, regras basicas e acompanhamento de usos.</div>
+          </div>
+          <button class="btn-recalc" onclick="resetClubPartnerForm()">Nova parceria</button>
+        </div>
+        <section class="kpis" id="clubPartnerKpis" style="margin-top:0"></section>
+        <div class="partner-form-grid">
+          <input type="hidden" id="partnerId">
+          <div class="partner-field">
+            <label>Parceiro</label>
+            <input class="ctl-input" id="partnerName" style="width:100%" placeholder="Muffatao Autocenter">
+          </div>
+          <div class="partner-field">
+            <label>Categoria</label>
+            <input class="ctl-input" id="partnerCategory" style="width:100%" placeholder="Auto center">
+          </div>
+          <div class="partner-field">
+            <label>Status</label>
+            <select class="ctl-select" id="partnerStatus">
+              <option value="active">Ativo</option>
+              <option value="prospect">Em negociacao</option>
+              <option value="paused">Pausado</option>
+            </select>
+          </div>
+          <div class="partner-field">
+            <label>Usos registrados</label>
+            <input class="ctl-input" id="partnerUsageCount" type="number" min="0" step="1" value="0" style="width:100%">
+          </div>
+          <div class="partner-field wide">
+            <label>Beneficio</label>
+            <textarea class="ctl-input" id="partnerBenefit" style="width:100%" placeholder="10% de desconto em todos os servicos"></textarea>
+          </div>
+          <div class="partner-field wide">
+            <label>Regra basica</label>
+            <textarea class="ctl-input" id="partnerRule" style="width:100%" placeholder="Valido para participantes do Clube UBY mediante comprovacao"></textarea>
+          </div>
+          <div class="partner-field">
+            <label>Cupom / codigo</label>
+            <input class="ctl-input" id="partnerCoupon" style="width:100%" placeholder="CLUBEUBY">
+          </div>
+          <div class="partner-field">
+            <label>Contato</label>
+            <input class="ctl-input" id="partnerContact" style="width:100%" placeholder="Nome / WhatsApp">
+          </div>
+          <div class="partner-field">
+            <label>Validade</label>
+            <input class="ctl-input" id="partnerValidity" style="width:100%" placeholder="Sem prazo">
+          </div>
+          <div class="partner-field">
+            <label>Prioridade</label>
+            <select class="ctl-select" id="partnerPriority">
+              <option value="high">Alta</option>
+              <option value="medium">Media</option>
+              <option value="low">Baixa</option>
+            </select>
+          </div>
+          <div class="partner-field full">
+            <label>Observacoes de controle</label>
+            <textarea class="ctl-input" id="partnerNotes" style="width:100%" placeholder="Pendencias, combinados, materiais de divulgacao, data de revisao"></textarea>
+          </div>
+        </div>
+        <div class="partner-actions">
+          <button class="btn-recalc" onclick="saveClubPartner()">Salvar parceria</button>
+          <button class="btn-danger" onclick="resetClubPartnerForm()">Limpar campos</button>
+          <span class="club-form-status" id="clubPartnerStatus">Alteracoes ficam salvas automaticamente neste navegador.</span>
+        </div>
+        <div style="overflow-x:auto;margin-top:16px">
+          <table>
+            <thead><tr><th>Parceiro</th><th>Status</th><th>Beneficio</th><th>Regra</th><th>Cupom</th><th>Usos</th><th>Contato</th><th>Validade</th><th>Acoes</th></tr></thead>
+            <tbody id="clubPartnerTable"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -1253,6 +1344,7 @@ const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
 const RECARGAS_IMPORT_UNDO_KEY = 'uby-recargas-import-undo-v1';
 const XLSX_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
+const CLUB_PARTNERS_LOCAL_KEY = 'uby-club-partners-v1';
 const CLUB_FORM_ID = '1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM';
 const CLUB_FORM_RESPONSES_URL = `https://docs.google.com/forms/d/${CLUB_FORM_ID}/edit#responses`;
 const CLUB_FORM_SHEET_ID = '19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws';
@@ -5359,6 +5451,217 @@ function ensureClubParticipantsAutoSync(force = false) {
   syncClubParticipantsFromSheet({ silent: true }).catch(() => {});
 }
 
+function defaultClubPartners() {
+  return [
+    {
+      id: 'partner-muffatao',
+      name: 'Muffatao Autocenter',
+      category: 'Auto center',
+      status: 'active',
+      benefit: '10% de desconto em todos os servicos da rede Muffatao Autocenter.',
+      rule: 'Valido para participantes do Clube UBY mediante comprovacao no atendimento.',
+      coupon: 'CLUBEUBY',
+      contact: '',
+      validity: 'Sem prazo',
+      priority: 'high',
+      usageCount: 0,
+      notes: 'Beneficio geral para todos os participantes do Clube UBY.',
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'partner-bancouros',
+      name: 'Bancouros',
+      category: 'Parceiro comercial',
+      status: 'prospect',
+      benefit: 'Beneficio a definir.',
+      rule: 'Definir regra comercial, publico elegivel e forma de comprovacao.',
+      coupon: '',
+      contact: '',
+      validity: 'A definir',
+      priority: 'medium',
+      usageCount: 0,
+      notes: '',
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'partner-lava-cars',
+      name: 'Lava Cars',
+      category: 'Lavagem / estetica',
+      status: 'prospect',
+      benefit: 'Beneficio a definir para lavagem, higienizacao ou estetica automotiva.',
+      rule: 'Definir regra comercial, unidades participantes e comprovacao.',
+      coupon: '',
+      contact: '',
+      validity: 'A definir',
+      priority: 'medium',
+      usageCount: 0,
+      notes: '',
+      updatedAt: new Date().toISOString()
+    }
+  ];
+}
+
+function clubPartnersStore() {
+  const stored = readJson(CLUB_PARTNERS_LOCAL_KEY, null);
+  if (Array.isArray(stored) && stored.length) return stored;
+  const defaults = defaultClubPartners();
+  writeJson(CLUB_PARTNERS_LOCAL_KEY, defaults);
+  return defaults;
+}
+
+function writeClubPartnersStore(partners = []) {
+  const clean = partners
+    .filter(partner => partner && safeText(partner.name).trim())
+    .map(partner => ({
+      id: partner.id || `partner-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: safeText(partner.name).trim(),
+      category: safeText(partner.category).trim(),
+      status: partner.status || 'prospect',
+      benefit: safeText(partner.benefit).trim(),
+      rule: safeText(partner.rule).trim(),
+      coupon: safeText(partner.coupon).trim(),
+      contact: safeText(partner.contact).trim(),
+      validity: safeText(partner.validity).trim(),
+      priority: partner.priority || 'medium',
+      usageCount: Math.max(0, Math.round(Number(partner.usageCount || 0))),
+      notes: safeText(partner.notes).trim(),
+      updatedAt: partner.updatedAt || new Date().toISOString()
+    }))
+    .sort((a, b) => partnerStatusOrder(a.status) - partnerStatusOrder(b.status) || partnerPriorityOrder(a.priority) - partnerPriorityOrder(b.priority) || a.name.localeCompare(b.name, 'pt-BR'));
+  writeJson(CLUB_PARTNERS_LOCAL_KEY, clean);
+  return clean;
+}
+
+function partnerStatusOrder(status = '') {
+  return { active: 0, prospect: 1, paused: 2 }[status] ?? 3;
+}
+
+function partnerPriorityOrder(priority = '') {
+  return { high: 0, medium: 1, low: 2 }[priority] ?? 3;
+}
+
+function partnerStatusInfo(status = '') {
+  if (status === 'active') return { label: 'Ativo', cls: 'good' };
+  if (status === 'paused') return { label: 'Pausado', cls: 'muted' };
+  return { label: 'Em negociacao', cls: 'warn' };
+}
+
+function resetClubPartnerForm() {
+  ['partnerId','partnerName','partnerCategory','partnerBenefit','partnerRule','partnerCoupon','partnerContact','partnerValidity','partnerNotes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const status = document.getElementById('partnerStatus');
+  if (status) status.value = 'active';
+  const priority = document.getElementById('partnerPriority');
+  if (priority) priority.value = 'medium';
+  const usage = document.getElementById('partnerUsageCount');
+  if (usage) usage.value = 0;
+  const info = document.getElementById('clubPartnerStatus');
+  if (info) info.textContent = 'Nova parceria pronta para cadastro.';
+}
+
+function partnerFromInputs() {
+  return {
+    id: document.getElementById('partnerId')?.value || '',
+    name: document.getElementById('partnerName')?.value || '',
+    category: document.getElementById('partnerCategory')?.value || '',
+    status: document.getElementById('partnerStatus')?.value || 'prospect',
+    benefit: document.getElementById('partnerBenefit')?.value || '',
+    rule: document.getElementById('partnerRule')?.value || '',
+    coupon: document.getElementById('partnerCoupon')?.value || '',
+    contact: document.getElementById('partnerContact')?.value || '',
+    validity: document.getElementById('partnerValidity')?.value || '',
+    priority: document.getElementById('partnerPriority')?.value || 'medium',
+    usageCount: Number(document.getElementById('partnerUsageCount')?.value || 0),
+    notes: document.getElementById('partnerNotes')?.value || '',
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function saveClubPartner() {
+  const partner = partnerFromInputs();
+  const status = document.getElementById('clubPartnerStatus');
+  if (!safeText(partner.name).trim()) {
+    if (status) status.textContent = 'Informe o nome do parceiro antes de salvar.';
+    return;
+  }
+  const partners = clubPartnersStore();
+  const id = partner.id || `partner-${Date.now()}`;
+  const next = partners.filter(item => item.id !== id);
+  next.push({ ...partner, id });
+  writeClubPartnersStore(next);
+  if (status) status.textContent = `Parceria ${partner.name} salva.`;
+  resetClubPartnerForm();
+  renderClubPartners();
+}
+
+function editClubPartner(id) {
+  const partner = clubPartnersStore().find(item => item.id === id);
+  if (!partner) return;
+  const set = (field, value) => {
+    const el = document.getElementById(field);
+    if (el) el.value = value || '';
+  };
+  set('partnerId', partner.id);
+  set('partnerName', partner.name);
+  set('partnerCategory', partner.category);
+  set('partnerBenefit', partner.benefit);
+  set('partnerRule', partner.rule);
+  set('partnerCoupon', partner.coupon);
+  set('partnerContact', partner.contact);
+  set('partnerValidity', partner.validity);
+  set('partnerNotes', partner.notes);
+  set('partnerUsageCount', partner.usageCount || 0);
+  set('partnerStatus', partner.status || 'prospect');
+  set('partnerPriority', partner.priority || 'medium');
+  const status = document.getElementById('clubPartnerStatus');
+  if (status) status.textContent = `Editando ${partner.name}.`;
+}
+
+function deleteClubPartner(id) {
+  const partner = clubPartnersStore().find(item => item.id === id);
+  if (!partner) return;
+  if (!confirm(`Excluir parceria ${partner.name}?`)) return;
+  writeClubPartnersStore(clubPartnersStore().filter(item => item.id !== id));
+  const status = document.getElementById('clubPartnerStatus');
+  if (status) status.textContent = `Parceria ${partner.name} excluida.`;
+  renderClubPartners();
+}
+
+function renderClubPartners() {
+  const partners = clubPartnersStore();
+  const active = partners.filter(item => item.status === 'active').length;
+  const prospects = partners.filter(item => item.status === 'prospect').length;
+  const uses = partners.reduce((sum, item) => sum + Number(item.usageCount || 0), 0);
+  const high = partners.filter(item => item.priority === 'high').length;
+  const kpis = document.getElementById('clubPartnerKpis');
+  if (kpis) {
+    kpis.innerHTML = `
+      <div class="card"><div class="label">Parceiros</div><div class="value">${partners.length}</div><div class="sub">base de parcerias do clube</div></div>
+      <div class="card"><div class="label">Ativos</div><div class="value">${active}</div><div class="sub">${prospects} em negociacao</div></div>
+      <div class="card"><div class="label">Usos registrados</div><div class="value">${uses}</div><div class="sub">controle manual de beneficios</div></div>
+      <div class="card"><div class="label">Prioridade alta</div><div class="value">${high}</div><div class="sub">parcerias para acompanhar de perto</div></div>
+    `;
+  }
+  const table = document.getElementById('clubPartnerTable');
+  if (!table) return;
+  table.innerHTML = partners.length ? partners.map(partner => {
+    const status = partnerStatusInfo(partner.status);
+    return `<tr>
+      <td><strong>${escapeHtml(partner.name)}</strong><br><span style="color:var(--p3-muted);font-size:11px">${escapeHtml(partner.category || '-')}</span></td>
+      <td><span class="club-status-pill ${status.cls}">${status.label}</span></td>
+      <td>${escapeHtml(partner.benefit || '-')}</td>
+      <td>${escapeHtml(partner.rule || '-')}</td>
+      <td>${escapeHtml(partner.coupon || '-')}</td>
+      <td>${Number(partner.usageCount || 0)}</td>
+      <td>${escapeHtml(partner.contact || '-')}</td>
+      <td>${escapeHtml(partner.validity || '-')}</td>
+      <td><div class="partner-table-actions"><button class="btn-recalc" onclick="editClubPartner('${escapeAttr(partner.id)}')">Editar</button><button class="btn-danger" onclick="deleteClubPartner('${escapeAttr(partner.id)}')">Excluir</button></div></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:20px">Nenhuma parceria cadastrada.</td></tr>';
+}
+
 async function handleClubParticipantFiles(files = []) {
   if (!files.length) return;
   const imported = [];
@@ -5452,6 +5755,7 @@ function renderClub() {
     <div class="action-row"><div><strong>Top 3</strong><span>30% de desconto em alinhamento e balanceamento.</span></div><b class="good">Ativo</b></div>
     <div class="action-row"><div><strong>Todos os participantes</strong><span>10% de desconto em todos os serviços da rede Muffatão Autocenter.</span></div><b class="good">Ativo</b></div>
   `;
+  renderClubPartners();
 
   const statusEl = document.getElementById('clubParticipantsStatus');
   const sourceEl = document.getElementById('clubParticipantsSource');
