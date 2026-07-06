@@ -6314,12 +6314,18 @@ function renderUbyOperation() {
   const sourceMonths = [...new Set(sourceUbyCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const currentGeneralMonth = sourceMonths[sourceMonths.length - 1] || '';
   const generalViewMode = document.getElementById('generalViewMode')?.value || 'month';
-  const isMonthView = generalViewMode !== 'accumulated' && !!currentGeneralMonth;
-  const visibleRows = sourceRows.map(row => summarizeUbyChargerRow(
+  let isMonthView = generalViewMode !== 'accumulated' && !!currentGeneralMonth;
+  let visibleRows = sourceRows.map(row => summarizeUbyChargerRow(
     row,
     isMonthView ? row.charges.filter(charge => chargeMonthKey(charge) === currentGeneralMonth) : row.charges
   ));
-  const included = visibleRows.filter(row => row.included && row.count > 0);
+  let included = visibleRows.filter(row => row.included && row.count > 0);
+  const monthFallbackToAccumulated = isMonthView && !included.length && sourceUbyCharges.length;
+  if (monthFallbackToAccumulated) {
+    isMonthView = false;
+    visibleRows = sourceRows.map(row => summarizeUbyChargerRow(row, row.charges));
+    included = visibleRows.filter(row => row.included && row.count > 0);
+  }
   included.sort((a, b) => b.revenue - a.revenue);
   const allUbyCharges = included.flatMap(row => row.charges);
   const revenue = included.reduce((sum, row) => sum + row.revenue, 0);
@@ -6352,7 +6358,9 @@ function renderUbyOperation() {
   const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
   const firstPeriod = windows.length ? new Date(Math.min(...windows.map(window => window.start).filter(Boolean))) : firstDate;
   const lastPeriod = windows.length ? new Date(Math.max(...windows.map(window => window.end).filter(Boolean))) : lastDate;
-  const viewLabel = isMonthView ? `Mes atual (${monthLabel(currentGeneralMonth)})` : 'Acumulado UBY';
+  const viewLabel = monthFallbackToAccumulated
+    ? `Acumulado UBY (sem recargas em ${monthLabel(currentGeneralMonth)})`
+    : (isMonthView ? `Mes atual (${monthLabel(currentGeneralMonth)})` : 'Acumulado UBY');
   const occClass = totalOcc < 15 ? 'occ-red' : (totalOcc < 30 ? 'occ-yellow' : 'occ-green');
   const occStatus = totalOcc < 15 ? 'abaixo do objetivo minimo de 15%' : (totalOcc < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
 
@@ -6517,8 +6525,13 @@ function renderGeral() {
   const sourceMonths = [...new Set(sourceCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const currentGeneralMonth = sourceMonths[sourceMonths.length - 1] || '';
   const generalViewMode = document.getElementById('generalViewMode')?.value || 'month';
-  const isGeneralMonthView = generalViewMode !== 'accumulated' && !!currentGeneralMonth;
-  const unitData = isGeneralMonthView ? filterGeneralUnitDataByMonth(sourceUnitData, currentGeneralMonth) : sourceUnitData;
+  let isGeneralMonthView = generalViewMode !== 'accumulated' && !!currentGeneralMonth;
+  let unitData = isGeneralMonthView ? filterGeneralUnitDataByMonth(sourceUnitData, currentGeneralMonth) : sourceUnitData;
+  const generalMonthFallbackToAccumulated = isGeneralMonthView && !getAllGeneralCharges(unitData).length && sourceCharges.length;
+  if (generalMonthFallbackToAccumulated) {
+    isGeneralMonthView = false;
+    unitData = sourceUnitData;
+  }
   const stationRows = getGeneralStationRows(unitData);
   const rankingUnitData = currentGeneralMonth ? filterGeneralUnitDataByMonth(sourceUnitData, currentGeneralMonth, true) : sourceUnitData;
   const rankingStationRows = getGeneralStationRows(rankingUnitData);
@@ -6553,7 +6566,9 @@ function renderGeral() {
   const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
   const firstPeriod = generalWindows.length ? new Date(Math.min(...generalWindows.map(window => window.start).filter(Boolean))) : firstDate;
   const lastPeriod = generalWindows.length ? new Date(Math.max(...generalWindows.map(window => window.end).filter(Boolean))) : lastDate;
-  const viewLabel = isGeneralMonthView ? `Mês atual (${monthLabel(currentGeneralMonth)})` : 'Acumulado';
+  const viewLabel = generalMonthFallbackToAccumulated
+    ? `Acumulado (sem recargas em ${monthLabel(currentGeneralMonth)})`
+    : (isGeneralMonthView ? `Mês atual (${monthLabel(currentGeneralMonth)})` : 'Acumulado');
   const viewDetail = isGeneralMonthView ? 'ocupação calculada somente sobre o mês atual' : 'histórico completo das bases salvas';
 
   document.getElementById('generalHeroMeta').innerHTML = totalCharges
