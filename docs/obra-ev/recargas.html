@@ -1939,6 +1939,21 @@ function sameStationName(a, b) {
   return !!left && !!right && left === right;
 }
 
+function isRobertKochWorkId(workId) {
+  return String(workId || '').trim().toLowerCase() === 'malassise';
+}
+
+function isRobertKochCandidateText(value = '') {
+  const text = normalizeStationForCompare(value);
+  return text.includes('robert koch') ||
+    text.includes('robert kock') ||
+    text.includes('posto robert') ||
+    text.includes('malassise r k') ||
+    text.includes('malassise rk') ||
+    text.includes('liv 000199') ||
+    text.includes('liv000199');
+}
+
 function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
   const raw = safeText(stationName || fallbackName).trim();
   const normalized = normalizeStationForCompare(raw);
@@ -1947,7 +1962,7 @@ function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
   if (String(workId) === 'rio' || normalizeStationForCompare(workName).includes('rio beach') || normalized.includes('rio beach')) {
     return 'Rio Beach EV';
   }
-  if (normalized.includes('robert koch')) {
+  if (isRobertKochWorkId(workId) || isRobertKochCandidateText(`${raw} ${workName}`)) {
     return 'UBY RECHARGE - POSTO ROBERT KOCH';
   }
   if (normalized.includes('sabara')) {
@@ -1967,7 +1982,7 @@ function stationLooksRelatedToWork(station, workName) {
   const stationText = normalizeStationForCompare(station);
   const workText = normalizeStationForCompare(workName);
   if (!stationText || !workText) return true;
-  if (stationText.includes('robert koch') && (workText.includes('robert koch') || workText.includes('malassise') || workText.includes('r k'))) return true;
+  if (isRobertKochCandidateText(`${stationText} ${workText}`) && (workText.includes('malassise') || isRobertKochCandidateText(workText))) return true;
   if (stationText.includes('santarem') && workText.includes('santarem')) return true;
   if (stationText.includes('jardins') && (workText.includes('centro') || workText.includes('santarem'))) return true;
   if (stationText.includes('centro') && (workText.includes('jardins') || workText.includes('santarem'))) return true;
@@ -5270,14 +5285,14 @@ function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = ch
 }
 
 function chargerKind(charge = {}) {
-  const raw = `${charge.connType || ''} ${charge.station || ''}`.toUpperCase();
+  const raw = `${charge.connType || ''} ${charge.station || ''} ${charge.charger || ''} ${charge.workName || ''}`.toUpperCase();
   const normalized = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const powerMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*KW/);
   const power = powerMatch ? Number(powerMatch[1].replace(',', '.')) : NaN;
   if (/\bDC\b|\bCCS\b|CHADEMO|FAST|RAPID|RAPID[OA]/.test(normalized)) return 'dc';
   if (/\bAC\b|TYPE\s*2|TIPO\s*2/.test(normalized)) return 'ac';
   const station = normalizeStationForCompare(canonicalStationNameForWork(charge.workId, charge.station, charge.workName));
-  if (station.includes('robert koch')) return 'dc';
+  if (station.includes('robert koch') || isRobertKochWorkId(charge.workId) || isRobertKochCandidateText(raw)) return 'dc';
   if (station.includes('rio beach') || station.includes('santarem')) return 'ac';
   if (Number.isFinite(power)) return power > 30 ? 'dc' : 'ac';
   return 'unknown';
@@ -5297,6 +5312,12 @@ function isUbyOperationCharge(charge = {}, overrides = ubyOperationOverrides) {
   const key = ubyOperationKey(charge);
   if (Object.prototype.hasOwnProperty.call(overrides || {}, key)) return !!overrides[key];
   return chargerKind(charge) === 'dc';
+}
+
+function isUbyOperationGroup(group = {}, overrides = ubyOperationOverrides) {
+  if (Object.prototype.hasOwnProperty.call(overrides || {}, group.key)) return !!overrides[group.key];
+  if (group.kind === 'dc') return true;
+  return (group.charges || []).some(charge => isUbyOperationCharge(charge, overrides));
 }
 
 function generalAcDcStats(charges = []) {
@@ -5540,21 +5561,22 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
       group.energy += Number(charge.energyKWh || 0);
       group.revenue += Number(charge.revenue || 0);
       if (charge.connType) group.connTypes.add(charge.connType);
-      if (group.kind === 'unknown' && chargerKind(charge) !== 'unknown') group.kind = chargerKind(charge);
+      const detectedKind = chargerKind(charge);
+      if (detectedKind === 'dc' || (group.kind === 'unknown' && detectedKind !== 'unknown')) group.kind = detectedKind;
       const client = charge.userEmail || charge.userName;
       if (client) group.clients.add(client);
     });
 
     groups.forEach(group => {
       const hasOverride = Object.prototype.hasOwnProperty.call(unit.ubyOperationOverrides || {}, group.key);
-      const included = isUbyOperationCharge(group.charges[0], unit.ubyOperationOverrides);
+      const included = isUbyOperationGroup(group, unit.ubyOperationOverrides);
       rows.push({
         ...group,
         connType: group.connTypes?.size ? [...group.connTypes].join(' + ') : group.connType,
         connTypes: undefined,
         clients: group.clients.size,
         included,
-        ruleSource: hasOverride ? 'manual' : group.kind === 'dc' ? 'DC automatico' : 'fora por padrao'
+        ruleSource: hasOverride ? 'manual' : included ? 'DC automatico' : 'fora por padrao'
       });
     });
   });
