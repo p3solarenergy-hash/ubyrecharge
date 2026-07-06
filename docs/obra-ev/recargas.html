@@ -43,7 +43,7 @@
     /* Cards e grid */
     .grid   { display:grid; gap:14px; }
     .kpis   { grid-template-columns:repeat(6,minmax(150px,1fr)); margin-top:24px; }
-    .card   { background:var(--p3-card); border:1px solid var(--p3-border); border-radius:12px; padding:18px; box-shadow:var(--p3-shadow); }
+    .card   { position:relative; overflow:hidden; background:var(--p3-card); border:1px solid var(--p3-border); border-radius:12px; padding:18px; box-shadow:var(--p3-shadow); }
     .kpis .card { min-height:136px; }
     .label  { color:var(--p3-muted); font-size:11px; text-transform:uppercase; font-weight:700; letter-spacing:.8px; min-height:18px; overflow-wrap:anywhere; }
     .value  { font-size:clamp(22px,2.1vw,30px); font-weight:700; color:var(--p3-primary); margin-top:6px; line-height:1.1; white-space:nowrap; }
@@ -137,7 +137,8 @@
     .visual-summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin:18px 0; }
     .visual-card { position:relative; min-height:132px; overflow:hidden; border-radius:8px; border:1px solid rgba(84,180,255,.26); background:linear-gradient(135deg,#102945,#0B1524 64%,#0E2035); color:var(--p3-text); box-shadow:var(--p3-shadow); padding:18px 16px; display:flex; flex-direction:column; justify-content:space-between; }
     .visual-card::before { content:""; position:absolute; inset:auto 0 0 0; height:4px; background:#57B7FF; opacity:.95; }
-    .visual-card::after { content:""; position:absolute; right:-18px; top:-10px; width:120px; height:120px; background:var(--visual-img) center/contain no-repeat; opacity:.08; filter:grayscale(1) brightness(2.1); }
+    .visual-card::after { content:""; display:none; position:absolute; right:-18px; top:-10px; width:120px; height:120px; background:var(--visual-img) center/contain no-repeat; opacity:.08; filter:grayscale(1) brightness(2.1); }
+    .visual-card.main::after { display:block; }
     .visual-card .visual-title { position:relative; z-index:1; color:#BFEAD8; font-size:14px; font-weight:900; line-height:1.25; max-width:72%; }
     .visual-card .visual-value { position:relative; z-index:1; color:#57B7FF; font-size:24px; font-weight:900; line-height:1; }
     .visual-card .visual-sub { position:relative; z-index:1; color:var(--p3-muted); font-size:11px; margin-top:6px; line-height:1.35; }
@@ -150,6 +151,10 @@
     .visual-card.bad::before { background:#E64B4B; }
     .visual-card.bad .visual-value { color:#FF7A7A; }
     .visual-card.bad .visual-trend { color:#FFD0D0; background:rgba(230,75,75,.16); border-color:rgba(230,75,75,.32); }
+    .compact-kpis { grid-template-columns:repeat(5,minmax(0,1fr)); }
+    .compact-kpis .card { min-height:128px; background:linear-gradient(135deg,#102945,#0B1524 70%,#0E2035); border-color:rgba(84,180,255,.26); box-shadow:var(--p3-shadow); }
+    .compact-kpis .card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.9; }
+    .compact-kpis .card .value { font-size:26px; }
     .day-compare-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; }
     .day-kpi-card { position:relative; overflow:hidden; min-height:118px; border:1px solid rgba(84,180,255,.28); border-radius:12px; background:linear-gradient(135deg,#102945,#0B1524); padding:14px; box-shadow:var(--p3-shadow); }
     .day-kpi-card::after { content:""; position:absolute; right:-28px; bottom:-36px; width:104px; height:104px; border-radius:50%; background:rgba(87,183,255,.08); }
@@ -948,7 +953,7 @@
 
     <section class="visual-summary" id="ubyVisualSummary"></section>
 
-    <section class="grid kpis" id="kpiUby"></section>
+    <section class="grid kpis compact-kpis" id="kpiUby"></section>
 
     <section class="section uby-access-section" style="margin-top:18px">
       <div class="card">
@@ -958,18 +963,6 @@
       <div class="card">
         <h2>Evolucao mensal UBY</h2>
         <canvas id="chartUbyMonth" aria-label="Evolucao mensal UBY"></canvas>
-      </div>
-    </section>
-
-    <section class="section" style="margin-top:18px">
-      <div class="card" style="grid-column:1/-1">
-        <h2>Classificacao dos carregadores</h2>
-        <div style="overflow-x:auto">
-          <table>
-            <thead><tr><th>UBY</th><th>Unidade</th><th>Carregador</th><th>Tipo</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>Origem da regra</th><th>Abrir</th></tr></thead>
-            <tbody id="ubyChargerTable"></tbody>
-          </table>
-        </div>
       </div>
     </section>
 
@@ -1029,6 +1022,18 @@
     <section class="section usage-grid" style="margin-top:18px">
       <div class="card"><h2>Horarios mais populares</h2><canvas id="usageUbyPopularHours"></canvas></div>
       <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageUbyIdleValueDaily"></canvas></div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Classificacao dos carregadores</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>UBY</th><th>Unidade</th><th>Carregador</th><th>Tipo</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>Origem da regra</th><th>Abrir</th></tr></thead>
+            <tbody id="ubyChargerTable"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
   </div>
@@ -4143,8 +4148,8 @@ function renderVisualSummary(elId, charges = [], options = {}) {
     { title: 'Clientes atendidos', value: String(clients), sub: `${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, trend: trendGlyph(clients), cls: '', img: imgBadge },
     { title: 'Total de transacoes', value: String(total), sub: `${signedNumber(countDiff)} vs dia anterior`, trend: trendGlyph(countDiff), cls: countDiff < 0 ? 'warn' : '', img: imgBolt }
   ];
-  el.innerHTML = cards.map(card => `
-    <div class="visual-card ${card.cls || ''}" style="--visual-img:${card.img}">
+  el.innerHTML = cards.map((card, index) => `
+    <div class="visual-card ${index === 0 ? 'main' : ''} ${card.cls || ''}" style="--visual-img:${card.img}">
       <div class="visual-title">${card.title}</div>
       <div>
         <div class="visual-value">${card.value}</div>
@@ -6398,16 +6403,11 @@ function renderUbyOperation() {
     : 'Marque carregadores UBY ou suba planilhas das unidades UBY para iniciar o painel.';
 
   document.getElementById('kpiUby').innerHTML = `
-    <div class="card kpi-feature ${occClass}"><div class="label">Ocupacao UBY</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">${occStatus} - meta: 15% minimo / 30% ideal</div></div>
-    <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div>${trendCharges}</div>
-    <div class="card"><div class="label">Energia UBY</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida</div>${trendEnergy}</div>
     <div class="card"><div class="label">Ticket medio UBY</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas UBY</div></div>
-    <div class="card"><div class="label">Melhor unidade UBY</div><div class="value" style="font-size:18px;white-space:normal">${included[0]?.stationName || '-'}</div><div class="sub">${included[0] ? fmtBRL(included[0].revenue) : 'sem dados'}</div></div>
-    <div class="card kpi-feature revenue-card"><div class="label">Receita UBY</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${included.length} carregador(es) marcados</div>${trendRevenue}</div>
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
-    <div class="card"><div class="label">Carregadores AC</div><div class="value">${acCount}</div><div class="sub">incluidos na operacao UBY</div></div>
-    <div class="card"><div class="label">Carregadores DC</div><div class="value">${dcCount}</div><div class="sub">incluidos na operacao UBY</div></div>
+    <div class="card"><div class="label">Carregadores UBY</div><div class="value">${included.length}</div><div class="sub">${dcCount} DC / ${acCount} AC incluidos</div></div>
+    <div class="card"><div class="label">Melhor unidade UBY</div><div class="value" style="font-size:18px;white-space:normal">${included[0]?.stationName || '-'}</div><div class="sub">${included[0] ? fmtBRL(included[0].revenue) : 'sem dados'}</div></div>
   `;
 
   renderVisualSummary('ubyVisualSummary', allUbyCharges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceUbyCharges });
@@ -6417,6 +6417,8 @@ function renderUbyOperation() {
   });
 
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
+  const accessRows = [...visibleRows.filter(row => row.included)]
+    .sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
   const chartLabels = chartRows.map(row => {
     const label = row.stationName || row.workName || '-';
     return label.length > 24 ? label.slice(0, 24) + '...' : label;
@@ -6424,14 +6426,14 @@ function renderUbyOperation() {
   renderBarChart('chartUbyRevenueUnit', chartLabels, chartRows.map(row => row.revenue), '#57B7FF', ' R$');
   renderBarChart('chartUbyEnergyUnit', chartLabels, chartRows.map(row => row.energy), '#2DBBD3', ' kWh');
 
-  document.getElementById('ubyUnitRank').innerHTML = chartRows.length ? chartRows.slice(0, 12).map(unit => `
+  document.getElementById('ubyUnitRank').innerHTML = accessRows.length ? accessRows.slice(0, 12).map(unit => `
     <div class="unit-card">
       <div><strong>${escapeHtml(unit.stationName || unit.workName)}</strong><span>Obra: ${escapeHtml(unit.workName)} - ${unit.clients} cliente(s)</span></div>
       <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
       <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">${unit.kind.toUpperCase()} - ${unit.connType || 'sem conector'}</div></div>
       <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir estacao</button></div>
     </div>
-  `).join('') : '<div class="note">Nenhuma unidade UBY com recargas no periodo.</div>';
+  `).join('') : '<div class="note">Nenhuma unidade marcada como UBY.</div>';
 
   const monthData = sourceMonths.map(mk => {
     const monthCharges = sourceUbyCharges.filter(charge => chargeMonthKey(charge) === mk);
