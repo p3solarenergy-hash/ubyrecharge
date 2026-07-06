@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UBY Recharge — Links</title>
+  <meta name="description" content="Todos os links da UBY Recharge: Google Maps, Waze, avaliações, app SPOTT, WhatsApp, Instagram e site.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --g:  #00E676;
+      --g2: #00C853;
+      --g3: #69F0AE;
+      --dark:  #050D0A;
+      --dark2: #0A1810;
+      --card:  #0D1F14;
+      --border:  rgba(0,230,118,.14);
+      --border2: rgba(0,230,118,.28);
+      --text:  #E8F5E9;
+      --muted: #6B8F72;
+      --white: #fff;
+    }
+
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse 70% 45% at 50% 0%, rgba(0,230,118,.14) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(0,200,83,.08) 0%, transparent 60%),
+        var(--dark);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 56px 20px 40px;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    .page { width: 100%; max-width: 480px; }
+
+    /* ── PROFILE ── */
+    .profile { text-align: center; margin-bottom: 30px; }
+    .avatar {
+      width: 104px; height: 104px; margin: 0 auto 18px;
+      border-radius: 50%; overflow: hidden;
+      background: #0A1628;
+      border: 2px solid var(--border2);
+      box-shadow: 0 0 40px rgba(0,230,118,.18);
+      display: grid; place-items: center;
+    }
+    .avatar svg { width: 62%; height: 62%; }
+    .brand-name {
+      font-size: 24px; font-weight: 800; letter-spacing: -.4px;
+      color: var(--white); margin-bottom: 8px;
+    }
+    .bio { font-size: 14.5px; color: var(--muted); margin-bottom: 18px; line-height: 1.6; }
+
+    .socials { display: flex; justify-content: center; gap: 12px; }
+    .social-icon {
+      width: 42px; height: 42px; border-radius: 50%;
+      border: 1.5px solid var(--border2);
+      display: grid; place-items: center;
+      transition: border-color .2s, transform .18s, background .2s;
+    }
+    .social-icon svg { width: 19px; height: 19px; }
+    .social-icon:hover { border-color: var(--g); background: rgba(0,230,118,.08); transform: translateY(-2px); }
+
+    /* ── LINKS ── */
+    .links { display: flex; flex-direction: column; gap: 13px; }
+    .link-card {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 14px; padding: 15px 18px;
+      transition: border-color .2s, transform .18s, background .2s;
+    }
+    .link-card:hover { border-color: var(--g); background: #0F2418; transform: translateY(-2px); }
+    .link-icon {
+      width: 40px; height: 40px; flex-shrink: 0; border-radius: 10px;
+      background: rgba(0,230,118,.08); border: 1px solid var(--border);
+      display: grid; place-items: center; font-size: 19px;
+    }
+    .link-text { flex: 1; min-width: 0; }
+    .link-title { font-size: 15px; font-weight: 700; color: var(--white); line-height: 1.35; }
+    .link-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .link-featured { border-color: var(--g); box-shadow: 0 0 26px rgba(0,230,118,.14); }
+
+    footer { text-align: center; margin-top: 34px; }
+    .footer-copy { font-size: 11.5px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="profile">
+    <div class="avatar">
+      <svg viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bolt" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#57B7FF"/>
+            <stop offset="100%" stop-color="#38D4FF"/>
+          </linearGradient>
+        </defs>
+        <path d="M 124 16 L 56 112 L 96 112 L 76 184 L 144 88 L 104 88 Z" fill="url(#bolt)"/>
+      </svg>
+    </div>
+    <div class="brand-name">UBY Recharge</div>
+    <p class="bio">⚡ Conecte, carregue e siga a gente 🔋🚗💨</p>
+    <div class="socials">
+      <a class="social-icon" href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
+      </a>
+      <a class="social-icon" href="https://wa.me/5543988281585" target="_blank" rel="noopener" aria-label="WhatsApp">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.96L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.87 9.87 0 0 0 12.04 2zm0 1.67c2.19 0 4.25.85 5.79 2.4a8.19 8.19 0 0 1 2.41 5.83c0 4.55-3.7 8.24-8.25 8.24a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.11.82.83-3.03-.2-.31a8.2 8.2 0 0 1-1.26-4.37c0-4.55 3.7-8.25 8.28-8.25zm-4.53 4.72c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.66 2.6 4.11 3.55 2.03.79 2.44.63 2.88.6.44-.04 1.42-.58 1.62-1.14s.2-1.04.14-1.14c-.06-.1-.22-.16-.46-.28s-1.42-.7-1.64-.78-.38-.12-.54.12-.62.78-.76.94-.28.18-.52.06c-.24-.12-1.01-.37-1.92-1.18-.71-.63-1.19-1.42-1.33-1.66s-.02-.37.11-.5c.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.32-.75-1.8-.2-.47-.4-.4-.54-.41z"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <div class="links">
+
+    <a class="link-card link-featured" href="https://maps.app.goo.gl/BziUxpxHEzAvSBHGA" target="_blank" rel="noopener">
+      <div class="link-icon">📍</div>
+      <div class="link-text">
+        <div class="link-title">Rota até o eletroposto · Google Maps</div>
+        <div class="link-sub">Robert Koch, 10 — Londrina, PR</div>
+      </div>
+    </a>
+
+    <a class="link-card" href="https://www.waze.com/ul?q=Robert%20Koch%2C%2010%2C%20Londrina%2C%20PR&navigate=yes" target="_blank" rel="noopener">
+      <div class="link-icon">🧭</div>
+      <div class="link-text">
+        <div class="link-title">Rota até o eletroposto · Waze</div>
+        <div class="link-sub">Robert Koch, 10 — Londrina, PR</div>
+      </div>
+    </a>
+
+    <a class="link-card" href="https://maps.app.goo.gl/BziUxpxHEzAvSBHGA" target="_blank" rel="noopener">
+      <div class="link-icon">⭐</div>
+      <div class="link-text">
+        <div class="link-title">Gostou? Nos avalie no Google!</div>
+        <div class="link-sub">Sua avaliação ajuda a gente a crescer</div>
+      </div>
+    </a>
+
+    <a class="link-card" href="https://apps.apple.com/br/app/spott-ev-charging/id1574424820" target="_blank" rel="noopener">
+      <div class="link-icon">🍎</div>
+      <div class="link-text">
+        <div class="link-title">Baixar SPOTT · App Store</div>
+        <div class="link-sub">App para carregar na UBY Recharge</div>
+      </div>
+    </a>
+
+    <a class="link-card" href="https://play.google.com/store/apps/details?id=com.spott.ev" target="_blank" rel="noopener">
+      <div class="link-icon">▶</div>
+      <div class="link-text">
+        <div class="link-title">Baixar SPOTT · Google Play</div>
+        <div class="link-sub">App para carregar na UBY Recharge</div>
+      </div>
+    </a>
+
+    <a class="link-card" href="https://wa.me/5543988281585" target="_blank" rel="noopener">
+      <div class="link-icon">💬</div>
+      <div class="link-text">
+        <div class="link-title">Falar no WhatsApp</div>
+        <div class="link-sub">Dúvidas, suporte e parcerias</div>
+      </div>
+    </a>
+
+    <a class="link-card" href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener">
+      <div class="link-icon">📸</div>
+      <div class="link-text">
+        <div class="link-title">Instagram</div>
+        <div class="link-sub">@uby.recharge</div>
+      </div>
+    </a>
+
+    <a class="link-card" href="./index.html">
+      <div class="link-icon">🌐</div>
+      <div class="link-text">
+        <div class="link-title">Site oficial</div>
+        <div class="link-sub">UBY Recharge — rede de eletropostos</div>
+      </div>
+    </a>
+
+  </div>
+
+  <footer>
+    <p class="footer-copy">© 2025 UBY Recharge. Londrina, PR.</p>
+  </footer>
+
+</div>
+
+</body>
+</html>
