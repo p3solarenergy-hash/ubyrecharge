@@ -950,6 +950,29 @@
 
     <section class="grid kpis" id="kpiUby"></section>
 
+    <section class="section uby-access-section" style="margin-top:18px">
+      <div class="card">
+        <h2>Acessar unidades UBY</h2>
+        <div class="unit-rank" id="ubyUnitRank"></div>
+      </div>
+      <div class="card">
+        <h2>Evolucao mensal UBY</h2>
+        <canvas id="chartUbyMonth" aria-label="Evolucao mensal UBY"></canvas>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Classificacao dos carregadores</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>UBY</th><th>Unidade</th><th>Carregador</th><th>Tipo</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>Origem da regra</th><th>Abrir</th></tr></thead>
+            <tbody id="ubyChargerTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section class="day-compare-grid" id="usageUbyDayCompare"></section>
     <section class="section weekday-report" id="usageUbyWeekdayReport"></section>
 
@@ -1008,28 +1031,6 @@
       <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageUbyIdleValueDaily"></canvas></div>
     </section>
 
-    <section class="section" style="margin-top:18px">
-      <div class="card">
-        <h2>Ranking de unidades UBY</h2>
-        <div class="unit-rank" id="ubyUnitRank"></div>
-      </div>
-      <div class="card">
-        <h2>Evolucao mensal UBY</h2>
-        <canvas id="chartUbyMonth" aria-label="Evolucao mensal UBY"></canvas>
-      </div>
-    </section>
-
-    <section class="section" style="margin-top:18px">
-      <div class="card" style="grid-column:1/-1">
-        <h2>Classificacao dos carregadores</h2>
-        <div style="overflow-x:auto">
-          <table>
-            <thead><tr><th>UBY</th><th>Unidade</th><th>Carregador</th><th>Tipo</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>Origem da regra</th><th>Abrir</th></tr></thead>
-            <tbody id="ubyChargerTable"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
   </div>
 
   <div id="tabFinanceiroGeral" style="display:none">
