@@ -1,16 +1,1103 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UBY Recharge - Central</title>
-<meta http-equiv="refresh" content="0; url=docs/index.html">
-<script>
-  window.location.replace("docs/index.html");
-</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UBY Recharge — Carregadores Elétricos em Londrina</title>
+  <meta name="description" content="Rede de eletropostos em Londrina PR. Ponto ativo na Robert Koch 10. Em obras na Av. JK. Projeto de 50 eletropostos.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --g:  #00E676;
+      --g2: #00C853;
+      --g3: #69F0AE;
+      --dark:   #050D0A;
+      --dark2:  #0A1810;
+      --dark3:  #0F2218;
+      --card:   #0D1F14;
+      --card2:  #102217;
+      --border:  rgba(0,230,118,.13);
+      --border2: rgba(0,230,118,.26);
+      --text:   #E8F5E9;
+      --muted:  #6B8F72;
+      --white:  #fff;
+      --radius: 14px;
+      --shadow: 0 4px 28px rgba(0,0,0,.6);
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--dark);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 9px;
+      font-weight: 700; font-size: 15px; border-radius: 10px;
+      cursor: pointer; border: none; white-space: nowrap;
+      transition: transform .18s, box-shadow .18s, background .18s;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn-primary {
+      background: var(--g); color: #050D0A;
+      padding: 14px 28px;
+      box-shadow: 0 0 24px rgba(0,230,118,.35);
+    }
+    .btn-primary:hover { background: var(--g3); box-shadow: 0 0 36px rgba(0,230,118,.55); }
+    .btn-outline {
+      background: transparent; color: var(--g);
+      padding: 13px 26px; border: 1.5px solid var(--border2);
+    }
+    .btn-outline:hover { background: rgba(0,230,118,.07); border-color: var(--g); }
+
+    .tag {
+      display: inline-block;
+      background: rgba(0,230,118,.08); border: 1px solid var(--border2);
+      color: var(--g); font-size: 11px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase;
+      border-radius: 999px; padding: 5px 14px; margin-bottom: 18px;
+    }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 68px; display: flex; align-items: center;
+      padding: 0 28px;
+      background: rgba(5,13,10,.88);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      transition: background .3s;
+    }
+    nav.scrolled { background: rgba(5,13,10,.97); }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; max-width: 1120px; margin: 0 auto;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; }
+    .nav-mark {
+      width: 36px; height: 36px; background: var(--g);
+      border-radius: 8px; display: grid; place-items: center;
+    }
+    .nav-mark svg { width: 20px; height: 20px; }
+    .nav-brand { font-size: 18px; font-weight: 800; color: var(--white); letter-spacing: -.4px; }
+    .nav-brand span { color: var(--g); }
+    .nav-links { display: flex; align-items: center; gap: 30px; list-style: none; }
+    .nav-links a { font-size: 14px; font-weight: 500; color: var(--muted); transition: color .15s; }
+    .nav-links a:hover { color: var(--white); }
+    .nav-cta { display: flex; align-items: center; gap: 12px; }
+    .hamburger {
+      display: none; flex-direction: column; gap: 5px;
+      cursor: pointer; background: none; border: none; padding: 4px;
+    }
+    .hamburger span {
+      display: block; width: 24px; height: 2px;
+      background: var(--text); border-radius: 2px;
+    }
+    .mobile-nav {
+      display: none; position: fixed; top: 68px; left: 0; right: 0;
+      background: var(--dark); border-bottom: 1px solid var(--border);
+      padding: 20px 28px 28px; z-index: 99;
+      flex-direction: column; gap: 4px;
+    }
+    .mobile-nav.open { display: flex; }
+    .mobile-nav a {
+      font-size: 16px; font-weight: 500; color: var(--muted);
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .mobile-nav a:last-child { border-bottom: none; color: var(--g); font-weight: 700; }
+
+    #hero {
+      min-height: 100vh; display: flex; align-items: center;
+      position: relative; overflow: hidden; padding-top: 68px;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 55% at 50% 0%, rgba(0,230,118,.11) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 90% 80%, rgba(0,200,83,.07) 0%, transparent 60%);
+    }
+    .hero-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,230,118,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,230,118,.04) 1px, transparent 1px);
+      background-size: 56px 56px;
+    }
+    .hero-inner {
+      position: relative; z-index: 1;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 60px; align-items: center;
+      width: 100%; max-width: 1120px; margin: 0 auto;
+      padding: 80px 28px;
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,230,118,.08); border: 1px solid var(--border2);
+      border-radius: 999px; padding: 6px 14px;
+      font-size: 12px; font-weight: 600; color: var(--g);
+      margin-bottom: 24px;
+    }
+    .live-dot {
+      width: 7px; height: 7px; background: var(--g);
+      border-radius: 50%; animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+    h1.hero-title {
+      font-size: clamp(36px, 5.5vw, 64px);
+      font-weight: 900; line-height: 1.08;
+      letter-spacing: -2px; margin-bottom: 22px;
+      text-wrap: balance;
+    }
+    h1.hero-title .hl { color: var(--g); }
+    .hero-desc {
+      font-size: 18px; color: var(--muted);
+      max-width: 480px; margin-bottom: 38px; line-height: 1.7;
+    }
+    .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 52px; }
+    .hero-stats { display: flex; gap: 36px; flex-wrap: wrap; }
+    .stat-num { font-size: 28px; font-weight: 800; color: var(--white); line-height: 1; }
+    .stat-num span { color: var(--g); }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    .hero-visual {
+      position: relative; display: flex;
+      justify-content: center; align-items: center;
+    }
+    .hero-card {
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 22px; padding: 28px; width: 100%; max-width: 370px;
+      box-shadow: 0 0 80px rgba(0,230,118,.12), var(--shadow);
+    }
+    .station-header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 22px;
+    }
+    .station-active {
+      width: 10px; height: 10px; background: var(--g);
+      border-radius: 50%; box-shadow: 0 0 8px var(--g); flex-shrink: 0;
+    }
+    .station-name { font-size: 14px; font-weight: 700; }
+    .station-addr { font-size: 11px; color: var(--muted); }
+    .station-kw {
+      margin-left: auto; font-size: 13px; font-weight: 800;
+      color: var(--g); background: rgba(0,230,118,.08);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 4px 10px;
+    }
+    .charge-label-row {
+      display: flex; justify-content: space-between;
+      font-size: 12px; margin-bottom: 9px;
+    }
+    .charge-pct { color: var(--g); font-weight: 700; }
+    .prog-bar { height: 9px; background: rgba(255,255,255,.06); border-radius: 999px; overflow: hidden; margin-bottom: 18px; }
+    .prog-fill {
+      height: 100%; width: 0;
+      background: linear-gradient(90deg, var(--g2), var(--g));
+      border-radius: 999px; position: relative;
+      animation: fillUp 2.5s ease-out forwards;
+    }
+    @keyframes fillUp { to { width: 72%; } }
+    .prog-fill::after {
+      content: ''; position: absolute; right: 0; top: 50%;
+      transform: translateY(-50%);
+      width: 13px; height: 13px; background: var(--g);
+      border-radius: 50%; box-shadow: 0 0 10px var(--g);
+    }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .info-cell {
+      background: rgba(0,230,118,.04); border: 1px solid var(--border);
+      border-radius: 10px; padding: 11px;
+    }
+    .info-cell .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .info-cell .val { font-size: 17px; font-weight: 700; color: var(--white); margin-top: 2px; }
+    .float-badge {
+      position: absolute;
+      background: var(--card2); border: 1px solid var(--border2);
+      border-radius: 11px; padding: 9px 15px;
+      font-size: 12px; font-weight: 600; white-space: nowrap;
+      box-shadow: var(--shadow);
+    }
+    .fb-tl { top: -18px; left: -36px; }
+    .fb-br { bottom: -16px; right: -28px; }
+    .fb-g { color: var(--g); }
+
+    #status {
+      padding: 56px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .status-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px 22px;
+      display: flex; gap: 16px; align-items: flex-start;
+      transition: border-color .2s, transform .2s;
+    }
+    .status-card:hover { border-color: var(--border2); transform: translateY(-3px); }
+    .status-icon {
+      width: 46px; height: 46px; flex-shrink: 0;
+      border-radius: 12px; display: grid; place-items: center; font-size: 22px;
+    }
+    .si-green { background: rgba(0,230,118,.1); border: 1px solid var(--border2); }
+    .si-yellow { background: rgba(255,193,7,.08); border: 1px solid rgba(255,193,7,.2); }
+    .si-blue   { background: rgba(66,165,245,.08); border: 1px solid rgba(66,165,245,.2); }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; border-radius: 999px;
+      padding: 3px 9px; margin-bottom: 7px;
+    }
+    .sb-active { background: rgba(0,230,118,.12); color: var(--g); }
+    .sb-obras  { background: rgba(255,193,7,.12); color: #FFC107; }
+    .sb-proj   { background: rgba(66,165,245,.12); color: #42A5F5; }
+    .status-title { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 5px; line-height: 1.3; }
+    .status-desc  { font-size: 13px; color: var(--muted); line-height: 1.55; }
+    .status-kw { font-size: 12px; color: var(--g); font-weight: 600; margin-top: 8px; }
+
+    #como-funciona { padding: 100px 0; }
+    .sec-head { text-align: center; max-width: 640px; margin: 0 auto 60px; }
+    h2.sec-title { font-size: clamp(26px, 4vw, 40px); font-weight: 800; line-height: 1.2; margin-bottom: 14px; letter-spacing: -.5px; text-wrap: balance; }
+    .sec-sub { color: var(--muted); font-size: 17px; }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; position: relative; }
+    .steps::before {
+      content: ''; position: absolute; top: 34px;
+      left: calc(12.5% + 18px); right: calc(12.5% + 18px);
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border2), var(--border2), transparent);
+    }
+    .step { text-align: center; position: relative; z-index: 1; }
+    .step-n {
+      width: 68px; height: 68px; background: var(--card);
+      border: 2px solid var(--border2); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 18px;
+      font-size: 21px; font-weight: 800; color: var(--g);
+    }
+    .step h3 { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 7px; }
+    .step p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    #vantagens {
+      padding: 100px 0;
+      background: linear-gradient(180deg, transparent 0%, rgba(0,230,118,.02) 50%, transparent 100%);
+    }
+    .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .feat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 26px;
+      transition: border-color .2s, transform .2s;
+    }
+    .feat-card:hover { border-color: var(--border2); transform: translateY(-4px); }
+    .feat-icon {
+      width: 50px; height: 50px; background: rgba(0,230,118,.08);
+      border: 1px solid var(--border); border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; margin-bottom: 18px;
+    }
+    .feat-card h3 { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .feat-card p  { font-size: 13px; color: var(--muted); line-height: 1.65; }
+
+    #avaliacoes { padding: 100px 0; }
+    .reviews-actions {
+      display: flex; gap: 14px; flex-wrap: wrap;
+      justify-content: center; margin-bottom: 48px;
+    }
+    .review-link {
+      display: inline-flex; align-items: center; gap: 9px;
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 12px; padding: 14px 24px;
+      font-size: 14px; font-weight: 700; color: var(--text);
+      transition: border-color .2s, transform .18s;
+    }
+    .review-link:hover { border-color: var(--g); transform: translateY(-2px); }
+
+    .review-form-wrap {
+      max-width: 640px; margin: 0 auto;
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 18px; padding: 32px;
+    }
+    .form-title { font-size: 17px; font-weight: 700; color: var(--white); margin-bottom: 6px; }
+    .form-sub   { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
+    .star-picker { display: flex; gap: 6px; margin-bottom: 18px; }
+    .star-btn {
+      font-size: 28px; cursor: pointer; background: none; border: none;
+      color: rgba(0,230,118,.25); transition: color .15s, transform .15s;
+    }
+    .star-btn:hover, .star-btn.active { color: var(--g); transform: scale(1.15); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .form-input {
+      background: rgba(0,230,118,.04); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px;
+      color: var(--text); font-size: 14px; font-family: inherit;
+      transition: border-color .2s; outline: none; width: 100%;
+    }
+    .form-input:focus { border-color: var(--border2); }
+    .form-input::placeholder { color: var(--muted); }
+    textarea.form-input { resize: vertical; min-height: 90px; }
+
+    #localizacao { padding: 100px 0; }
+    .map-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+    .map-text h2 { font-size: clamp(26px, 4vw, 40px); font-weight: 800; line-height: 1.2; margin-bottom: 18px; letter-spacing: -.5px; text-wrap: balance; }
+    .map-text p  { color: var(--muted); font-size: 16px; margin-bottom: 28px; line-height: 1.7; }
+    .location-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }
+    .loc-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 16px;
+    }
+    .loc-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 3px;
+    }
+    .ld-green { background: var(--g); box-shadow: 0 0 8px var(--g); }
+    .ld-yellow { background: #FFC107; box-shadow: 0 0 8px #FFC107; animation: pulse 2s infinite; }
+    .loc-name { font-size: 14px; font-weight: 700; color: var(--white); }
+    .loc-addr { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .loc-badge {
+      margin-left: auto; font-size: 10px; font-weight: 700;
+      border-radius: 999px; padding: 3px 10px; white-space: nowrap; flex-shrink: 0;
+    }
+    .lb-g  { background: rgba(0,230,118,.12); color: var(--g); }
+    .lb-y  { background: rgba(255,193,7,.12); color: #FFC107; }
+
+    .map-card {
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 18px; overflow: hidden;
+      box-shadow: 0 0 60px rgba(0,230,118,.08), var(--shadow);
+    }
+    .map-bar {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .map-dots { display: flex; gap: 5px; }
+    .md { width: 9px; height: 9px; border-radius: 50%; }
+    .map-body {
+      position: relative; height: 300px;
+      background:
+        radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0,230,118,.04) 0%, transparent 70%),
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,230,118,.04) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,230,118,.04) 40px);
+      background-color: #070F0B;
+    }
+    .map-pin {
+      position: absolute; display: flex; flex-direction: column;
+      align-items: center; cursor: pointer;
+    }
+    .mp-dot {
+      width: 13px; height: 13px; background: var(--g); border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(0,230,118,.22), 0 0 14px rgba(0,230,118,.5);
+      animation: ppulse 2.5s ease-in-out infinite;
+    }
+    .mp-dot.yellow {
+      background: #FFC107;
+      box-shadow: 0 0 0 4px rgba(255,193,7,.22), 0 0 14px rgba(255,193,7,.5);
+    }
+    @keyframes ppulse {
+      0%,100%{ box-shadow: 0 0 0 4px rgba(0,230,118,.22), 0 0 14px rgba(0,230,118,.5); }
+      50%    { box-shadow: 0 0 0 8px rgba(0,230,118,.1),  0 0 26px rgba(0,230,118,.6); }
+    }
+    .mp-label {
+      background: var(--card2); border: 1px solid var(--border2);
+      border-radius: 6px; padding: 3px 7px;
+      font-size: 9px; font-weight: 700; margin-top: 4px; white-space: nowrap;
+    }
+
+    #redes { padding: 72px 0; border-top: 1px solid var(--border); }
+    .social-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 600px; margin: 0 auto; }
+    .social-card {
+      display: flex; align-items: center; gap: 16px;
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 16px; padding: 22px 24px;
+      transition: border-color .2s, transform .18s;
+    }
+    .social-card:hover { border-color: var(--g); transform: translateY(-3px); }
+    .social-icon { font-size: 30px; }
+    .social-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .social-name { font-size: 16px; font-weight: 700; color: var(--white); }
+    .social-arr { margin-left: auto; color: var(--g); font-size: 20px; }
+
+    #faq { padding: 100px 0; }
+    .faq-list { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+    .faq-item { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .faq-q {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 18px 22px; cursor: pointer;
+      font-size: 14px; font-weight: 600; transition: color .15s;
+    }
+    .faq-q:hover { color: var(--g); }
+    .faq-arr { font-size: 16px; color: var(--muted); transition: transform .25s; flex-shrink: 0; }
+    .faq-item.open .faq-arr { transform: rotate(180deg); color: var(--g); }
+    .faq-a {
+      max-height: 0; overflow: hidden;
+      transition: max-height .35s ease, padding .25s;
+      font-size: 13px; color: var(--muted); line-height: 1.7;
+    }
+    .faq-item.open .faq-a { max-height: 260px; padding: 0 22px 18px; }
+
+    #cta { padding: 80px 0; }
+    .cta-card {
+      background: linear-gradient(135deg, #0A2018 0%, #0F2F1E 100%);
+      border: 1px solid var(--border2); border-radius: 22px;
+      padding: 68px 56px; text-align: center;
+      position: relative; overflow: hidden;
+      box-shadow: 0 0 80px rgba(0,230,118,.09);
+    }
+    .cta-card::before {
+      content: ''; position: absolute; top: -70px; left: 50%;
+      transform: translateX(-50%);
+      width: 380px; height: 380px;
+      background: radial-gradient(circle, rgba(0,230,118,.18), transparent 70%);
+    }
+    .cta-card h2 { font-size: clamp(26px, 4vw, 44px); font-weight: 900; line-height: 1.2; margin-bottom: 14px; position: relative; letter-spacing: -.5px; text-wrap: balance; }
+    .cta-card p  { font-size: 17px; color: var(--muted); margin-bottom: 36px; position: relative; }
+    .cta-btns { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; position: relative; }
+
+    footer {
+      background: var(--dark2); border-top: 1px solid var(--border);
+      padding: 56px 0 28px;
+    }
+    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 36px; margin-bottom: 44px; }
+    .footer-desc { font-size: 13px; color: var(--muted); margin-top: 14px; line-height: 1.7; max-width: 280px; }
+    .footer-socials { display: flex; gap: 10px; margin-top: 18px; }
+    .soc-btn {
+      width: 34px; height: 34px; background: var(--card);
+      border: 1px solid var(--border); border-radius: 8px;
+      display: grid; place-items: center; font-size: 15px;
+      transition: border-color .15s;
+    }
+    .soc-btn:hover { border-color: var(--g); }
+    .footer-col h4 {
+      font-size: 12px; font-weight: 700; color: var(--white);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 18px;
+    }
+    .footer-links { display: flex; flex-direction: column; gap: 11px; list-style: none; }
+    .footer-links a { font-size: 13px; color: var(--muted); transition: color .15s; }
+    .footer-links a:hover { color: var(--g); }
+    .footer-bottom {
+      border-top: 1px solid var(--border); padding-top: 24px;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 14px; flex-wrap: wrap;
+    }
+    .footer-copy { font-size: 12px; color: var(--muted); }
+    .footer-legal { display: flex; gap: 20px; }
+    .footer-legal a { font-size: 12px; color: var(--muted); transition: color .15s; }
+    .footer-legal a:hover { color: var(--g); }
+
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity .65s ease, transform .65s ease; }
+    .reveal.visible { opacity: 1; transform: none; }
+
+    @media (max-width: 900px) {
+      .nav-links, .nav-cta { display: none; }
+      .hamburger { display: flex; }
+      .hero-inner { grid-template-columns: 1fr; text-align: center; }
+      .hero-desc { margin: 0 auto 38px; }
+      .hero-actions { justify-content: center; }
+      .hero-stats { justify-content: center; }
+      .hero-visual { display: none; }
+      .status-grid { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: repeat(2, 1fr); }
+      .steps::before { display: none; }
+      .feat-grid { grid-template-columns: repeat(2, 1fr); }
+      .map-layout { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .cta-card { padding: 48px 28px; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .feat-grid { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr; }
+      .footer-bottom { flex-direction: column; text-align: center; }
+      .social-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-  <p>Redirecionando para a central UBY Recharge...</p>
-  <p><a href="docs/index.html">Abrir central</a></p>
+
+<nav id="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <div class="nav-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#050D0A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+      </div>
+      <span class="nav-brand">UBY <span>Recharge</span></span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#status">Nossa rede</a></li>
+      <li><a href="#como-funciona">Como funciona</a></li>
+      <li><a href="#spott">SPOTT</a></li>
+      <li><a href="#avaliacoes">Avaliações</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ul>
+    <div class="nav-cta">
+      <a href="#avaliacoes" class="btn btn-outline" style="padding:9px 18px;font-size:13px;">Avaliar</a>
+      <a href="#localizacao" class="btn btn-primary" style="padding:9px 18px;font-size:13px;">⚡ Encontrar ponto</a>
+    </div>
+    <button class="hamburger" id="ham" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<div class="mobile-nav" id="mobileNav">
+  <a href="#status"         onclick="closeMob()">Nossa rede</a>
+  <a href="#como-funciona"  onclick="closeMob()">Como funciona</a>
+  <a href="#spott"          onclick="closeMob()">Baixar SPOTT</a>
+  <a href="#avaliacoes"     onclick="closeMob()">Avaliações</a>
+  <a href="#faq"            onclick="closeMob()">FAQ</a>
+  <a href="#localizacao"    onclick="closeMob()">⚡ Encontrar ponto</a>
+</div>
+
+
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="hero-content">
+      <div class="hero-eyebrow">
+        <div class="live-dot"></div>
+        Ponto ativo · Robert Koch 10, Londrina PR
+      </div>
+      <h1 class="hero-title">
+        Carregue seu<br>
+        elétrico com<br>
+        <span class="hl">inteligência</span>
+      </h1>
+      <p class="hero-desc">
+        UBY Recharge é a rede de eletropostos de Londrina PR. Nosso primeiro ponto já está ativo — e o projeto é de <strong style="color:var(--white)">50 eletropostos</strong>.
+      </p>
+      <div class="hero-actions">
+        <a href="#localizacao" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Ver localização
+        </a>
+        <a href="#spott" class="btn btn-outline">⬇ Baixar SPOTT</a>
+      </div>
+      <div class="hero-stats">
+        <div>
+          <div class="stat-num"><span>1</span> ativo</div>
+          <div class="stat-label">Ponto em funcionamento</div>
+        </div>
+        <div>
+          <div class="stat-num"><span>1</span> em obras</div>
+          <div class="stat-label">Segunda unidade chegando</div>
+        </div>
+        <div>
+          <div class="stat-num"><span>50</span></div>
+          <div class="stat-label">Meta de eletropostos</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="float-badge fb-tl">
+        ⚡ <span class="fb-g">Online agora</span> · Robert Koch 10
+      </div>
+      <div class="hero-card">
+        <div class="station-header">
+          <div class="station-active"></div>
+          <div>
+            <div class="station-name">UBY Recharge · Unidade 01</div>
+            <div class="station-addr">Robert Koch 10, Londrina PR</div>
+          </div>
+          <div class="station-kw">60 kW</div>
+        </div>
+        <div class="charge-label-row">
+          <span>Carregando…</span>
+          <span class="charge-pct">72%</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill"></div></div>
+        <div class="info-grid">
+          <div class="info-cell"><div class="lbl">Energia</div><div class="val">28.4 kWh</div></div>
+          <div class="info-cell"><div class="lbl">Tempo</div><div class="val">38 min</div></div>
+          <div class="info-cell"><div class="lbl">Potência</div><div class="val">60 kW</div></div>
+          <div class="info-cell"><div class="lbl">Status</div><div class="val" style="font-size:13px;color:var(--g)">Ativo ✓</div></div>
+        </div>
+      </div>
+      <div class="float-badge fb-br">
+        📍 <span class="fb-g">Robert Koch 10</span> · Londrina PR
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="status">
+  <div class="wrap">
+    <div class="status-grid">
+
+      <div class="status-card reveal">
+        <div class="status-icon si-green">⚡</div>
+        <div class="status-text">
+          <div class="status-badge sb-active">
+            <span style="width:6px;height:6px;background:var(--g);border-radius:50%;display:inline-block;animation:pulse 2s infinite"></span>
+            Ativo agora
+          </div>
+          <div class="status-title">Robert Koch 10<br>Londrina, PR</div>
+          <div class="status-desc">Nosso primeiro eletroposto em operação. Acesso 24h, pagamento via QR Code, CCS2.</div>
+          <div class="status-kw">⚡ 60 kW DC</div>
+        </div>
+      </div>
+
+      <div class="status-card reveal">
+        <div class="status-icon si-yellow">🏗️</div>
+        <div class="status-text">
+          <div class="status-badge sb-obras">🔧 Em obras</div>
+          <div class="status-title">Posto Central · Av. JK<br>Londrina, PR</div>
+          <div class="status-desc">Nossa segunda unidade está em instalação. Em breve 80 kW disponíveis na JK!</div>
+          <div class="status-kw" style="color:#FFC107">⚡ 80 kW DC · Em breve</div>
+        </div>
+      </div>
+
+      <div class="status-card reveal">
+        <div class="status-icon si-blue">🎯</div>
+        <div class="status-text">
+          <div class="status-badge sb-proj">📋 Projeto</div>
+          <div class="status-title">50 Eletropostos<br>Sul e Sudeste do Brasil</div>
+          <div class="status-desc">Nosso objetivo é cobrir Londrina e expandir por todo o Sul e Sudeste do Brasil.</div>
+          <div class="status-kw" style="color:#42A5F5">Expansão contínua</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<section id="como-funciona">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="tag">Como funciona</div>
+      <h2 class="sec-title">Simples assim</h2>
+      <p class="sec-sub">Em 4 passos você já está carregando seu elétrico com a UBY Recharge.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-n">1</div>
+        <h3>Chegue ao ponto</h3>
+        <p>Nosso eletroposto fica na Robert Koch 10. Localização no mapa logo abaixo.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-n">2</div>
+        <h3>Conecte o cabo</h3>
+        <p>Plugue o cabo CCS2 no seu veículo. O sistema identifica automaticamente.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-n">3</div>
+        <h3>Use o app SPOTT</h3>
+        <p>Baixe o SPOTT, escaneie o QR Code na estação e inicie a sessão em segundos.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-n">4</div>
+        <h3>Pague e vá</h3>
+        <p>Pagamento via Pix ou cartão dentro do próprio SPOTT. Simples e rápido.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="vantagens">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="tag">Vantagens</div>
+      <h2 class="sec-title">Por que escolher a UBY?</h2>
+      <p class="sec-sub">Tecnologia séria, suporte real, preço justo.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-card reveal">
+        <div class="feat-icon">⚡</div>
+        <h3>Carga rápida DC</h3>
+        <p>60 kW na Robert Koch e 80 kW no Posto Central JK. Carregamento rápido em minutos.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">🔌</div>
+        <h3>CCS2</h3>
+        <p>Compatível com BYD, Geely, GAC, GWM, Volvo, BMW, Audi, Mercedes-Benz e os principais elétricos vendidos no Brasil.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">💳</div>
+        <h3>Pagamento fácil</h3>
+        <p>Pix ou cartão de crédito. Pague direto na estação, sem complicação.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">🛡️</div>
+        <h3>Suporte via WhatsApp</h3>
+        <p>Qualquer dúvida ou problema, nossa equipe responde pelo WhatsApp.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">🕐</div>
+        <h3>Aberto 24 horas</h3>
+        <p>O ponto da Robert Koch 10 funciona 24h por dia, 7 dias por semana.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">🌱</div>
+        <h3>100% elétrico</h3>
+        <p>Cada sessão UBY equivale a km rodados sem emitir CO₂. Bom pra você, bom pro planeta.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="spott" style="padding:80px 0;border-top:1px solid var(--border);">
+  <div class="wrap">
+    <div class="map-layout" style="gap:48px;">
+      <div class="reveal">
+        <div class="tag">Como carregar</div>
+        <h2 style="font-size:clamp(26px,4vw,40px);font-weight:800;line-height:1.2;margin-bottom:18px;letter-spacing:-.5px;text-wrap:balance;">
+          Use o SPOTT para carregar na UBY Recharge
+        </h2>
+        <p style="color:var(--muted);font-size:16px;margin-bottom:28px;line-height:1.7;">
+          Nossos eletropostos funcionam pelo app SPOTT. Baixe gratuitamente, escaneie o QR Code na estação e comece a carregar em segundos.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <a href="https://apps.apple.com/br/app/spott-ev-charging/id1574424820" target="_blank" rel="noopener" class="btn btn-primary">
+            🍎 App Store
+          </a>
+          <a href="https://play.google.com/store/apps/details?id=eco.spott.spottapp" target="_blank" rel="noopener" class="btn btn-outline">
+            ▶ Google Play
+          </a>
+        </div>
+      </div>
+      <div class="reveal">
+        <div style="background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:32px;box-shadow:0 0 60px rgba(0,230,118,.07);">
+          <div style="text-align:center;margin-bottom:24px;">
+            <div style="font-size:48px;margin-bottom:10px;">⚡</div>
+            <div style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:6px;">SPOTT</div>
+            <div style="font-size:13px;color:var(--muted);">EV Charging Network</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;background:rgba(0,230,118,.04);border:1px solid var(--border);border-radius:10px;padding:12px;">
+              <span style="font-size:20px;">📍</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--white);">UBY Recharge · Robert Koch 10</div>
+                <div style="font-size:11px;color:var(--g);">Disponível no SPOTT</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;background:rgba(0,230,118,.04);border:1px solid var(--border);border-radius:10px;padding:12px;">
+              <span style="font-size:20px;">🔌</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--white);">CCS2</div>
+                <div style="font-size:11px;color:var(--muted);">Conectores disponíveis</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;background:rgba(0,230,118,.04);border:1px solid var(--border);border-radius:10px;padding:12px;">
+              <span style="font-size:20px;">💳</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--white);">Pix · Cartão</div>
+                <div style="font-size:11px;color:var(--muted);">Pagamento pelo SPOTT</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="avaliacoes">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="tag">Avaliações</div>
+      <h2 class="sec-title">Avalie sua experiência</h2>
+      <p class="sec-sub">Sua opinião ajuda outros motoristas elétricos a conhecerem a UBY Recharge.</p>
+    </div>
+
+    <div class="reviews-actions reveal">
+      <a href="https://maps.app.goo.gl/BziUxpxHEzAvSBHGA" target="_blank" rel="noopener" class="review-link" style="background:rgba(0,230,118,.06);border-color:var(--g);">
+        🌐 Ver avaliações no Google Maps
+      </a>
+      <a href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener" class="review-link">
+        📸 Ver no Instagram
+      </a>
+    </div>
+
+    <div class="review-form-wrap reveal">
+      <div class="form-title">⭐ Deixe sua avaliação</div>
+      <div class="form-sub">Preencha abaixo e sua mensagem vai direto para nosso WhatsApp — sem cadastro.</div>
+      <div class="star-picker" id="starPicker">
+        <button class="star-btn" data-val="1" aria-label="1 estrela">★</button>
+        <button class="star-btn" data-val="2" aria-label="2 estrelas">★</button>
+        <button class="star-btn" data-val="3" aria-label="3 estrelas">★</button>
+        <button class="star-btn" data-val="4" aria-label="4 estrelas">★</button>
+        <button class="star-btn" data-val="5" aria-label="5 estrelas">★</button>
+      </div>
+      <div class="form-row">
+        <input type="text"  class="form-input" placeholder="Seu nome" id="rev-nome">
+        <input type="text"  class="form-input" placeholder="Seu veículo (ex: BYD Dolphin)" id="rev-veiculo">
+      </div>
+      <textarea class="form-input" placeholder="Conte como foi sua experiência na UBY Recharge..." id="rev-texto" style="margin-bottom:16px"></textarea>
+      <button class="btn btn-primary" onclick="submitReview()" style="width:100%;justify-content:center;font-size:15px;padding:15px;">
+        💬 Enviar avaliação pelo WhatsApp
+      </button>
+      <div id="rev-success" style="display:none;margin-top:14px;background:rgba(0,230,118,.08);border:1px solid var(--border2);border-radius:10px;padding:14px;text-align:center;color:var(--g);font-weight:600;">
+        ✓ Obrigado! Redirecionando para o WhatsApp…
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="localizacao">
+  <div class="wrap">
+    <div class="map-layout">
+      <div class="map-text reveal">
+        <div class="tag">Localização</div>
+        <h2>Encontre nossos eletropostos</h2>
+        <p>Estamos crescendo em Londrina. Veja os pontos ativos e os que chegam em breve.</p>
+        <div class="location-list">
+          <div class="loc-item">
+            <div class="loc-dot ld-green"></div>
+            <div>
+              <div class="loc-name">Robert Koch, 10</div>
+              <div class="loc-addr">Londrina, PR · Ativo 24h</div>
+            </div>
+            <div class="loc-badge lb-g">⚡ 60 kW · Ativo</div>
+          </div>
+          <div class="loc-item">
+            <div class="loc-dot ld-yellow"></div>
+            <div>
+              <div class="loc-name">Posto Central · Av. JK</div>
+              <div class="loc-addr">Londrina, PR · Em instalação</div>
+            </div>
+            <div class="loc-badge lb-y">🔧 Em obras</div>
+          </div>
+        </div>
+        <a href="https://maps.app.goo.gl/BziUxpxHEzAvSBHGA" target="_blank" rel="noopener" class="btn btn-primary">
+          📍 Abrir no Google Maps
+        </a>
+      </div>
+
+      <div class="map-visual reveal">
+        <div class="map-card">
+          <div class="map-bar">
+            <div class="map-dots">
+              <div class="md" style="background:#ff5f57"></div>
+              <div class="md" style="background:#febc2e"></div>
+              <div class="md" style="background:#28c840"></div>
+            </div>
+            <span style="font-size:12px;color:var(--muted)">UBY Recharge · Londrina PR</span>
+          </div>
+          <div class="map-body">
+            <div class="map-pin" style="left:44%;top:42%">
+              <div class="mp-dot"></div>
+              <div class="mp-label">⚡ Robert Koch 10</div>
+            </div>
+            <div class="map-pin" style="left:58%;top:32%">
+              <div class="mp-dot yellow"></div>
+              <div class="mp-label" style="border-color:rgba(255,193,7,.3)">🔧 Posto Central JK</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="redes">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="tag">Redes sociais</div>
+      <h2 class="sec-title">Siga a UBY Recharge</h2>
+      <p class="sec-sub">Acompanhe novidades, novos pontos e dicas sobre mobilidade elétrica.</p>
+    </div>
+    <div class="social-grid reveal">
+      <a href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener" class="social-card">
+        <div class="social-icon">📸</div>
+        <div>
+          <div class="social-label">Instagram</div>
+          <div class="social-name">@uby.recharge</div>
+        </div>
+        <div class="social-arr">›</div>
+      </a>
+      <a href="https://maps.app.goo.gl/BziUxpxHEzAvSBHGA" target="_blank" rel="noopener" class="social-card">
+        <div class="social-icon">🌐</div>
+        <div>
+          <div class="social-label">Google Maps</div>
+          <div class="social-name">Avaliar &amp; localizar</div>
+        </div>
+        <div class="social-arr">›</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="tag">FAQ</div>
+      <h2 class="sec-title">Perguntas frequentes</h2>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">Onde fica o eletroposto da UBY Recharge?<span class="faq-arr">▼</span></div>
+        <div class="faq-a">Nosso primeiro ponto está na Robert Koch 10, Londrina PR. Em breve a segunda unidade abre no Posto Central da Av. JK. Veja o mapa na seção Localização.</div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">Quais conectores vocês têm?<span class="faq-arr">▼</span></div>
+        <div class="faq-a">Temos CCS2. Compatíveis com BYD, Geely, GAC, GWM, Volvo, BMW, Audi, Mercedes-Benz e a maioria dos elétricos vendidos no Brasil.</div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">Como pago a sessão de carregamento?<span class="faq-arr">▼</span></div>
+        <div class="faq-a">Via Pix ou cartão de crédito direto na estação, após escanear o QR Code. Você é cobrado apenas pelo kWh efetivamente carregado.</div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">O ponto funciona 24 horas?<span class="faq-arr">▼</span></div>
+        <div class="faq-a">Sim. O eletroposto da Robert Koch 10 opera 24h por dia, 7 dias por semana.</div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="toggleFaq(this)">Quero instalar um eletroposto UBY no meu estabelecimento. Como faço?<span class="faq-arr">▼</span></div>
+        <div class="faq-a">Fale conosco pelo WhatsApp! Fazemos um estudo de viabilidade gratuito e cuidamos de toda a instalação e operação. Nosso projeto prevê 50 pontos no Sul e Sudeste do Brasil.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="cta">
+  <div class="wrap">
+    <div class="cta-card reveal">
+      <h2>Carregue em Londrina.<br><span style="color:var(--g)">Agora.</span></h2>
+      <p>Veja a localização do nosso ponto ativo ou fale com nossa equipe.</p>
+      <div class="cta-btns">
+        <a href="#localizacao" class="btn btn-primary" style="font-size:16px;padding:16px 32px;">
+          📍 Ver localização
+        </a>
+        <a href="https://wa.me/5543988281585" target="_blank" rel="noopener" class="btn btn-outline" style="font-size:16px;padding:15px 32px;">
+          💬 Falar no WhatsApp
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<footer id="contato">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a href="#" class="nav-logo" style="display:inline-flex">
+          <div class="nav-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#050D0A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+          <span class="nav-brand">UBY <span>Recharge</span></span>
+        </a>
+        <p class="footer-desc">Rede de eletropostos de Londrina PR. 1 ponto ativo, 1 em obras, 50 no projeto.</p>
+        <div class="footer-socials">
+          <a class="soc-btn" href="https://www.instagram.com/uby.recharge" target="_blank" aria-label="Instagram">📸</a>
+          <a class="soc-btn" href="https://wa.me/5543988281585" target="_blank" aria-label="WhatsApp">💬</a>
+          <a class="soc-btn" href="https://maps.app.goo.gl/BziUxpxHEzAvSBHGA" target="_blank" aria-label="Google Maps">🌐</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Rede</h4>
+        <ul class="footer-links">
+          <li><a href="#status">Pontos ativos</a></li>
+          <li><a href="#localizacao">Localização</a></li>
+          <li><a href="#como-funciona">Como funciona</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Contato</h4>
+        <ul class="footer-links">
+          <li><a href="https://wa.me/5543988281585" target="_blank">WhatsApp</a></li>
+          <li><a href="https://maps.app.goo.gl/BziUxpxHEzAvSBHGA" target="_blank">Google Maps</a></li>
+          <li><a href="https://www.instagram.com/uby.recharge" target="_blank">Instagram</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-copy">© 2025 UBY Recharge. Londrina, PR. Todos os direitos reservados.</p>
+      <div class="footer-legal">
+        <a href="#">Privacidade</a>
+        <a href="#">Termos</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+<script>
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 40);
+  });
+
+  document.getElementById('ham').addEventListener('click', () => {
+    document.getElementById('mobileNav').classList.toggle('open');
+  });
+  function closeMob() { document.getElementById('mobileNav').classList.remove('open'); }
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        setTimeout(() => e.target.classList.add('visible'), i * 70);
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  function toggleFaq(btn) {
+    const item = btn.parentElement;
+    const open = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+    if (!open) item.classList.add('open');
+  }
+
+  let selectedStars = 0;
+  document.querySelectorAll('.star-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedStars = parseInt(btn.dataset.val);
+      document.querySelectorAll('.star-btn').forEach((b, i) => {
+        b.classList.toggle('active', i < selectedStars);
+      });
+    });
+    btn.addEventListener('mouseenter', () => {
+      const val = parseInt(btn.dataset.val);
+      document.querySelectorAll('.star-btn').forEach((b, i) => {
+        b.style.color = i < val ? 'var(--g)' : '';
+      });
+    });
+    btn.addEventListener('mouseleave', () => {
+      document.querySelectorAll('.star-btn').forEach((b, i) => {
+        b.style.color = i < selectedStars ? 'var(--g)' : '';
+      });
+    });
+  });
+
+  function submitReview() {
+    const nome    = document.getElementById('rev-nome').value.trim();
+    const veiculo = document.getElementById('rev-veiculo').value.trim();
+    const texto   = document.getElementById('rev-texto').value.trim();
+    if (!selectedStars || !nome || !texto) {
+      alert('Por favor preencha sua nota, nome e comentário.');
+      return;
+    }
+    const msg = encodeURIComponent(
+      `⭐ Avaliação UBY Recharge\nNota: ${'★'.repeat(selectedStars)}\nNome: ${nome}${veiculo ? '\nVeículo: '+veiculo : ''}\n\n"${texto}"`
+    );
+    window.open(`https://wa.me/5543988281585?text=${msg}`, '_blank');
+    document.getElementById('rev-success').style.display = 'block';
+  }
+</script>
+
 </body>
 </html>
