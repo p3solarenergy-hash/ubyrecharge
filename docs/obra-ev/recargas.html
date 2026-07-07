@@ -4031,16 +4031,59 @@ function chargeDisplayDay(charge = {}) {
   return charge?.startDate && !Number.isNaN(charge.startDate.getTime()) ? chargeDayLabel(charge) : 'Sem data';
 }
 
+function dayLabelFromDate(date) {
+  return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}`;
+}
+
+function dateOnly(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function eachDateInRange(start, end) {
+  if (!start || !end) return [];
+  const rows = [];
+  const cursor = dateOnly(start);
+  const limit = dateOnly(end);
+  while (cursor <= limit) {
+    rows.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return rows;
+}
+
+function dailySeriesBounds(dated = []) {
+  if (!dated.length) return null;
+  const minDate = new Date(Math.min(...dated.map(charge => charge.startDate)));
+  const maxDate = new Date(Math.max(...dated.map(charge => charge.startDate)));
+  const sameMonth = dated.every(charge =>
+    charge.startDate.getFullYear() === minDate.getFullYear() &&
+    charge.startDate.getMonth() === minDate.getMonth()
+  );
+  if (!sameMonth) return { start: minDate, end: maxDate };
+  const start = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+  const today = new Date();
+  const monthEnd = new Date(minDate.getFullYear(), minDate.getMonth() + 1, 0);
+  const end = today.getFullYear() === minDate.getFullYear() && today.getMonth() === minDate.getMonth()
+    ? new Date(Math.min(today, monthEnd))
+    : monthEnd;
+  return { start, end: maxDate > end ? maxDate : end };
+}
+
 function dailyFinancialSeries(charges = []) {
   const dated = charges.filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()));
   if (!dated.length) return { labels: [], revenue: [], idleValue: [] };
 
   const byDay = {};
+  const bounds = dailySeriesBounds(dated);
+  eachDateInRange(bounds.start, bounds.end).forEach(date => {
+    const label = dayLabelFromDate(date);
+    byDay[label] = { date, revenue: 0, idleValue: 0 };
+  });
   dated.forEach(charge => {
     const label = chargeDayLabel(charge);
     if (!byDay[label]) {
       byDay[label] = {
-        date: new Date(charge.startDate.getFullYear(), charge.startDate.getMonth(), charge.startDate.getDate()),
+        date: dateOnly(charge.startDate),
         revenue: 0,
         idleValue: 0
       };
@@ -4080,10 +4123,15 @@ function dailyOperationalRows(charges = [], historyCharges = charges) {
   if (!dated.length) return [];
   const firstClientDay = firstClientDayMap(historyCharges?.length ? historyCharges : charges);
   const byDay = {};
+  const bounds = dailySeriesBounds(dated);
+  eachDateInRange(bounds.start, bounds.end).forEach(date => {
+    const key = chargeDayKeyFromDate(date);
+    byDay[key] = { key, date, label: dayLabelFromDate(date), revenue: 0, energy: 0, count: 0, clients: new Set(), newClients: new Set(), failed: 0 };
+  });
   dated.forEach(charge => {
     const key = chargeDayKeyFromDate(charge.startDate);
     if (!byDay[key]) {
-      const date = new Date(charge.startDate.getFullYear(), charge.startDate.getMonth(), charge.startDate.getDate());
+      const date = dateOnly(charge.startDate);
       byDay[key] = { key, date, label: chargeDayLabel(charge), revenue: 0, energy: 0, count: 0, clients: new Set(), newClients: new Set(), failed: 0 };
     }
     const client = clientKeyFromCharge(charge);
@@ -6841,30 +6889,28 @@ function renderKPIs(charges, mk, window) {
   const proj    = dMonth / Math.max(days, 1);
   const occClass = occ.pct < 15 ? 'occ-red' : (occ.pct < 30 ? 'occ-yellow' : 'occ-green');
   const occStatus = occ.pct < 15 ? 'abaixo do objetivo minimo de 15%' : (occ.pct < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
-  const trendRevenue = kpiDayTrend(charges, 'revenue');
-  const trendCharges = kpiDayTrend(charges, 'count');
-  const trendEnergy = kpiDayTrend(charges, 'energy');
+  const idleValue = charges.reduce((sum, charge) => sum + Number(charge.idleValue || 0), 0);
+  const failedCount = charges.filter(charge => isFailedCharge(charge)).length;
 
   document.getElementById('kpiGrid').innerHTML = `
-    <div class="card"><div class="label">Receita total</div>
-      <div class="value">${fmtBRL(rev)}</div>
-      <div class="sub">projeção ${fmtBRL(rev * proj)}</div>${trendRevenue}</div>
-    <div class="card"><div class="label">Ocupação real</div>
-      <div class="value">${fmtPct(occ.pct)}</div>
-      <div class="bar"><span style="width:${Math.min(occ.pct,100).toFixed(1)}%"></span></div>
-      <div class="sub">intervalo · mês cheio ${fmtPct(occFull.pct)}</div></div>
     <div class="card"><div class="label">Ticket médio</div>
       <div class="value">${fmtBRL(avgTkt)}</div>
       <div class="sub">${avgKwh.toFixed(1).replace('.',',')} kWh por sessão válida</div></div>
     <div class="card"><div class="label">R$/kWh médio</div>
       <div class="value">${fmtBRL(revKwh)}</div>
       <div class="sub">receita ÷ energia</div></div>
-    <div class="card"><div class="label">Total recargas</div>
-      <div class="value">${charges.length}</div>
-      <div class="sub">${clients} clientes únicos</div>${trendCharges}</div>
-    <div class="card"><div class="label">Energia entregue</div>
-      <div class="value">${fmtKWh(energy)}</div>
-      <div class="sub">projeção ${fmtKWh(energy * proj)}</div>${trendEnergy}</div>
+    <div class="card"><div class="label">Sessão válida média</div>
+      <div class="value">${avgKwh.toFixed(1).replace('.',',')} kWh</div>
+      <div class="sub">${cleanStats.executed.length} recarga(s) executada(s)</div></div>
+    <div class="card"><div class="label">Projeção mês</div>
+      <div class="value">${fmtBRL(rev * proj)}</div>
+      <div class="sub">${fmtKWh(energy * proj)} se mantiver o ritmo</div></div>
+    <div class="card"><div class="label">Ociosidade</div>
+      <div class="value">${fmtBRL(idleValue)}</div>
+      <div class="sub">valor estimado parado após recarga</div></div>
+    <div class="card"><div class="label">Falhas no período</div>
+      <div class="value">${failedCount}</div>
+      <div class="sub">${charges.length ? fmtPct(failedCount / charges.length * 100) : '0,00%'} das tentativas</div></div>
   `;
 }
 
@@ -6875,6 +6921,7 @@ function enhanceIndividualKpis() {
   const byLabel = text => cards.find(card => normalizeTextForInsight(card.querySelector('.label')?.textContent || '').includes(text));
   const occCard = byLabel('ocupacao');
   const revenueCard = byLabel('receita total');
+  if (!occCard && !revenueCard) return;
   const ticketCard = byLabel('ticket');
   const revKwhCard = byLabel('kwh medio');
   const countCard = byLabel('total recargas');
