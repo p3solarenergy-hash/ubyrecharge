@@ -282,6 +282,10 @@
     .calendar-day .day-num { display:flex; justify-content:space-between; gap:8px; color:var(--p3-text); font-weight:800; font-size:13px; }
     .calendar-day .day-main { color:var(--p3-primary); font-size:17px; font-weight:800; line-height:1.1; }
     .calendar-day .day-sub { color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .calendar-day .day-occ { color:#BFEBD6; font-size:11px; font-weight:800; line-height:1.35; }
+    .calendar-day .day-occ.low { color:#FF9A9A; }
+    .calendar-day .day-occ.mid { color:#FFD66B; }
+    .calendar-day .day-occ.good { color:#57D990; }
     .calendar-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:auto; }
     .calendar-tag { background:rgba(45,127,249,.16); color:#BFD8FF; border:1px solid rgba(45,127,249,.25); border-radius:999px; padding:2px 7px; font-size:10px; line-height:1.4; }
     .calendar-tag.warn { background:rgba(242,169,61,.16); color:#FFD66B; border-color:rgba(242,169,61,.25); }
@@ -4727,6 +4731,14 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
   const dated = charges.filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()));
   const periodStart = dated.length ? new Date(Math.min(...dated.map(charge => charge.startDate))) : firstDay;
   const periodEnd = dated.length ? new Date(Math.max(...dated.map(charge => charge.startDate))) : lastDay;
+  const calendarPower = Math.max(Number(options.power || getPower() || 0), 0);
+  const dayOccupation = (energy = 0, dayCount = 1) => {
+    const days = Math.max(Number(dayCount || 1), 1);
+    const maxKWh = calendarPower * 24 * days;
+    const pct = maxKWh > 0 ? Number(energy || 0) / maxKWh * 100 : 0;
+    const cls = pct < 15 ? 'low' : (pct < 30 ? 'mid' : 'good');
+    return { pct, cls };
+  };
   const build = (external = {}) => {
     const weekHeads = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'].map(day => `<div class="calendar-head">${day}</div>`).join('');
     const locationLabel = external.location?.name
@@ -4740,12 +4752,14 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
         const item = dayOfMonthMap[day] || { revenue: 0, count: 0, energy: 0, failed: 0, newClientCount: 0, monthCount: 0 };
         const hasMovement = item.count > 0 || item.revenue > 0;
         const avgDayRevenue = item.monthCount ? item.revenue / item.monthCount : 0;
+        const occ = dayOccupation(item.energy, item.monthCount || 1);
         const cls = !hasMovement ? '' : (avgDayRevenue >= 150 ? 'good' : (avgDayRevenue <= 30 ? 'down' : 'warn'));
         const tags = weatherTagsForDayOfMonth(day, external).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
         return `<div class="calendar-day ${cls}">
           <div class="day-num"><span>Dia ${day}</span><span>${item.failed ? `${item.failed} erro(s)` : ''}</span></div>
           <div class="day-main">${fmtBRL(item.revenue)}</div>
           <div class="day-sub">${item.count} recarga(s) - ${fmtKWh(item.energy)}</div>
+          <div class="day-occ ${occ.cls}">Ocup. media/dia: ${fmtPct(occ.pct)}</div>
           <div class="day-sub">${item.monthCount || 0} mes(es) com movimento</div>
           <div class="day-sub">${item.newClientCount ? `${item.newClientCount} cliente(s) novo(s)` : 'sem cliente novo'}</div>
           <div class="calendar-tags">${tags}</div>
@@ -4764,6 +4778,7 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
       const prev = historyMap[dateKeyLocal(prevDate)] || { revenue: 0, count: 0, energy: 0, failed: 0 };
       const change = pctChange(item.revenue, prev.revenue);
       const hasMovement = item.count > 0 || item.revenue > 0;
+      const occ = dayOccupation(item.energy);
       const cls = !hasMovement ? '' : (change >= 10 ? 'good' : (change <= -10 ? 'down' : 'warn'));
       const changeText = prev.revenue > 0 || item.revenue > 0 ? `${change >= 0 ? '+' : ''}${fmtPct(change)} vs ${String(prevDate.getDate()).padStart(2,'0')}/${String(prevDate.getMonth()+1).padStart(2,'0')}` : 'sem base mes anterior';
       const tags = contextTagsForDate(date, external).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
@@ -4771,6 +4786,7 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
         <div class="day-num"><span>${index + 1}</span><span>${item.failed ? `${item.failed} erro(s)` : ''}</span></div>
         <div class="day-main">${fmtBRL(item.revenue)}</div>
         <div class="day-sub">${item.count} recarga(s) - ${fmtKWh(item.energy)}</div>
+        <div class="day-occ ${occ.cls}">Ocup. dia: ${fmtPct(occ.pct)}</div>
         <div class="day-sub">${item.newClientCount ? `${item.newClientCount} cliente(s) novo(s)` : 'sem cliente novo'}</div>
         <div class="day-sub">${changeText}</div>
         <div class="calendar-tags">${tags}</div>
@@ -6378,6 +6394,7 @@ function renderUbyOperation() {
   const totalCharges = allUbyCharges.length;
   const avgTicket = totalCharges ? revenue / totalCharges : 0;
   const cleanStats = cleanOperationStats(allUbyCharges);
+  const calendarPower = included.reduce((sum, row) => sum + Number(workPowerById(row.workId) || 0), 0) || getPower();
   const trendRevenue = kpiDayTrend(allUbyCharges, 'revenue', sourceUbyCharges);
   const trendCharges = kpiDayTrend(allUbyCharges, 'count', sourceUbyCharges);
   const trendEnergy = kpiDayTrend(allUbyCharges, 'energy', sourceUbyCharges);
@@ -6426,7 +6443,7 @@ function renderUbyOperation() {
   renderVisualSummary('ubyVisualSummary', allUbyCharges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceUbyCharges });
   renderUbyDecisionCockpit([], allUbyCharges, included);
   renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
-    calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated' }
+    calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower }
   });
 
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
@@ -6587,6 +6604,9 @@ function renderGeral() {
   const lastDate = dates.length ? new Date(Math.max(...dates)) : null;
   const avgTicket = totalCharges ? revenue / totalCharges : 0;
   const cleanStats = cleanOperationStats(charges);
+  const calendarPower = stationRows
+    .filter(row => row.count > 0)
+    .reduce((sum, row) => sum + Number(workPowerById(row.workId) || 0), 0) || getPower();
   const trendRevenue = kpiDayTrend(charges, 'revenue', sourceCharges);
   const trendCharges = kpiDayTrend(charges, 'count', sourceCharges);
   const trendEnergy = kpiDayTrend(charges, 'energy', sourceCharges);
@@ -6635,7 +6655,7 @@ function renderGeral() {
   `;
   renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
-  renderUsageInsights(charges, 'usageGeneral', sourceCharges);
+  renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower } });
   renderGeneralFinance(sourceUnitData);
 
   document.getElementById('generalUnitRank').innerHTML = rankingStationRows.length ? rankingStationRows.slice(0, 12).map(unit => `
