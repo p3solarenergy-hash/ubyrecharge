@@ -290,6 +290,25 @@
     .calendar-tag { background:rgba(45,127,249,.16); color:#BFD8FF; border:1px solid rgba(45,127,249,.25); border-radius:999px; padding:2px 7px; font-size:10px; line-height:1.4; }
     .calendar-tag.warn { background:rgba(242,169,61,.16); color:#FFD66B; border-color:rgba(242,169,61,.25); }
     .calendar-tag.muted { background:rgba(143,163,154,.10); color:var(--p3-muted); border-color:rgba(143,163,154,.18); }
+    .accountability-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+    .accountability-head p { margin:0; color:var(--p3-muted); font-size:12px; line-height:1.45; max-width:780px; }
+    .accountability-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .accountability-card { background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:16px; box-shadow:var(--p3-shadow); overflow:hidden; }
+    .accountability-title { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding-bottom:12px; border-bottom:1px solid var(--surface-border); }
+    .accountability-title strong { color:var(--p3-text); font-size:15px; line-height:1.25; display:block; }
+    .accountability-title span { color:var(--p3-muted); font-size:11px; display:block; margin-top:4px; }
+    .accountability-pill { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; padding:4px 9px; background:rgba(45,127,249,.16); color:#BFD8FF; border:1px solid rgba(45,127,249,.28); font-size:11px; font-weight:800; white-space:nowrap; }
+    .accountability-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:12px 0; }
+    .accountability-metric { border:1px solid rgba(84,180,255,.18); border-radius:10px; padding:10px; background:rgba(84,180,255,.05); min-width:0; }
+    .accountability-metric b { display:block; color:#57B7FF; font-size:16px; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .accountability-metric span { display:block; color:var(--p3-muted); font-size:10px; margin-top:4px; text-transform:uppercase; letter-spacing:.05em; }
+    .accountability-controls { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:12px; }
+    .accountability-controls label { display:grid; gap:6px; color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:800; min-width:0; }
+    .accountability-controls .wide { grid-column:span 2; }
+    .accountability-result { margin-top:12px; overflow-x:auto; }
+    .accountability-note { margin-top:12px; border-left:3px solid #57B7FF; border-radius:8px; padding:10px 12px; background:rgba(84,180,255,.08); color:#BFEBD6; font-size:12px; line-height:1.45; }
+    .investor-preview { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:14px; }
+    .investor-preview .accountability-metric { background:rgba(45,127,249,.07); }
 
     /* ── NOVO: Upload zone ── */
     .upload-zone {
@@ -452,6 +471,8 @@
       .decision-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .calendar-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
       .kpi-feature { grid-column:span 2; }
+      .accountability-grid { grid-template-columns:1fr; }
+      .investor-preview { grid-template-columns:repeat(3,minmax(0,1fr)); }
     }
     @media (max-width:960px) {
       .hero,.section,.kpis { grid-template-columns:1fr; }
@@ -473,6 +494,8 @@
       .podium-place, .podium-place.rank-1, .podium-place.rank-2, .podium-place.rank-3 { min-height:auto; }
       .podium-content, .podium-place.rank-1 .podium-content { min-height:auto; border-radius:10px 10px 0 0; }
       .podium-step, .podium-place.rank-1 .podium-step, .podium-place.rank-2 .podium-step, .podium-place.rank-3 .podium-step { min-height:50px; }
+      .accountability-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .accountability-metrics, .investor-preview { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
     @media (max-width:640px) {
       body { font-size:13px; }
@@ -983,6 +1006,20 @@
       </div>
     </section>
 
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="accountability-head">
+          <div>
+            <h2>Prestacao de contas dos pontos UBY</h2>
+            <p>Fechamento por parceiro de area com custo de energia, participacao da area e ajustes extras. O ciclo fecha todo dia 10; no Robert Koch o primeiro periodo considera 08/06/2026 a 10/07/2026.</p>
+          </div>
+          <span class="accountability-pill">Fechamento dia 10</span>
+        </div>
+        <div class="accountability-grid" id="ubyPartnerReports"></div>
+        <div class="accountability-note" id="ubyInvestorPreview"></div>
+      </div>
+    </section>
+
     <section class="day-compare-grid" id="usageUbyDayCompare"></section>
     <section class="section weekday-report" id="usageUbyWeekdayReport"></section>
 
@@ -1438,6 +1475,7 @@ let localRechargeDbSignature = '';
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
 const RECARGAS_IMPORT_UNDO_KEY = 'uby-recargas-import-undo-v1';
+const UBY_AREA_ACCOUNTING_KEY = 'uby-area-accounting-v1';
 const XLSX_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
 const CLUB_PARTNERS_LOCAL_KEY = 'uby-club-partners-v1';
@@ -1745,6 +1783,7 @@ function hydratedRechargeRecord(record, workId = '') {
     charges: Array.isArray(record.charges) ? record.charges.map(hydrateCharge) : [],
     financialSettings: record.financialSettings || record.summary?.financialSettings || {},
     ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
+    ubyAreaAccounting: record.ubyAreaAccounting || record.summary?.ubyAreaAccounting || {},
     updatedAt: record.updatedAt || record.summary?.updatedAt || ''
   };
 }
@@ -1793,6 +1832,7 @@ function mergeCloudRechargeRecords(records) {
       charges: Array.isArray(record.charges) ? record.charges : [],
       financialSettings: record.financialSettings || record.summary?.financialSettings || {},
       ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
+      ubyAreaAccounting: record.ubyAreaAccounting || record.summary?.ubyAreaAccounting || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
     const existing = allRechargeRecords[workId];
@@ -1825,6 +1865,7 @@ function rechargeSummary() {
     monthlyClosings,
     financialSettings,
     ubyOperationOverrides,
+    ubyAreaAccounting: readUbyAreaAccounting(),
     energyKWh: energy,
     revenue,
     firstDate: dates.length ? new Date(Math.min(...dates)).toISOString() : '',
@@ -1853,6 +1894,7 @@ function buildRechargeRecord() {
     monthlyClosings,
     financialSettings,
     ubyOperationOverrides,
+    ubyAreaAccounting: readUbyAreaAccounting(),
     summary: rechargeSummary(),
     updatedAt
   };
@@ -6411,6 +6453,210 @@ function summarizeUbyChargerRow(row, charges = row.charges || []) {
   };
 }
 
+function readUbyAreaAccounting() {
+  const local = readJson(UBY_AREA_ACCOUNTING_KEY, {});
+  Object.values(allRechargeRecords || {}).forEach(record => {
+    const cloud = record?.ubyAreaAccounting || record?.summary?.ubyAreaAccounting || {};
+    Object.assign(local, cloud);
+  });
+  return local;
+}
+
+function writeUbyAreaAccounting(data) {
+  writeJson(UBY_AREA_ACCOUNTING_KEY, data || {});
+}
+
+function ubyAreaRowKey(row = {}) {
+  return `${row.workId || 'obra'}|${normalizeStationForCompare(row.stationName || row.station || row.workName || '')}`;
+}
+
+function ubyAreaOperationStart(row = {}) {
+  const label = normalizeStationForCompare([row.stationName, row.station, row.workName].filter(Boolean).join(' '));
+  if (label.includes('robert koch')) return new Date(2026, 5, 8, 0, 0, 0);
+  const dates = (row.charges || []).map(charge => charge.startDate).filter(Boolean);
+  return dates.length ? new Date(Math.min(...dates)) : new Date();
+}
+
+function ubyAreaFirstClosingDate(start) {
+  if (!start || Number.isNaN(start.getTime())) return new Date();
+  const first = new Date(start.getFullYear(), start.getMonth(), 10, 23, 59, 59);
+  if (first <= start) first.setMonth(first.getMonth() + 1);
+  return first;
+}
+
+function ubyAreaCurrentCycle(row = {}, reference = new Date()) {
+  const start = ubyAreaOperationStart(row);
+  const firstClose = ubyAreaFirstClosingDate(start);
+  let close = new Date(reference.getFullYear(), reference.getMonth(), 10, 23, 59, 59);
+  if (close < reference) close = new Date(reference.getFullYear(), reference.getMonth() + 1, 10, 23, 59, 59);
+  if (close < firstClose) close = new Date(firstClose);
+  const prevClose = new Date(close.getFullYear(), close.getMonth() - 1, 10, 23, 59, 59);
+  const periodStart = close.getTime() === firstClose.getTime()
+    ? new Date(start)
+    : new Date(prevClose.getFullYear(), prevClose.getMonth(), prevClose.getDate() + 1, 0, 0, 0);
+  return {
+    start: periodStart,
+    end: close,
+    key: `${close.getFullYear()}-${String(close.getMonth() + 1).padStart(2, '0')}-10`,
+    label: `${fmtDateOnly(periodStart)} a ${fmtDateOnly(close)}`,
+    first: close.getTime() === firstClose.getTime()
+  };
+}
+
+function ubyAreaSettingsForRow(row = {}, cycle = {}) {
+  const saved = readUbyAreaAccounting();
+  const rowKey = ubyAreaRowKey(row);
+  const savedRow = saved[rowKey] || {};
+  const savedCycle = savedRow[cycle.key] || {};
+  const workFinance = allRechargeRecords[row.workId]?.financialSettings || {};
+  const latestMonth = [...new Set((row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort().at(-1) || '';
+  const finance = workFinance[latestMonth] || workFinance.default || defaultFinanceSettings();
+  const defaultShare = Number(finance.ownerRevenueSharePct || finance.ownerNetProfitSharePct || 0);
+  return {
+    energyRate: Number(savedCycle.energyRate ?? finance.ownerEnergyRate ?? finance.energyCostPerKWh ?? 0),
+    transferMode: savedCycle.transferMode || finance.ownerTransferMode || 'net',
+    areaSharePct: Number(savedCycle.areaSharePct ?? defaultShare ?? 0),
+    extraRevenue: Number(savedCycle.extraRevenue ?? 0),
+    otherCosts: Number(savedCycle.otherCosts ?? 0),
+    notes: savedCycle.notes || ''
+  };
+}
+
+async function saveUbyAreaSetting(rowKey, cycleKey, field, value) {
+  const saved = readUbyAreaAccounting();
+  const row = saved[rowKey] || {};
+  const current = row[cycleKey] || {};
+  const numericFields = new Set(['energyRate', 'areaSharePct', 'extraRevenue', 'otherCosts']);
+  current[field] = numericFields.has(field) ? Number(parseFloat(value) || 0) : String(value || '');
+  saved[rowKey] = { ...row, [cycleKey]: current };
+  writeUbyAreaAccounting(saved);
+  renderUbyOperation();
+  const workId = String(rowKey || '').split('|')[0] || '';
+  const perWork = Object.fromEntries(Object.entries(saved).filter(([key]) => key.startsWith(`${workId}|`)));
+  const record = allRechargeRecords[workId];
+  if (record) {
+    record.ubyAreaAccounting = perWork;
+    record.summary = { ...(record.summary || {}), ubyAreaAccounting: perWork };
+    const localDb = readJson(RECARGAS_LOCAL_KEY, {});
+    localDb[workId] = { ...(localDb[workId] || {}), ...record, summary: record.summary };
+    writeJson(RECARGAS_LOCAL_KEY, localDb);
+    if (window.UBY_SUPABASE?.saveRechargeBase) {
+      try {
+        await window.UBY_SUPABASE.saveRechargeBase(workId, record);
+        setStorageState('Prestacao de contas UBY salva no banco.');
+      } catch (err) {
+        setStorageState(`Prestacao salva neste navegador. Supabase pendente: ${err.message}`, true);
+      }
+      return;
+    }
+  }
+  setStorageState('Prestacao de contas UBY salva neste navegador.');
+}
+
+function calculateUbyAreaReport(row = {}, cycle = {}, settings = {}) {
+  const charges = (row.charges || []).filter(charge => {
+    const d = charge.startDate;
+    return d && d >= cycle.start && d <= cycle.end;
+  });
+  const revenue = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  const energyCost = energy * Number(settings.energyRate || 0);
+  const extraRevenue = Number(settings.extraRevenue || 0);
+  const otherCosts = Number(settings.otherCosts || 0);
+  const netBeforeArea = revenue + extraRevenue - energyCost - otherCosts;
+  const shareBase = settings.transferMode === 'gross' ? revenue : Math.max(netBeforeArea, 0);
+  const areaShare = shareBase * Number(settings.areaSharePct || 0) / 100;
+  const ubyResult = netBeforeArea - areaShare;
+  return { charges, count: charges.length, revenue, energy, clients, energyCost, extraRevenue, otherCosts, netBeforeArea, shareBase, areaShare, ubyResult };
+}
+
+function renderUbyPartnerReports(rows = []) {
+  const container = document.getElementById('ubyPartnerReports');
+  const investor = document.getElementById('ubyInvestorPreview');
+  if (!container || !investor) return;
+  if (!rows.length) {
+    container.innerHTML = '<div class="note">Nenhum carregador UBY com recargas para gerar prestacao de contas.</div>';
+    investor.textContent = 'O resumo para investidores sera montado automaticamente quando houver dados UBY no periodo.';
+    return;
+  }
+  const reports = rows.map(row => {
+    const cycle = ubyAreaCurrentCycle(row);
+    const settings = ubyAreaSettingsForRow(row, cycle);
+    const result = calculateUbyAreaReport(row, cycle, settings);
+    return { row, cycle, settings, result, rowKey: ubyAreaRowKey(row) };
+  }).sort((a, b) => b.result.revenue - a.result.revenue);
+  const totals = reports.reduce((acc, item) => {
+    Object.entries(item.result).forEach(([key, value]) => {
+      if (typeof value === 'number') acc[key] = (acc[key] || 0) + value;
+    });
+    return acc;
+  }, {});
+  container.innerHTML = reports.map(({ row, cycle, settings, result, rowKey }) => {
+    const modeLabel = settings.transferMode === 'gross' ? 'Bruto' : 'Lucro liquido';
+    return `
+      <div class="accountability-card">
+        <div class="accountability-title">
+          <div>
+            <strong>${escapeHtml(row.stationName || row.station || row.workName)}</strong>
+            <span>Obra: ${escapeHtml(row.workName)} | ciclo ${cycle.label}${cycle.first ? ' | primeiro fechamento' : ''}</span>
+          </div>
+          <span class="accountability-pill">${modeLabel}</span>
+        </div>
+        <div class="accountability-metrics">
+          <div class="accountability-metric"><b>${fmtBRL(result.revenue)}</b><span>Receita</span></div>
+          <div class="accountability-metric"><b>${fmtKWh(result.energy)}</b><span>Energia</span></div>
+          <div class="accountability-metric"><b>${result.count}</b><span>Recargas</span></div>
+          <div class="accountability-metric"><b>${result.clients}</b><span>Clientes</span></div>
+        </div>
+        <div class="accountability-controls">
+          <label>Energia R$/kWh
+            <input class="ctl-input" type="number" min="0" step="0.01" value="${settings.energyRate}" onchange="saveUbyAreaSetting('${escapeAttr(rowKey)}','${escapeAttr(cycle.key)}','energyRate',this.value)">
+          </label>
+          <label>Tipo repasse
+            <select class="ctl-select" onchange="saveUbyAreaSetting('${escapeAttr(rowKey)}','${escapeAttr(cycle.key)}','transferMode',this.value)">
+              <option value="net" ${settings.transferMode === 'net' ? 'selected' : ''}>Lucro liquido</option>
+              <option value="gross" ${settings.transferMode === 'gross' ? 'selected' : ''}>Faturamento bruto</option>
+            </select>
+          </label>
+          <label>% area
+            <input class="ctl-input" type="number" min="0" max="100" step="0.1" value="${settings.areaSharePct}" onchange="saveUbyAreaSetting('${escapeAttr(rowKey)}','${escapeAttr(cycle.key)}','areaSharePct',this.value)">
+          </label>
+          <label>Receitas extras
+            <input class="ctl-input" type="number" min="0" step="0.01" value="${settings.extraRevenue}" onchange="saveUbyAreaSetting('${escapeAttr(rowKey)}','${escapeAttr(cycle.key)}','extraRevenue',this.value)">
+          </label>
+          <label>Outros custos
+            <input class="ctl-input" type="number" min="0" step="0.01" value="${settings.otherCosts}" onchange="saveUbyAreaSetting('${escapeAttr(rowKey)}','${escapeAttr(cycle.key)}','otherCosts',this.value)">
+          </label>
+          <label class="wide">Observacao
+            <input class="ctl-input" value="${escapeAttr(settings.notes)}" onchange="saveUbyAreaSetting('${escapeAttr(rowKey)}','${escapeAttr(cycle.key)}','notes',this.value)" placeholder="energia, aluguel, acerto com area">
+          </label>
+        </div>
+        <div class="accountability-result">
+          <table>
+            <tbody>
+              <tr><td>Reembolso energia</td><td>${fmtBRL(result.energyCost)}</td><td>${fmtKWh(result.energy)} x ${fmtBRL(settings.energyRate)}</td></tr>
+              <tr><td>Base do repasse</td><td>${fmtBRL(result.shareBase)}</td><td>${modeLabel}</td></tr>
+              <tr><td>Participacao da area</td><td>${fmtBRL(result.areaShare)}</td><td>${fmtPct(settings.areaSharePct)}</td></tr>
+              <tr><td>Resultado UBY do ciclo</td><td>${fmtBRL(result.ubyResult)}</td><td>apos energia, extras e area</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }).join('');
+  investor.innerHTML = `
+    <strong>Previa para relatorio de investidores do periodo atual:</strong>
+    <div class="investor-preview">
+      <div class="accountability-metric"><b>${fmtBRL(totals.revenue || 0)}</b><span>Receita UBY</span></div>
+      <div class="accountability-metric"><b>${fmtBRL(totals.energyCost || 0)}</b><span>Custo energia</span></div>
+      <div class="accountability-metric"><b>${fmtBRL(totals.areaShare || 0)}</b><span>Areas/parceiros</span></div>
+      <div class="accountability-metric"><b>${fmtBRL(totals.ubyResult || 0)}</b><span>Resultado pontos</span></div>
+      <div class="accountability-metric"><b>${reports.length}</b><span>Pontos UBY</span></div>
+    </div>
+  `;
+}
+
 function renderUbyOperation() {
   const sourceUnitData = getGeneralUnitData();
   const sourceRows = getUbyChargerRows(sourceUnitData);
@@ -6512,6 +6758,7 @@ function renderUbyOperation() {
       <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir estacao</button></div>
     </div>
   `).join('') : '<div class="note">Nenhuma unidade marcada como UBY.</div>';
+  renderUbyPartnerReports(accessRows.filter(row => row.count > 0));
 
   const monthData = sourceMonths.map(mk => {
     const monthCharges = sourceUbyCharges.filter(charge => chargeMonthKey(charge) === mk);
