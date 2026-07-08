@@ -6566,7 +6566,39 @@ function calculateUbyAreaReport(row = {}, cycle = {}, settings = {}) {
   const shareBase = settings.transferMode === 'gross' ? revenue : Math.max(netBeforeArea, 0);
   const areaShare = shareBase * Number(settings.areaSharePct || 0) / 100;
   const ubyResult = netBeforeArea - areaShare;
-  return { charges, count: charges.length, revenue, energy, clients, energyCost, extraRevenue, otherCosts, netBeforeArea, shareBase, areaShare, ubyResult };
+  const partnerTotal = energyCost + areaShare;
+  return { charges, count: charges.length, revenue, energy, clients, energyCost, extraRevenue, otherCosts, netBeforeArea, shareBase, areaShare, partnerTotal, ubyResult };
+}
+
+function ubyAreaCyclesUntil(row = {}, currentCycle = ubyAreaCurrentCycle(row)) {
+  const start = ubyAreaOperationStart(row);
+  const firstClose = ubyAreaFirstClosingDate(start);
+  const cycles = [];
+  let close = new Date(firstClose);
+  while (close <= currentCycle.end) {
+    const prevClose = new Date(close.getFullYear(), close.getMonth() - 1, 10, 23, 59, 59);
+    const periodStart = close.getTime() === firstClose.getTime()
+      ? new Date(start)
+      : new Date(prevClose.getFullYear(), prevClose.getMonth(), prevClose.getDate() + 1, 0, 0, 0);
+    cycles.push({
+      start: periodStart,
+      end: new Date(close),
+      key: `${close.getFullYear()}-${String(close.getMonth() + 1).padStart(2, '0')}-10`,
+      label: `${fmtDateOnly(periodStart)} a ${fmtDateOnly(close)}`,
+      first: close.getTime() === firstClose.getTime()
+    });
+    close = new Date(close.getFullYear(), close.getMonth() + 1, 10, 23, 59, 59);
+  }
+  return cycles;
+}
+
+function sumUbyAreaReports(items = []) {
+  return items.reduce((acc, item) => {
+    Object.entries(item.result || item).forEach(([key, value]) => {
+      if (typeof value === 'number') acc[key] = (acc[key] || 0) + value;
+    });
+    return acc;
+  }, {});
 }
 
 function generateUbyAreaReportPdf(rowKey) {
@@ -6581,6 +6613,11 @@ function generateUbyAreaReportPdf(rowKey) {
   const settings = ubyAreaSettingsForRow(row, cycle);
   const result = calculateUbyAreaReport(row, cycle, settings);
   const modeLabel = settings.transferMode === 'gross' ? 'Faturamento bruto' : 'Lucro liquido';
+  const cycleReports = ubyAreaCyclesUntil(row, cycle).map(itemCycle => {
+    const itemSettings = ubyAreaSettingsForRow(row, itemCycle);
+    return { cycle: itemCycle, settings: itemSettings, result: calculateUbyAreaReport(row, itemCycle, itemSettings) };
+  });
+  const accumulated = sumUbyAreaReports(cycleReports);
   const rows = [
     ['Unidade', row.stationName || row.station || row.workName],
     ['Obra', row.workName],
@@ -6595,9 +6632,28 @@ function generateUbyAreaReportPdf(rowKey) {
     ['Tipo de repasse', modeLabel],
     ['Base do repasse', fmtBRL(result.shareBase)],
     ['Participacao da area', `${fmtPct(settings.areaSharePct)} = ${fmtBRL(result.areaShare)}`],
-    ['Resultado UBY do ciclo', fmtBRL(result.ubyResult)],
+    ['Total para area no periodo', `${fmtBRL(result.energyCost)} + ${fmtBRL(result.areaShare)} = ${fmtBRL(result.partnerTotal)}`],
     ['Observacao', settings.notes || '-']
   ];
+  const accumulatedRows = [
+    ['Receita acumulada', fmtBRL(accumulated.revenue || 0)],
+    ['Energia acumulada', fmtKWh(accumulated.energy || 0)],
+    ['Recargas acumuladas', String(accumulated.count || 0)],
+    ['Reembolso energia acumulado', fmtBRL(accumulated.energyCost || 0)],
+    ['Participacao area acumulada', fmtBRL(accumulated.areaShare || 0)],
+    ['Total acumulado para area', fmtBRL(accumulated.partnerTotal || 0)]
+  ];
+  const cycleRows = cycleReports.map(item => `
+    <tr>
+      <td>${escapeHtml(item.cycle.label)}</td>
+      <td>${fmtBRL(item.result.revenue)}</td>
+      <td>${fmtKWh(item.result.energy)}</td>
+      <td>${item.result.count}</td>
+      <td>${fmtBRL(item.result.energyCost)}</td>
+      <td>${fmtBRL(item.result.areaShare)}</td>
+      <td><strong>${fmtBRL(item.result.partnerTotal)}</strong></td>
+    </tr>
+  `).join('');
   const printable = window.open('', '_blank');
   if (!printable) {
     alert('O navegador bloqueou a janela do relatorio. Libere pop-ups para gerar o PDF.');
@@ -6620,9 +6676,11 @@ function generateUbyAreaReportPdf(rowKey) {
         .kpi b{display:block;color:#2D7FF9;font-size:20px}
         .kpi span{display:block;color:#425466;font-size:11px;text-transform:uppercase;margin-top:4px}
         table{width:100%;border-collapse:collapse;margin-top:12px}
+        th{background:#f6f9fc;border-bottom:1px solid #d8e3f0;padding:10px 8px;font-size:12px;text-align:left;color:#24364e}
         td{border-bottom:1px solid #d8e3f0;padding:11px 8px;font-size:13px}
         td:first-child{font-weight:700;color:#24364e;width:32%}
         .total{font-size:18px;font-weight:800;color:#0b1524}
+        .section-title{font-size:16px;font-weight:800;margin:24px 0 8px;color:#0b1524}
         .foot{margin-top:22px;color:#66788a;font-size:11px}
         @media print{button{display:none}body{margin:18mm}.head{break-inside:avoid}}
       </style>
@@ -6642,7 +6700,14 @@ function generateUbyAreaReportPdf(rowKey) {
         <div class="kpi"><b>${result.clients}</b><span>Clientes</span></div>
       </div>
       <table>${rows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`).join('')}</table>
-      <p class="total">Total para area: ${fmtBRL(result.areaShare)} | Resultado UBY: ${fmtBRL(result.ubyResult)}</p>
+      <p class="total">Total para area no periodo: ${fmtBRL(result.partnerTotal)}</p>
+      <div class="section-title">Acumulado do ponto</div>
+      <table>${accumulatedRows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`).join('')}</table>
+      <div class="section-title">Historico por fechamento</div>
+      <table>
+        <thead><tr><th>Periodo</th><th>Receita</th><th>Energia</th><th>Recargas</th><th>Energia R$</th><th>Participacao</th><th>Total area</th></tr></thead>
+        <tbody>${cycleRows}</tbody>
+      </table>
       <div class="foot">Relatorio operacional gerado pelo painel UBY Recharge. Conferir notas fiscais, tarifa de energia e ajustes manuais antes do envio final.</div>
       <script>setTimeout(()=>window.print(),350)<\/script>
     </body>
@@ -6721,7 +6786,7 @@ function renderUbyPartnerReports(rows = []) {
               <tr><td>Reembolso energia</td><td>${fmtBRL(result.energyCost)}</td><td>${fmtKWh(result.energy)} x ${fmtBRL(settings.energyRate)}</td></tr>
               <tr><td>Base do repasse</td><td>${fmtBRL(result.shareBase)}</td><td>${modeLabel}</td></tr>
               <tr><td>Participacao da area</td><td>${fmtBRL(result.areaShare)}</td><td>${fmtPct(settings.areaSharePct)}</td></tr>
-              <tr><td>Resultado UBY do ciclo</td><td>${fmtBRL(result.ubyResult)}</td><td>apos energia, extras e area</td></tr>
+              <tr><td>Total para area</td><td>${fmtBRL(result.partnerTotal)}</td><td>energia + participacao</td></tr>
             </tbody>
           </table>
         </div>
