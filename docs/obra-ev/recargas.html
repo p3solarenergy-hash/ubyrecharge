@@ -1006,20 +1006,6 @@
       </div>
     </section>
 
-    <section class="section" style="margin-top:18px">
-      <div class="card" style="grid-column:1/-1">
-        <div class="accountability-head">
-          <div>
-            <h2>Prestacao de contas dos pontos UBY</h2>
-            <p>Fechamento por parceiro de area com custo de energia, participacao da area e ajustes extras. O ciclo fecha todo dia 10; no Robert Koch o primeiro periodo considera 08/06/2026 a 10/07/2026.</p>
-          </div>
-          <span class="accountability-pill">Fechamento dia 10</span>
-        </div>
-        <div class="accountability-grid" id="ubyPartnerReports"></div>
-        <div class="accountability-note" id="ubyInvestorPreview"></div>
-      </div>
-    </section>
-
     <section class="day-compare-grid" id="usageUbyDayCompare"></section>
     <section class="section weekday-report" id="usageUbyWeekdayReport"></section>
 
@@ -1087,6 +1073,20 @@
             <tbody id="ubyChargerTable"></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="accountability-head">
+          <div>
+            <h2>Prestacao de contas dos pontos UBY</h2>
+            <p>Fechamento por parceiro de area com custo de energia, participacao da area e ajustes extras. O ciclo fecha todo dia 10; no Robert Koch o primeiro periodo considera 08/06/2026 a 10/07/2026.</p>
+          </div>
+          <span class="accountability-pill">Fechamento dia 10</span>
+        </div>
+        <div class="accountability-grid" id="ubyPartnerReports"></div>
+        <div class="accountability-note" id="ubyInvestorPreview"></div>
       </div>
     </section>
 
@@ -6479,9 +6479,7 @@ function ubyAreaOperationStart(row = {}) {
 
 function ubyAreaFirstClosingDate(start) {
   if (!start || Number.isNaN(start.getTime())) return new Date();
-  const first = new Date(start.getFullYear(), start.getMonth(), 10, 23, 59, 59);
-  if (first <= start) first.setMonth(first.getMonth() + 1);
-  return first;
+  return new Date(start.getFullYear(), start.getMonth() + 1, 10, 23, 59, 59);
 }
 
 function ubyAreaCurrentCycle(row = {}, reference = new Date()) {
@@ -6571,6 +6569,88 @@ function calculateUbyAreaReport(row = {}, cycle = {}, settings = {}) {
   return { charges, count: charges.length, revenue, energy, clients, energyCost, extraRevenue, otherCosts, netBeforeArea, shareBase, areaShare, ubyResult };
 }
 
+function generateUbyAreaReportPdf(rowKey) {
+  const row = getUbyChargerRows(getGeneralUnitData())
+    .map(item => summarizeUbyChargerRow(item, item.charges))
+    .find(item => ubyAreaRowKey(item) === rowKey);
+  if (!row) {
+    alert('Nao encontrei a base deste ponto para gerar o relatorio.');
+    return;
+  }
+  const cycle = ubyAreaCurrentCycle(row);
+  const settings = ubyAreaSettingsForRow(row, cycle);
+  const result = calculateUbyAreaReport(row, cycle, settings);
+  const modeLabel = settings.transferMode === 'gross' ? 'Faturamento bruto' : 'Lucro liquido';
+  const rows = [
+    ['Unidade', row.stationName || row.station || row.workName],
+    ['Obra', row.workName],
+    ['Periodo', cycle.label],
+    ['Receita do periodo', fmtBRL(result.revenue)],
+    ['Energia consumida', fmtKWh(result.energy)],
+    ['Recargas', String(result.count)],
+    ['Clientes atendidos', String(result.clients)],
+    ['Custo energia', `${fmtKWh(result.energy)} x ${fmtBRL(settings.energyRate)} = ${fmtBRL(result.energyCost)}`],
+    ['Receitas extras', fmtBRL(result.extraRevenue)],
+    ['Outros custos', fmtBRL(result.otherCosts)],
+    ['Tipo de repasse', modeLabel],
+    ['Base do repasse', fmtBRL(result.shareBase)],
+    ['Participacao da area', `${fmtPct(settings.areaSharePct)} = ${fmtBRL(result.areaShare)}`],
+    ['Resultado UBY do ciclo', fmtBRL(result.ubyResult)],
+    ['Observacao', settings.notes || '-']
+  ];
+  const printable = window.open('', '_blank');
+  if (!printable) {
+    alert('O navegador bloqueou a janela do relatorio. Libere pop-ups para gerar o PDF.');
+    return;
+  }
+  printable.document.write(`
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Prestacao de contas UBY - ${escapeHtml(row.stationName || row.workName)}</title>
+      <style>
+        body{font-family:Arial,sans-serif;color:#0b1524;margin:32px;background:#fff}
+        .head{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #2D7FF9;padding-bottom:18px;margin-bottom:24px}
+        h1{font-size:24px;margin:0 0 8px;color:#0b1524}
+        .sub{color:#425466;font-size:13px;line-height:1.45}
+        .badge{border:1px solid #2D7FF9;color:#2D7FF9;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;height:max-content}
+        .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}
+        .kpi{border:1px solid #d8e3f0;border-radius:10px;padding:12px;background:#f6f9fc}
+        .kpi b{display:block;color:#2D7FF9;font-size:20px}
+        .kpi span{display:block;color:#425466;font-size:11px;text-transform:uppercase;margin-top:4px}
+        table{width:100%;border-collapse:collapse;margin-top:12px}
+        td{border-bottom:1px solid #d8e3f0;padding:11px 8px;font-size:13px}
+        td:first-child{font-weight:700;color:#24364e;width:32%}
+        .total{font-size:18px;font-weight:800;color:#0b1524}
+        .foot{margin-top:22px;color:#66788a;font-size:11px}
+        @media print{button{display:none}body{margin:18mm}.head{break-inside:avoid}}
+      </style>
+    </head>
+    <body>
+      <div class="head">
+        <div>
+          <h1>Prestacao de contas UBY</h1>
+          <div class="sub">${escapeHtml(row.stationName || row.workName)}<br>Periodo: ${escapeHtml(cycle.label)}<br>Gerado em ${fmtDT(new Date())}</div>
+        </div>
+        <div class="badge">Fechamento dia 10</div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><b>${fmtBRL(result.revenue)}</b><span>Receita</span></div>
+        <div class="kpi"><b>${fmtKWh(result.energy)}</b><span>Energia</span></div>
+        <div class="kpi"><b>${result.count}</b><span>Recargas</span></div>
+        <div class="kpi"><b>${result.clients}</b><span>Clientes</span></div>
+      </div>
+      <table>${rows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`).join('')}</table>
+      <p class="total">Total para area: ${fmtBRL(result.areaShare)} | Resultado UBY: ${fmtBRL(result.ubyResult)}</p>
+      <div class="foot">Relatorio operacional gerado pelo painel UBY Recharge. Conferir notas fiscais, tarifa de energia e ajustes manuais antes do envio final.</div>
+      <script>setTimeout(()=>window.print(),350)<\/script>
+    </body>
+    </html>
+  `);
+  printable.document.close();
+}
+
 function renderUbyPartnerReports(rows = []) {
   const container = document.getElementById('ubyPartnerReports');
   const investor = document.getElementById('ubyInvestorPreview');
@@ -6601,7 +6681,10 @@ function renderUbyPartnerReports(rows = []) {
             <strong>${escapeHtml(row.stationName || row.station || row.workName)}</strong>
             <span>Obra: ${escapeHtml(row.workName)} | ciclo ${cycle.label}${cycle.first ? ' | primeiro fechamento' : ''}</span>
           </div>
-          <span class="accountability-pill">${modeLabel}</span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+            <span class="accountability-pill">${modeLabel}</span>
+            <button class="btn-recalc" type="button" onclick="generateUbyAreaReportPdf('${escapeAttr(rowKey)}')">Gerar PDF</button>
+          </div>
         </div>
         <div class="accountability-metrics">
           <div class="accountability-metric"><b>${fmtBRL(result.revenue)}</b><span>Receita</span></div>
