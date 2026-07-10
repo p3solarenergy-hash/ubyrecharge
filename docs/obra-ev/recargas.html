@@ -45,7 +45,9 @@
     /* Cards e grid */
     .grid   { display:grid; gap:14px; }
     .kpis   { grid-template-columns:repeat(6,minmax(150px,1fr)); margin-top:24px; }
-    .card   { position:relative; overflow:hidden; background:var(--p3-card); border:1px solid var(--p3-border); border-radius:12px; padding:18px; box-shadow:var(--p3-shadow); }
+    .card   { position:relative; overflow:hidden; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:18px; box-shadow:var(--p3-shadow); }
+    .card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.9; pointer-events:none; }
+    .card > * { position:relative; z-index:1; }
     .kpis .card { min-height:136px; }
     .label  { color:var(--p3-muted); font-size:11px; text-transform:uppercase; font-weight:700; letter-spacing:.8px; min-height:18px; overflow-wrap:anywhere; }
     .value  { font-size:clamp(22px,2.1vw,30px); font-weight:700; color:var(--p3-primary); margin-top:6px; line-height:1.1; white-space:nowrap; }
@@ -86,7 +88,9 @@
     .general-hero .value { color:#fff; font-size:clamp(30px,4vw,48px); }
     .general-split { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
     .unit-rank { display:grid; gap:12px; }
-    .unit-card { display:grid; grid-template-columns:minmax(180px,1fr) minmax(120px,.45fr) minmax(120px,.45fr) auto; gap:12px; align-items:center; background:#0B1524; border:1px solid var(--p3-border); border-radius:10px; padding:12px 14px; }
+    .unit-card { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(180px,1fr) minmax(120px,.45fr) minmax(120px,.45fr) auto; gap:12px; align-items:center; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:12px 14px; box-shadow:var(--p3-shadow); }
+    .unit-card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
+    .unit-card > * { position:relative; z-index:1; }
     .unit-card strong { display:block; color:var(--p3-text); font-size:13px; }
     .unit-card span { color:var(--p3-muted); font-size:11px; }
     .unit-card .unit-value { color:var(--p3-primary); font-weight:700; text-align:right; white-space:nowrap; }
@@ -125,7 +129,9 @@
     .ai-card .action { color:#E8EFEB; font-size:12px; font-weight:700; }
     .daily-metrics { display:grid; gap:10px; }
     .metric-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; align-items:stretch; }
-    .metric-mini { background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:11px 12px; min-height:104px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:var(--p3-shadow); }
+    .metric-mini { position:relative; overflow:hidden; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:11px 12px; min-height:104px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:var(--p3-shadow); }
+    .metric-mini::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
+    .metric-mini > * { position:relative; z-index:1; }
     .metric-mini strong { display:block; color:var(--p3-primary); font-size:17px; margin-top:4px; line-height:1.15; }
     .metric-mini span { display:block; color:var(--p3-muted); font-size:11px; }
     .metric-mini.good strong { color:#38C96F; }
@@ -136,13 +142,15 @@
     .metric-line b { color:var(--p3-primary); font-weight:700; white-space:nowrap; }
     .metric-line .warn { color:var(--p3-warn); }
     .metric-line .good { color:#38C96F; }
-    .visual-summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin:18px 0; }
-    .visual-card { position:relative; min-height:132px; overflow:hidden; border-radius:12px; border:1px solid var(--surface-border); background:var(--surface-bg); color:var(--p3-text); box-shadow:var(--p3-shadow); padding:18px 16px; display:flex; flex-direction:column; justify-content:space-between; }
+    .visual-summary { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:12px; margin:18px 0; }
+    .visual-card { grid-column:span 2; position:relative; min-height:132px; overflow:hidden; border-radius:12px; border:1px solid var(--surface-border); background:var(--surface-bg); color:var(--p3-text); box-shadow:var(--p3-shadow); padding:18px 16px; display:flex; flex-direction:column; justify-content:space-between; }
+    .visual-card.feature { grid-column:span 3; min-height:152px; }
     .visual-card::before { content:""; position:absolute; inset:auto 0 0 0; height:4px; background:#57B7FF; opacity:.95; }
     .visual-card::after { content:""; display:none; position:absolute; right:-18px; top:-10px; width:120px; height:120px; background:var(--visual-img) center/contain no-repeat; opacity:.07; filter:grayscale(1) brightness(2.1); }
     .visual-card.main::after { display:block; }
     .visual-card .visual-title { position:relative; z-index:1; color:#BFEAD8; font-size:14px; font-weight:900; line-height:1.25; max-width:72%; }
     .visual-card .visual-value { position:relative; z-index:1; color:#57B7FF; font-size:24px; font-weight:900; line-height:1; }
+    .visual-card.feature .visual-value { font-size:30px; }
     .visual-card .visual-sub { position:relative; z-index:1; color:var(--p3-muted); font-size:11px; margin-top:6px; line-height:1.35; }
     .visual-card .visual-trend { position:absolute; right:12px; bottom:16px; z-index:1; display:grid; place-items:center; width:26px; height:26px; border-radius:999px; color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.28); font-weight:900; font-size:15px; }
     .visual-card.warn { background:var(--surface-bg); border-color:rgba(255,214,107,.32); }
@@ -201,7 +209,9 @@
     .decision-card strong { display:block; color:var(--p3-text); font-size:18px; margin:8px 0 6px; line-height:1.2; }
     .decision-card p { margin:0; color:var(--p3-muted); font-size:12px; line-height:1.45; }
     .action-list { display:grid; gap:10px; }
-    .action-row { display:grid; grid-template-columns:minmax(140px,1fr) auto; gap:12px; align-items:center; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:12px 14px; }
+    .action-row { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(140px,1fr) auto; gap:12px; align-items:center; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:12px 14px; box-shadow:var(--p3-shadow); }
+    .action-row::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
+    .action-row > * { position:relative; z-index:1; }
     .action-row strong { display:block; color:var(--p3-text); font-size:13px; }
     .action-row span { display:block; color:var(--p3-muted); font-size:11px; margin-top:2px; }
     .action-row b { color:var(--p3-primary); font-size:14px; white-space:nowrap; }
@@ -293,7 +303,9 @@
     .accountability-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
     .accountability-head p { margin:0; color:var(--p3-muted); font-size:12px; line-height:1.45; max-width:780px; }
     .accountability-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-    .accountability-card { background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:16px; box-shadow:var(--p3-shadow); overflow:hidden; }
+    .accountability-card { position:relative; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:16px; box-shadow:var(--p3-shadow); overflow:hidden; }
+    .accountability-card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
+    .accountability-card > * { position:relative; z-index:1; }
     .accountability-title { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding-bottom:12px; border-bottom:1px solid var(--surface-border); }
     .accountability-title strong { color:var(--p3-text); font-size:15px; line-height:1.25; display:block; }
     .accountability-title span { color:var(--p3-muted); font-size:11px; display:block; margin-top:4px; }
@@ -467,6 +479,7 @@
       .general-split { grid-template-columns:1fr; }
       .metric-strip { grid-template-columns:1fr; }
       .visual-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .visual-card, .visual-card.feature { grid-column:span 1; }
       .day-compare-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .decision-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .calendar-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
@@ -546,9 +559,10 @@
       canvas { max-height:240px; }
       .pay-grid, .metric-strip, .club-print-foot { grid-template-columns:1fr; }
       .visual-summary { grid-template-columns:1fr 1fr; gap:8px; }
+      .visual-card, .visual-card.feature { grid-column:span 1; min-height:118px; }
       .visual-card { min-height:118px; padding:14px 12px; }
       .visual-card .visual-title { font-size:12px; }
-      .visual-card .visual-value { font-size:19px; }
+      .visual-card .visual-value, .visual-card.feature .visual-value { font-size:19px; }
       .day-compare-grid { grid-template-columns:1fr 1fr; gap:8px; }
       .day-kpi-card { min-height:112px; padding:12px; }
       .day-kpi-card strong { font-size:20px; }
@@ -4249,14 +4263,14 @@ function renderVisualSummary(elId, charges = [], options = {}) {
   const imgBolt = "url('assets/brand/05_simbolo_raio.svg')";
   const imgBadge = "url('assets/brand/04_simbolo_badge.svg')";
   const cards = [
-    { title: 'Ocupacao semanal', value: fmtPct(occ.pct), sub: 'base do periodo selecionado', trend: trendGlyph(occ.pct - 15), cls: occState, img: imgBolt },
+    { title: 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: 'base do periodo selecionado', trend: trendGlyph(occ.pct - 15), cls: occState, img: imgBolt },
     { title: 'Faturamento', value: fmtBRL(revenue), sub: `${signedMoney(revenueDiff)} vs dia anterior`, trend: trendGlyph(revenueDiff), cls: revenueDiff < 0 ? 'bad' : '', img: imgBadge },
     { title: 'Consumo de energia', value: fmtKWh(energy), sub: `${signedNumber(energyDiff, ' kWh')} vs dia anterior`, trend: trendGlyph(energyDiff), cls: energyDiff < 0 ? 'warn' : '', img: imgBolt },
     { title: 'Clientes atendidos', value: String(clients), sub: `${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, trend: trendGlyph(clients), cls: '', img: imgBadge },
     { title: 'Total de transacoes', value: String(total), sub: `${signedNumber(countDiff)} vs dia anterior`, trend: trendGlyph(countDiff), cls: countDiff < 0 ? 'warn' : '', img: imgBolt }
   ];
   el.innerHTML = cards.map((card, index) => `
-    <div class="visual-card ${index === 0 ? 'main' : ''} ${card.cls || ''}" style="--visual-img:${card.img}">
+    <div class="visual-card ${index < 2 ? 'feature main' : ''} ${card.cls || ''}" style="--visual-img:${card.img}">
       <div class="visual-title">${card.title}</div>
       <div>
         <div class="visual-value">${card.value}</div>
@@ -4389,11 +4403,25 @@ function renderWeekdayReport(prefix = 'usage', charges = [], historyCharges = ch
   `;
 }
 
-function weekdayOccupancyRows(charges = [], power = getPower()) {
+function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
   const groups = {};
   WEEKDAY_ORDER_BR.forEach(idx => {
     groups[idx] = { idx, label: WEEKDAY_LABELS_BR[idx], dates: new Set(), revenue: 0, energy: 0, count: 0, clients: new Set(), failed: 0 };
   });
+  const validDates = charges
+    .map(charge => charge.startDate)
+    .filter(date => date && !Number.isNaN(date.getTime()));
+  const startBound = bounds?.start || (validDates.length ? new Date(Math.min(...validDates)) : null);
+  const endBound = bounds?.end || (validDates.length ? new Date(Math.max(...validDates)) : null);
+  if (startBound && endBound) {
+    const cursor = new Date(startBound.getFullYear(), startBound.getMonth(), startBound.getDate(), 0, 0, 0);
+    const endDay = new Date(endBound.getFullYear(), endBound.getMonth(), endBound.getDate(), 0, 0, 0);
+    while (cursor <= endDay) {
+      const idx = cursor.getDay();
+      groups[idx].dates.add(dateKeyLocal(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
   charges
     .filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()))
     .forEach(charge => {
@@ -4430,10 +4458,10 @@ function occClassForPct(pct = 0) {
   return pct < 15 ? 'occ-red' : (pct < 30 ? 'occ-yellow' : 'occ-green');
 }
 
-function renderWeekdayOccupancyReport(elId, charges = [], power = getPower(), title = 'Dinamica semanal de ocupacao') {
+function renderWeekdayOccupancyReport(elId, charges = [], power = getPower(), title = 'Dinamica semanal de ocupacao', bounds = null) {
   const el = document.getElementById(elId);
   if (!el) return;
-  const rows = weekdayOccupancyRows(charges, power);
+  const rows = weekdayOccupancyRows(charges, power, bounds);
   const activeRows = rows.filter(row => row.days || row.count || row.energy || row.revenue);
   if (!activeRows.length) {
     el.innerHTML = '';
@@ -4470,7 +4498,7 @@ function renderWeekdayOccupancyReport(elId, charges = [], power = getPower(), ti
       <div class="weekday-bars">${bars}</div>
       <div class="weekday-best">
         <strong>Melhor ocupacao: ${best.label} (${fmtPct(best.occ)})</strong>
-        <span>Pior dia: ${worst.label} (${fmtPct(worst.occ)}). A leitura usa os dias com movimento no periodo selecionado.</span>
+        <span>Pior dia: ${worst.label} (${fmtPct(worst.occ)}). A leitura usa todos os dias do periodo selecionado.</span>
       </div>
     </div>
     <div class="card">
@@ -5389,10 +5417,12 @@ function renderCouponSummary(id, details = []) {
 function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = charges, options = {}) {
   const data = usageSeries(charges);
   const daily = dailyFinancialSeries(charges);
+  const weekdayPower = options.weekdayPower || options.calendar?.power || getPower();
+  const weekdayBounds = options.weekdayBounds || options.bounds || null;
   renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
   renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
   renderDayComparison(prefix, charges, historyCharges);
-  renderWeekdayOccupancyReport(`${prefix}WeekdayReport`, charges, getPower(), 'Dinamica semanal de ocupacao');
+  renderWeekdayOccupancyReport(`${prefix}WeekdayReport`, charges, weekdayPower, 'Dinamica semanal de ocupacao', weekdayBounds);
   renderDailyOperationalMetrics(prefix, charges, historyCharges);
   renderRecentFailureDiagnostics(prefix, charges);
   renderOperationQuality(prefix, charges);
@@ -6885,7 +6915,9 @@ function renderUbyOperation() {
   renderVisualSummary('ubyVisualSummary', allUbyCharges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceUbyCharges });
   renderUbyDecisionCockpit([], allUbyCharges, included);
   renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
-    calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower }
+    calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower },
+    weekdayPower: calendarPower,
+    weekdayBounds: { start: firstPeriod, end: lastPeriod }
   });
 
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
@@ -7083,6 +7115,14 @@ function renderGeral() {
     : 'Sem bases salvas para consolidar';
   const occClass = totalOcc < 15 ? 'occ-red' : (totalOcc < 30 ? 'occ-yellow' : 'occ-green');
   const occStatus = totalOcc < 15 ? 'abaixo do objetivo minimo de 15%' : (totalOcc < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
+  const generalComplementCards = `
+    <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
+    <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.stationName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
+    <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
+    <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
+    <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
+    <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
+  `;
 
   document.getElementById('kpiGeneral').innerHTML = `
     <div class="card kpi-feature ${occClass}"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">${occStatus} · meta: 15% minimo / 30% ideal</div></div>
@@ -7096,9 +7136,10 @@ function renderGeral() {
     <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
   `;
+  document.getElementById('kpiGeneral').innerHTML = generalComplementCards;
   renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
-  renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower } });
+  renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } });
   renderGeneralFinance(sourceUnitData);
 
   document.getElementById('generalUnitRank').innerHTML = rankingStationRows.length ? rankingStationRows.slice(0, 12).map(unit => `
@@ -7224,10 +7265,10 @@ function renderMensal() {
   const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
-  renderUsageInsights(monthCharges, 'usage', allCharges);
+  renderUsageInsights(monthCharges, 'usage', allCharges, { weekdayPower: getPower(), weekdayBounds: window });
   if (!charges.length) {
     renderVisualSummary('monthlyVisualSummary', [], { historyCharges: allCharges });
-    renderWeekdayOccupancyReport('weekdayOccupancyMensal', [], getPower(), `Dinamica semanal - ${monthLabel(mk)}`);
+  renderWeekdayOccupancyReport('weekdayOccupancyMensal', [], getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
     setStorageState(`Sem recargas em ${periodModeLabel(window.mode)} para <strong>${currentWorkName}</strong>.`);
     renderMonthClosing(mk);
     return;
@@ -7237,7 +7278,7 @@ function renderMensal() {
   renderVisualSummary('monthlyVisualSummary', charges, { bounds: window, historyCharges: allCharges });
   renderKPIs(charges, mk, window);
   enhanceIndividualKpis();
-  renderWeekdayOccupancyReport('weekdayOccupancyMensal', charges, getPower(), `Dinamica semanal - ${monthLabel(mk)}`);
+  renderWeekdayOccupancyReport('weekdayOccupancyMensal', charges, getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
   renderPaymentChart(charges);
   renderUserPieChart(charges);
   renderUserBars(charges, 'userBars');
