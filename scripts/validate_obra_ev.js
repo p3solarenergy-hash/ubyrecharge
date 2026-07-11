@@ -8,6 +8,7 @@ const obraDir = path.join(root, "docs", "obra-ev");
 const jsFiles = [
   "auth.js",
   "backup_guard.js",
+  "finance_engine.js",
   "supabase_bridge.js",
   "app_store.js",
   "sidebar.js"

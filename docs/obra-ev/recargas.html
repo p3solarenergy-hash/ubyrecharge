@@ -322,6 +322,62 @@
     .investor-preview { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:14px; }
     .investor-preview .accountability-metric { background:rgba(45,127,249,.07); }
 
+    /* Financeiro operacional por carregador */
+    .finance-workbench { margin-top:18px; }
+    .finance-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+    .finance-section-head h2 { margin:0; padding:0; border:0; }
+    .finance-section-head p { margin:4px 0 0; max-width:760px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .finance-basis-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .finance-basis-card { min-width:0; border:1px solid rgba(84,180,255,.18); border-radius:10px; padding:12px; background:rgba(84,180,255,.05); }
+    .finance-basis-card label,.finance-basis-card span { display:block; color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:800; }
+    .finance-basis-card strong { display:block; margin-top:5px; color:#57B7FF; font-size:18px; line-height:1.15; overflow-wrap:anywhere; }
+    .finance-basis-card small { display:block; margin-top:4px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .finance-basis-card .ctl-input { width:100%; margin-top:7px; }
+    .finance-ledger-wrap { overflow-x:auto; border:1px solid rgba(84,180,255,.16); border-radius:10px; }
+    .finance-ledger { min-width:980px; }
+    .finance-ledger th { white-space:nowrap; }
+    .finance-ledger td { vertical-align:middle; }
+    .finance-ledger .rule-enabled { width:54px; text-align:center; }
+    .finance-ledger .rule-name { min-width:210px; }
+    .finance-ledger .rule-name input { width:100%; min-width:180px; }
+    .finance-ledger .rule-basis { min-width:152px; }
+    .finance-ledger .rule-value { min-width:112px; }
+    .finance-ledger .rule-value small { display:block; margin-top:3px; color:var(--p3-muted); font-size:9px; white-space:nowrap; }
+    .finance-ledger .rule-output { min-width:116px; white-space:nowrap; font-weight:800; color:#DCEBFF; }
+    .finance-ledger .rule-output.primary { color:#57B7FF; }
+    .finance-ledger .rule-actions { width:46px; text-align:center; }
+    .finance-ledger .ctl-input,.finance-ledger .ctl-select { width:100%; min-height:36px; }
+    .finance-ledger input[type="checkbox"] { width:18px; height:18px; accent-color:var(--p3-primary); }
+    .finance-rule-remove { width:32px; height:32px; display:inline-grid; place-items:center; border-radius:8px; border:1px solid rgba(230,75,75,.3); background:rgba(230,75,75,.1); color:#FF9A9A; cursor:pointer; font-size:18px; line-height:1; }
+    .finance-rule-remove:hover { background:rgba(230,75,75,.2); }
+    .finance-ledger tr.rule-disabled td { opacity:.46; }
+    .finance-ledger tr.rule-disabled td.rule-enabled,.finance-ledger tr.rule-disabled td.rule-actions { opacity:1; }
+    .finance-ledger tr.finance-energy-row td { background:rgba(45,127,249,.06); }
+    .finance-ledger tfoot td { background:#13243B; color:#BFEBD6; font-weight:800; border-bottom:0; }
+    .finance-results { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:16px; }
+    .finance-result-card { position:relative; overflow:hidden; min-height:126px; border:1px solid var(--surface-border); border-radius:12px; background:var(--surface-bg); padding:15px; box-shadow:var(--p3-shadow); }
+    .finance-result-card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; }
+    .finance-result-card.good::before { background:#38C96F; }
+    .finance-result-card.warn::before { background:#FFD66B; }
+    .finance-result-card.bad::before { background:#E64B4B; }
+    .finance-result-card span { display:block; color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:800; }
+    .finance-result-card strong { display:block; margin-top:7px; color:#57B7FF; font-size:24px; line-height:1.1; overflow-wrap:anywhere; }
+    .finance-result-card.good strong { color:#57D990; }
+    .finance-result-card.warn strong { color:#FFD66B; }
+    .finance-result-card.bad strong { color:#FF7A7A; }
+    .finance-result-card small { display:block; margin-top:7px; color:var(--p3-muted); font-size:11px; line-height:1.4; }
+    .uby-finance-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:14px 0; }
+    .uby-finance-list { display:grid; gap:10px; }
+    .uby-finance-row { display:grid; grid-template-columns:minmax(220px,1.2fr) repeat(4,minmax(105px,.55fr)) auto; gap:12px; align-items:center; border:1px solid var(--surface-border); border-radius:12px; background:var(--surface-bg); padding:13px 14px; box-shadow:var(--p3-shadow); }
+    .uby-finance-row strong { display:block; color:var(--p3-text); font-size:13px; }
+    .uby-finance-row span { display:block; color:var(--p3-muted); font-size:11px; margin-top:2px; }
+    .uby-finance-cell { text-align:right; min-width:0; }
+    .uby-finance-cell b { display:block; color:#57B7FF; font-size:14px; white-space:nowrap; }
+    .uby-finance-cell em { display:block; color:var(--p3-muted); font-size:10px; font-style:normal; margin-top:2px; }
+    .uby-finance-cell.result-positive b { color:#57D990; }
+    .uby-finance-cell.result-negative b { color:#FF7A7A; }
+    .finance-empty-guidance { border-left:3px solid #FFD66B; border-radius:8px; background:rgba(242,169,61,.10); color:#FFE4A0; padding:10px 12px; font-size:12px; line-height:1.45; margin-top:12px; }
+
     /* ── NOVO: Upload zone ── */
     .upload-zone {
       display:block;
@@ -486,6 +542,9 @@
       .kpi-feature { grid-column:span 2; }
       .accountability-grid { grid-template-columns:1fr; }
       .investor-preview { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .finance-basis-grid,.finance-results,.uby-finance-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .uby-finance-row { grid-template-columns:minmax(190px,1fr) repeat(2,minmax(105px,.55fr)) auto; }
+      .uby-finance-row .uby-finance-cell:nth-of-type(4),.uby-finance-row .uby-finance-cell:nth-of-type(5) { display:none; }
     }
     @media (max-width:960px) {
       .hero,.section,.kpis { grid-template-columns:1fr; }
@@ -509,6 +568,9 @@
       .podium-step, .podium-place.rank-1 .podium-step, .podium-place.rank-2 .podium-step, .podium-place.rank-3 .podium-step { min-height:50px; }
       .accountability-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .accountability-metrics, .investor-preview { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .uby-finance-row { grid-template-columns:1fr 1fr; }
+      .uby-finance-row > div:first-child,.uby-finance-row .unit-actions { grid-column:1/-1; }
+      .uby-finance-cell { text-align:left; }
     }
     @media (max-width:640px) {
       body { font-size:13px; }
@@ -600,6 +662,11 @@
       .card > table td:first-child { width:56%; }
       .card > div[style*="overflow-x:auto"] { margin-left:-6px; margin-right:-6px; padding:0 6px 6px; }
       .empty-state { padding:44px 12px; }
+      .finance-basis-grid,.finance-results,.uby-finance-summary { grid-template-columns:1fr 1fr; gap:8px; }
+      .finance-section-head .btn-recalc { width:auto; }
+      .finance-result-card { min-height:112px; padding:12px; }
+      .finance-result-card strong { font-size:20px; }
+      .uby-finance-row { grid-template-columns:1fr 1fr; gap:9px; padding:12px; }
     }
   </style>
 </head>
@@ -1020,6 +1087,18 @@
       </div>
     </section>
 
+    <section class="card finance-workbench" id="ubyFinanceOverview">
+      <div class="finance-section-head">
+        <div>
+          <h2>Resultado financeiro por carregador UBY</h2>
+          <p>Custos, receitas e resultado operacional calculados com as regras salvas em cada carregador. Abra o financeiro da unidade para editar os itens.</p>
+        </div>
+        <span class="accountability-pill" id="ubyFinancePeriodLabel">Periodo atual</span>
+      </div>
+      <div class="uby-finance-summary" id="ubyFinanceSummary"></div>
+      <div class="uby-finance-list" id="ubyFinanceRows"></div>
+    </section>
+
     <section class="day-compare-grid" id="usageUbyDayCompare"></section>
     <section class="section weekday-report" id="usageUbyWeekdayReport"></section>
 
@@ -1388,14 +1467,48 @@
       </div>
     </section>
 
-    <section class="section">
-      <div class="card">
-        <h2>Custos extras do ponto</h2>
-        <table><tbody id="financeExtraCostsRows"></tbody></table>
+    <section class="card finance-workbench">
+      <div class="finance-section-head">
+        <div>
+          <h2>Custos operacionais do carregador</h2>
+          <p>Ative apenas os itens usados neste ponto. O custo realizado por kWh cai conforme o volume vendido aumenta; a base inicial permite planejar o mes mesmo antes da primeira recarga.</p>
+        </div>
+        <button class="btn-recalc" type="button" onclick="addFinanceRule('cost')">+ Adicionar custo</button>
       </div>
-      <div class="card">
-        <h2>Receitas extras</h2>
-        <table><tbody id="financeExtraRevenueRows"></tbody></table>
+      <div class="finance-basis-grid">
+        <div class="finance-basis-card">
+          <label>Base inicial de diluicao</label>
+          <input class="ctl-input" id="financePlanningKWh" type="number" min="0" step="10" value="0" oninput="handleFinanceRuleEditorChange()">
+          <small>kWh planejados no mes. Zero usa meta, mes anterior ou volume atual.</small>
+        </div>
+        <div class="finance-basis-card"><span>Base usada no calculo</span><strong id="financePlanningKWhResolved">0,00 kWh</strong><small id="financePlanningKWhSource">Defina uma base planejada.</small></div>
+        <div class="finance-basis-card"><span>Preco medio de venda</span><strong id="financeSalePriceKWh">R$ 0,00/kWh</strong><small>Real do periodo; usa objetivo quando ainda nao ha venda.</small></div>
+        <div class="finance-basis-card"><span>Energia vendida</span><strong id="financeActualKWh">0,00 kWh</strong><small>Base do custo efetivo diluido.</small></div>
+      </div>
+      <div class="finance-ledger-wrap">
+        <table class="finance-ledger">
+          <thead><tr><th>Usar</th><th>Item</th><th>Regra</th><th>Valor da regra</th><th>Custo realizado</th><th>R$/kWh inicial</th><th>R$/kWh atual</th><th></th></tr></thead>
+          <tbody id="financeCostRuleRows"></tbody>
+          <tfoot id="financeCostRuleTotals"></tfoot>
+        </table>
+      </div>
+      <div class="finance-empty-guidance" id="financePlanningGuidance" style="display:none"></div>
+    </section>
+
+    <section class="card finance-workbench">
+      <div class="finance-section-head">
+        <div>
+          <h2>Receitas adicionais do carregador</h2>
+          <p>Cadastre estacionamento, publicidade, assinatura, conveniencia ou qualquer receita que nao esteja na planilha de recargas.</p>
+        </div>
+        <button class="btn-recalc" type="button" onclick="addFinanceRule('revenue')">+ Adicionar receita</button>
+      </div>
+      <div class="finance-ledger-wrap">
+        <table class="finance-ledger">
+          <thead><tr><th>Usar</th><th>Item</th><th>Regra</th><th>Valor da regra</th><th>Receita realizada</th><th>R$/kWh inicial</th><th>R$/kWh atual</th><th></th></tr></thead>
+          <tbody id="financeRevenueRuleRows"></tbody>
+          <tfoot id="financeRevenueRuleTotals"></tfoot>
+        </table>
       </div>
     </section>
 
@@ -1420,6 +1533,8 @@
     </section>
 
     <section class="grid kpis" id="financeKpis"></section>
+
+    <section class="finance-results" id="financeOperationalResults"></section>
 
     <section class="section">
       <div class="card">
@@ -1458,6 +1573,7 @@
 
 <script src="sidebar.js"></script>
 <script src="backup_guard.js"></script>
+<script src="finance_engine.js"></script>
 <script src="supabase_config.js"></script>
 <script src="clube_uby_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1481,6 +1597,7 @@ let openingWorkReport = false;
 let monthlyClosings = {};
 let financialSettings = {};
 let financeSaveTimer = null;
+let financeEditorCurrentSettings = null;
 let ubyOperationOverrides = {};
 let rechargeRecordsVersion = 0;
 let generalUnitDataCache = null;
@@ -1522,6 +1639,12 @@ const FINANCE_COST_ITEMS = [
   ['marketing', 'Marketing'],
   ['accounting', 'Contabilidade / administrativo'],
   ['demandCost', 'Custo demanda Grupo A (c/ impostos)'],
+  ['cleaning', 'Limpeza / conservacao'],
+  ['monitoring', 'Monitoramento / telemetria'],
+  ['taxes', 'Tributos e taxas fixas'],
+  ['financing', 'Leasing / financiamento'],
+  ['depreciation', 'Depreciacao do ativo'],
+  ['paymentFees', 'Taxas de pagamento'],
   ['otherCostsLegacy', 'Outros custos']
 ];
 const FINANCE_EXTRA_REVENUE_ITEMS = [
@@ -1535,6 +1658,13 @@ const FINANCE_EXTRA_REVENUE_ITEMS = [
   ['spaceRental', 'Aluguel de espaco (vending/loja)'],
   ['localServices', 'Servicos no local (lavagem/cafe)'],
   ['otherRevenue', 'Outros']
+];
+const FINANCE_RULE_BASIS = [
+  ['fixed', 'Fixo mensal'],
+  ['per_kwh', 'Por kWh'],
+  ['revenue_pct', '% do faturamento'],
+  ['per_charge', 'Por recarga'],
+  ['one_off', 'Avulso no ciclo']
 ];
 const appData = window.UBY_APP_DATA || {};
 let currentWorkId = new URLSearchParams(location.search).get('obra') || localStorage.getItem('uby-recargas-current-work') || 'rio';
@@ -3083,9 +3213,14 @@ function monthLabel(key) {
 function daysInMonth(y, m) { return new Date(+y, +m, 0).getDate(); }
 function getMonths() {
   const validClosings = Object.keys(monthlyClosings || {}).filter(mk => closingMatchesMonth(monthlyClosings[mk], mk));
+  const current = new Date();
+  const currentMk = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+  const financeMonths = Object.keys(financeStoreForScope()).filter(mk => /^\d{4}-\d{2}$/.test(mk));
   return [...new Set([
     ...allCharges.map(chargeMonthKey),
-    ...validClosings
+    ...validClosings,
+    ...financeMonths,
+    ...(allCharges.length ? [currentMk] : [])
   ])]
     .filter(k => k !== 'unknown').sort();
 }
@@ -3273,8 +3408,11 @@ function defaultFinanceSettings() {
     ownerTransferMode: 'gross',
     ownerRevenueSharePct: 0,
     ownerNetProfitSharePct: 0,
+    costPlanningKWh: 0,
     costItems: {},
-    revenueItems: {}
+    revenueItems: {},
+    costRules: [],
+    revenueRules: []
   };
 }
 
@@ -3291,9 +3429,79 @@ function sumFinanceItems(values = {}) {
   return Object.values(values || {}).reduce((sum, value) => sum + Number(value || 0), 0);
 }
 
+function financeRuleField(kind = 'cost') {
+  return kind === 'revenue' ? 'revenueRules' : 'costRules';
+}
+
+function financeRuleCatalog(kind = 'cost') {
+  return kind === 'revenue' ? FINANCE_EXTRA_REVENUE_ITEMS : FINANCE_COST_ITEMS;
+}
+
+function financeRuleLegacyField(kind = 'cost') {
+  return kind === 'revenue' ? 'revenueItems' : 'costItems';
+}
+
+function normalizeFinanceRules(settings = {}, kind = 'cost') {
+  const field = financeRuleField(kind);
+  const legacyField = financeRuleLegacyField(kind);
+  const catalog = financeRuleCatalog(kind);
+  const saved = Array.isArray(settings?.[field]) ? settings[field] : [];
+  const legacy = settings?.[legacyField] || {};
+  const savedById = new Map(saved.map(rule => [String(rule?.id || ''), rule]).filter(([id]) => id));
+  const catalogIds = new Set(catalog.map(([id]) => String(id)));
+  const normalized = catalog.map(([id, defaultLabel]) => {
+    const stored = savedById.get(String(id));
+    const legacyValue = Number(legacy?.[id] || 0);
+    return {
+      id: String(id),
+      label: safeText(stored?.label || defaultLabel),
+      enabled: stored ? stored.enabled !== false : legacyValue > 0,
+      basis: FINANCE_RULE_BASIS.some(([basis]) => basis === stored?.basis) ? stored.basis : 'fixed',
+      value: Number(stored?.value ?? legacyValue ?? 0) || 0,
+      custom: false
+    };
+  });
+  saved.forEach((rule, index) => {
+    const id = String(rule?.id || `custom-${kind}-${index}`);
+    if (!id || catalogIds.has(id)) return;
+    normalized.push({
+      id,
+      label: safeText(rule?.label || (kind === 'revenue' ? 'Receita personalizada' : 'Custo personalizado')),
+      enabled: rule?.enabled !== false,
+      basis: FINANCE_RULE_BASIS.some(([basis]) => basis === rule?.basis) ? rule.basis : 'fixed',
+      value: Number(rule?.value || 0),
+      custom: true
+    });
+  });
+  return normalized;
+}
+
+function financeRulesFromInputs(kind = 'cost') {
+  const rows = [...document.querySelectorAll(`tr[data-finance-rule-kind="${kind}"]`)];
+  if (!rows.length) return normalizeFinanceRules(financeEditorCurrentSettings || {}, kind);
+  return rows.map(row => ({
+    id: String(row.dataset.ruleId || ''),
+    label: safeText(row.querySelector('[data-rule-field="label"]')?.value || ''),
+    enabled: !!row.querySelector('[data-rule-field="enabled"]')?.checked,
+    basis: row.querySelector('[data-rule-field="basis"]')?.value || 'fixed',
+    value: Number(parseFloat(row.querySelector('[data-rule-field="value"]')?.value) || 0),
+    custom: row.dataset.custom === 'true'
+  })).filter(rule => rule.id);
+}
+
+function financeLegacyValuesFromRules(rules = [], kind = 'cost') {
+  const catalogIds = new Set(financeRuleCatalog(kind).map(([id]) => String(id)));
+  return Object.fromEntries(rules
+    .filter(rule => catalogIds.has(String(rule.id)))
+    .map(rule => [rule.id, rule.enabled && ['fixed','one_off'].includes(rule.basis) ? Number(rule.value || 0) : 0]));
+}
+
 function currentFinanceSettingsFromInputs() {
   const energyCostPerKWh = numberInputValue('financeEnergyCost', 0);
-  const savedOwnerEnergyRate = Number(financialSettings[financeMonthKey()]?.ownerEnergyRate || financialSettings.default?.ownerEnergyRate || 0);
+  const savedScopeSettings = financeSettingsForMonth(financeMonthKey());
+  const savedOwnerEnergyRate = Number(savedScopeSettings.ownerEnergyRate || 0);
+  const costRules = financeRulesFromInputs('cost');
+  const revenueRules = financeRulesFromInputs('revenue');
   return {
     operationModel: document.getElementById('financeOperationModel')?.value || 'uby',
     managementPct: numberInputValue('financeMgmtPct', 5),
@@ -3308,23 +3516,96 @@ function currentFinanceSettingsFromInputs() {
     targetOccPct: numberInputValue('financeTargetOccPct', 0),
     targetRevenuePerKWh: numberInputValue('financeTargetRevenuePerKWh', 0),
     ownerEnergyRate: numberInputValue('ownerEnergyRate', savedOwnerEnergyRate || energyCostPerKWh),
-    ownerTransferMode: document.getElementById('ownerTransferMode')?.value || financialSettings[financeMonthKey()]?.ownerTransferMode || financialSettings.default?.ownerTransferMode || 'gross',
-    ownerRevenueSharePct: numberInputValue('ownerRevenueSharePct', Number(financialSettings[financeMonthKey()]?.ownerRevenueSharePct || financialSettings.default?.ownerRevenueSharePct || 0)),
-    ownerNetProfitSharePct: numberInputValue('ownerNetProfitSharePct', Number(financialSettings[financeMonthKey()]?.ownerNetProfitSharePct || financialSettings.default?.ownerNetProfitSharePct || 0)),
-    costItems: financeItemValues(FINANCE_COST_ITEMS, 'finance-cost'),
-    revenueItems: financeItemValues(FINANCE_EXTRA_REVENUE_ITEMS, 'finance-revenue')
+    ownerTransferMode: document.getElementById('ownerTransferMode')?.value || savedScopeSettings.ownerTransferMode || 'gross',
+    ownerRevenueSharePct: numberInputValue('ownerRevenueSharePct', Number(savedScopeSettings.ownerRevenueSharePct || 0)),
+    ownerNetProfitSharePct: numberInputValue('ownerNetProfitSharePct', Number(savedScopeSettings.ownerNetProfitSharePct || 0)),
+    costPlanningKWh: numberInputValue('financePlanningKWh', Number(financeEditorCurrentSettings?.costPlanningKWh || 0)),
+    costRules,
+    revenueRules,
+    costItems: financeLegacyValuesFromRules(costRules, 'cost'),
+    revenueItems: financeLegacyValuesFromRules(revenueRules, 'revenue')
   };
 }
 
-function renderFinanceItemInputs(containerId, items, values, prefix) {
+function financeRuleBasisOptions(selected = 'fixed') {
+  return FINANCE_RULE_BASIS.map(([value, label]) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`).join('');
+}
+
+function financeRuleValueHint(basis = 'fixed') {
+  return {
+    fixed: 'R$ por mes',
+    per_kwh: 'R$ por kWh',
+    revenue_pct: 'percentual',
+    per_charge: 'R$ por recarga',
+    one_off: 'R$ neste ciclo'
+  }[basis] || 'valor';
+}
+
+function renderFinanceRuleInputs(containerId, rules = [], kind = 'cost') {
   const container = document.getElementById(containerId);
   if (!container) return;
-  container.innerHTML = items.map(([key, label]) => `
-    <tr>
-      <td>${label}</td>
-      <td><input class="ctl-input" id="${prefix}-${key}" type="number" min="0" step="0.01" value="${Number(values?.[key] || 0)}" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td>
+  const energyRow = kind === 'cost' ? `
+    <tr class="finance-energy-row" data-finance-energy-row="true">
+      <td class="rule-enabled">Ativo</td>
+      <td class="rule-name"><strong>Energia eletrica</strong><div class="sub">Tarifa definida nos parametros do ponto</div></td>
+      <td class="rule-basis">Por kWh</td>
+      <td class="rule-value" id="financeEnergyRuleValue">${fmtBRL(numberInputValue('financeEnergyCost', 0))}/kWh</td>
+      <td class="rule-output" data-finance-energy-actual>${fmtBRL(0)}</td>
+      <td class="rule-output primary" data-finance-energy-planned-kwh>${fmtBRL(numberInputValue('financeEnergyCost', 0))}</td>
+      <td class="rule-output primary" data-finance-energy-actual-kwh>${fmtBRL(numberInputValue('financeEnergyCost', 0))}</td>
+      <td class="rule-actions"></td>
+    </tr>
+  ` : '';
+  container.innerHTML = energyRow + rules.map(rule => `
+    <tr class="${rule.enabled ? '' : 'rule-disabled'}" data-finance-rule-kind="${kind}" data-rule-id="${escapeAttr(rule.id)}" data-custom="${rule.custom ? 'true' : 'false'}">
+      <td class="rule-enabled"><input type="checkbox" data-rule-field="enabled" ${rule.enabled ? 'checked' : ''} onchange="handleFinanceRuleEditorChange()" aria-label="Usar ${escapeAttr(rule.label)}"></td>
+      <td class="rule-name"><input class="ctl-input" data-rule-field="label" value="${escapeAttr(rule.label)}" oninput="handleFinanceRuleEditorChange()" aria-label="Nome do item"></td>
+      <td class="rule-basis"><select class="ctl-select" data-rule-field="basis" onchange="handleFinanceRuleEditorChange()">${financeRuleBasisOptions(rule.basis)}</select></td>
+      <td class="rule-value"><input class="ctl-input" data-rule-field="value" type="number" min="0" step="0.01" value="${Number(rule.value || 0)}" oninput="handleFinanceRuleEditorChange()"><small data-rule-value-hint>${financeRuleValueHint(rule.basis)}</small></td>
+      <td class="rule-output" data-rule-output="actual">${fmtBRL(0)}</td>
+      <td class="rule-output primary" data-rule-output="planned-kwh">-</td>
+      <td class="rule-output primary" data-rule-output="actual-kwh">-</td>
+      <td class="rule-actions">${rule.custom ? `<button class="finance-rule-remove" type="button" title="Excluir item" onclick="removeFinanceRule(this)">&times;</button>` : ''}</td>
     </tr>
   `).join('');
+}
+
+function addFinanceRule(kind = 'cost') {
+  const settings = currentFinanceSettingsFromInputs();
+  const field = financeRuleField(kind);
+  const rules = normalizeFinanceRules(settings, kind);
+  rules.push({
+    id: `custom-${kind}-${Date.now()}`,
+    label: kind === 'revenue' ? 'Nova receita' : 'Novo custo',
+    enabled: true,
+    basis: 'fixed',
+    value: 0,
+    custom: true
+  });
+  settings[field] = rules;
+  financeEditorCurrentSettings = settings;
+  renderFinanceRuleInputs(kind === 'revenue' ? 'financeRevenueRuleRows' : 'financeCostRuleRows', rules, kind);
+  handleFinanceRuleEditorChange();
+  const last = document.querySelector(`tr[data-finance-rule-kind="${kind}"]:last-child [data-rule-field="label"]`);
+  last?.focus();
+  last?.select();
+}
+
+function removeFinanceRule(button) {
+  const row = button?.closest('tr[data-finance-rule-kind]');
+  if (!row || row.dataset.custom !== 'true') return;
+  row.remove();
+  handleFinanceRuleEditorChange();
+}
+
+function handleFinanceRuleEditorChange() {
+  document.querySelectorAll('tr[data-finance-rule-kind]').forEach(row => {
+    row.classList.toggle('rule-disabled', !row.querySelector('[data-rule-field="enabled"]')?.checked);
+    const hint = row.querySelector('[data-rule-value-hint]');
+    if (hint) hint.textContent = financeRuleValueHint(row.querySelector('[data-rule-field="basis"]')?.value || 'fixed');
+  });
+  renderFinanceiro(false);
+  scheduleFinancialSettingsSave();
 }
 
 function applyFinanceSettingsToInputs(settings = {}) {
@@ -3335,6 +3616,9 @@ function applyFinanceSettingsToInputs(settings = {}) {
   merged.costItems = { ...(settings.costItems || {}), ...(settings.extraCosts || {}) };
   if (Number(settings.otherCosts || 0) > 0 && !merged.costItems.otherCostsLegacy) merged.costItems.otherCostsLegacy = Number(settings.otherCosts || 0);
   merged.revenueItems = { ...(settings.revenueItems || {}), ...(settings.extraRevenue || {}) };
+  merged.costRules = normalizeFinanceRules({ ...settings, costItems: merged.costItems }, 'cost');
+  merged.revenueRules = normalizeFinanceRules({ ...settings, revenueItems: merged.revenueItems }, 'revenue');
+  financeEditorCurrentSettings = merged;
   const fields = {
     financeOperationModel: merged.operationModel,
     financeMgmtPct: merged.managementPct,
@@ -3348,6 +3632,7 @@ function applyFinanceSettingsToInputs(settings = {}) {
     financeSaRetentionPct: merged.saRetentionPct,
     financeTargetOccPct: merged.targetOccPct,
     financeTargetRevenuePerKWh: merged.targetRevenuePerKWh,
+    financePlanningKWh: merged.costPlanningKWh,
     ownerEnergyRate: merged.ownerEnergyRate,
     ownerTransferMode: merged.ownerTransferMode,
     ownerRevenueSharePct: merged.ownerRevenueSharePct,
@@ -3362,8 +3647,8 @@ function applyFinanceSettingsToInputs(settings = {}) {
       el.value = Number(value || 0);
     }
   });
-  renderFinanceItemInputs('financeExtraCostsRows', FINANCE_COST_ITEMS, merged.costItems, 'finance-cost');
-  renderFinanceItemInputs('financeExtraRevenueRows', FINANCE_EXTRA_REVENUE_ITEMS, merged.revenueItems, 'finance-revenue');
+  renderFinanceRuleInputs('financeCostRuleRows', merged.costRules, 'cost');
+  renderFinanceRuleInputs('financeRevenueRuleRows', merged.revenueRules, 'revenue');
 }
 
 function syncOwnerEnergyRateFromCost(force = false) {
@@ -3379,8 +3664,47 @@ function financeMonthKey() {
   return document.getElementById('financeMonthSelector')?.value || document.getElementById('monthSelector')?.value || getMonths().at(-1) || '';
 }
 
+function financeChargerStorageKey(stationName = currentStationReportName) {
+  const station = safeText(stationName).trim();
+  return station ? normalizeStationForCompare(canonicalStationNameForWork(currentWorkId, station, currentWorkName)) : '';
+}
+
+function financeStoreForScope(root = financialSettings, stationName = currentStationReportName) {
+  const key = financeChargerStorageKey(stationName);
+  if (!key) return root || {};
+  return root?.chargers?.[key] || {};
+}
+
+function financeSettingsForMonth(mk, root = financialSettings, stationName = currentStationReportName) {
+  const base = root || {};
+  const key = financeChargerStorageKey(stationName);
+  if (!key) return { ...defaultFinanceSettings(), ...(base.default || {}), ...(base[mk] || {}) };
+  const scoped = base?.chargers?.[key] || {};
+  return {
+    ...defaultFinanceSettings(),
+    ...(base.default || {}),
+    ...(base[mk] || {}),
+    ...(scoped.default || {}),
+    ...(scoped[mk] || {})
+  };
+}
+
+function financeSettingsForUbyRow(row = {}, mk = '') {
+  const root = allRechargeRecords[row.workId]?.financialSettings || allRechargeRecords[row.workId]?.summary?.financialSettings || {};
+  const stationName = row.stationName || row.station || row.workName || '';
+  const key = normalizeStationForCompare(canonicalStationNameForWork(row.workId, stationName, row.workName));
+  const scoped = root?.chargers?.[key] || {};
+  return {
+    ...defaultFinanceSettings(),
+    ...(root.default || {}),
+    ...(root[mk] || {}),
+    ...(scoped.default || {}),
+    ...(scoped[mk] || {})
+  };
+}
+
 function ownerAreaSettingsForMonth(mk, useInputs = false) {
-  const saved = { ...defaultFinanceSettings(), ...(financialSettings.default || {}), ...(financialSettings[mk] || {}) };
+  const saved = financeSettingsForMonth(mk);
   if (!useInputs) return saved;
   return { ...saved, ...currentFinanceSettingsFromInputs() };
 }
@@ -3408,7 +3732,7 @@ function ownerAreaReportForSummary(summary, settings = {}, charges = []) {
   const sharePct = Number(settings.ownerRevenueSharePct || 0);
   const netProfitSharePct = Number(settings.ownerNetProfitSharePct || 0);
   const finance = financeForCharges(charges || [], settings);
-  const netProfit = charges?.length ? Number(finance.operationNet || 0) : Math.max(revenue - energy * energyRate, 0);
+  const netProfit = charges?.length ? Number(finance.preAreaNet || 0) : Math.max(revenue - energy * energyRate, 0);
   const energyReimbursement = energy * energyRate;
   const revenueShare = revenue * sharePct / 100;
   const netProfitShare = Math.max(netProfit, 0) * netProfitSharePct / 100;
@@ -3495,11 +3819,12 @@ function renderFinanceiro(applySaved = true) {
   }
   const mk = financeMonthKey();
   if (!mk) return;
-  if (applySaved) applyFinanceSettingsToInputs(financialSettings[mk] || financialSettings.default || defaultFinanceSettings());
+  if (applySaved) applyFinanceSettingsToInputs(financeSettingsForMonth(mk));
   const settings = currentFinanceSettingsFromInputs();
+  financeEditorCurrentSettings = settings;
   updateFinanceModelVisibility(settings.operationModel);
   const charges = allCharges.filter(c => chargeMonthKey(c) === mk);
-  const result = financeForCharges(charges, settings);
+  const result = financeForCharges(charges, settings, { monthKey: mk });
   const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
   const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
@@ -3531,6 +3856,7 @@ function renderFinanceiro(applySaved = true) {
     `<tr><td>Receita DC</td><td>${fmtBRL(dcRevenue)}</td></tr>`,
     `<tr><td>Gestao P3 (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>`,
     `<tr><td>App/plataforma terceiros (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>`,
+    result.areaEligible ? `<tr><td>Participacao da area (${result.areaSharePct}%)</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em AC (${settings.p3AcEquityPct}%)</td><td>${fmtBRL(p3AcEquity)}</td></tr>` : '',
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em DC (${settings.p3DcEquityPct}%)</td><td>${fmtBRL(p3DcEquity)}</td></tr>` : '',
     settings.operationModel === 'p3_society' ? `<tr><td>Sociedade P3 geral (${settings.p3SocietyPct}%)</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
@@ -3550,7 +3876,12 @@ function renderFinanceiro(applySaved = true) {
     `<tr><td>Receita P3</td><td>${fmtBRL(p3Gross)}</td></tr>`,
     `<tr><td>App/plataforma terceiros</td><td>${fmtBRL(platform)}</td></tr>`,
     `<tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>`,
-    `<tr><td>Custos extras</td><td>${fmtBRL(extraCosts)}</td></tr>`,
+    result.areaEligible ? `<tr><td>Participacao do parceiro da area</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
+    `<tr><td>Custos operacionais cadastrados</td><td>${fmtBRL(extraCosts)}</td></tr>`,
+    `<tr><td>Custo operacional total</td><td>${fmtBRL(result.totalOperatingCost)}</td></tr>`,
+    `<tr><td>Custo efetivo por kWh</td><td>${fmtPerKWh(result.totalCostPerKWh)}</td></tr>`,
+    `<tr><td>Custo inicial por kWh</td><td>${fmtPerKWh(result.plannedTotalCostPerKWh)}</td></tr>`,
+    `<tr><td>Ponto de equilibrio</td><td>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</td></tr>`,
     hasP3Society ? `<tr><td>Lucro sociedade P3</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
     isUbyModel ? `<tr><td>Resultado liquido UBY</td><td>${fmtBRL(ubyNet)}</td></tr>` : '',
     isUbyModel ? `<tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(saRetention)}</td></tr>` : '',
@@ -3565,8 +3896,10 @@ function renderFinanceiro(applySaved = true) {
   ].filter(Boolean).join('');
   document.getElementById('financeNote').innerHTML =
     isUbyModel
-      ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). A UBY fica com ${fmtBRL(ubyNet)} antes da retencao S.A.; ${fmtBRL(saRetention)} ficam retidos por estatuto e ${fmtBRL(investorDistribution)} sao distribuiveis aos investidores. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
+      ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}) e o parceiro da area recebe ${fmtBRL(result.areaParticipation)} conforme a regra cadastrada. A UBY fica com ${fmtBRL(ubyNet)} antes da retencao S.A.; ${fmtBRL(saRetention)} ficam retidos por estatuto e ${fmtBRL(investorDistribution)} sao distribuiveis aos investidores. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
       : `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). O socio/local fica com ${fmtBRL(partnerShare)} conforme o modelo escolhido. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`;
+  updateFinanceRuleOutputs(result);
+  renderFinanceOperationalResults(result);
   renderOwnerAreaReportForCurrentMonth();
 }
 
@@ -3583,14 +3916,62 @@ async function saveFinancialSettings() {
   persistFinancialSettingsFromInputs(mk);
   renderFinanceiro(false);
   setFeedback(`Financeiro de ${monthLabel(mk)} salvo para ${currentWorkName}.`, 'up-loading');
-  await saveRechargeBase();
+  await saveFinancialSettingsRecord();
 }
 
 function persistFinancialSettingsFromInputs(mk = financeMonthKey()) {
   if (!mk) return null;
   const settings = currentFinanceSettingsFromInputs();
-  financialSettings = { ...financialSettings, [mk]: settings, default: settings };
+  const scopeKey = financeChargerStorageKey();
+  if (scopeKey) {
+    const chargers = { ...(financialSettings.chargers || {}) };
+    const scoped = { ...(chargers[scopeKey] || {}), [mk]: settings, default: settings };
+    chargers[scopeKey] = scoped;
+    financialSettings = { ...financialSettings, chargers };
+  } else {
+    financialSettings = { ...financialSettings, [mk]: settings, default: settings };
+  }
+  financeEditorCurrentSettings = settings;
   return settings;
+}
+
+function financeRecordWithCurrentSettings() {
+  const source = allRechargeRecords[currentWorkId] || localRecord();
+  const sourceHasFullCharges = Array.isArray(source?.charges) && source.charges.length > 0;
+  const sourceExpectedCharges = Number(source?.summary?.charges || 0);
+  if (currentStationReportName && sourceExpectedCharges > 0 && !sourceHasFullCharges) {
+    throw new Error('A base completa da obra ainda nao terminou de carregar. Aguarde e tente novamente.');
+  }
+  if (!currentStationReportName && (!source || (!sourceHasFullCharges && allCharges.length))) {
+    return buildRechargeRecord();
+  }
+  if (!source) return buildRechargeRecord();
+  const updatedAt = new Date().toISOString();
+  return {
+    ...source,
+    workId: currentWorkId,
+    workName: source.workName || currentWorkName,
+    financialSettings,
+    summary: {
+      ...(source.summary || {}),
+      workId: currentWorkId,
+      workName: source.summary?.workName || source.workName || currentWorkName,
+      financialSettings,
+      updatedAt
+    },
+    updatedAt,
+    localCompact: false
+  };
+}
+
+async function saveFinancialSettingsRecord() {
+  const record = financeRecordWithCurrentSettings();
+  const localSave = saveLocalRechargeBase(record);
+  allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
+  markRechargeRecordsDirty();
+  if (!window.UBY_SUPABASE?.saveRechargeBase) return localSave;
+  await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
+  return localSave;
 }
 
 function scheduleFinancialSettingsSave() {
@@ -3601,7 +3982,7 @@ function scheduleFinancialSettingsSave() {
   clearTimeout(financeSaveTimer);
   financeSaveTimer = setTimeout(async () => {
     try {
-      await saveRechargeBase();
+      await saveFinancialSettingsRecord();
       setStorageState(`Financeiro de ${monthLabel(mk)} salvo automaticamente para <strong>${currentWorkName}</strong>.`);
       renderGeneralFinance(getGeneralUnitData());
     } catch (err) {
@@ -3614,6 +3995,144 @@ function formatPaybackMonths(months) {
   if (!Number.isFinite(months) || months <= 0) return '-';
   if (months >= 1200) return '> 100 anos';
   return `${months.toFixed(1).replace('.', ',')} meses`;
+}
+
+function previousMonthEnergyForFinance(mk = '', charges = allCharges) {
+  const months = [...new Set((charges || []).map(chargeMonthKey).filter(key => key !== 'unknown' && key < mk))].sort();
+  const previous = months.at(-1);
+  if (!previous) return 0;
+  return (charges || []).filter(charge => chargeMonthKey(charge) === previous).reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+}
+
+function financePlanningContext(charges = [], mk = '', settings = {}, historyCharges = charges, powerOverride = null) {
+  const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const revenue = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const validCharges = charges.filter(charge => Number(charge.energyKWh || 0) > 0);
+  const averageEnergyPerCharge = validCharges.length ? validCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0) / validCharges.length : 0;
+  const target = mk ? targetOccupationMetrics(charges, mk, settings) : { fullMonthTargetEnergy: 0, targetRevenuePerKWh: 0 };
+  const manualKWh = Math.max(Number(settings.costPlanningKWh || 0), 0);
+  const [targetYear, targetMonth] = String(mk || '').split('-').map(Number);
+  const targetPower = Number(powerOverride);
+  const targetKWhByPower = Number.isFinite(targetPower) && targetPower > 0 && targetYear && targetMonth
+    ? targetPower * daysInMonth(targetYear, targetMonth) * 24 * Math.max(Number(settings.targetOccPct || 0), 0) / 100
+    : 0;
+  const targetKWh = Math.max(targetKWhByPower || Number(target.fullMonthTargetEnergy || 0), 0);
+  const previousKWh = Math.max(previousMonthEnergyForFinance(mk, historyCharges), 0);
+  const currentKWh = Math.max(energy, 0);
+  let planningKWh = manualKWh;
+  let source = 'Base informada manualmente';
+  if (!planningKWh && targetKWh) {
+    planningKWh = targetKWh;
+    source = 'Meta mensal de ocupacao';
+  } else if (!planningKWh && previousKWh) {
+    planningKWh = previousKWh;
+    source = 'Energia do mes anterior';
+  } else if (!planningKWh && currentKWh) {
+    planningKWh = currentKWh;
+    source = 'Volume atual do periodo';
+  } else if (!planningKWh) {
+    source = 'Defina a base inicial de kWh';
+  }
+  const realSalePrice = energy > 0 ? revenue / energy : 0;
+  const targetSalePrice = Math.max(Number(settings.targetRevenuePerKWh || target.targetRevenuePerKWh || 0), 0);
+  const salePricePerKWh = realSalePrice || targetSalePrice;
+  const planningRevenue = planningKWh * salePricePerKWh;
+  const planningCharges = averageEnergyPerCharge > 0 ? planningKWh / averageEnergyPerCharge : 0;
+  return {
+    mk,
+    energy,
+    revenue,
+    count: charges.length,
+    averageEnergyPerCharge,
+    planningKWh,
+    planningRevenue,
+    planningCharges,
+    salePricePerKWh,
+    realSalePrice,
+    targetSalePrice,
+    source
+  };
+}
+
+function financeRuleAmount(rule = {}, context = {}, planned = false) {
+  return window.UBY_FINANCE_ENGINE.ruleAmount(rule, context, planned);
+}
+
+function evaluateFinanceRules(rules = [], context = {}) {
+  return window.UBY_FINANCE_ENGINE.evaluateRules(rules, context);
+}
+
+function financeVariableCostPerKWh(rules = [], context = {}) {
+  return window.UBY_FINANCE_ENGINE.variablePerKWh(rules, context);
+}
+
+function financeFixedRuleTotal(rules = []) {
+  return window.UBY_FINANCE_ENGINE.fixedTotal(rules);
+}
+
+function fmtPerKWh(value) {
+  return Number.isFinite(value) ? `${fmtBRL(value)}/kWh` : '-';
+}
+
+function updateFinanceRuleOutputs(result = {}) {
+  const planning = result.planning || {};
+  const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+  setText('financePlanningKWhResolved', fmtKWh(planning.planningKWh || 0));
+  setText('financePlanningKWhSource', planning.source || 'Defina uma base planejada.');
+  setText('financeSalePriceKWh', fmtPerKWh(planning.salePricePerKWh || 0));
+  setText('financeActualKWh', fmtKWh(planning.energy || 0));
+  setText('financeEnergyRuleValue', `${fmtBRL(result.energyRate || 0)}/kWh`);
+
+  const energyActual = document.querySelector('[data-finance-energy-actual]');
+  const energyPlanned = document.querySelector('[data-finance-energy-planned-kwh]');
+  const energyPerKWh = document.querySelector('[data-finance-energy-actual-kwh]');
+  if (energyActual) energyActual.textContent = fmtBRL(result.energyCost || 0);
+  if (energyPlanned) energyPlanned.textContent = fmtPerKWh(result.energyRate || 0);
+  if (energyPerKWh) energyPerKWh.textContent = fmtPerKWh(result.energyRate || 0);
+
+  const renderDetails = (kind, details = []) => {
+    const byId = new Map(details.map(item => [String(item.id), item]));
+    document.querySelectorAll(`tr[data-finance-rule-kind="${kind}"]`).forEach(row => {
+      const item = byId.get(String(row.dataset.ruleId || ''));
+      if (!item) return;
+      const actual = row.querySelector('[data-rule-output="actual"]');
+      const planned = row.querySelector('[data-rule-output="planned-kwh"]');
+      const actualKWh = row.querySelector('[data-rule-output="actual-kwh"]');
+      if (actual) actual.textContent = fmtBRL(item.actual || 0);
+      if (planned) planned.textContent = fmtPerKWh(item.plannedPerKWh);
+      if (actualKWh) actualKWh.textContent = fmtPerKWh(item.actualPerKWh);
+    });
+  };
+  renderDetails('cost', result.costRuleDetails);
+  renderDetails('revenue', result.revenueRuleDetails);
+
+  const costTotal = document.getElementById('financeCostRuleTotals');
+  if (costTotal) costTotal.innerHTML = `<tr><td colspan="4">Custos diretos</td><td>${fmtBRL((result.energyCost || 0) + (result.extraCosts || 0))}</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td><td>${fmtPerKWh(result.directCostPerKWh)}</td><td></td></tr>`;
+  const revenueTotal = document.getElementById('financeRevenueRuleTotals');
+  if (revenueTotal) revenueTotal.innerHTML = `<tr><td colspan="4">Receitas adicionais</td><td>${fmtBRL(result.extraRevenue || 0)}</td><td>${fmtPerKWh(result.plannedExtraRevenuePerKWh)}</td><td>${fmtPerKWh(result.extraRevenuePerKWh)}</td><td></td></tr>`;
+
+  const guidance = document.getElementById('financePlanningGuidance');
+  if (guidance) {
+    guidance.style.display = planning.planningKWh > 0 ? 'none' : 'block';
+    guidance.textContent = 'Informe a base inicial de kWh ou defina a meta de ocupacao para calcular o custo de partida antes da primeira venda.';
+  }
+}
+
+function renderFinanceOperationalResults(result = {}) {
+  const container = document.getElementById('financeOperationalResults');
+  if (!container) return;
+  const resultClass = result.operationNet > 0 ? 'good' : (result.operationNet < 0 ? 'bad' : 'warn');
+  const marginClass = result.margin >= 20 ? 'good' : (result.margin >= 0 ? 'warn' : 'bad');
+  container.innerHTML = `
+    <div class="finance-result-card"><span>Custo operacional total</span><strong>${fmtBRL(result.totalOperatingCost || 0)}</strong><small>energia + itens + gestao P3 + plataforma</small></div>
+    <div class="finance-result-card"><span>Custo efetivo por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>diluido pelos ${fmtKWh(result.energy || 0)} vendidos</small></div>
+    <div class="finance-result-card"><span>Custo inicial por kWh</span><strong>${fmtPerKWh(result.plannedTotalCostPerKWh)}</strong><small>base: ${fmtKWh(result.planning?.planningKWh || 0)}</small></div>
+    <div class="finance-result-card warn"><span>Ponto de equilibrio</span><strong>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</strong><small>${result.contributionPerKWh > 0 ? `${fmtPerKWh(result.contributionPerKWh)} de contribuicao` : 'preco de venda nao cobre os custos variaveis'}</small></div>
+    <div class="finance-result-card ${resultClass}"><span>Resultado operacional</span><strong>${fmtBRL(result.operationNet || 0)}</strong><small>receitas totais menos todos os custos</small></div>
+    <div class="finance-result-card ${resultClass}"><span>Resultado por kWh</span><strong>${fmtPerKWh(result.resultPerKWh)}</strong><small>resultado diluido pela energia vendida</small></div>
+    <div class="finance-result-card ${marginClass}"><span>Margem operacional</span><strong>${fmtPct(result.operationMargin || 0)}</strong><small>resultado / receitas totais</small></div>
+    <div class="finance-result-card"><span>Preco medio vendido</span><strong>${fmtPerKWh(result.planning?.salePricePerKWh || 0)}</strong><small>comparar com custo efetivo e custo inicial</small></div>
+  `;
 }
 
 function targetOccupationMetrics(charges, mk, settings = {}) {
@@ -3663,35 +4182,46 @@ function operationModelLabel(model) {
   }[model] || 'UBY - ativo proprio';
 }
 
-function financeForCharges(charges, settings = {}) {
+function financeForCharges(charges, settings = {}, options = {}) {
   const cfg = { ...defaultFinanceSettings(), ...settings };
   if (!settings.operationModel && (Number(settings.p3AcEquityPct || 0) > 0 || Number(settings.p3DcEquityPct || 0) > 0)) cfg.operationModel = 'hybrid';
   cfg.costItems = { ...(settings.costItems || {}), ...(settings.extraCosts || {}) };
   if (Number(settings.otherCosts || 0) > 0 && !cfg.costItems.otherCostsLegacy) cfg.costItems.otherCostsLegacy = Number(settings.otherCosts || 0);
   cfg.revenueItems = { ...(settings.revenueItems || {}), ...(settings.extraRevenue || {}) };
+  cfg.costRules = normalizeFinanceRules({ ...settings, costItems: cfg.costItems }, 'cost');
+  cfg.revenueRules = normalizeFinanceRules({ ...settings, revenueItems: cfg.revenueItems }, 'revenue');
   const revenue = charges.reduce((sum, c) => sum + c.revenue, 0);
   const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
   const acRevenue = charges.filter(c => chargerKind(c) === 'ac').reduce((sum, c) => sum + c.revenue, 0);
   const dcRevenue = charges.filter(c => chargerKind(c) === 'dc').reduce((sum, c) => sum + c.revenue, 0);
   const unknownRevenue = Math.max(revenue - acRevenue - dcRevenue, 0);
+  const model = cfg.operationModel || 'uby';
   const management = revenue * cfg.managementPct / 100;
   const platform = revenue * cfg.platformPct / 100;
   const energyCost = energy * cfg.energyCostPerKWh;
-  const extraCosts = sumFinanceItems(cfg.costItems);
-  const extraRevenue = sumFinanceItems(cfg.revenueItems);
+  const mk = options.monthKey || chargeMonthKey(charges[0] || {}) || financeMonthKey();
+  const planning = financePlanningContext(charges, mk === 'unknown' ? financeMonthKey() : mk, cfg, options.historyCharges || charges, options.power);
+  const costEvaluation = evaluateFinanceRules(cfg.costRules, planning);
+  const revenueEvaluation = evaluateFinanceRules(cfg.revenueRules, planning);
+  const extraCosts = costEvaluation.actual;
+  const extraRevenue = revenueEvaluation.actual;
   const costs = energyCost + extraCosts;
-  const operationNet = revenue + extraRevenue - management - platform - costs;
+  const preAreaNet = revenue + extraRevenue - management - platform - costs;
+  const areaEligible = model === 'uby' || model === 'hybrid';
+  const areaSharePct = cfg.ownerTransferMode === 'net' ? Number(cfg.ownerNetProfitSharePct || 0) : Number(cfg.ownerRevenueSharePct || 0);
+  const areaShareBase = cfg.ownerTransferMode === 'net' ? Math.max(preAreaNet, 0) : revenue;
+  const areaParticipation = areaEligible ? areaShareBase * areaSharePct / 100 : 0;
+  const operationNet = preAreaNet - areaParticipation;
   const splitNet = partRevenue => {
     const ratio = revenue > 0 ? partRevenue / revenue : 0;
     return {
       revenue: partRevenue,
-      net: partRevenue + extraRevenue * ratio - management * ratio - platform * ratio - costs * ratio
+      net: partRevenue + extraRevenue * ratio - management * ratio - platform * ratio - (costs + areaParticipation) * ratio
     };
   };
   const ac = splitNet(acRevenue);
   const dc = splitNet(dcRevenue);
   const unknown = splitNet(unknownRevenue);
-  const model = cfg.operationModel || 'uby';
   let ubyNet = 0;
   let p3SocietyProfit = 0;
   let partnerShare = 0;
@@ -3725,6 +4255,45 @@ function financeForCharges(charges, settings = {}) {
   const paybackMonths = cfg.investmentValue > 0 && paybackBase > 0 ? cfg.investmentValue / paybackBase : 0;
   const roiMonthly = cfg.investmentValue > 0 ? paybackBase / cfg.investmentValue * 100 : 0;
   const margin = revenue ? ownResult / revenue * 100 : 0;
+  const totalRevenue = revenue + extraRevenue;
+  const totalOperatingCost = energyCost + extraCosts + management + platform + areaParticipation;
+  const directCostPerKWh = energy > 0 ? (energyCost + extraCosts + areaParticipation) / energy : null;
+  const totalCostPerKWh = energy > 0 ? totalOperatingCost / energy : null;
+  const extraRevenuePerKWh = energy > 0 ? extraRevenue / energy : null;
+  const plannedEnergyCost = planning.planningKWh * cfg.energyCostPerKWh;
+  const plannedManagement = planning.planningRevenue * cfg.managementPct / 100;
+  const plannedPlatform = planning.planningRevenue * cfg.platformPct / 100;
+  const plannedPreAreaNet = planning.planningRevenue + revenueEvaluation.planned - plannedManagement - plannedPlatform - plannedEnergyCost - costEvaluation.planned;
+  const plannedAreaShareBase = cfg.ownerTransferMode === 'net' ? Math.max(plannedPreAreaNet, 0) : planning.planningRevenue;
+  const plannedAreaParticipation = areaEligible ? plannedAreaShareBase * areaSharePct / 100 : 0;
+  const plannedDirectCost = plannedEnergyCost + costEvaluation.planned + plannedAreaParticipation;
+  const plannedTotalCost = plannedDirectCost + plannedManagement + plannedPlatform;
+  const plannedDirectCostPerKWh = planning.planningKWh > 0 ? plannedDirectCost / planning.planningKWh : null;
+  const plannedExtraRevenuePerKWh = planning.planningKWh > 0 ? revenueEvaluation.planned / planning.planningKWh : null;
+  const managementVariable = planning.salePricePerKWh * cfg.managementPct / 100;
+  const platformVariable = planning.salePricePerKWh * cfg.platformPct / 100;
+  const areaVariable = areaEligible && cfg.ownerTransferMode !== 'net' ? planning.salePricePerKWh * areaSharePct / 100 : 0;
+  const variableCostPerKWh = cfg.energyCostPerKWh + managementVariable + platformVariable + areaVariable + financeVariableCostPerKWh(cfg.costRules, planning);
+  const variableRevenuePerKWh = planning.salePricePerKWh + financeVariableCostPerKWh(cfg.revenueRules, planning);
+  const economics = window.UBY_FINANCE_ENGINE.unitEconomics({
+    energy,
+    revenue,
+    extraRevenue,
+    energyCost,
+    extraCosts: extraCosts + areaParticipation,
+    management,
+    platform,
+    planningKWh: planning.planningKWh,
+    plannedEnergyCost,
+    plannedExtraCosts: costEvaluation.planned + plannedAreaParticipation,
+    plannedManagement,
+    plannedPlatform,
+    variableRevenuePerKWh,
+    variableCostPerKWh,
+    fixedCosts: financeFixedRuleTotal(cfg.costRules),
+    fixedRevenue: financeFixedRuleTotal(cfg.revenueRules)
+  });
+  const { plannedTotalCostPerKWh, resultPerKWh, operationMargin, contributionPerKWh, breakEvenKWh } = economics;
   return {
     operationModel: model,
     revenue,
@@ -3740,9 +4309,36 @@ function financeForCharges(charges, settings = {}) {
     partnerShare,
     ownResult,
     energyCost,
+    energyRate: Number(cfg.energyCostPerKWh || 0),
     extraCosts,
     extraRevenue,
+    preAreaNet,
+    areaEligible,
+    areaSharePct,
+    areaShareBase,
+    areaParticipation,
+    plannedAreaParticipation,
+    costRules: cfg.costRules,
+    revenueRules: cfg.revenueRules,
+    costRuleDetails: costEvaluation.details,
+    revenueRuleDetails: revenueEvaluation.details,
     costs,
+    totalRevenue,
+    totalOperatingCost,
+    directCostPerKWh,
+    totalCostPerKWh,
+    extraRevenuePerKWh,
+    plannedDirectCost,
+    plannedTotalCost,
+    plannedDirectCostPerKWh,
+    plannedTotalCostPerKWh,
+    plannedExtraRevenuePerKWh,
+    resultPerKWh,
+    operationMargin,
+    variableCostPerKWh,
+    contributionPerKWh,
+    breakEvenKWh,
+    planning,
     p3Gross,
     operationNet,
     ubyNet,
@@ -3768,10 +4364,10 @@ function generalFinanceByUnit(unitData) {
     });
     const settings = allRechargeRecords[unit.workId]?.financialSettings || {};
     const total = Object.entries(byMonth).reduce((acc, [mk, charges]) => {
-      const result = financeForCharges(charges, settings[mk] || settings.default || defaultFinanceSettings());
-      Object.keys(result).forEach(key => {
-        if (['operationModel', 'margin', 'paybackMonths', 'roiMonthly', 'investmentValue'].includes(key)) return;
-        acc[key] = (acc[key] || 0) + result[key];
+      const result = financeForCharges(charges, settings[mk] || settings.default || defaultFinanceSettings(), { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId) });
+      Object.entries(result).forEach(([key, value]) => {
+        if (['operationModel', 'margin', 'paybackMonths', 'roiMonthly', 'investmentValue'].includes(key) || !Number.isFinite(value)) return;
+        acc[key] = (acc[key] || 0) + value;
       });
       acc.investmentValue = Math.max(acc.investmentValue || 0, result.investmentValue || 0);
       return acc;
@@ -3791,7 +4387,7 @@ function renderGeneralFinance(unitData) {
   });
   const total = rows.reduce((acc, row) => {
     Object.entries(row.finance || {}).forEach(([key, value]) => {
-      if (!['margin', 'paybackMonths', 'roiMonthly'].includes(key)) acc[key] = (acc[key] || 0) + Number(value || 0);
+      if (!['margin', 'paybackMonths', 'roiMonthly'].includes(key) && Number.isFinite(value)) acc[key] = (acc[key] || 0) + value;
     });
     return acc;
   }, {});
@@ -3822,6 +4418,8 @@ function renderGeneralFinance(unitData) {
     <tr><td>Sociedade P3 em DC</td><td>${fmtBRL(total.p3DcEquity || 0)}</td></tr>
     <tr><td>Receitas extras</td><td>${fmtBRL(total.extraRevenue || 0)}</td></tr>
     <tr><td>Custos configurados</td><td>${fmtBRL(total.costs || 0)}</td></tr>
+    <tr><td>Participacao dos parceiros de area</td><td>${fmtBRL(total.areaParticipation || 0)}</td></tr>
+    <tr><td>Custo operacional total</td><td>${fmtBRL(total.totalOperatingCost || 0)}</td></tr>
     <tr><td>Resultado liquido UBY</td><td>${fmtBRL(total.ubyNet || 0)}</td></tr>
     <tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(total.saRetention || 0)}</td></tr>
     <tr><td>Base distribuivel UBY</td><td>${fmtBRL(total.ubyDistributable || 0)}</td></tr>
@@ -6835,6 +7433,74 @@ function renderUbyPartnerReports(rows = []) {
   `;
 }
 
+function ubyFinanceMonthsForRow(row = {}, sourceMonths = [], isMonthView = true, currentMonth = '') {
+  if (isMonthView) return currentMonth ? [currentMonth] : [];
+  const rowMonths = [...new Set((row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
+  const firstMonth = rowMonths[0] || sourceMonths[0] || '';
+  return (sourceMonths || []).filter(mk => !firstMonth || mk >= firstMonth);
+}
+
+function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true, currentMonth = '') {
+  const months = ubyFinanceMonthsForRow(row, sourceMonths, isMonthView, currentMonth);
+  const results = months.map(mk => {
+    const monthCharges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
+    const settings = financeSettingsForUbyRow(row, mk);
+    return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId) });
+  });
+  const totals = results.reduce((acc, result) => {
+    ['revenue','extraRevenue','totalRevenue','energy','energyCost','extraCosts','management','platform','totalOperatingCost','operationNet','plannedTotalCost'].forEach(key => {
+      acc[key] += Number(result[key] || 0);
+    });
+    acc.planningKWh += Number(result.planning?.planningKWh || 0);
+    return acc;
+  }, { revenue:0, extraRevenue:0, totalRevenue:0, energy:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0 });
+  totals.totalCostPerKWh = totals.energy > 0 ? totals.totalOperatingCost / totals.energy : null;
+  totals.plannedTotalCostPerKWh = totals.planningKWh > 0 ? totals.plannedTotalCost / totals.planningKWh : null;
+  totals.resultPerKWh = totals.energy > 0 ? totals.operationNet / totals.energy : null;
+  totals.operationMargin = totals.totalRevenue > 0 ? totals.operationNet / totals.totalRevenue * 100 : 0;
+  return { ...row, financeMonths: months, finance: totals };
+}
+
+function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthView = true, currentMonth = '', viewLabel = '') {
+  const summary = document.getElementById('ubyFinanceSummary');
+  const rowsEl = document.getElementById('ubyFinanceRows');
+  const periodLabel = document.getElementById('ubyFinancePeriodLabel');
+  if (!summary || !rowsEl) return;
+  const rows = sourceRows
+    .filter(row => row.included)
+    .map(row => aggregateUbyFinanceRow(row, sourceMonths, isMonthView, currentMonth))
+    .sort((a, b) => Number(b.finance.operationNet || 0) - Number(a.finance.operationNet || 0));
+  const total = rows.reduce((acc, row) => {
+    Object.keys(acc).forEach(key => { acc[key] += Number(row.finance?.[key] || 0); });
+    return acc;
+  }, { revenue:0, totalRevenue:0, energy:0, totalOperatingCost:0, operationNet:0, planningKWh:0, plannedTotalCost:0 });
+  const totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
+  const plannedCostPerKWh = total.planningKWh > 0 ? total.plannedTotalCost / total.planningKWh : null;
+  const margin = total.totalRevenue > 0 ? total.operationNet / total.totalRevenue * 100 : 0;
+  if (periodLabel) periodLabel.textContent = viewLabel || (isMonthView ? monthLabel(currentMonth) : 'Acumulado');
+  summary.innerHTML = `
+    <div class="accountability-metric"><b>${fmtBRL(total.revenue)}</b><span>Faturamento recargas</span></div>
+    <div class="accountability-metric"><b>${fmtBRL(total.totalOperatingCost)}</b><span>Custos operacionais</span></div>
+    <div class="accountability-metric"><b>${fmtPerKWh(totalCostPerKWh)}</b><span>Custo efetivo por kWh</span></div>
+    <div class="accountability-metric"><b>${fmtBRL(total.operationNet)}</b><span>Resultado UBY ${fmtPct(margin)}</span></div>
+  `;
+  rowsEl.innerHTML = rows.length ? rows.map(row => {
+    const finance = row.finance;
+    const resultClass = finance.operationNet >= 0 ? 'result-positive' : 'result-negative';
+    return `<div class="uby-finance-row">
+      <div><strong>${escapeHtml(row.stationName || row.station || row.workName)}</strong><span>${escapeHtml(row.workName)} | ${row.financeMonths.length} periodo(s) calculado(s)</span></div>
+      <div class="uby-finance-cell"><b>${fmtBRL(finance.revenue)}</b><em>faturamento</em></div>
+      <div class="uby-finance-cell"><b>${fmtBRL(finance.totalOperatingCost)}</b><em>custos totais</em></div>
+      <div class="uby-finance-cell"><b>${fmtPerKWh(finance.totalCostPerKWh)}</b><em>custo atual</em></div>
+      <div class="uby-finance-cell ${resultClass}"><b>${fmtBRL(finance.operationNet)}</b><em>resultado | ${fmtPct(finance.operationMargin)}</em></div>
+      <div class="unit-actions"><button class="btn-open" type="button" onclick="openWorkReport('${escapeAttr(row.workId)}','financeiro','${escapeAttr(row.stationName || row.station)}')">Abrir financeiro</button></div>
+    </div>`;
+  }).join('') : '<div class="note">Nenhum carregador UBY marcado para o periodo.</div>';
+  if (rows.length && !Number.isFinite(totalCostPerKWh) && Number.isFinite(plannedCostPerKWh)) {
+    rowsEl.insertAdjacentHTML('beforeend', `<div class="finance-empty-guidance">Ainda nao houve venda de energia neste periodo. O custo inicial planejado da operacao esta em <strong>${fmtPerKWh(plannedCostPerKWh)}</strong>.</div>`);
+  }
+}
+
 function renderUbyOperation() {
   const sourceUnitData = getGeneralUnitData();
   const sourceRows = getUbyChargerRows(sourceUnitData);
@@ -6923,6 +7589,7 @@ function renderUbyOperation() {
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
   const accessRows = [...visibleRows.filter(row => row.included)]
     .sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
+  renderUbyFinancialOverview(sourceRows, sourceMonths, isMonthView, currentGeneralMonth, viewLabel);
   const chartLabels = chartRows.map(row => {
     const label = row.stationName || row.workName || '-';
     return label.length > 24 ? label.slice(0, 24) + '...' : label;
