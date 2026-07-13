@@ -9,6 +9,8 @@ const areaModel = {
 };
 
 const areaHtml = reports.areaReport(areaModel);
+assert.ok(areaHtml.includes('Periodo do relatorio'));
+assert.ok(areaHtml.includes('08/06/2026 a 10/07/2026'));
 assert.ok(areaHtml.includes('Faturamento do periodo'));
 assert.ok(areaHtml.includes('Tarifa de energia'));
 assert.ok(areaHtml.includes('Percentual contratado'));
@@ -23,7 +25,7 @@ const investorEntry = {
   paybackMonths: 123.1, saRetention: 130, investorDistribution: 1170
 };
 const investorModel = {
-  report: { station: 'Consolidado UBY', period: 'Jul/2026', status: 'partial', generatedAt: '13/07/2026 10:00' },
+  report: { station: 'Consolidado UBY', period: 'Jul/2026', periodStart: '2026-07-01', periodEnd: '2026-07-13', status: 'partial', generatedAt: '13/07/2026 10:00' },
   current: investorEntry,
   accumulated: { ...investorEntry, totalRevenue: 9300, energy: 5100, totalOperatingCost: 7000, operationNet: 2300, occupancyPct: 16.2, operationMargin: 24.73, investorDistribution: 2070 },
   timeline: [
@@ -39,6 +41,8 @@ const investorModel = {
 };
 
 const investorHtml = reports.investorReport(investorModel);
+assert.ok(investorHtml.includes('Periodo do relatorio'));
+assert.ok(investorHtml.includes('01/07/2026 a 13/07/2026'));
 assert.ok(investorHtml.includes('Ocupacao do periodo'));
 assert.ok(investorHtml.includes('Composicao financeira e custo diluido'));
 assert.ok(investorHtml.includes('R$/kWh inicial'));

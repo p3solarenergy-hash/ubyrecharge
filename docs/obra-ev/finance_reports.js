@@ -52,6 +52,22 @@
     return status === 'closed' ? 'Fechado' : 'Parcial';
   }
 
+  function reportDate(value) {
+    var text = String(value == null ? '' : value).trim();
+    var iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return iso[3] + '/' + iso[2] + '/' + iso[1];
+    var br = text.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (br) return br[1] + '/' + br[2] + '/' + br[3];
+    return text;
+  }
+
+  function reportPeriod(meta) {
+    var start = reportDate(meta && meta.periodStart);
+    var end = reportDate(meta && meta.periodEnd);
+    if (start && end) return start === end ? start : start + ' a ' + end;
+    return String(meta && meta.period || '-');
+  }
+
   function reportCss() {
     return `
       @page{size:A4;margin:12mm}
@@ -65,6 +81,9 @@
       h1{margin:6px 0 8px;font-size:25px;line-height:1.12}
       .meta{color:#c9d9e9;line-height:1.55}
       .badge{border:1px solid #61b8ff;border-radius:999px;padding:6px 10px;color:#d8efff;font-weight:800;white-space:nowrap}
+      .period-banner{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:11px 22px;background:#eaf4ff;border:1px solid #9ccfff;border-top:0;color:#174f82}
+      .period-banner span{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+      .period-banner strong{font-size:14px;color:#0c2440}
       .section{padding:18px 22px 0}
       .section-title{display:flex;align-items:end;justify-content:space-between;gap:16px;margin:0 0 10px;padding-bottom:7px;border-bottom:2px solid #dce9f6}
       .section-title h2{margin:0;color:#0c2440;font-size:15px}
@@ -96,7 +115,7 @@
       .page-break{break-before:page;page-break-before:always}
       .avoid{break-inside:avoid;page-break-inside:avoid}
       @media(max-width:760px){.header{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}.section{overflow-x:auto}}
-      @media print{.toolbar{display:none}.report{max-width:none}.header,.metric,.panel,.grand-total,.timeline-bar{break-inside:avoid;page-break-inside:avoid}.section{padding-left:0;padding-right:0}.metrics{padding-left:0;padding-right:0}.grand-total,.note,.foot{margin-left:0;margin-right:0}}
+      @media print{.toolbar{display:none}.report{max-width:none}.header,.period-banner,.metric,.panel,.grand-total,.timeline-bar{break-inside:avoid;page-break-inside:avoid}.section{padding-left:0;padding-right:0}.metrics{padding-left:0;padding-right:0}.grand-total,.note,.foot{margin-left:0;margin-right:0}}
     `;
   }
 
@@ -108,7 +127,7 @@
 
   function header(model, eyebrow, title) {
     var meta = model.report || {};
-    return '<div class="header"><div><div class="eyebrow">' + esc(eyebrow) + '</div><h1>' + esc(title) + '</h1><div class="meta"><strong>' + esc(meta.station || meta.scope || '-') + '</strong><br>' + (meta.work ? 'Obra: ' + esc(meta.work) + '<br>' : '') + 'Periodo: ' + esc(meta.period || '-') + '<br>Gerado em ' + esc(meta.generatedAt || '-') + '</div></div><div class="badge">' + esc(statusLabel(meta.status)) + (meta.version ? ' - versao ' + esc(meta.version) : '') + '</div></div>';
+    return '<div class="header"><div><div class="eyebrow">' + esc(eyebrow) + '</div><h1>' + esc(title) + '</h1><div class="meta"><strong>' + esc(meta.station || meta.scope || '-') + '</strong><br>' + (meta.work ? 'Obra: ' + esc(meta.work) + '<br>' : '') + 'Gerado em ' + esc(meta.generatedAt || '-') + '</div></div><div class="badge">' + esc(statusLabel(meta.status)) + (meta.version ? ' - versao ' + esc(meta.version) : '') + '</div></div><div class="period-banner"><span>Periodo do relatorio</span><strong>' + esc(reportPeriod(meta)) + '</strong></div>';
   }
 
   function metrics(items) {

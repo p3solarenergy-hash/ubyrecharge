@@ -4488,6 +4488,7 @@ function currentWorkInvestorTimeline(uptoMonth = financeMonthKey(), selectedSett
 
 function currentWorkInvestorReportModel(mk = financeMonthKey(), settingsOverride = null) {
   const settings = settingsOverride || currentFinanceSettingsFromInputs();
+  const period = financeReportPeriod(mk);
   const timeline = currentWorkInvestorTimeline(mk, settings);
   const current = timeline.find(entry => entry.key === mk) || financeInvestorEntry([], settings, mk, { power: workPowerById(currentWorkId) });
   const accumulated = aggregateInvestorEntries(timeline, current.investmentValue);
@@ -4495,7 +4496,9 @@ function currentWorkInvestorReportModel(mk = financeMonthKey(), settingsOverride
     report: {
       station: currentStationReportName || currentWorkName,
       work: currentWorkName,
-      period: monthLabel(mk),
+      period: period.label,
+      periodStart: period.start,
+      periodEnd: period.end,
       status: mk < new Date().toISOString().slice(0, 7) || monthlyClosings?.[mk] ? 'closed' : 'partial',
       generatedAt: new Date().toLocaleString('pt-BR')
     },
@@ -4531,6 +4534,7 @@ function ownerAreaEntryForMonth(mk = '', settings = {}) {
 }
 
 function currentWorkOwnerAreaReportModel(mk = financeMonthKey(), settingsOverride = null) {
+  const period = financeReportPeriod(mk);
   const available = [...new Set(allCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const firstMonth = available.find(key => key <= mk) || mk;
   const timeline = financeMonthSeries(firstMonth, mk).map(monthKeyValue => ownerAreaEntryForMonth(
@@ -4546,7 +4550,9 @@ function currentWorkOwnerAreaReportModel(mk = financeMonthKey(), settingsOverrid
     report: {
       station: currentStationReportName || currentWorkName,
       work: currentWorkName,
-      period: monthLabel(mk),
+      period: period.label,
+      periodStart: period.start,
+      periodEnd: period.end,
       status: mk < new Date().toISOString().slice(0, 7) || monthlyClosings?.[mk] ? 'closed' : 'partial',
       generatedAt: new Date().toLocaleString('pt-BR')
     },
@@ -4702,6 +4708,8 @@ function archivedPartnerAreaModel(report = {}) {
       station: report.stationName || report.payload?.work?.stationName || '-',
       work: report.payload?.work?.name || '',
       period: report.payload?.period?.label || report.payload?.cycle?.label || report.periodKey,
+      periodStart: report.payload?.period?.start || report.periodStart || '',
+      periodEnd: report.payload?.period?.end || report.periodEnd || '',
       status: report.status,
       version: report.version,
       generatedAt: new Date(report.generatedAt || report.updatedAt || Date.now()).toLocaleString('pt-BR')
@@ -4758,6 +4766,8 @@ function archivedInvestorModel(report = {}) {
         station: report.stationName || report.payload?.work?.stationName || report.payload.investorModel.report?.station || '-',
         work: report.payload?.work?.name || report.payload.investorModel.report?.work || '',
         period: report.payload?.period?.label || report.payload.investorModel.report?.period || monthLabel(report.periodKey),
+        periodStart: report.payload?.period?.start || report.periodStart || report.payload.investorModel.report?.periodStart || '',
+        periodEnd: report.payload?.period?.end || report.periodEnd || report.payload.investorModel.report?.periodEnd || '',
         status: report.status,
         version: report.version,
         generatedAt: new Date(report.generatedAt || report.updatedAt || Date.now()).toLocaleString('pt-BR')
@@ -4776,6 +4786,8 @@ function archivedInvestorModel(report = {}) {
       station: report.stationName || report.payload?.work?.stationName || '-',
       work: report.payload?.work?.name || '',
       period: report.payload?.period?.label || monthLabel(report.periodKey),
+      periodStart: report.payload?.period?.start || report.periodStart || '',
+      periodEnd: report.payload?.period?.end || report.periodEnd || '',
       status: report.status,
       version: report.version,
       generatedAt: new Date(report.generatedAt || report.updatedAt || Date.now()).toLocaleString('pt-BR')
@@ -8687,6 +8699,7 @@ function ubyInvestorMonthEntry(rows = [], mk = '') {
 }
 
 function buildUbyInvestorReportModel(mk = ubyInvestorLatestMonth(), rows = ubyInvestorSourceRows()) {
+  const period = financeReportPeriod(mk);
   const starts = rows.map(row => ubyAreaOperationStart(row)).filter(date => date && !Number.isNaN(date.getTime()));
   const firstDate = starts.length ? new Date(Math.min(...starts)) : new Date();
   const firstMonth = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, '0')}`;
@@ -8699,7 +8712,9 @@ function buildUbyInvestorReportModel(mk = ubyInvestorLatestMonth(), rows = ubyIn
     report: {
       scope: 'Rede de carregadores UBY',
       station: 'Consolidado UBY',
-      period: monthLabel(mk),
+      period: period.label,
+      periodStart: period.start,
+      periodEnd: period.end,
       status: mk < new Date().toISOString().slice(0, 7) ? 'closed' : 'partial',
       generatedAt: new Date().toLocaleString('pt-BR')
     },
@@ -8714,6 +8729,7 @@ function buildUbyInvestorReportModel(mk = ubyInvestorLatestMonth(), rows = ubyIn
 
 function ubyInvestorReportRecord(row = {}, mk = '', status = 'partial') {
   const settings = financeSettingsForUbyRow(row, mk);
+  const period = financeReportPeriod(mk);
   const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
   const entry = financeInvestorEntry(charges, settings, mk, { historyCharges: row.charges, power: workPowerById(row.workId) });
   const start = ubyAreaOperationStart(row);
@@ -8726,7 +8742,9 @@ function ubyInvestorReportRecord(row = {}, mk = '', status = 'partial') {
     report: {
       station: row.stationName || row.station || row.workName,
       work: row.workName,
-      period: monthLabel(mk),
+      period: period.label,
+      periodStart: period.start,
+      periodEnd: period.end,
       status,
       generatedAt: new Date().toLocaleString('pt-BR')
     },
@@ -8737,7 +8755,6 @@ function ubyInvestorReportRecord(row = {}, mk = '', status = 'partial') {
     revenueItems: entry.revenueItems,
     costItems: entry.costItems
   };
-  const period = financeReportPeriod(mk);
   const stationName = row.stationName || row.station || row.workName || '';
   return {
     workId: row.workId,
