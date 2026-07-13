@@ -63,6 +63,48 @@
     }).reduce(function (sum, rule) { return sum + positive(rule.value); }, 0);
   }
 
+  function monthKeys(store) {
+    return Object.keys(store || {}).filter(function (key) {
+      return /^\d{4}-\d{2}$/.test(key);
+    }).sort();
+  }
+
+  function latestMonthBefore(stores, targetMonth) {
+    return Array.from(new Set((Array.isArray(stores) ? stores : [stores]).reduce(function (keys, store) {
+      return keys.concat(monthKeys(store));
+    }, []))).filter(function (key) {
+      return !targetMonth || key < targetMonth;
+    }).sort().pop() || '';
+  }
+
+  function resolveMonthlySettings(defaults, rootStore, scopedStore, targetMonth) {
+    const root = rootStore || {};
+    const scoped = scopedStore || {};
+    const rootPrior = latestMonthBefore(root, targetMonth);
+    const scopedPrior = latestMonthBefore(scoped, targetMonth);
+    const previousMonth = [rootPrior, scopedPrior].filter(Boolean).sort().pop() || '';
+    const rootExact = !!targetMonth && Object.prototype.hasOwnProperty.call(root, targetMonth);
+    const scopedExact = !!targetMonth && Object.prototype.hasOwnProperty.call(scoped, targetMonth);
+    const exact = rootExact || scopedExact;
+    const settings = Object.assign(
+      {},
+      defaults || {},
+      root.default || {},
+      scoped.default || {},
+      rootPrior ? root[rootPrior] || {} : {},
+      scopedPrior ? scoped[scopedPrior] || {} : {},
+      rootExact ? root[targetMonth] || {} : {},
+      scopedExact ? scoped[targetMonth] || {} : {}
+    );
+    return {
+      settings: settings,
+      exact: exact,
+      previousMonth: previousMonth,
+      source: exact ? 'saved' : (previousMonth ? 'inherited' : 'default'),
+      sourceMonth: exact ? targetMonth : previousMonth
+    };
+  }
+
   function unitEconomics(input) {
     const data = input || {};
     const energy = positive(data.energy);
@@ -92,6 +134,9 @@
   global.UBY_FINANCE_ENGINE = Object.freeze({
     evaluateRules: evaluateRules,
     fixedTotal: fixedTotal,
+    latestMonthBefore: latestMonthBefore,
+    monthKeys: monthKeys,
+    resolveMonthlySettings: resolveMonthlySettings,
     ruleAmount: ruleAmount,
     unitEconomics: unitEconomics,
     variablePerKWh: variablePerKWh

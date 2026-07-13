@@ -327,6 +327,60 @@
     .finance-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
     .finance-section-head h2 { margin:0; padding:0; border:0; }
     .finance-section-head p { margin:4px 0 0; max-width:760px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .finance-flow-nav { display:flex; gap:8px; flex-wrap:wrap; margin:16px 0 0; }
+    .finance-flow-nav a { display:inline-flex; align-items:center; gap:7px; min-height:34px; padding:7px 11px; border:1px solid var(--surface-border); border-radius:8px; background:var(--surface-bg); color:#BFD8FF; text-decoration:none; font-size:11px; font-weight:800; }
+    .finance-flow-nav a:hover { border-color:#57B7FF; color:#fff; }
+    .finance-flow-nav b { display:inline-grid; place-items:center; width:19px; height:19px; border-radius:50%; background:rgba(45,127,249,.2); color:#57B7FF; font-size:10px; }
+    .finance-month-panel { margin-top:18px; border:1px solid rgba(84,180,255,.25); border-radius:12px; background:linear-gradient(135deg,rgba(17,39,67,.98),rgba(11,25,43,.98)); padding:16px; box-shadow:var(--p3-shadow); }
+    .finance-month-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+    .finance-month-head h2 { margin:0; padding:0; border:0; }
+    .finance-month-head p { margin:5px 0 0; color:var(--p3-muted); font-size:12px; line-height:1.45; max-width:780px; }
+    .finance-month-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .finance-month-status-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
+    .finance-month-status { min-width:0; border:1px solid rgba(84,180,255,.16); border-radius:10px; padding:11px 12px; background:rgba(84,180,255,.045); }
+    .finance-month-status span { display:block; color:var(--p3-muted); font-size:9px; text-transform:uppercase; letter-spacing:.07em; font-weight:800; }
+    .finance-month-status strong { display:block; margin-top:5px; color:#57B7FF; font-size:15px; line-height:1.2; overflow-wrap:anywhere; }
+    .finance-month-status small { display:block; margin-top:4px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .finance-month-status.good strong { color:#57D990; }
+    .finance-month-status.warn strong { color:#FFD66B; }
+    .finance-step-kicker { display:block; margin-bottom:5px; color:#57B7FF; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+    .finance-variables-ledger { min-width:1080px; }
+    .finance-variables-ledger .setting-group { width:110px; color:var(--p3-muted); font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .finance-variables-ledger .setting-name { min-width:220px; font-weight:800; color:var(--p3-text); }
+    .finance-variables-ledger .setting-rule { min-width:180px; color:var(--p3-muted); font-size:11px; }
+    .finance-variables-ledger .setting-value { min-width:170px; }
+    .finance-variables-ledger .setting-previous { min-width:130px; color:#BFD8FF; font-weight:800; white-space:nowrap; }
+    .finance-setting-state { display:inline-flex; align-items:center; justify-content:center; min-width:82px; border-radius:999px; padding:5px 9px; border:1px solid rgba(84,180,255,.25); background:rgba(84,180,255,.1); color:#BFD8FF; font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+    .finance-setting-state.changed { border-color:rgba(255,214,107,.3); background:rgba(255,214,107,.1); color:#FFD66B; }
+    .finance-setting-state.inherited { border-color:rgba(56,201,111,.3); background:rgba(56,201,111,.1); color:#57D990; }
+    .finance-setting-state.new { border-color:rgba(143,163,154,.25); background:rgba(143,163,154,.08); color:var(--p3-muted); }
+    .finance-section-divider { margin-top:18px; }
+    .finance-report-zone { margin-top:20px; border-top:1px solid rgba(84,180,255,.16); padding-top:2px; }
+    .finance-command-center { position:sticky; top:10px; z-index:25; margin-top:16px; padding:14px; border:1px solid rgba(84,180,255,.28); border-radius:12px; background:rgba(8,22,39,.96); box-shadow:0 16px 38px rgba(0,0,0,.28); backdrop-filter:blur(12px); }
+    .finance-command-grid { display:grid; grid-template-columns:minmax(220px,1.4fr) minmax(150px,.7fr) minmax(190px,.9fr) auto; gap:10px; align-items:end; }
+    .finance-command-field { display:grid; gap:6px; min-width:0; }
+    .finance-command-field label { color:var(--p3-muted); font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.07em; }
+    .finance-command-field .ctl-select { width:100%; min-width:0; }
+    .finance-command-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .finance-command-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:12px; }
+    .finance-command-metric { min-width:0; padding:10px 12px; border:1px solid rgba(84,180,255,.16); border-radius:9px; background:rgba(84,180,255,.055); }
+    .finance-command-metric span { display:block; color:var(--p3-muted); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+    .finance-command-metric strong { display:block; margin-top:4px; color:#57B7FF; font-size:17px; line-height:1.15; overflow-wrap:anywhere; }
+    .finance-command-metric.positive strong { color:#57D990; }
+    .finance-command-metric.negative strong { color:#FF7373; }
+    .finance-panel-hidden { display:none !important; }
+    .report-library { display:grid; gap:10px; margin-top:14px; }
+    .report-library-toolbar { display:flex; align-items:end; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:14px; }
+    .report-library-filters { display:flex; align-items:end; gap:8px; flex-wrap:wrap; }
+    .report-library-card { display:grid; grid-template-columns:minmax(210px,1.4fr) repeat(4,minmax(90px,.65fr)) auto; gap:10px; align-items:center; padding:12px 14px; border:1px solid var(--surface-border); border-radius:10px; background:rgba(8,22,39,.7); }
+    .report-library-main strong { display:block; color:var(--p3-text); font-size:13px; }
+    .report-library-main span,.report-library-value span { display:block; margin-top:3px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .report-library-value b { display:block; color:#57B7FF; font-size:13px; }
+    .report-library-actions { display:flex; gap:7px; justify-content:flex-end; flex-wrap:wrap; }
+    .report-status { display:inline-flex; width:max-content; margin-top:5px; padding:3px 7px; border-radius:999px; font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
+    .report-status.closed { color:#57D990; border:1px solid rgba(87,217,144,.32); background:rgba(87,217,144,.1); }
+    .report-status.partial { color:#FFD66B; border:1px solid rgba(255,214,107,.32); background:rgba(255,214,107,.1); }
+    .report-library-empty { padding:18px; border:1px dashed rgba(84,180,255,.24); border-radius:10px; color:var(--p3-muted); text-align:center; font-size:12px; }
     .finance-basis-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
     .finance-basis-card { min-width:0; border:1px solid rgba(84,180,255,.18); border-radius:10px; padding:12px; background:rgba(84,180,255,.05); }
     .finance-basis-card label,.finance-basis-card span { display:block; color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:800; }
@@ -334,7 +388,7 @@
     .finance-basis-card small { display:block; margin-top:4px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
     .finance-basis-card .ctl-input { width:100%; margin-top:7px; }
     .finance-ledger-wrap { overflow-x:auto; border:1px solid rgba(84,180,255,.16); border-radius:10px; }
-    .finance-ledger { min-width:980px; }
+    .finance-ledger { min-width:1220px; }
     .finance-ledger th { white-space:nowrap; }
     .finance-ledger td { vertical-align:middle; }
     .finance-ledger .rule-enabled { width:54px; text-align:center; }
@@ -345,6 +399,8 @@
     .finance-ledger .rule-value small { display:block; margin-top:3px; color:var(--p3-muted); font-size:9px; white-space:nowrap; }
     .finance-ledger .rule-output { min-width:116px; white-space:nowrap; font-weight:800; color:#DCEBFF; }
     .finance-ledger .rule-output.primary { color:#57B7FF; }
+    .finance-ledger .rule-previous { min-width:126px; color:#BFD8FF; font-size:10px; font-weight:800; line-height:1.35; }
+    .finance-ledger .rule-state { min-width:96px; text-align:center; }
     .finance-ledger .rule-actions { width:46px; text-align:center; }
     .finance-ledger .ctl-input,.finance-ledger .ctl-select { width:100%; min-height:36px; }
     .finance-ledger input[type="checkbox"] { width:18px; height:18px; accent-color:var(--p3-primary); }
@@ -377,6 +433,21 @@
     .uby-finance-cell.result-positive b { color:#57D990; }
     .uby-finance-cell.result-negative b { color:#FF7A7A; }
     .finance-empty-guidance { border-left:3px solid #FFD66B; border-radius:8px; background:rgba(242,169,61,.10); color:#FFE4A0; padding:10px 12px; font-size:12px; line-height:1.45; margin-top:12px; }
+    .station-layout-dialog { width:min(620px,calc(100vw - 24px)); border:1px solid rgba(84,180,255,.28); border-radius:12px; padding:0; background:#0D1B2E; color:var(--p3-text); box-shadow:0 30px 80px rgba(0,0,0,.55); }
+    .station-layout-dialog::backdrop { background:rgba(2,8,18,.76); backdrop-filter:blur(3px); }
+    .station-layout-head { padding:18px 20px 14px; border-bottom:1px solid var(--surface-border); }
+    .station-layout-head h2 { margin:0; padding:0; border:0; }
+    .station-layout-head p { margin:5px 0 0; color:var(--p3-muted); font-size:11px; line-height:1.45; }
+    .station-layout-body { padding:18px 20px; }
+    .station-layout-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .station-layout-field { display:grid; gap:6px; min-width:0; color:var(--p3-muted); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
+    .station-layout-field.wide { grid-column:1/-1; }
+    .station-layout-field input { width:100%; min-height:40px; border:1px solid var(--p3-border); border-radius:8px; background:#091526; color:var(--p3-text); padding:9px 10px; font:inherit; }
+    .station-layout-actions { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px 18px; border-top:1px solid var(--surface-border); }
+    .plant-count { display:inline-grid; gap:2px; min-width:56px; }
+    .plant-count strong { color:var(--p3-text); font-size:13px; }
+    .plant-count small { color:var(--p3-muted); font-size:9px; white-space:nowrap; }
+    .unit-table-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 
     /* ── NOVO: Upload zone ── */
     .upload-zone {
@@ -541,8 +612,11 @@
       .calendar-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
       .kpi-feature { grid-column:span 2; }
       .accountability-grid { grid-template-columns:1fr; }
+      .finance-command-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .report-library-card { grid-template-columns:minmax(190px,1.4fr) repeat(2,minmax(100px,.7fr)) auto; }
+      .report-library-card .report-library-value.optional { display:none; }
       .investor-preview { grid-template-columns:repeat(3,minmax(0,1fr)); }
-      .finance-basis-grid,.finance-results,.uby-finance-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .finance-basis-grid,.finance-results,.uby-finance-summary,.finance-month-status-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .uby-finance-row { grid-template-columns:minmax(190px,1fr) repeat(2,minmax(105px,.55fr)) auto; }
       .uby-finance-row .uby-finance-cell:nth-of-type(4),.uby-finance-row .uby-finance-cell:nth-of-type(5) { display:none; }
     }
@@ -662,8 +736,22 @@
       .card > table td:first-child { width:56%; }
       .card > div[style*="overflow-x:auto"] { margin-left:-6px; margin-right:-6px; padding:0 6px 6px; }
       .empty-state { padding:44px 12px; }
-      .finance-basis-grid,.finance-results,.uby-finance-summary { grid-template-columns:1fr 1fr; gap:8px; }
+      .finance-basis-grid,.finance-results,.uby-finance-summary,.finance-month-status-grid { grid-template-columns:1fr 1fr; gap:8px; }
       .finance-section-head .btn-recalc { width:auto; }
+      .finance-month-actions { width:100%; }
+      .finance-month-actions .btn-recalc { flex:1 1 160px; }
+      .finance-flow-nav { display:grid; grid-template-columns:1fr 1fr; }
+      .finance-flow-nav a { min-width:0; }
+      .finance-command-center { position:relative; top:auto; padding:12px; }
+      .finance-command-grid { grid-template-columns:1fr 1fr; }
+      .finance-command-field:first-child,.finance-command-actions { grid-column:1/-1; }
+      .finance-command-summary { grid-template-columns:1fr 1fr; }
+      .report-library-card { grid-template-columns:1fr 1fr; }
+      .report-library-main,.report-library-actions { grid-column:1/-1; }
+      .report-library-actions { justify-content:flex-start; }
+      .station-layout-grid { grid-template-columns:1fr 1fr; }
+      .station-layout-dialog { width:calc(100vw - 18px); }
+      .station-layout-body,.station-layout-head { padding-left:14px; padding-right:14px; }
       .finance-result-card { min-height:112px; padding:12px; }
       .finance-result-card strong { font-size:20px; }
       .uby-finance-row { grid-template-columns:1fr 1fr; gap:9px; padding:12px; }
@@ -738,9 +826,7 @@
       <button class="btn-recalc" onclick="renderAll()">↺ Recalcular</button>
     </div>
     <div class="controls" id="ctrlFinanceiro" style="display:none">
-      <span>Mes:</span>
-      <select class="ctl-select" id="financeMonthSelector" onchange="renderFinanceiro()"></select>
-      <button class="btn-recalc" onclick="saveFinancialSettings()">Salvar financeiro</button>
+      <span>Financeiro mensal com salvamento automatico e historico de fechamentos.</span>
     </div>
   </div>
 
@@ -1180,6 +1266,18 @@
         </div>
         <div class="accountability-grid" id="ubyPartnerReports"></div>
         <div class="accountability-note" id="ubyInvestorPreview"></div>
+        <div class="report-library-toolbar">
+          <div>
+            <span class="finance-step-kicker">Biblioteca permanente</span>
+            <h2 style="margin:0;border:0;padding:0">Fechamentos anteriores</h2>
+            <p>Consulte os relatorios fechados e os parciais de todas as unidades UBY.</p>
+          </div>
+          <div class="report-library-filters">
+            <select class="ctl-select" id="ubyReportUnitFilter" onchange="renderUbyPartnerReportLibrary()"><option value="">Todas as unidades</option></select>
+            <select class="ctl-select" id="ubyReportStatusFilter" onchange="renderUbyPartnerReportLibrary()"><option value="">Todos</option><option value="closed">Fechados</option><option value="partial">Parciais</option></select>
+          </div>
+        </div>
+        <div class="report-library" id="ubyPartnerReportLibrary"><div class="report-library-empty">Carregando historico financeiro...</div></div>
       </div>
     </section>
 
@@ -1443,35 +1541,99 @@
       <div class="formula" id="financeFormula">Resultado liquido = gestao P3, app terceiros, custos e modelo da operacao.</div>
     </section>
 
-    <section class="section">
-      <div class="card">
-        <h2>Parametros do ponto</h2>
-        <table><tbody>
-          <tr><td>Modelo da operacao</td><td><select class="ctl-select" id="financeOperationModel" onchange="renderFinanceiro(false); scheduleFinancialSettingsSave()"><option value="uby">UBY - ativo proprio</option><option value="p3_society">P3 sociedade fora da UBY</option><option value="hybrid">Hibrido AC/DC</option><option value="management_only">Somente gestao</option></select></td></tr>
-          <tr><td>% gestao P3</td><td><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr class="finance-model-row" data-models="p3_society"><td>% sociedade P3 geral</td><td><input class="ctl-input" id="financeP3SocietyPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr class="finance-model-row" data-models="hybrid"><td>% sociedade P3 em AC</td><td><input class="ctl-input" id="financeP3AcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr class="finance-model-row" data-models="hybrid"><td>% sociedade P3 em DC</td><td><input class="ctl-input" id="financeP3DcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>% app / plataforma terceiros</td><td><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>Custo energia R$/kWh</td><td><input class="ctl-input" id="financeEnergyCost" type="number" min="0" step="0.01" value="0" oninput="syncOwnerEnergyRateFromCost(true); renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>Investimento no ponto (R$)</td><td><input class="ctl-input" id="financeInvestmentValue" type="number" min="0" step="100" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr class="finance-model-row" data-models="uby hybrid"><td>% cotas investidores</td><td><input class="ctl-input" id="financeInvestorQuotaPct" type="number" min="0" max="100" step="0.1" value="100" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr class="finance-model-row" data-models="uby hybrid"><td>Retencao obrigatoria S.A. (%)</td><td><input class="ctl-input" id="financeSaRetentionPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>Objetivo de ocupacao (%)</td><td><input class="ctl-input" id="financeTargetOccPct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-          <tr><td>R$/kWh objetivo (0 = real)</td><td><input class="ctl-input" id="financeTargetRevenuePerKWh" type="number" min="0" step="0.01" value="0" oninput="renderFinanceiro(false); scheduleFinancialSettingsSave()"></td></tr>
-        </tbody></table>
+    <section class="finance-command-center" aria-label="Central financeira">
+      <div class="finance-command-grid">
+        <div class="finance-command-field"><label for="financeWorkSelector">Obra / ponto</label><select class="ctl-select" id="financeWorkSelector" onchange="handleFinanceWorkChange(this.value)"></select></div>
+        <div class="finance-command-field"><label for="financeMonthSelector">Competencia</label><select class="ctl-select" id="financeMonthSelector" onchange="handleFinanceMonthChange()"></select></div>
+        <div class="finance-command-field"><label for="financePanelSelector">Quadro exibido</label><select class="ctl-select" id="financePanelSelector" onchange="showFinancePanel(this.value)"><option value="overview">Resultado</option><option value="premises">Premissas</option><option value="revenue">Receitas</option><option value="cost">Custos</option><option value="reports">Relatorios</option><option value="all">Painel completo</option></select></div>
+        <div class="finance-command-actions"><button class="btn-recalc" type="button" onclick="confirmFinanceMonthValues()">Salvar competencia</button></div>
       </div>
-      <div class="card">
-        <h2>Distribuicao da receita</h2>
-        <table><tbody id="financeDistributionTable"></tbody></table>
+      <div class="finance-command-summary" id="financeCommandSummary"></div>
+    </section>
+
+    <section class="finance-month-panel" id="financeMonthPanel" data-finance-panel="premises">
+      <div class="finance-month-head">
+        <div>
+          <span class="finance-step-kicker">Competencia financeira</span>
+          <h2>Valores versionados por mes</h2>
+          <p>O mes novo parte da ultima configuracao salva. Alteracoes ficam somente na competencia selecionada e os meses anteriores permanecem preservados.</p>
+        </div>
+        <div class="finance-month-actions">
+          <button class="btn-recalc" type="button" onclick="restoreFinancePreviousMonth()">Restaurar mes anterior</button>
+          <button class="btn-recalc" type="button" onclick="confirmFinanceMonthValues()">Manter valores deste mes</button>
+        </div>
+      </div>
+      <div class="finance-month-status-grid">
+        <div class="finance-month-status"><span>Competencia</span><strong id="financeVersionMonth">-</strong><small>mes usado em todos os calculos e relatorios</small></div>
+        <div class="finance-month-status"><span>Base dos valores</span><strong id="financeVersionSource">-</strong><small id="financeVersionSourceHelp">carregando configuracao</small></div>
+        <div class="finance-month-status" id="financeVersionStateCard"><span>Situacao</span><strong id="financeVersionState">-</strong><small id="financeVersionChanges">sem alteracoes pendentes</small></div>
+        <div class="finance-month-status good"><span>Salvamento</span><strong id="financeVersionSaved">Automatico</strong><small id="financeVersionSavedAt">banco e copia local</small></div>
       </div>
     </section>
 
-    <section class="card finance-workbench">
+    <section class="card finance-workbench" id="financeMonthlyPremises" data-finance-panel="premises">
       <div class="finance-section-head">
         <div>
+          <span class="finance-step-kicker">1. Premissas do mes</span>
+          <h2>Variaveis financeiras e operacionais</h2>
+          <p>Gestao, plataforma, energia, participacoes e metas seguem o mesmo controle mensal dos demais custos. A coluna anterior deixa claro o que foi mantido ou alterado.</p>
+        </div>
+      </div>
+      <div class="finance-ledger-wrap">
+        <table class="finance-ledger finance-variables-ledger">
+          <thead><tr><th>Grupo</th><th>Variavel</th><th>Regra</th><th>Valor do mes</th><th>Mes anterior</th><th>Situacao</th></tr></thead>
+          <tbody>
+            <tr data-finance-setting-key="operationModel" data-finance-setting-format="model"><td class="setting-group">Operacao</td><td class="setting-name">Modelo da operacao</td><td class="setting-rule">Define propriedade e distribuicao do resultado</td><td class="setting-value"><select class="ctl-select" id="financeOperationModel" onchange="handleFinanceSettingChange()"><option value="uby">UBY - ativo proprio</option><option value="p3_society">P3 sociedade fora da UBY</option><option value="hybrid">Hibrido AC/DC</option><option value="management_only">Somente gestao</option></select></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="managementPct" data-finance-setting-format="pct"><td class="setting-group">Gestao</td><td class="setting-name">Gestao P3</td><td class="setting-rule">Percentual sobre o faturamento</td><td class="setting-value"><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="p3_society" data-finance-setting-key="p3SocietyPct" data-finance-setting-format="pct"><td class="setting-group">Sociedade</td><td class="setting-name">Sociedade P3 geral</td><td class="setting-rule">Percentual do resultado da sociedade</td><td class="setting-value"><input class="ctl-input" id="financeP3SocietyPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="hybrid" data-finance-setting-key="p3AcEquityPct" data-finance-setting-format="pct"><td class="setting-group">Sociedade</td><td class="setting-name">Sociedade P3 em AC</td><td class="setting-rule">Percentual aplicado a operacao AC</td><td class="setting-value"><input class="ctl-input" id="financeP3AcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="hybrid" data-finance-setting-key="p3DcEquityPct" data-finance-setting-format="pct"><td class="setting-group">Sociedade</td><td class="setting-name">Sociedade P3 em DC</td><td class="setting-rule">Percentual aplicado a operacao DC</td><td class="setting-value"><input class="ctl-input" id="financeP3DcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="platformPct" data-finance-setting-format="pct"><td class="setting-group">Plataforma</td><td class="setting-name">App / plataforma de terceiros</td><td class="setting-rule">Percentual sobre o faturamento</td><td class="setting-value"><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="energyCostPerKWh" data-finance-setting-format="brl_kwh"><td class="setting-group">Energia</td><td class="setting-name">Custo da energia</td><td class="setting-rule">Tarifa aplicada a cada kWh vendido</td><td class="setting-value"><input class="ctl-input" id="financeEnergyCost" type="number" min="0" step="0.01" value="0" oninput="handleFinanceEnergySettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="investmentValue" data-finance-setting-format="brl"><td class="setting-group">Capital</td><td class="setting-name">Investimento no ponto</td><td class="setting-rule">Base para ROI e payback</td><td class="setting-value"><input class="ctl-input" id="financeInvestmentValue" type="number" min="0" step="100" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="uby hybrid" data-finance-setting-key="investorQuotaPct" data-finance-setting-format="pct"><td class="setting-group">Investidores</td><td class="setting-name">Cotas dos investidores</td><td class="setting-rule">Percentual distribuivel aos cotistas</td><td class="setting-value"><input class="ctl-input" id="financeInvestorQuotaPct" type="number" min="0" max="100" step="0.1" value="100" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="uby hybrid" data-finance-setting-key="saRetentionPct" data-finance-setting-format="pct"><td class="setting-group">Retencao</td><td class="setting-name">Retencao obrigatoria S.A.</td><td class="setting-rule">Percentual retido sobre o lucro liquido</td><td class="setting-value"><input class="ctl-input" id="financeSaRetentionPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="targetOccPct" data-finance-setting-format="pct"><td class="setting-group">Meta</td><td class="setting-name">Objetivo de ocupacao</td><td class="setting-rule">Meta mensal de utilizacao</td><td class="setting-value"><input class="ctl-input" id="financeTargetOccPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="targetRevenuePerKWh" data-finance-setting-format="brl_kwh"><td class="setting-group">Meta</td><td class="setting-name">Preco objetivo</td><td class="setting-rule">Zero usa o preco medio real</td><td class="setting-value"><input class="ctl-input" id="financeTargetRevenuePerKWh" type="number" min="0" step="0.01" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="ownerEnergyRate" data-finance-setting-format="brl_kwh"><td class="setting-group">Parceiro</td><td class="setting-name">Energia para reembolso</td><td class="setting-rule">Inicia igual ao custo da energia; pode ser ajustado</td><td class="setting-value"><input class="ctl-input" id="ownerEnergyRate" type="number" min="0" step="0.01" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="ownerTransferMode" data-finance-setting-format="transfer"><td class="setting-group">Parceiro</td><td class="setting-name">Tipo de repasse da area</td><td class="setting-rule">Escolha uma unica base de calculo</td><td class="setting-value"><select class="ctl-select" id="ownerTransferMode" onchange="handleFinanceSettingChange()"><option value="gross">Sobre faturamento bruto</option><option value="net">Sobre lucro liquido</option></select></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr id="ownerRevenueShareRow" data-finance-setting-key="ownerRevenueSharePct" data-finance-setting-format="pct"><td class="setting-group">Parceiro</td><td class="setting-name">Repasse sobre faturamento</td><td class="setting-rule">Percentual sobre receita bruta</td><td class="setting-value"><input class="ctl-input" id="ownerRevenueSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr id="ownerNetProfitShareRow" data-finance-setting-key="ownerNetProfitSharePct" data-finance-setting-format="pct"><td class="setting-group">Parceiro</td><td class="setting-name">Repasse sobre lucro liquido</td><td class="setting-rule">Percentual sobre resultado antes da area</td><td class="setting-value"><input class="ctl-input" id="ownerNetProfitSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card finance-workbench" id="financeRevenueSection" data-finance-panel="revenue">
+      <div class="finance-section-head">
+        <div>
+          <span class="finance-step-kicker">2. Receitas do mes</span>
+          <h2>Receitas adicionais do carregador</h2>
+          <p>O faturamento das recargas vem automaticamente da base. Cadastre abaixo estacionamento, publicidade, assinatura, conveniencia ou qualquer receita complementar da competencia.</p>
+        </div>
+        <button class="btn-recalc" type="button" onclick="addFinanceRule('revenue')">+ Adicionar receita</button>
+      </div>
+      <div class="finance-ledger-wrap" style="margin-bottom:14px">
+        <table class="finance-ledger">
+          <thead><tr><th colspan="2">Composicao da receita e distribuicao</th></tr></thead>
+          <tbody id="financeDistributionTable"></tbody>
+        </table>
+      </div>
+      <div class="finance-ledger-wrap">
+        <table class="finance-ledger">
+          <thead><tr><th>Usar</th><th>Item</th><th>Regra</th><th>Valor da regra</th><th>Receita realizada</th><th>R$/kWh inicial</th><th>R$/kWh atual</th><th>Mes anterior</th><th>Situacao</th><th></th></tr></thead>
+          <tbody id="financeRevenueRuleRows"></tbody>
+          <tfoot id="financeRevenueRuleTotals"></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="card finance-workbench" id="financeCostSection" data-finance-panel="cost">
+      <div class="finance-section-head">
+        <div>
+          <span class="finance-step-kicker">3. Custos do mes</span>
           <h2>Custos operacionais do carregador</h2>
-          <p>Ative apenas os itens usados neste ponto. O custo realizado por kWh cai conforme o volume vendido aumenta; a base inicial permite planejar o mes mesmo antes da primeira recarga.</p>
+          <p>Ative apenas os itens usados neste ponto. Cada custo fica salvo na competencia e mostra seu peso inicial e o valor efetivamente diluido por kWh.</p>
         </div>
         <button class="btn-recalc" type="button" onclick="addFinanceRule('cost')">+ Adicionar custo</button>
       </div>
@@ -1487,7 +1649,7 @@
       </div>
       <div class="finance-ledger-wrap">
         <table class="finance-ledger">
-          <thead><tr><th>Usar</th><th>Item</th><th>Regra</th><th>Valor da regra</th><th>Custo realizado</th><th>R$/kWh inicial</th><th>R$/kWh atual</th><th></th></tr></thead>
+          <thead><tr><th>Usar</th><th>Item</th><th>Regra</th><th>Valor da regra</th><th>Custo realizado</th><th>R$/kWh inicial</th><th>R$/kWh atual</th><th>Mes anterior</th><th>Situacao</th><th></th></tr></thead>
           <tbody id="financeCostRuleRows"></tbody>
           <tfoot id="financeCostRuleTotals"></tfoot>
         </table>
@@ -1495,56 +1657,52 @@
       <div class="finance-empty-guidance" id="financePlanningGuidance" style="display:none"></div>
     </section>
 
-    <section class="card finance-workbench">
+    <section class="finance-section-divider" id="financeResultSection" data-finance-panel="overview">
       <div class="finance-section-head">
-        <div>
-          <h2>Receitas adicionais do carregador</h2>
-          <p>Cadastre estacionamento, publicidade, assinatura, conveniencia ou qualquer receita que nao esteja na planilha de recargas.</p>
+        <div><span class="finance-step-kicker">4. Resultado do mes</span><h2>Resultado financeiro consolidado</h2><p>Receitas, custos, participacoes, margem, custo por kWh, ponto de equilibrio, ROI e payback da competencia selecionada.</p></div>
+      </div>
+      <section class="grid kpis" id="financeKpis"></section>
+      <section class="finance-results" id="financeOperationalResults"></section>
+      <section class="section">
+        <div class="card">
+          <h2>Demonstrativo do resultado</h2>
+          <table><tbody id="financeResultTable"></tbody></table>
         </div>
-        <button class="btn-recalc" type="button" onclick="addFinanceRule('revenue')">+ Adicionar receita</button>
-      </div>
-      <div class="finance-ledger-wrap">
-        <table class="finance-ledger">
-          <thead><tr><th>Usar</th><th>Item</th><th>Regra</th><th>Valor da regra</th><th>Receita realizada</th><th>R$/kWh inicial</th><th>R$/kWh atual</th><th></th></tr></thead>
-          <tbody id="financeRevenueRuleRows"></tbody>
-          <tfoot id="financeRevenueRuleTotals"></tfoot>
-        </table>
-      </div>
+        <div class="card">
+          <h2>Leitura executiva</h2>
+          <div class="note" id="financeNote"></div>
+        </div>
+      </section>
     </section>
 
-    <section class="section">
-      <div class="card" style="grid-column:1/-1">
-        <h2>Relatorio para dono da area</h2>
+    <section class="finance-report-zone" id="financeReportSection" data-finance-panel="reports">
+      <section class="card finance-workbench">
+        <div class="finance-section-head">
+          <div>
+            <span class="finance-step-kicker">5. Relatorios e prestacao de contas</span>
+            <h2>Relatorio para parceiro da area</h2>
+            <p>O relatorio usa exatamente as tarifas, percentuais, receitas e custos salvos no mes selecionado. O acumulado respeita a configuracao historica de cada competencia.</p>
+          </div>
+          <div class="finance-command-actions">
+            <button class="btn-recalc" type="button" onclick="saveCurrentFinanceReport('partial')">Salvar parcial</button>
+            <button class="btn-recalc" type="button" onclick="saveCurrentFinanceReport('closed')">Fechar e arquivar</button>
+            <button class="btn-recalc" type="button" onclick="generateCurrentFinanceReport()">Gerar PDF do mes</button>
+          </div>
+        </div>
         <div class="section" style="margin-top:0">
           <div>
-            <table><tbody>
-              <tr><td>Energia para reembolso (R$/kWh)</td><td><input class="ctl-input" id="ownerEnergyRate" type="number" min="0" step="0.01" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
-              <tr><td>Tipo de repasse ao dono</td><td><select class="ctl-select" id="ownerTransferMode" onchange="renderFinanceiro(false); scheduleFinancialSettingsSave()"><option value="gross">Sobre faturamento bruto</option><option value="net">Sobre lucro liquido</option></select></td></tr>
-              <tr id="ownerRevenueShareRow"><td>Repasse sobre faturamento (%)</td><td><input class="ctl-input" id="ownerRevenueSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
-              <tr id="ownerNetProfitShareRow"><td>Repasse sobre lucro liquido (%)</td><td><input class="ctl-input" id="ownerNetProfitSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="renderOwnerAreaReportForCurrentMonth(); scheduleFinancialSettingsSave()"></td></tr>
-            </tbody></table>
-            <div class="note" style="margin-top:12px">Use estes campos para relatorio basico ao proprietario do local. Eles ficam salvos por mes. Em pontos com sociedade, informe o percentual sobre lucro liquido.</div>
+            <div class="note">Os campos de energia e repasse foram centralizados em Premissas do mes. Para alterar o relatorio, edite a competencia no topo; meses anteriores nao serao recalculados com tarifas futuras.</div>
           </div>
-          <div>
+          <div class="finance-ledger-wrap">
             <table><tbody id="ownerAreaReportTable"></tbody></table>
           </div>
         </div>
-      </div>
-    </section>
-
-    <section class="grid kpis" id="financeKpis"></section>
-
-    <section class="finance-results" id="financeOperationalResults"></section>
-
-    <section class="section">
-      <div class="card">
-        <h2>Resultado financeiro</h2>
-        <table><tbody id="financeResultTable"></tbody></table>
-      </div>
-      <div class="card">
-        <h2>Leitura</h2>
-        <div class="note" id="financeNote"></div>
-      </div>
+        <div class="report-library-toolbar">
+          <div><span class="finance-step-kicker">Historico da obra</span><h2 style="margin:0;border:0;padding:0">Relatorios de todas as competencias</h2></div>
+          <select class="ctl-select" id="financeReportStatusFilter" onchange="renderIndividualFinanceReportLibrary()"><option value="">Todos</option><option value="closed">Fechados</option><option value="partial">Parciais</option></select>
+        </div>
+        <div class="report-library" id="financeReportLibrary"><div class="report-library-empty">Carregando historico financeiro...</div></div>
+      </section>
     </section>
   </div><!-- /tabFinanceiro -->
 
@@ -1568,6 +1726,28 @@
       </div>
     </div>
   </div><!-- /tabDetalhes -->
+
+  <dialog class="station-layout-dialog" id="stationLayoutDialog">
+    <div class="station-layout-head">
+      <h2>Organizar planta e carregadores</h2>
+      <p>Use o mesmo nome de planta em estacoes que devem aparecer unificadas. Carregador fisico e plug/conector sao contados separadamente.</p>
+    </div>
+    <div class="station-layout-body">
+      <input type="hidden" id="stationLayoutWorkId">
+      <input type="hidden" id="stationLayoutSourceName">
+      <div class="station-layout-grid">
+        <label class="station-layout-field wide">Nome da planta unificada<input id="stationLayoutPlantName" type="text" placeholder="Ex.: Mercado Santarem - Sabara"></label>
+        <label class="station-layout-field">Carregadores AC<input id="stationLayoutAcChargers" type="number" min="0" step="1" value="0"></label>
+        <label class="station-layout-field">Plugs AC<input id="stationLayoutAcPlugs" type="number" min="0" step="1" value="0"></label>
+        <label class="station-layout-field">Carregadores DC<input id="stationLayoutDcChargers" type="number" min="0" step="1" value="0"></label>
+        <label class="station-layout-field">Plugs DC<input id="stationLayoutDcPlugs" type="number" min="0" step="1" value="0"></label>
+      </div>
+    </div>
+    <div class="station-layout-actions">
+      <button class="btn-danger" type="button" onclick="document.getElementById('stationLayoutDialog').close()">Cancelar</button>
+      <button class="btn-recalc" type="button" onclick="saveStationLayoutConfiguration()">Salvar organizacao</button>
+    </div>
+  </dialog>
 
 </main>
 
@@ -1602,11 +1782,17 @@ let ubyOperationOverrides = {};
 let rechargeRecordsVersion = 0;
 let generalUnitDataCache = null;
 let localRechargeDbSignature = '';
+let financeReportArchive = [];
+let financeReportArchiveLoaded = false;
+let financeReportArchivePromise = null;
+let financeHistorySyncPromise = null;
+let ubyAreaReportSyncPromise = null;
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
 const RECARGAS_IMPORT_UNDO_KEY = 'uby-recargas-import-undo-v1';
 const UBY_AREA_ACCOUNTING_KEY = 'uby-area-accounting-v1';
+const FINANCE_REPORTS_LOCAL_KEY = 'uby-finance-reports-v1';
 const XLSX_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
 const CLUB_PARTNERS_LOCAL_KEY = 'uby-club-partners-v1';
@@ -1674,6 +1860,12 @@ let spreadsheetLibraryPromise = null;
 const RECHARGE_STATION_BLOCKLIST_BY_WORK = {
   malassise: ['posto prata', 'prata cambe', 'prata cambé', 'cambe', 'cambé']
 };
+const DEFAULT_STATION_PHYSICAL_LAYOUTS = [
+  { terms: ['robert koch', 'malassise r k', 'liv 000199'], acChargers: 0, acPlugs: 0, dcChargers: 1, dcPlugs: 2 },
+  { terms: ['rio beach'], acChargers: 1, acPlugs: 1, dcChargers: 0, dcPlugs: 0 },
+  { terms: ['santarem ev jardins', 'santarem jardins'], acChargers: 1, acPlugs: 1, dcChargers: 0, dcPlugs: 0 },
+  { terms: ['santarem ev sabara', 'santarem sabara'], acChargers: 2, acPlugs: 2, dcChargers: 0, dcPlugs: 0 }
+];
 
 function markRechargeRecordsDirty() {
   rechargeRecordsVersion += 1;
@@ -2384,6 +2576,7 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
   document.querySelectorAll('.report-tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${target}'`)));
   showTab(target);
   if (target === 'detalhes') renderDetalhes();
+  if (target === 'financeiro') await handleFinanceMonthChange();
   requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }
 
@@ -3215,12 +3408,15 @@ function getMonths() {
   const validClosings = Object.keys(monthlyClosings || {}).filter(mk => closingMatchesMonth(monthlyClosings[mk], mk));
   const current = new Date();
   const currentMk = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
-  const financeMonths = Object.keys(financeStoreForScope()).filter(mk => /^\d{4}-\d{2}$/.test(mk));
+  const financeMonths = [...new Set([
+    ...Object.keys(financialSettings || {}),
+    ...Object.keys(financeStoreForScope())
+  ])].filter(mk => /^\d{4}-\d{2}$/.test(mk));
   return [...new Set([
     ...allCharges.map(chargeMonthKey),
     ...validClosings,
     ...financeMonths,
-    ...(allCharges.length ? [currentMk] : [])
+    ...(currentWorkId ? [currentMk] : [])
   ])]
     .filter(k => k !== 'unknown').sort();
 }
@@ -3523,7 +3719,8 @@ function currentFinanceSettingsFromInputs() {
     costRules,
     revenueRules,
     costItems: financeLegacyValuesFromRules(costRules, 'cost'),
-    revenueItems: financeLegacyValuesFromRules(revenueRules, 'revenue')
+    revenueItems: financeLegacyValuesFromRules(revenueRules, 'revenue'),
+    periodMeta: { ...(savedScopeSettings.periodMeta || {}) }
   };
 }
 
@@ -3541,6 +3738,70 @@ function financeRuleValueHint(basis = 'fixed') {
   }[basis] || 'valor';
 }
 
+function financeRuleDisplayValue(rule) {
+  if (!rule) return 'Sem base anterior';
+  if (rule.enabled === false) return 'Nao utilizado';
+  const value = Number(rule.value || 0);
+  if (rule.basis === 'revenue_pct') return `${value.toFixed(2).replace('.', ',')}% do faturamento`;
+  if (rule.basis === 'per_kwh') return `${fmtBRL(value)}/kWh`;
+  if (rule.basis === 'per_charge') return `${fmtBRL(value)}/recarga`;
+  if (rule.basis === 'one_off') return `${fmtBRL(value)} no ciclo`;
+  return `${fmtBRL(value)}/mes`;
+}
+
+function financeRuleSignature(rule) {
+  if (!rule) return '';
+  return JSON.stringify({
+    enabled: rule.enabled !== false,
+    label: safeText(rule.label),
+    basis: rule.basis || 'fixed',
+    value: Number(rule.value || 0)
+  });
+}
+
+function financeVersionStateInfo(equal, hasPrevious, exact) {
+  if (!hasPrevious) return { label: 'Novo', className: 'new' };
+  if (!exact) return { label: 'Herdado', className: 'inherited' };
+  return equal
+    ? { label: 'Mantido', className: 'inherited' }
+    : { label: 'Alterado', className: 'changed' };
+}
+
+function updateFinanceRuleVersionState() {
+  const mk = financeMonthKey();
+  if (!mk) return;
+  const resolution = financeMonthResolution(mk);
+  const previousSettings = resolution.previousMonth ? financeSettingsForMonth(resolution.previousMonth) : null;
+  ['cost', 'revenue'].forEach(kind => {
+    const currentRules = financeRulesFromInputs(kind);
+    const previousRules = previousSettings ? normalizeFinanceRules(previousSettings, kind) : [];
+    const previousById = new Map(previousRules.map(rule => [String(rule.id), rule]));
+    currentRules.forEach(rule => {
+      const row = [...document.querySelectorAll(`tr[data-finance-rule-kind="${kind}"]`)].find(candidate => String(candidate.dataset.ruleId || '') === String(rule.id));
+      if (!row) return;
+      const previous = previousById.get(String(rule.id));
+      const previousCell = row.querySelector('[data-rule-previous]');
+      const state = financeVersionStateInfo(financeRuleSignature(rule) === financeRuleSignature(previous), !!previous, resolution.exact);
+      if (previousCell) previousCell.textContent = financeRuleDisplayValue(previous);
+      const stateEl = row.querySelector('[data-rule-state]');
+      if (stateEl) {
+        stateEl.textContent = state.label;
+        stateEl.className = `finance-setting-state ${state.className}`;
+      }
+    });
+  });
+  const currentEnergy = numberInputValue('financeEnergyCost', 0);
+  const previousEnergy = previousSettings ? Number(previousSettings.energyCostPerKWh || 0) : null;
+  const energyPrevious = document.querySelector('[data-finance-energy-previous]');
+  if (energyPrevious) energyPrevious.textContent = previousSettings ? `${fmtBRL(previousEnergy)}/kWh` : 'Sem base anterior';
+  const energyState = financeVersionStateInfo(previousSettings ? Math.abs(currentEnergy - previousEnergy) < 0.000001 : false, !!previousSettings, resolution.exact);
+  const energyStateEl = document.querySelector('[data-finance-energy-state]');
+  if (energyStateEl) {
+    energyStateEl.textContent = energyState.label;
+    energyStateEl.className = `finance-setting-state ${energyState.className}`;
+  }
+}
+
 function renderFinanceRuleInputs(containerId, rules = [], kind = 'cost') {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -3553,6 +3814,8 @@ function renderFinanceRuleInputs(containerId, rules = [], kind = 'cost') {
       <td class="rule-output" data-finance-energy-actual>${fmtBRL(0)}</td>
       <td class="rule-output primary" data-finance-energy-planned-kwh>${fmtBRL(numberInputValue('financeEnergyCost', 0))}</td>
       <td class="rule-output primary" data-finance-energy-actual-kwh>${fmtBRL(numberInputValue('financeEnergyCost', 0))}</td>
+      <td class="rule-previous" data-finance-energy-previous>-</td>
+      <td class="rule-state"><span class="finance-setting-state" data-finance-energy-state>-</span></td>
       <td class="rule-actions"></td>
     </tr>
   ` : '';
@@ -3565,6 +3828,8 @@ function renderFinanceRuleInputs(containerId, rules = [], kind = 'cost') {
       <td class="rule-output" data-rule-output="actual">${fmtBRL(0)}</td>
       <td class="rule-output primary" data-rule-output="planned-kwh">-</td>
       <td class="rule-output primary" data-rule-output="actual-kwh">-</td>
+      <td class="rule-previous" data-rule-previous>-</td>
+      <td class="rule-state"><span class="finance-setting-state" data-rule-state>-</span></td>
       <td class="rule-actions">${rule.custom ? `<button class="finance-rule-remove" type="button" title="Excluir item" onclick="removeFinanceRule(this)">&times;</button>` : ''}</td>
     </tr>
   `).join('');
@@ -3605,7 +3870,144 @@ function handleFinanceRuleEditorChange() {
     if (hint) hint.textContent = financeRuleValueHint(row.querySelector('[data-rule-field="basis"]')?.value || 'fixed');
   });
   renderFinanceiro(false);
+  updateFinanceRuleVersionState();
   scheduleFinancialSettingsSave();
+}
+
+function handleFinanceSettingChange() {
+  const model = document.getElementById('financeOperationModel')?.value || 'uby';
+  const transferMode = document.getElementById('ownerTransferMode')?.value || 'gross';
+  updateFinanceModelVisibility(model);
+  updateOwnerTransferModeVisibility(transferMode);
+  renderFinanceiro(false);
+  scheduleFinancialSettingsSave();
+}
+
+function handleFinanceEnergySettingChange() {
+  const priorEnergy = Number(financeEditorCurrentSettings?.energyCostPerKWh || 0);
+  const ownerRate = numberInputValue('ownerEnergyRate', 0);
+  syncOwnerEnergyRateFromCost(!ownerRate || Math.abs(ownerRate - priorEnergy) < 0.000001);
+  handleFinanceSettingChange();
+}
+
+function formatFinanceSettingValue(value, format = '') {
+  if (format === 'model') return operationModelLabel(value);
+  if (format === 'transfer') return value === 'net' ? 'Lucro liquido' : 'Faturamento bruto';
+  if (format === 'pct') return fmtPct(Number(value || 0));
+  if (format === 'brl_kwh') return `${fmtBRL(Number(value || 0))}/kWh`;
+  if (format === 'brl') return fmtBRL(Number(value || 0));
+  return String(value ?? '-');
+}
+
+function financeSettingValuesEqual(current, previous) {
+  if (typeof current === 'number' || typeof previous === 'number') {
+    return Math.abs(Number(current || 0) - Number(previous || 0)) < 0.000001;
+  }
+  return String(current ?? '') === String(previous ?? '');
+}
+
+function financeRuleChangeCount(currentSettings = {}, previousSettings = null) {
+  if (!previousSettings) return 0;
+  return ['cost', 'revenue'].reduce((total, kind) => {
+    const current = normalizeFinanceRules(currentSettings, kind);
+    const previous = normalizeFinanceRules(previousSettings, kind);
+    const previousById = new Map(previous.map(rule => [String(rule.id), rule]));
+    return total + current.reduce((count, rule) => count + (financeRuleSignature(rule) === financeRuleSignature(previousById.get(String(rule.id))) ? 0 : 1), 0);
+  }, 0);
+}
+
+function renderFinanceMonthVersionState(settings = currentFinanceSettingsFromInputs()) {
+  const mk = financeMonthKey();
+  if (!mk) return;
+  const resolution = financeMonthResolution(mk);
+  const exactSettings = financeExactSettingsForMonth(mk);
+  const previousSettings = resolution.previousMonth ? financeSettingsForMonth(resolution.previousMonth) : null;
+  const periodMeta = exactSettings.periodMeta || settings.periodMeta || {};
+  const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+  setText('financeVersionMonth', monthLabel(mk));
+  if (resolution.exact) {
+    setText('financeVersionSource', periodMeta.inheritedFrom ? monthLabel(periodMeta.inheritedFrom) : 'Valores proprios do mes');
+    setText('financeVersionSourceHelp', periodMeta.inheritedFrom ? 'base copiada e preservada nesta competencia' : 'configuracao mensal ja registrada');
+  } else if (resolution.previousMonth) {
+    setText('financeVersionSource', monthLabel(resolution.previousMonth));
+    setText('financeVersionSourceHelp', 'valores herdados; serao fixados automaticamente');
+  } else {
+    setText('financeVersionSource', 'Configuracao inicial');
+    setText('financeVersionSourceHelp', 'primeira competencia financeira deste ponto');
+  }
+
+  let changed = 0;
+  document.querySelectorAll('[data-finance-setting-key]').forEach(row => {
+    const key = row.dataset.financeSettingKey;
+    const format = row.dataset.financeSettingFormat || '';
+    const currentValue = settings?.[key];
+    const previousValue = previousSettings?.[key];
+    const hasPrevious = !!previousSettings;
+    const state = financeVersionStateInfo(financeSettingValuesEqual(currentValue, previousValue), hasPrevious, resolution.exact);
+    if (hasPrevious && !financeSettingValuesEqual(currentValue, previousValue)) changed += 1;
+    const previousEl = row.querySelector('[data-finance-setting-previous]');
+    if (previousEl) previousEl.textContent = hasPrevious ? formatFinanceSettingValue(previousValue, format) : 'Sem base anterior';
+    const stateEl = row.querySelector('[data-finance-setting-state]');
+    if (stateEl) {
+      stateEl.textContent = state.label;
+      stateEl.className = `finance-setting-state ${state.className}`;
+    }
+  });
+  changed += financeRuleChangeCount(settings, previousSettings);
+  const stateCard = document.getElementById('financeVersionStateCard');
+  const stateLabel = !resolution.exact ? 'Herdado e protegido' : (changed ? 'Atualizado no mes' : 'Valores mantidos');
+  setText('financeVersionState', stateLabel);
+  setText('financeVersionChanges', changed ? `${changed} variavel(is) diferente(s) da base anterior` : 'sem diferencas em relacao a base anterior');
+  if (stateCard) stateCard.className = `finance-month-status ${changed ? 'warn' : 'good'}`;
+  setText('financeVersionSaved', resolution.exact ? 'Salvo' : 'Preparando copia');
+  setText('financeVersionSavedAt', periodMeta.updatedAt ? `ultima gravacao ${new Date(periodMeta.updatedAt).toLocaleString('pt-BR')}` : 'banco e copia local');
+  updateFinanceRuleVersionState();
+}
+
+async function handleFinanceMonthChange() {
+  clearTimeout(financeSaveTimer);
+  const mk = financeMonthKey();
+  if (!mk) return;
+  const resolution = financeMonthResolution(mk);
+  renderFinanceiro(true);
+  if (!resolution.exact && currentWorkId) {
+    persistFinancialSettingsFromInputs(mk);
+    saveLocalRechargeBase();
+    try {
+      await saveFinancialSettingsRecord();
+      renderFinanceiro(false);
+      setStorageState(`Valores de ${monthLabel(resolution.previousMonth || mk)} mantidos como base de <strong>${monthLabel(mk)}</strong>.`);
+    } catch (err) {
+      setStorageState(`Base mensal salva localmente. Falha ao sincronizar: ${err.message}`, true);
+    }
+  }
+}
+
+async function confirmFinanceMonthValues() {
+  const mk = financeMonthKey();
+  if (!mk) return;
+  persistFinancialSettingsFromInputs(mk);
+  renderFinanceiro(false);
+  setFeedback(`Valores de ${monthLabel(mk)} confirmados para ${currentWorkName}.`, 'up-loading');
+  await saveFinancialSettingsRecord();
+  renderFinanceiro(false);
+}
+
+async function restoreFinancePreviousMonth() {
+  const mk = financeMonthKey();
+  const resolution = financeMonthResolution(mk);
+  const previousMonth = resolution.previousMonth;
+  if (!previousMonth) {
+    alert('Nao existe um mes financeiro anterior para restaurar.');
+    return;
+  }
+  if (resolution.exact && !confirm(`Restaurar em ${monthLabel(mk)} todos os valores de ${monthLabel(previousMonth)}?`)) return;
+  const previous = { ...financeSettingsForMonth(previousMonth), periodMeta: {} };
+  applyFinanceSettingsToInputs(previous);
+  persistFinancialSettingsFromInputs(mk, previousMonth);
+  renderFinanceiro(false);
+  await saveFinancialSettingsRecord();
+  setStorageState(`Valores de <strong>${monthLabel(previousMonth)}</strong> restaurados em ${monthLabel(mk)}.`);
 }
 
 function applyFinanceSettingsToInputs(settings = {}) {
@@ -3660,6 +4062,42 @@ function syncOwnerEnergyRateFromCost(force = false) {
   if (force || !current) ownerInput.value = cost;
 }
 
+function populateFinanceWorkSelector() {
+  const target = document.getElementById('financeWorkSelector');
+  const source = document.getElementById('workSelector');
+  if (!target || !source) return;
+  const options = [...source.options].filter(option => option.value);
+  target.innerHTML = options.map(option => `<option value="${escapeAttr(option.value)}">${escapeHtml(option.textContent || option.value)}</option>`).join('');
+  if (currentWorkId && options.some(option => option.value === currentWorkId)) target.value = currentWorkId;
+}
+
+async function handleFinanceWorkChange(workId) {
+  if (!workId || String(workId) === String(currentWorkId)) return;
+  await openWorkReport(workId, 'financeiro');
+}
+
+function showFinancePanel(panel = '') {
+  const selector = document.getElementById('financePanelSelector');
+  const active = panel || selector?.value || 'overview';
+  if (selector && selector.value !== active) selector.value = active;
+  document.querySelectorAll('[data-finance-panel]').forEach(section => {
+    section.classList.toggle('finance-panel-hidden', active !== 'all' && section.dataset.financePanel !== active);
+  });
+  if (active === 'reports') renderIndividualFinanceReportLibrary();
+}
+
+function updateFinanceCommandSummary(result = {}, charges = [], clients = 0) {
+  const target = document.getElementById('financeCommandSummary');
+  if (!target) return;
+  const net = Number(result.operationNet || 0);
+  target.innerHTML = `
+    <div class="finance-command-metric"><span>Receita</span><strong>${fmtBRL(result.totalRevenue || result.revenue || 0)}</strong></div>
+    <div class="finance-command-metric"><span>Custos totais</span><strong>${fmtBRL(result.totalOperatingCost || 0)}</strong></div>
+    <div class="finance-command-metric ${net >= 0 ? 'positive' : 'negative'}"><span>Resultado</span><strong>${fmtBRL(net)}</strong></div>
+    <div class="finance-command-metric"><span>Operacao</span><strong>${charges.length} recargas</strong><span>${clients} cliente(s) | ${fmtKWh(result.energy || 0)}</span></div>
+  `;
+}
+
 function financeMonthKey() {
   return document.getElementById('financeMonthSelector')?.value || document.getElementById('monthSelector')?.value || getMonths().at(-1) || '';
 }
@@ -3675,18 +4113,22 @@ function financeStoreForScope(root = financialSettings, stationName = currentSta
   return root?.chargers?.[key] || {};
 }
 
-function financeSettingsForMonth(mk, root = financialSettings, stationName = currentStationReportName) {
+function financeMonthResolution(mk, root = financialSettings, stationName = currentStationReportName) {
   const base = root || {};
   const key = financeChargerStorageKey(stationName);
-  if (!key) return { ...defaultFinanceSettings(), ...(base.default || {}), ...(base[mk] || {}) };
-  const scoped = base?.chargers?.[key] || {};
-  return {
-    ...defaultFinanceSettings(),
-    ...(base.default || {}),
-    ...(base[mk] || {}),
-    ...(scoped.default || {}),
-    ...(scoped[mk] || {})
-  };
+  const scoped = key ? (base?.chargers?.[key] || {}) : {};
+  return window.UBY_FINANCE_ENGINE.resolveMonthlySettings(defaultFinanceSettings(), base, scoped, mk);
+}
+
+function financeSettingsForMonth(mk, root = financialSettings, stationName = currentStationReportName) {
+  return financeMonthResolution(mk, root, stationName).settings;
+}
+
+function financeExactSettingsForMonth(mk, root = financialSettings, stationName = currentStationReportName) {
+  const base = root || {};
+  const key = financeChargerStorageKey(stationName);
+  const scoped = key ? (base?.chargers?.[key] || {}) : {};
+  return { ...(base?.[mk] || {}), ...(scoped?.[mk] || {}) };
 }
 
 function financeSettingsForUbyRow(row = {}, mk = '') {
@@ -3694,13 +4136,7 @@ function financeSettingsForUbyRow(row = {}, mk = '') {
   const stationName = row.stationName || row.station || row.workName || '';
   const key = normalizeStationForCompare(canonicalStationNameForWork(row.workId, stationName, row.workName));
   const scoped = root?.chargers?.[key] || {};
-  return {
-    ...defaultFinanceSettings(),
-    ...(root.default || {}),
-    ...(root[mk] || {}),
-    ...(scoped.default || {}),
-    ...(scoped[mk] || {})
-  };
+  return window.UBY_FINANCE_ENGINE.resolveMonthlySettings(defaultFinanceSettings(), root, scoped, mk).settings;
 }
 
 function ownerAreaSettingsForMonth(mk, useInputs = false) {
@@ -3767,7 +4203,7 @@ function renderOwnerAreaReportForCurrentMonth() {
   const currentSettings = ownerAreaSettingsForMonth(mk, true);
   const currentCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const current = ownerAreaReportForSummary(currentSummary, currentSettings, currentCharges);
-  const accumulated = getMonths().reduce((acc, monthKeyValue) => {
+  const accumulated = getMonths().filter(monthKeyValue => monthKeyValue <= mk).reduce((acc, monthKeyValue) => {
     const settings = monthKeyValue === mk ? currentSettings : ownerAreaSettingsForMonth(monthKeyValue);
     const charges = allCharges.filter(c => chargeMonthKey(c) === monthKeyValue);
     const report = ownerAreaReportForSummary(monthSummaryForMonth(monthKeyValue), settings, charges);
@@ -3801,6 +4237,320 @@ function renderOwnerAreaReportForCurrentMonth() {
   `;
 }
 
+function cleanFinanceReportPayload(value) {
+  return JSON.parse(JSON.stringify(value || {}, (key, item) => typeof item === 'number' && !Number.isFinite(item) ? null : item));
+}
+
+function financeReportTuple(report = {}) {
+  return [report.workId, report.stationKey || '', report.reportType, report.periodKey, Number(report.version || 1)].join('|');
+}
+
+function sortFinanceReports(items = []) {
+  return [...items].sort((a, b) => String(b.periodEnd || '').localeCompare(String(a.periodEnd || '')) || Number(b.version || 1) - Number(a.version || 1));
+}
+
+function readLocalFinanceReports() {
+  const stored = readJson(FINANCE_REPORTS_LOCAL_KEY, []);
+  return Array.isArray(stored) ? stored : [];
+}
+
+function writeLocalFinanceReports(items = financeReportArchive) {
+  writeJson(FINANCE_REPORTS_LOCAL_KEY, sortFinanceReports(items).slice(0, 600));
+}
+
+function mergeFinanceReportArchive(...collections) {
+  const merged = new Map();
+  collections.flat().filter(Boolean).forEach(report => {
+    const key = financeReportTuple(report);
+    const current = merged.get(key);
+    if (!current || (!String(report.id || '').startsWith('local-') && String(current.id || '').startsWith('local-'))) merged.set(key, report);
+  });
+  financeReportArchive = sortFinanceReports([...merged.values()]);
+  return financeReportArchive;
+}
+
+async function loadFinanceReportArchive(force = false) {
+  if (financeReportArchiveLoaded && !force) return financeReportArchive;
+  if (financeReportArchivePromise && !force) return financeReportArchivePromise;
+  financeReportArchivePromise = (async () => {
+    const local = readLocalFinanceReports();
+    let cloud = [];
+    if (window.UBY_SUPABASE?.loadFinanceReports) {
+      try {
+        cloud = await window.UBY_SUPABASE.loadFinanceReports();
+      } catch (err) {
+        console.warn('Historico financeiro em nuvem indisponivel:', err);
+      }
+    }
+    mergeFinanceReportArchive(local, cloud);
+    writeLocalFinanceReports(financeReportArchive);
+    financeReportArchiveLoaded = true;
+    return financeReportArchive;
+  })().finally(() => { financeReportArchivePromise = null; });
+  return financeReportArchivePromise;
+}
+
+function saveFinanceReportLocal(report = {}) {
+  const related = sortFinanceReports(financeReportArchive.filter(item =>
+    item.workId === report.workId && (item.stationKey || '') === (report.stationKey || '') && item.reportType === report.reportType && item.periodKey === report.periodKey
+  ));
+  const latest = related[0] || null;
+  const now = new Date().toISOString();
+  let saved;
+  if (latest && latest.status !== 'closed') {
+    saved = { ...latest, ...report, version: latest.version || 1, updatedAt: now, closedAt: report.status === 'closed' ? now : null };
+    financeReportArchive = financeReportArchive.filter(item => item.id !== latest.id);
+  } else {
+    saved = { ...report, id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, version: latest ? Number(latest.version || 1) + 1 : 1, generatedAt: now, updatedAt: now, closedAt: report.status === 'closed' ? now : null };
+  }
+  financeReportArchive.push(saved);
+  financeReportArchive = sortFinanceReports(financeReportArchive);
+  writeLocalFinanceReports(financeReportArchive);
+  return saved;
+}
+
+async function persistFinanceReport(report = {}) {
+  const prepared = { ...report, payload: cleanFinanceReportPayload(report.payload), status: report.status === 'closed' ? 'closed' : 'partial' };
+  let saved = null;
+  if (window.UBY_SUPABASE?.saveFinanceReport) {
+    try {
+      const response = await window.UBY_SUPABASE.saveFinanceReport(prepared);
+      saved = response?.report || null;
+    } catch (err) {
+      console.warn('Relatorio salvo somente na copia local:', err);
+    }
+  }
+  if (!saved) saved = saveFinanceReportLocal(prepared);
+  mergeFinanceReportArchive(financeReportArchive.filter(item => financeReportTuple(item) !== financeReportTuple(saved)), saved);
+  writeLocalFinanceReports(financeReportArchive);
+  return saved;
+}
+
+function financeReportPeriod(mk = '') {
+  const [year, month] = String(mk).split('-').map(Number);
+  const start = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 0);
+  const today = new Date();
+  const end = year === today.getFullYear() && month === today.getMonth() + 1 ? today : monthEnd;
+  const iso = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return { key: mk, label: monthLabel(mk), start: iso(start), end: iso(end) };
+}
+
+function buildFinanceMonthReportSnapshot(mk = financeMonthKey(), settingsOverride = null) {
+  const settings = settingsOverride || currentFinanceSettingsFromInputs();
+  const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const result = financeForCharges(charges, settings, { monthKey: mk });
+  const summary = monthSummaryForMonth(mk);
+  const owner = ownerAreaReportForSummary(summary, settings, charges);
+  const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  const period = financeReportPeriod(mk);
+  return cleanFinanceReportPayload({
+    work: { id: currentWorkId, name: currentWorkName, stationName: currentStationReportName || currentWorkName, stationKey: financeChargerStorageKey() },
+    period,
+    settings,
+    metrics: { charges: charges.length, clients, energy: result.energy || 0, revenue: result.totalRevenue || result.revenue || 0 },
+    result,
+    owner
+  });
+}
+
+function financeMonthReportRecord(mk, status = 'partial', settingsOverride = null) {
+  const payload = buildFinanceMonthReportSnapshot(mk, settingsOverride);
+  return {
+    workId: currentWorkId,
+    stationKey: financeChargerStorageKey(),
+    stationName: currentStationReportName || currentWorkName,
+    reportType: 'charger_financial',
+    periodKey: mk,
+    periodStart: payload.period.start,
+    periodEnd: payload.period.end,
+    status,
+    payload
+  };
+}
+
+async function saveCurrentFinanceReport(status = 'partial') {
+  const mk = financeMonthKey();
+  if (!mk || !currentWorkId) return;
+  if (status === 'closed' && !confirm(`Fechar e arquivar o relatorio de ${monthLabel(mk)}? O fechamento preserva esta versao.`)) return;
+  persistFinancialSettingsFromInputs(mk);
+  await saveFinancialSettingsRecord();
+  const saved = await persistFinanceReport(financeMonthReportRecord(mk, status));
+  renderIndividualFinanceReportLibrary();
+  renderUbyPartnerReportLibrary();
+  setStorageState(`${status === 'closed' ? 'Fechamento' : 'Parcial'} de <strong>${monthLabel(mk)}</strong> salvo no historico (versao ${saved.version || 1}).`);
+}
+
+async function syncHistoricFinanceReportsForCurrentWork() {
+  if (financeHistorySyncPromise || !currentWorkId || !allCharges.length) return financeHistorySyncPromise;
+  const contextWorkId = currentWorkId;
+  const contextStationKey = financeChargerStorageKey();
+  financeHistorySyncPromise = (async () => {
+    await loadFinanceReportArchive();
+    const todayMonth = new Date().toISOString().slice(0, 7);
+    for (const mk of getMonths()) {
+      if (currentWorkId !== contextWorkId || financeChargerStorageKey() !== contextStationKey) return;
+      const shouldClose = mk < todayMonth || Boolean(monthlyClosings?.[mk]);
+      if (!shouldClose) continue;
+      const exists = financeReportArchive.some(item => item.workId === contextWorkId && (item.stationKey || '') === contextStationKey && item.reportType === 'charger_financial' && item.periodKey === mk && item.status === 'closed');
+      if (!exists) await persistFinanceReport(financeMonthReportRecord(mk, 'closed', financeSettingsForMonth(mk)));
+    }
+    renderIndividualFinanceReportLibrary();
+  })().catch(err => console.warn('Nao foi possivel completar o historico financeiro:', err)).finally(() => { financeHistorySyncPromise = null; });
+  return financeHistorySyncPromise;
+}
+
+function reportStatusLabel(status = '') {
+  return status === 'closed' ? 'Fechado' : 'Parcial';
+}
+
+function reportLibraryCard(report = {}) {
+  const payload = report.payload || {};
+  const metrics = payload.metrics || payload.result || {};
+  const stationName = report.stationName || payload.work?.stationName || payload.work?.name || '-';
+  const label = payload.period?.label || payload.cycle?.label || (report.reportType === 'charger_financial' ? monthLabel(report.periodKey) : report.periodKey);
+  const revenue = Number(metrics.revenue ?? metrics.totalRevenue ?? payload.result?.revenue ?? 0);
+  const energy = Number(metrics.energy ?? payload.result?.energy ?? 0);
+  const count = Number(metrics.charges ?? metrics.count ?? payload.result?.count ?? 0);
+  const resultValue = report.reportType === 'partner_area' ? Number(payload.result?.partnerTotal || 0) : Number(payload.result?.operationNet || 0);
+  const resultLabel = report.reportType === 'partner_area' ? 'Total area' : 'Resultado';
+  return `<div class="report-library-card">
+    <div class="report-library-main"><strong>${escapeHtml(stationName)}</strong><span>${escapeHtml(label)} | versao ${Number(report.version || 1)}</span><span class="report-status ${report.status}">${reportStatusLabel(report.status)}</span></div>
+    <div class="report-library-value"><b>${fmtBRL(revenue)}</b><span>Receita</span></div>
+    <div class="report-library-value"><b>${fmtKWh(energy)}</b><span>Energia</span></div>
+    <div class="report-library-value optional"><b>${count}</b><span>Recargas</span></div>
+    <div class="report-library-value optional"><b>${fmtBRL(resultValue)}</b><span>${resultLabel}</span></div>
+    <div class="report-library-actions"><button class="btn-recalc" type="button" onclick="openFinanceReportArchive('${escapeAttr(report.id)}',false)">Visualizar</button><button class="btn-recalc" type="button" onclick="openFinanceReportArchive('${escapeAttr(report.id)}',true)">PDF</button></div>
+  </div>`;
+}
+
+function renderIndividualFinanceReportLibrary() {
+  const container = document.getElementById('financeReportLibrary');
+  if (!container) return;
+  if (!financeReportArchiveLoaded) {
+    container.innerHTML = '<div class="report-library-empty">Carregando historico financeiro...</div>';
+    loadFinanceReportArchive().then(renderIndividualFinanceReportLibrary);
+    return;
+  }
+  const status = document.getElementById('financeReportStatusFilter')?.value || '';
+  const stationKey = financeChargerStorageKey();
+  const rows = financeReportArchive.filter(report => report.reportType === 'charger_financial' && report.workId === currentWorkId && (!stationKey || (report.stationKey || '') === stationKey) && (!status || report.status === status));
+  container.innerHTML = rows.length ? rows.map(reportLibraryCard).join('') : '<div class="report-library-empty">Nenhum relatorio arquivado para esta obra. Os meses anteriores serao preservados automaticamente.</div>';
+}
+
+function renderUbyPartnerReportLibrary() {
+  const container = document.getElementById('ubyPartnerReportLibrary');
+  if (!container) return;
+  if (!financeReportArchiveLoaded) {
+    container.innerHTML = '<div class="report-library-empty">Carregando historico financeiro...</div>';
+    loadFinanceReportArchive().then(renderUbyPartnerReportLibrary);
+    return;
+  }
+  const unitFilter = document.getElementById('ubyReportUnitFilter');
+  const status = document.getElementById('ubyReportStatusFilter')?.value || '';
+  const allRows = financeReportArchive.filter(report => report.reportType === 'partner_area');
+  if (unitFilter) {
+    const current = unitFilter.value;
+    const units = [...new Map(allRows.map(report => [report.workId, report.stationName || report.payload?.work?.stationName || report.workId])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'pt-BR'));
+    unitFilter.innerHTML = '<option value="">Todas as unidades</option>' + units.map(([id, name]) => `<option value="${escapeAttr(id)}">${escapeHtml(name)}</option>`).join('');
+    unitFilter.value = units.some(([id]) => id === current) ? current : '';
+  }
+  const workId = unitFilter?.value || '';
+  const rows = allRows.filter(report => (!workId || report.workId === workId) && (!status || report.status === status));
+  container.innerHTML = rows.length ? rows.map(reportLibraryCard).join('') : '<div class="report-library-empty">Ainda nao ha fechamento arquivado com estes filtros.</div>';
+}
+
+function openFinanceReportArchive(reportId, printAfter = false) {
+  const report = financeReportArchive.find(item => String(item.id) === String(reportId));
+  if (!report) return alert('Relatorio nao encontrado no historico carregado.');
+  const payload = report.payload || {};
+  const metrics = payload.metrics || payload.result || {};
+  const result = payload.result || {};
+  const settings = payload.settings || {};
+  const title = report.reportType === 'partner_area' ? 'Prestacao de contas UBY' : 'Relatorio financeiro do carregador';
+  const period = payload.period?.label || payload.cycle?.label || report.periodKey;
+  const station = report.stationName || payload.work?.stationName || payload.work?.name || '-';
+  const popup = window.open('', '_blank');
+  if (!popup) return alert('O navegador bloqueou a janela do relatorio. Libere pop-ups para visualizar ou gerar o PDF.');
+  const detailRows = report.reportType === 'partner_area' ? [
+    ['Reembolso de energia', fmtBRL(result.energyCost || 0)],
+    ['Base do repasse', fmtBRL(result.shareBase || 0)],
+    ['Participacao da area', fmtBRL(result.areaShare || 0)],
+    ['Total para a area', fmtBRL(result.partnerTotal || 0)],
+    ['Tarifa de energia', `${fmtBRL(settings.energyRate || 0)}/kWh`],
+    ['Tipo de repasse', settings.transferMode === 'gross' ? 'Faturamento bruto' : 'Lucro liquido']
+  ] : [
+    ['Receitas totais', fmtBRL(result.totalRevenue || result.revenue || 0)],
+    ['Custos operacionais', fmtBRL(result.totalOperatingCost || 0)],
+    ['Resultado operacional', fmtBRL(result.operationNet || 0)],
+    ['Margem', fmtPct(result.operationMargin || 0)],
+    ['Custo efetivo por kWh', fmtPerKWh(result.totalCostPerKWh)],
+    ['Total para parceiro da area', fmtBRL(payload.owner?.ownerTotal || 0)]
+  ];
+  popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeHtml(title)} - ${escapeHtml(period)}</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#10233b;margin:28px;background:#fff;font-size:12px}.head{display:flex;justify-content:space-between;gap:20px;border-bottom:3px solid #2d7ff9;padding-bottom:16px}h1{margin:0 0 8px;font-size:24px}.sub{color:#536b82;line-height:1.5}.badge{height:max-content;border:1px solid #2d7ff9;border-radius:999px;padding:6px 10px;color:#1566c0;font-weight:700}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:18px 0}.metric{padding:12px;border:1px solid #dbe7f4;border-radius:8px;background:#f3f7fc}.metric b{display:block;color:#2d7ff9;font-size:18px}.metric span{display:block;margin-top:4px;color:#60758a;font-size:9px;text-transform:uppercase}table{width:100%;border-collapse:collapse}td{padding:10px 8px;border-bottom:1px solid #dce6f0}td:first-child{font-weight:700}.actions{margin-bottom:16px}button{border:0;border-radius:6px;background:#2d7ff9;color:#fff;padding:9px 14px;font-weight:700}@media print{.actions{display:none}body{margin:14mm}}</style></head><body><div class="actions"><button onclick="window.print()">Salvar como PDF / imprimir</button></div><div class="head"><div><h1>${escapeHtml(title)}</h1><div class="sub"><strong>${escapeHtml(station)}</strong><br>Periodo: ${escapeHtml(period)}<br>Status: ${reportStatusLabel(report.status)} | versao ${Number(report.version || 1)}</div></div><div class="badge">Historico preservado</div></div><div class="metrics"><div class="metric"><b>${fmtBRL(metrics.revenue ?? metrics.totalRevenue ?? result.revenue ?? 0)}</b><span>Receita</span></div><div class="metric"><b>${fmtKWh(metrics.energy ?? result.energy ?? 0)}</b><span>Energia</span></div><div class="metric"><b>${Number(metrics.charges ?? metrics.count ?? result.count ?? 0)}</b><span>Recargas</span></div><div class="metric"><b>${Number(metrics.clients ?? result.clients ?? 0)}</b><span>Clientes</span></div></div><table>${detailRows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`).join('')}</table>${printAfter ? '<script>setTimeout(()=>window.print(),350)<\/script>' : ''}</body></html>`);
+  popup.document.close();
+}
+
+function financeReportRuleRows(details = [], emptyLabel = 'Nenhum item adicional') {
+  const enabled = (details || []).filter(item => item.enabled !== false && Number(item.actual || 0) !== 0);
+  if (!enabled.length) return `<tr><td>${emptyLabel}</td><td>-</td><td>${fmtBRL(0)}</td><td>-</td></tr>`;
+  return enabled.map(item => `<tr><td>${escapeHtml(item.label || item.id)}</td><td>${escapeHtml(financeRuleDisplayValue(item))}</td><td>${fmtBRL(item.actual || 0)}</td><td>${fmtPerKWh(item.actualPerKWh)}</td></tr>`).join('');
+}
+
+function generateCurrentFinanceReport() {
+  const mk = financeMonthKey();
+  if (!mk) return;
+  const popup = window.open('', '_blank');
+  if (!popup) {
+    alert('O navegador bloqueou a janela do relatorio. Libere pop-ups para gerar o PDF.');
+    return;
+  }
+  const settings = currentFinanceSettingsFromInputs();
+  const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const result = financeForCharges(charges, settings, { monthKey: mk });
+  const summary = monthSummaryForMonth(mk);
+  const owner = ownerAreaReportForSummary(summary, settings, charges);
+  const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  const resolution = financeMonthResolution(mk);
+  const sourceText = resolution.previousMonth ? `Base iniciada a partir de ${monthLabel(resolution.previousMonth)}` : 'Primeira configuracao financeira do ponto';
+  persistFinancialSettingsFromInputs(mk);
+  saveFinancialSettingsRecord().catch(err => setStorageState(`Relatorio gerado, mas a sincronizacao financeira falhou: ${err.message}`, true));
+  popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Financeiro ${escapeHtml(currentWorkName)} - ${monthLabel(mk)}</title><style>
+    *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#10233b;margin:24px;background:#fff;font-size:12px}h1{font-size:24px;margin:0;color:#0b1d33}h2{font-size:15px;margin:24px 0 8px;color:#1566c0;border-bottom:2px solid #d8e8fa;padding-bottom:7px}.head{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #2d7ff9;padding-bottom:16px}.meta{line-height:1.55;color:#496078}.badge{display:inline-block;border:1px solid #8dbcf5;border-radius:999px;padding:5px 9px;color:#1566c0;font-weight:700}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px}.metric{background:#f3f7fc;border:1px solid #dbe7f4;border-radius:8px;padding:12px}.metric b{display:block;color:#2d7ff9;font-size:18px}.metric span{display:block;margin-top:4px;color:#5d7188;font-size:9px;text-transform:uppercase}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #dce6f0;text-align:left}th{background:#eaf2fb;color:#1d4f82;text-transform:uppercase;font-size:9px}.total{font-size:18px;font-weight:800;color:#0b1d33;margin-top:16px;padding:12px;background:#eaf2fb;border-left:4px solid #2d7ff9}.note{margin-top:14px;color:#5d7188;line-height:1.5}.actions{margin:16px 0}button{border:0;border-radius:6px;background:#2d7ff9;color:#fff;padding:9px 14px;font-weight:700}@media print{body{margin:12mm}.actions{display:none}.head,.metrics,.metric,tr{break-inside:avoid}}
+  </style></head><body>
+    <div class="actions"><button onclick="window.print()">Salvar como PDF / imprimir</button></div>
+    <div class="head"><div><h1>Relatorio financeiro do carregador</h1><div class="meta"><strong>${escapeHtml(currentStationReportName || currentWorkName)}</strong><br>Obra: ${escapeHtml(currentWorkName)}<br>Competencia: ${monthLabel(mk)}<br>Gerado em ${new Date().toLocaleString('pt-BR')}</div></div><div><span class="badge">${escapeHtml(operationModelLabel(settings.operationModel))}</span><div class="meta" style="margin-top:8px;text-align:right">${escapeHtml(sourceText)}</div></div></div>
+    <div class="metrics"><div class="metric"><b>${fmtBRL(result.totalRevenue)}</b><span>Receitas totais</span></div><div class="metric"><b>${fmtKWh(result.energy)}</b><span>Energia vendida</span></div><div class="metric"><b>${charges.length}</b><span>Recargas</span></div><div class="metric"><b>${clients}</b><span>Clientes</span></div></div>
+    <h2>Premissas da competencia</h2><table><tbody>
+      <tr><td>Custo de energia</td><td>${fmtBRL(settings.energyCostPerKWh)}/kWh</td><td>Gestao P3</td><td>${fmtPct(settings.managementPct)}</td></tr>
+      <tr><td>App / plataforma</td><td>${fmtPct(settings.platformPct)}</td><td>Meta de ocupacao</td><td>${fmtPct(settings.targetOccPct)}</td></tr>
+      <tr><td>Repasse da area</td><td>${settings.ownerTransferMode === 'net' ? 'Lucro liquido' : 'Faturamento bruto'}</td><td>Percentual da area</td><td>${fmtPct(result.areaSharePct || 0)}</td></tr>
+      <tr><td>Base inicial de diluicao</td><td>${fmtKWh(result.planning?.planningKWh || 0)}</td><td>Preco medio vendido</td><td>${fmtPerKWh(result.planning?.salePricePerKWh || 0)}</td></tr>
+    </tbody></table>
+    <h2>Receitas</h2><table><thead><tr><th>Item</th><th>Regra</th><th>Valor do mes</th><th>R$/kWh</th></tr></thead><tbody>
+      <tr><td>Recargas</td><td>Base importada</td><td>${fmtBRL(result.revenue)}</td><td>${fmtPerKWh(result.energy > 0 ? result.revenue / result.energy : null)}</td></tr>${financeReportRuleRows(result.revenueRuleDetails, 'Sem receitas adicionais')}
+      <tr><td><strong>Total de receitas</strong></td><td></td><td><strong>${fmtBRL(result.totalRevenue)}</strong></td><td></td></tr>
+    </tbody></table>
+    <h2>Custos</h2><table><thead><tr><th>Item</th><th>Regra</th><th>Valor do mes</th><th>R$/kWh</th></tr></thead><tbody>
+      <tr><td>Energia eletrica</td><td>${fmtBRL(settings.energyCostPerKWh)}/kWh</td><td>${fmtBRL(result.energyCost)}</td><td>${fmtPerKWh(settings.energyCostPerKWh)}</td></tr>${financeReportRuleRows(result.costRuleDetails, 'Sem custos adicionais')}
+      <tr><td>Gestao P3</td><td>${fmtPct(settings.managementPct)} do faturamento</td><td>${fmtBRL(result.management)}</td><td>${fmtPerKWh(result.energy > 0 ? result.management / result.energy : null)}</td></tr>
+      <tr><td>App / plataforma</td><td>${fmtPct(settings.platformPct)} do faturamento</td><td>${fmtBRL(result.platform)}</td><td>${fmtPerKWh(result.energy > 0 ? result.platform / result.energy : null)}</td></tr>
+      ${result.areaEligible ? `<tr><td>Participacao da area</td><td>${fmtPct(result.areaSharePct)} sobre ${settings.ownerTransferMode === 'net' ? 'lucro liquido' : 'faturamento'}</td><td>${fmtBRL(result.areaParticipation)}</td><td>${fmtPerKWh(result.energy > 0 ? result.areaParticipation / result.energy : null)}</td></tr>` : ''}
+      <tr><td><strong>Total de custos</strong></td><td></td><td><strong>${fmtBRL(result.totalOperatingCost)}</strong></td><td><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong></td></tr>
+    </tbody></table>
+    <h2>Resultado e prestacao da area</h2><table><tbody>
+      <tr><td>Resultado operacional</td><td>${fmtBRL(result.operationNet)}</td><td>Margem operacional</td><td>${fmtPct(result.operationMargin)}</td></tr>
+      <tr><td>Custo inicial por kWh</td><td>${fmtPerKWh(result.plannedTotalCostPerKWh)}</td><td>Custo efetivo por kWh</td><td>${fmtPerKWh(result.totalCostPerKWh)}</td></tr>
+      <tr><td>Ponto de equilibrio</td><td>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</td><td>Resultado por kWh</td><td>${fmtPerKWh(result.resultPerKWh)}</td></tr>
+      <tr><td>Reembolso de energia ao parceiro</td><td>${fmtBRL(owner.energyReimbursement)}</td><td>${owner.selectedShareLabel}</td><td>${fmtBRL(owner.selectedShare)}</td></tr>
+    </tbody></table>
+    <div class="total">Total para o parceiro da area: ${fmtBRL(owner.ownerTotal)}</div>
+    <div class="note">Relatorio calculado com os valores salvos especificamente para ${monthLabel(mk)}. Alteracoes em meses futuros nao modificam esta competencia.</div>
+    <script>setTimeout(()=>window.print(),350)<\/script>
+  </body></html>`);
+  popup.document.close();
+}
+
 function updateOwnerTransferModeVisibility(mode = 'gross') {
   const isNet = mode === 'net';
   const grossRow = document.getElementById('ownerRevenueShareRow');
@@ -3810,6 +4560,7 @@ function updateOwnerTransferModeVisibility(mode = 'gross') {
 }
 
 function renderFinanceiro(applySaved = true) {
+  populateFinanceWorkSelector();
   const months = getMonths();
   const selector = document.getElementById('financeMonthSelector');
   if (selector) {
@@ -3831,6 +4582,7 @@ function renderFinanceiro(applySaved = true) {
   const p3TakePct = revenue ? p3Gross / revenue * 100 : 0;
   const isUbyModel = settings.operationModel === 'uby' || settings.operationModel === 'hybrid';
   const hasP3Society = settings.operationModel === 'p3_society' || settings.operationModel === 'hybrid';
+  updateFinanceCommandSummary(result, charges, clients);
 
   document.getElementById('financeHeroMeta').innerHTML =
     `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}`;
@@ -3901,6 +4653,10 @@ function renderFinanceiro(applySaved = true) {
   updateFinanceRuleOutputs(result);
   renderFinanceOperationalResults(result);
   renderOwnerAreaReportForCurrentMonth();
+  renderFinanceMonthVersionState(settings);
+  showFinancePanel(document.getElementById('financePanelSelector')?.value || 'overview');
+  renderIndividualFinanceReportLibrary();
+  syncHistoricFinanceReportsForCurrentWork();
 }
 
 function updateFinanceModelVisibility(model = 'uby') {
@@ -3919,17 +4675,33 @@ async function saveFinancialSettings() {
   await saveFinancialSettingsRecord();
 }
 
-function persistFinancialSettingsFromInputs(mk = financeMonthKey()) {
+function persistFinancialSettingsFromInputs(mk = financeMonthKey(), inheritedFromOverride = '') {
   if (!mk) return null;
+  const resolutionBeforeSave = financeMonthResolution(mk);
+  const exactBeforeSave = financeExactSettingsForMonth(mk);
+  const previousMeta = exactBeforeSave.periodMeta || {};
+  const now = new Date().toISOString();
   const settings = currentFinanceSettingsFromInputs();
+  settings.periodMeta = {
+    ...previousMeta,
+    month: mk,
+    inheritedFrom: inheritedFromOverride || previousMeta.inheritedFrom || resolutionBeforeSave.previousMonth || '',
+    createdAt: previousMeta.createdAt || now,
+    updatedAt: now
+  };
   const scopeKey = financeChargerStorageKey();
   if (scopeKey) {
     const chargers = { ...(financialSettings.chargers || {}) };
-    const scoped = { ...(chargers[scopeKey] || {}), [mk]: settings, default: settings };
+    const scoped = { ...(chargers[scopeKey] || {}), [mk]: settings };
+    const latestMonth = window.UBY_FINANCE_ENGINE.monthKeys(scoped).at(-1) || mk;
+    if (!scoped.default || mk === latestMonth) scoped.default = settings;
     chargers[scopeKey] = scoped;
     financialSettings = { ...financialSettings, chargers };
   } else {
-    financialSettings = { ...financialSettings, [mk]: settings, default: settings };
+    const updated = { ...financialSettings, [mk]: settings };
+    const latestMonth = window.UBY_FINANCE_ENGINE.monthKeys(updated).at(-1) || mk;
+    if (!updated.default || mk === latestMonth) updated.default = settings;
+    financialSettings = updated;
   }
   financeEditorCurrentSettings = settings;
   return settings;
@@ -3977,13 +4749,17 @@ async function saveFinancialSettingsRecord() {
 function scheduleFinancialSettingsSave() {
   const mk = financeMonthKey();
   if (!mk || !currentWorkId) return;
-  persistFinancialSettingsFromInputs(mk);
+  const settings = persistFinancialSettingsFromInputs(mk);
   saveLocalRechargeBase();
+  renderFinanceMonthVersionState(settings);
+  const savedLabel = document.getElementById('financeVersionSaved');
+  if (savedLabel) savedLabel.textContent = 'Salvando...';
   clearTimeout(financeSaveTimer);
   financeSaveTimer = setTimeout(async () => {
     try {
       await saveFinancialSettingsRecord();
       setStorageState(`Financeiro de ${monthLabel(mk)} salvo automaticamente para <strong>${currentWorkName}</strong>.`);
+      renderFinanceMonthVersionState(financeEditorCurrentSettings);
       renderGeneralFinance(getGeneralUnitData());
     } catch (err) {
       setStorageState(`Financeiro local salvo. Falha ao sincronizar: ${err.message}`, true);
@@ -4107,9 +4883,9 @@ function updateFinanceRuleOutputs(result = {}) {
   renderDetails('revenue', result.revenueRuleDetails);
 
   const costTotal = document.getElementById('financeCostRuleTotals');
-  if (costTotal) costTotal.innerHTML = `<tr><td colspan="4">Custos diretos</td><td>${fmtBRL((result.energyCost || 0) + (result.extraCosts || 0))}</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td><td>${fmtPerKWh(result.directCostPerKWh)}</td><td></td></tr>`;
+  if (costTotal) costTotal.innerHTML = `<tr><td colspan="4">Custos diretos</td><td>${fmtBRL((result.energyCost || 0) + (result.extraCosts || 0))}</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td><td>${fmtPerKWh(result.directCostPerKWh)}</td><td></td><td></td><td></td></tr>`;
   const revenueTotal = document.getElementById('financeRevenueRuleTotals');
-  if (revenueTotal) revenueTotal.innerHTML = `<tr><td colspan="4">Receitas adicionais</td><td>${fmtBRL(result.extraRevenue || 0)}</td><td>${fmtPerKWh(result.plannedExtraRevenuePerKWh)}</td><td>${fmtPerKWh(result.extraRevenuePerKWh)}</td><td></td></tr>`;
+  if (revenueTotal) revenueTotal.innerHTML = `<tr><td colspan="4">Receitas adicionais</td><td>${fmtBRL(result.extraRevenue || 0)}</td><td>${fmtPerKWh(result.plannedExtraRevenuePerKWh)}</td><td>${fmtPerKWh(result.extraRevenuePerKWh)}</td><td></td><td></td><td></td></tr>`;
 
   const guidance = document.getElementById('financePlanningGuidance');
   if (guidance) {
@@ -7134,9 +7910,8 @@ function ubyAreaSettingsForRow(row = {}, cycle = {}) {
   const rowKey = ubyAreaRowKey(row);
   const savedRow = saved[rowKey] || {};
   const savedCycle = savedRow[cycle.key] || {};
-  const workFinance = allRechargeRecords[row.workId]?.financialSettings || {};
   const latestMonth = [...new Set((row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort().at(-1) || '';
-  const finance = workFinance[latestMonth] || workFinance.default || defaultFinanceSettings();
+  const finance = financeSettingsForUbyRow(row, latestMonth);
   const defaultShare = Number(finance.ownerRevenueSharePct || finance.ownerNetProfitSharePct || 0);
   return {
     energyRate: Number(savedCycle.energyRate ?? finance.ownerEnergyRate ?? finance.energyCostPerKWh ?? 0),
@@ -7227,6 +8002,67 @@ function sumUbyAreaReports(items = []) {
     });
     return acc;
   }, {});
+}
+
+function ubyAreaReportRecord(row = {}, cycle = {}, status = 'partial') {
+  const settings = ubyAreaSettingsForRow(row, cycle);
+  const calculated = calculateUbyAreaReport(row, cycle, settings);
+  const result = { ...calculated };
+  delete result.charges;
+  const stationName = row.stationName || row.station || row.workName || '';
+  const dateOnly = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return {
+    workId: row.workId,
+    stationKey: normalizeStationForCompare(canonicalStationNameForWork(row.workId, stationName, row.workName)),
+    stationName,
+    reportType: 'partner_area',
+    periodKey: cycle.key,
+    periodStart: dateOnly(cycle.start),
+    periodEnd: dateOnly(cycle.end),
+    status,
+    payload: cleanFinanceReportPayload({
+      work: { id: row.workId, name: row.workName, stationName },
+      cycle: { key: cycle.key, label: cycle.label, first: cycle.first },
+      period: { key: cycle.key, label: cycle.label, start: dateOnly(cycle.start), end: dateOnly(cycle.end) },
+      settings,
+      metrics: { revenue: result.revenue, energy: result.energy, charges: result.count, clients: result.clients },
+      result
+    })
+  };
+}
+
+function findUbyAreaRow(rowKey) {
+  return getUbyChargerRows(getGeneralUnitData())
+    .map(item => summarizeUbyChargerRow(item, item.charges))
+    .find(item => ubyAreaRowKey(item) === rowKey);
+}
+
+async function saveCurrentUbyAreaReport(rowKey, status = 'partial') {
+  const row = findUbyAreaRow(rowKey);
+  if (!row) return alert('Nao encontrei a base completa desta unidade UBY.');
+  const cycle = ubyAreaCurrentCycle(row);
+  const saved = await persistFinanceReport(ubyAreaReportRecord(row, cycle, status));
+  renderUbyPartnerReportLibrary();
+  setStorageState(`${status === 'closed' ? 'Fechamento' : 'Parcial'} UBY de <strong>${cycle.label}</strong> salvo (versao ${saved.version || 1}).`);
+}
+
+async function syncCompletedUbyAreaReports(rows = []) {
+  if (ubyAreaReportSyncPromise || !rows.length) return ubyAreaReportSyncPromise;
+  ubyAreaReportSyncPromise = (async () => {
+    await loadFinanceReportArchive();
+    const now = new Date();
+    for (const row of rows) {
+      const currentCycle = ubyAreaCurrentCycle(row);
+      for (const cycle of ubyAreaCyclesUntil(row, currentCycle)) {
+        if (cycle.end > now) continue;
+        const stationKey = normalizeStationForCompare(canonicalStationNameForWork(row.workId, row.stationName || row.station || row.workName, row.workName));
+        const exists = financeReportArchive.some(item => item.workId === row.workId && (item.stationKey || '') === stationKey && item.reportType === 'partner_area' && item.periodKey === cycle.key && item.status === 'closed');
+        if (!exists) await persistFinanceReport(ubyAreaReportRecord(row, cycle, 'closed'));
+      }
+    }
+    renderUbyPartnerReportLibrary();
+  })().catch(err => console.warn('Nao foi possivel arquivar os fechamentos UBY:', err)).finally(() => { ubyAreaReportSyncPromise = null; });
+  return ubyAreaReportSyncPromise;
 }
 
 function generateUbyAreaReportPdf(rowKey) {
@@ -7376,6 +8212,7 @@ function renderUbyPartnerReports(rows = []) {
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
             <span class="accountability-pill">${modeLabel}</span>
+            <button class="btn-recalc" type="button" onclick="saveCurrentUbyAreaReport('${escapeAttr(rowKey)}','partial')">Salvar parcial</button>
             <button class="btn-recalc" type="button" onclick="generateUbyAreaReportPdf('${escapeAttr(rowKey)}')">Gerar PDF</button>
           </div>
         </div>
@@ -7431,6 +8268,8 @@ function renderUbyPartnerReports(rows = []) {
       <div class="accountability-metric"><b>${reports.length}</b><span>Pontos UBY</span></div>
     </div>
   `;
+  renderUbyPartnerReportLibrary();
+  syncCompletedUbyAreaReports(rows);
 }
 
 function ubyFinanceMonthsForRow(row = {}, sourceMonths = [], isMonthView = true, currentMonth = '') {
@@ -7605,7 +8444,10 @@ function renderUbyOperation() {
       <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir estacao</button></div>
     </div>
   `).join('') : '<div class="note">Nenhuma unidade marcada como UBY.</div>';
-  renderUbyPartnerReports(accessRows.filter(row => row.count > 0));
+  const accountingRows = sourceIncluded
+    .map(row => summarizeUbyChargerRow(row, row.charges))
+    .filter(row => row.count > 0);
+  renderUbyPartnerReports(accountingRows);
 
   const monthData = sourceMonths.map(mk => {
     const monthCharges = sourceUbyCharges.filter(charge => chargeMonthKey(charge) === mk);
@@ -7919,7 +8761,7 @@ function renderAll() {
   if (visibleTab === 'uby') renderUbyOperation();
   if (visibleTab === 'clube') renderClub();
   if (visibleTab === 'detalhes') renderDetalhes();
-  if (visibleTab === 'financeiro') renderFinanceiro();
+  if (visibleTab === 'financeiro') handleFinanceMonthChange();
   if (visibleTab === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
 }
 
@@ -8603,7 +9445,7 @@ function switchTab(name, btn) {
   if (name === 'clube') renderClub();
   if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
   if (name === 'detalhes') renderDetalhes();
-  if (name === 'financeiro') renderFinanceiro();
+  if (name === 'financeiro') handleFinanceMonthChange();
 }
 
 function openGeneralFinanceView() {
@@ -8623,6 +9465,8 @@ async function initializeRechargePage() {
     await loadRechargeBase();
   }
   await refreshGeneralRechargeBases();
+  await loadFinanceReportArchive();
+  renderUbyPartnerReportLibrary();
   openGeneralFinanceView();
 }
 

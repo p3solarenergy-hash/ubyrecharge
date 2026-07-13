@@ -480,6 +480,118 @@
     }));
   }
 
+  function normalizeFinanceReportRow(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      workId: row.obra_id,
+      stationKey: row.station_key || "",
+      stationName: row.station_name || "",
+      reportType: row.report_type,
+      periodKey: row.period_key,
+      periodStart: row.period_start,
+      periodEnd: row.period_end,
+      status: row.status || "partial",
+      version: Number(row.version || 1),
+      payload: row.payload || {},
+      generatedAt: row.generated_at,
+      closedAt: row.closed_at,
+      updatedAt: row.updated_at,
+      generatedByEmail: row.generated_by_email || ""
+    };
+  }
+
+  async function loadFinanceReports(filters = {}) {
+    const sb = client();
+    if (!sb) return [];
+    const user = await currentUser();
+    if (!user) return [];
+    let query = sb
+      .from("obra_finance_reports")
+      .select("id,obra_id,station_key,station_name,report_type,period_key,period_start,period_end,status,version,payload,generated_at,closed_at,updated_at,generated_by_email")
+      .order("period_end", { ascending: false })
+      .order("version", { ascending: false });
+    if (filters.workId) query = query.eq("obra_id", String(filters.workId));
+    if (filters.stationKey !== undefined) query = query.eq("station_key", String(filters.stationKey || ""));
+    if (filters.reportType) query = query.eq("report_type", String(filters.reportType));
+    if (filters.periodKey) query = query.eq("period_key", String(filters.periodKey));
+    if (filters.status) query = query.eq("status", String(filters.status));
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map(normalizeFinanceReportRow).filter(Boolean);
+  }
+
+  function sameFinanceReportPayload(left, right) {
+    try {
+      return JSON.stringify(left || {}) === JSON.stringify(right || {});
+    } catch (err) {
+      return false;
+    }
+  }
+
+  async function saveFinanceReport(report = {}) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre no Supabase antes de salvar relatorios financeiros.");
+    const workId = String(report.workId || "").trim();
+    const reportType = String(report.reportType || "").trim();
+    const periodKey = String(report.periodKey || "").trim();
+    const stationKey = String(report.stationKey || "").trim();
+    const status = report.status === "closed" ? "closed" : "partial";
+    if (!workId || !reportType || !periodKey || !report.periodStart || !report.periodEnd) {
+      throw new Error("Relatorio incompleto: obra, tipo e periodo sao obrigatorios.");
+    }
+
+    const existing = await loadFinanceReports({ workId, stationKey, reportType, periodKey });
+    const latest = existing[0] || null;
+    if (latest?.status === "closed" && status === "closed" && sameFinanceReportPayload(latest.payload, report.payload)) {
+      return { report: latest, unchanged: true };
+    }
+
+    const basePayload = {
+      obra_id: workId,
+      station_key: stationKey,
+      station_name: String(report.stationName || ""),
+      report_type: reportType,
+      period_key: periodKey,
+      period_start: report.periodStart,
+      period_end: report.periodEnd,
+      status,
+      payload: report.payload || {},
+      generated_by: user.id,
+      generated_by_email: user.email || null,
+      generated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    let data;
+    let error;
+    if (latest && latest.status !== "closed") {
+      ({ data, error } = await sb
+        .from("obra_finance_reports")
+        .update({ ...basePayload, version: latest.version })
+        .eq("id", latest.id)
+        .select("id,obra_id,station_key,station_name,report_type,period_key,period_start,period_end,status,version,payload,generated_at,closed_at,updated_at,generated_by_email")
+        .single());
+    } else {
+      ({ data, error } = await sb
+        .from("obra_finance_reports")
+        .insert({ ...basePayload, version: latest ? latest.version + 1 : 1 })
+        .select("id,obra_id,station_key,station_name,report_type,period_key,period_start,period_end,status,version,payload,generated_at,closed_at,updated_at,generated_by_email")
+        .single());
+    }
+    if (error) throw error;
+    const saved = normalizeFinanceReportRow(data);
+    await insertAuditLog(sb, user, {
+      entidadeTipo: "obra_finance_reports",
+      entidadeId: saved.id,
+      acao: status === "closed" ? "close_finance_report" : "save_partial_finance_report",
+      resumo: { workId, stationKey, reportType, periodKey, version: saved.version }
+    });
+    return { report: saved, unchanged: false };
+  }
+
   window.UBY_SUPABASE = {
     configured,
     client,
@@ -498,6 +610,8 @@
     clearRechargeBase,
     loadRechargeBase,
     loadAllRechargeBases,
-    loadAllRechargeSummaries
+    loadAllRechargeSummaries,
+    loadFinanceReports,
+    saveFinanceReport
   };
 })();
