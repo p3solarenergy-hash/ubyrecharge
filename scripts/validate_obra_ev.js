@@ -17,6 +17,8 @@ const jsFiles = [
 const htmlWithInlineScripts = [
   "recargas.html",
   "index.html",
+  "engenharia.html",
+  "gestao_obra_ev_detalhe.html",
   "login.html"
 ].map(file => path.join(obraDir, file));
 
@@ -47,6 +49,37 @@ function assertNoFrontendSecrets(file) {
   });
 }
 
+function assertUniqueHtmlIds(file) {
+  const source = read(file);
+  const ids = Array.from(source.matchAll(/\sid="([^"]+)"/g), match => match[1]);
+  const duplicates = Array.from(new Set(ids.filter((id, index) => ids.indexOf(id) !== index)));
+  if (duplicates.length) {
+    throw new Error(`IDs HTML duplicados em ${path.relative(root, file)}: ${duplicates.join(", ")}`);
+  }
+}
+
+function assertWorkDetailSafety() {
+  const detail = read(path.join(obraDir, "gestao_obra_ev_detalhe.html"));
+  const index = read(path.join(obraDir, "index.html"));
+  const store = read(path.join(obraDir, "app_store.js"));
+
+  if (/params\.get\(["']obra["']\)\s*\|\|\s*["']rio["']/.test(detail)) {
+    throw new Error("A pagina de detalhe nao pode assumir Rio quando o ID da obra estiver ausente.");
+  }
+  if (!detail.includes("__UBY_DETAIL_LOADING_ID__")) {
+    throw new Error("A pagina de detalhe precisa bloquear gravacao antes de carregar a obra da nuvem.");
+  }
+  if (!index.includes("workDetailLink(o.id)")) {
+    throw new Error("Os cartoes de obras precisam gerar o link a partir do ID canonico.");
+  }
+  if (store.includes("link: raw.link ||")) {
+    throw new Error("Links antigos salvos no raw_data nao podem decidir qual obra sera aberta.");
+  }
+  if (!store.includes("A gravacao provisoria foi bloqueada")) {
+    throw new Error("A camada de persistencia precisa bloquear a gravacao provisoria.");
+  }
+}
+
 function main() {
   jsFiles.forEach(file => {
     checkScript(read(file), path.relative(root, file));
@@ -58,7 +91,10 @@ function main() {
       checkScript(script, `${path.relative(root, file)}#inline-${index + 1}`);
     });
     assertNoFrontendSecrets(file);
+    assertUniqueHtmlIds(file);
   });
+
+  assertWorkDetailSafety();
 
   console.log("obra-ev validation ok");
 }

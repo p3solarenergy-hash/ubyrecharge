@@ -9,10 +9,10 @@
   ];
 
   const baseObras = [
-    { id: "rio", nome: "Rio Beach EV", cliente: "Rio Beach", local: "Rua Luiz Lerco 159", status: "Concluida", kind: "ok", pct: 100, kw: 7, carregadores: "1 x 7 kW", crit: 0, flags: ["Obra completa"], link: "gestao_obra_ev_detalhe.html" },
-    { id: "malassise", nome: "Posto Robert Koch R.K.", cliente: "Malassise Robert Koch", local: "Maringa - PR", status: "Projeto", kind: "warn", pct: 42, kw: 60, carregadores: "1 x 60 kW", crit: 4, flags: ["Aumento de carga", "Trafo a validar", "Orcamento civil"], link: "gestao_obra_ev_detalhe.html?obra=malassise" },
+    { id: "rio", nome: "Rio Beach EV", cliente: "Rio Beach", local: "Rua Luiz Lerco 159", status: "Concluida", kind: "ok", pct: 100, kw: 7, carregadores: "1 x 7 kW", crit: 0, flags: ["Obra completa"], obraSheetUrl: "https://docs.google.com/spreadsheets/d/14giw1FZcQX8zaRYe6H_NUDvZBG2DFyrQuhBxecJr5nw/edit", link: "gestao_obra_ev_detalhe.html?obra=rio" },
+    { id: "malassise", nome: "Posto Robert Koch R.K.", cliente: "Malassise Robert Koch", local: "Maringa - PR", status: "Projeto", kind: "warn", pct: 42, kw: 60, carregadores: "1 x 60 kW", crit: 4, flags: ["Aumento de carga", "Trafo a validar", "Orcamento civil"], obraSheetUrl: "https://docs.google.com/spreadsheets/d/1NWXav-JMnshFaa0jTcj2kOggDDk-T2YqSctX4MP0q2k/edit", link: "gestao_obra_ev_detalhe.html?obra=malassise" },
     { id: "prospect-1", nome: "Posto Duim", cliente: "Posto Duim", local: "Av. Maringa, 241 - Londrina/PR", status: "Projeto", kind: "warn", pct: 0, kw: 60, carregadores: "1 x 60 kW", crit: 0, flags: ["Obra real", "Estudo realizado", "DLM a validar"], link: "gestao_obra_ev_detalhe.html?obra=prospect-1" },
-    { id: "prospect-29", nome: "Posto Araguaia", cliente: "Malassise Araguaia", local: "Av Araguaia - Londrina/PR", status: "Projeto", kind: "warn", pct: 0, kw: 60, carregadores: "1 x 60 kW", crit: 0, flags: ["Obra real", "Analise vinculada", "DLM a validar"], link: "gestao_obra_ev_detalhe.html?obra=prospect-29" }
+    { id: "prospect-29", nome: "Posto Araguaia", cliente: "Malassise Araguaia", local: "Av Araguaia - Londrina/PR", status: "Projeto", kind: "warn", pct: 0, kw: 60, carregadores: "1 x 60 kW", crit: 0, flags: ["Obra real", "Analise vinculada", "DLM a validar"], obraSheetUrl: "https://docs.google.com/spreadsheets/d/1XbMc4FoHhq0B-ZEFUBsWJc01ObyJK13xMsVNZR8iKac/edit", link: "gestao_obra_ev_detalhe.html?obra=prospect-29" }
   ];
 
   const baseTasks = [

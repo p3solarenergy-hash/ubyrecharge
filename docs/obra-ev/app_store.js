@@ -28,6 +28,10 @@
     localStorage.setItem(key, JSON.stringify(value));
   }
 
+  function detailLink(id) {
+    return `gestao_obra_ev_detalhe.html?obra=${encodeURIComponent(String(id || ""))}`;
+  }
+
   function workToRow(work, detail) {
     return {
       id: String(work.id),
@@ -59,8 +63,10 @@
       carregadores: row.carregadores || raw.carregadores || "",
       crit: Number(row.criticas || 0),
       flags: raw.flags || [],
+      obraSheetUrl: raw.project?.obraSheetUrl || raw.obraSheetUrl || "",
       archived: Boolean(raw.archived || /arquivad/i.test(row.status_exec || "")),
-      link: raw.link || (row.id === "rio" ? "gestao_obra_ev_detalhe.html" : `gestao_obra_ev_detalhe.html?obra=${row.id}`)
+      detail: raw.project ? raw : null,
+      link: detailLink(row.id)
     };
   }
 
@@ -288,11 +294,26 @@
     } catch (err) {
       console.warn("Falha ao ler detalhe no Supabase:", err.message);
       return fallback;
+    } finally {
+      if (String(window.__UBY_DETAIL_LOADING_ID__ || "") === String(id || "")) {
+        window.__UBY_DETAIL_LOADING_ID__ = "";
+      }
     }
   }
 
   async function saveDetail(id, detail, card) {
-    localStorage.setItem(`uby-obra-detalhe-${id}`, JSON.stringify(detail));
+    const normalizedId = String(id || "").trim();
+    if (!normalizedId) throw new Error("Identificador da obra ausente. A gravacao foi bloqueada.");
+    if (!detail?.project || !Array.isArray(detail?.phases)) {
+      throw new Error("Detalhe da obra incompleto. A gravacao foi bloqueada para preservar a base atual.");
+    }
+    if (String(card?.id || "") !== normalizedId) {
+      throw new Error("A obra aberta nao corresponde ao registro que seria salvo. A gravacao foi bloqueada.");
+    }
+    if (String(window.__UBY_DETAIL_LOADING_ID__ || "") === normalizedId) {
+      throw new Error("A obra ainda esta sendo carregada da nuvem. A gravacao provisoria foi bloqueada.");
+    }
+    localStorage.setItem(`uby-obra-detalhe-${normalizedId}`, JSON.stringify(detail));
     return await saveWork(card, detail);
   }
 
