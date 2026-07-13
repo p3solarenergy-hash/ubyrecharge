@@ -8211,6 +8211,7 @@ function renderUbyPartnerReports(rows = []) {
             <span>Obra: ${escapeHtml(row.workName)} | ciclo ${cycle.label}${cycle.first ? ' | primeiro fechamento' : ''}</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+            <span class="report-status partial">Parcial atual</span>
             <span class="accountability-pill">${modeLabel}</span>
             <button class="btn-recalc" type="button" onclick="saveCurrentUbyAreaReport('${escapeAttr(rowKey)}','partial')">Salvar parcial</button>
             <button class="btn-recalc" type="button" onclick="generateUbyAreaReportPdf('${escapeAttr(rowKey)}')">Gerar PDF</button>
