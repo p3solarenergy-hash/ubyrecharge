@@ -1262,7 +1262,12 @@
             <h2>Prestacao de contas dos pontos UBY</h2>
             <p>Fechamento por parceiro de area com custo de energia, participacao da area e ajustes extras. O ciclo fecha todo dia 10; no Robert Koch o primeiro periodo considera 08/06/2026 a 10/07/2026.</p>
           </div>
-          <span class="accountability-pill">Fechamento dia 10</span>
+          <div class="finance-command-actions">
+            <span class="accountability-pill">Fechamento dia 10</span>
+            <select class="ctl-select" id="ubyInvestorMonthSelector" aria-label="Competencia do relatorio de investidores" onchange="renderUbyOperation()"></select>
+            <button class="btn-recalc" type="button" onclick="saveCurrentUbyInvestorReport('partial')">Salvar parcial investidores</button>
+            <button class="btn-recalc" type="button" onclick="generateUbyInvestorReportPdf()">PDF investidores</button>
+          </div>
         </div>
         <div class="accountability-grid" id="ubyPartnerReports"></div>
         <div class="accountability-note" id="ubyInvestorPreview"></div>
@@ -1273,6 +1278,7 @@
             <p>Consulte os relatorios fechados e os parciais de todas as unidades UBY.</p>
           </div>
           <div class="report-library-filters">
+            <select class="ctl-select" id="ubyReportTypeFilter" onchange="renderUbyPartnerReportLibrary()"><option value="">Todos os relatorios</option><option value="partner_area">Dono da area</option><option value="investor">Investidores</option></select>
             <select class="ctl-select" id="ubyReportUnitFilter" onchange="renderUbyPartnerReportLibrary()"><option value="">Todas as unidades</option></select>
             <select class="ctl-select" id="ubyReportStatusFilter" onchange="renderUbyPartnerReportLibrary()"><option value="">Todos</option><option value="closed">Fechados</option><option value="partial">Parciais</option></select>
           </div>
@@ -1680,13 +1686,14 @@
         <div class="finance-section-head">
           <div>
             <span class="finance-step-kicker">5. Relatorios e prestacao de contas</span>
-            <h2>Relatorio para parceiro da area</h2>
-            <p>O relatorio usa exatamente as tarifas, percentuais, receitas e custos salvos no mes selecionado. O acumulado respeita a configuracao historica de cada competencia.</p>
+            <h2>Relatorios financeiros por publico</h2>
+            <p>O parceiro da area recebe faturamento, energia, tarifa e repasse. O investidor recebe o demonstrativo completo, custos diluidos, ocupacao, resultado, acumulado e evolucao mensal.</p>
           </div>
           <div class="finance-command-actions">
             <button class="btn-recalc" type="button" onclick="saveCurrentFinanceReport('partial')">Salvar parcial</button>
             <button class="btn-recalc" type="button" onclick="saveCurrentFinanceReport('closed')">Fechar e arquivar</button>
-            <button class="btn-recalc" type="button" onclick="generateCurrentFinanceReport()">Gerar PDF do mes</button>
+            <button class="btn-recalc" type="button" onclick="generateCurrentOwnerAreaReport()">PDF dono da area</button>
+            <button class="btn-recalc" type="button" onclick="generateCurrentFinanceReport()">PDF investidor</button>
           </div>
         </div>
         <div class="section" style="margin-top:0">
@@ -1754,6 +1761,7 @@
 <script src="sidebar.js"></script>
 <script src="backup_guard.js"></script>
 <script src="finance_engine.js"></script>
+<script src="finance_reports.js"></script>
 <script src="supabase_config.js"></script>
 <script src="clube_uby_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1787,6 +1795,7 @@ let financeReportArchiveLoaded = false;
 let financeReportArchivePromise = null;
 let financeHistorySyncPromise = null;
 let ubyAreaReportSyncPromise = null;
+let ubyInvestorReportSyncPromise = null;
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -4336,21 +4345,243 @@ function financeReportPeriod(mk = '') {
   return { key: mk, label: monthLabel(mk), start: iso(start), end: iso(end) };
 }
 
+function financeMonthSeries(firstMonth = '', lastMonth = '') {
+  if (!/^\d{4}-\d{2}$/.test(firstMonth) || !/^\d{4}-\d{2}$/.test(lastMonth) || firstMonth > lastMonth) return [];
+  const [startYear, startMonth] = firstMonth.split('-').map(Number);
+  const [endYear, endMonth] = lastMonth.split('-').map(Number);
+  const rows = [];
+  let cursor = new Date(startYear, startMonth - 1, 1);
+  const end = new Date(endYear, endMonth - 1, 1);
+  while (cursor <= end) {
+    rows.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`);
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+  return rows;
+}
+
+function financeMonthOccupancy(charges = [], mk = '', powerOverride = 0) {
+  if (!/^\d{4}-\d{2}$/.test(mk)) return { pct: 0, maxKWh: 0, energy: 0, hours: 0 };
+  const [year, month] = mk.split('-').map(Number);
+  const start = new Date(year, month - 1, 1, 0, 0, 0);
+  const monthAfter = new Date(year, month, 1, 0, 0, 0);
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const chargeDates = charges.flatMap(charge => [charge.endDate, charge.startDate]).filter(Boolean).map(date => new Date(date)).filter(date => !Number.isNaN(date.getTime()));
+  const importedEnd = chargeDates.length ? new Date(Math.max(...chargeDates)) : null;
+  let end = mk === currentMonth ? (importedEnd || now) : monthAfter;
+  if (end < start) end = start;
+  if (end > monthAfter) end = monthAfter;
+  const hours = Math.max((end - start) / 3_600_000, 0);
+  const power = Number(powerOverride || 0);
+  const maxKWh = power * hours;
+  const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  return { pct: maxKWh > 0 ? energy / maxKWh * 100 : 0, maxKWh, energy, hours, power };
+}
+
+function financeRuleReportItems(result = {}, settings = {}, type = 'cost') {
+  const energy = Number(result.energy || 0);
+  const planningKWh = Number(result.planning?.planningKWh || 0);
+  const details = type === 'cost' ? (result.costRuleDetails || []) : (result.revenueRuleDetails || []);
+  const items = details.filter(item => item.enabled !== false).map(item => ({
+    id: item.id,
+    label: item.label || item.id || 'Item',
+    rule: financeRuleDisplayValue(item),
+    amount: Number(item.actual || 0),
+    plannedAmount: Number(item.planned || 0),
+    actualPerKWh: energy > 0 ? Number(item.actual || 0) / energy : null,
+    plannedPerKWh: planningKWh > 0 ? Number(item.planned || 0) / planningKWh : null
+  }));
+  if (type === 'revenue') {
+    items.unshift({
+      id: 'chargingRevenue', label: 'Recargas', rule: 'Base importada', amount: Number(result.revenue || 0),
+      plannedAmount: Number(result.planning?.planningRevenue || 0),
+      actualPerKWh: energy > 0 ? Number(result.revenue || 0) / energy : null,
+      plannedPerKWh: planningKWh > 0 ? Number(result.planning?.planningRevenue || 0) / planningKWh : null
+    });
+    return items;
+  }
+  items.unshift({
+    id: 'energy', label: 'Energia eletrica', rule: `${fmtBRL(settings.energyCostPerKWh || 0)}/kWh`, amount: Number(result.energyCost || 0),
+    plannedAmount: planningKWh * Number(settings.energyCostPerKWh || 0),
+    actualPerKWh: Number(settings.energyCostPerKWh || 0), plannedPerKWh: Number(settings.energyCostPerKWh || 0)
+  });
+  items.push({
+    id: 'management', label: 'Gestao P3', rule: `${fmtPct(settings.managementPct || 0)} do faturamento`, amount: Number(result.management || 0),
+    plannedAmount: Number(result.planning?.planningRevenue || 0) * Number(settings.managementPct || 0) / 100,
+    actualPerKWh: energy > 0 ? Number(result.management || 0) / energy : null,
+    plannedPerKWh: planningKWh > 0 ? Number(result.planning?.planningRevenue || 0) * Number(settings.managementPct || 0) / 100 / planningKWh : null
+  });
+  items.push({
+    id: 'platform', label: 'App / plataforma', rule: `${fmtPct(settings.platformPct || 0)} do faturamento`, amount: Number(result.platform || 0),
+    plannedAmount: Number(result.planning?.planningRevenue || 0) * Number(settings.platformPct || 0) / 100,
+    actualPerKWh: energy > 0 ? Number(result.platform || 0) / energy : null,
+    plannedPerKWh: planningKWh > 0 ? Number(result.planning?.planningRevenue || 0) * Number(settings.platformPct || 0) / 100 / planningKWh : null
+  });
+  if (result.areaEligible && (Number(result.areaParticipation || 0) || Number(result.plannedAreaParticipation || 0))) {
+    items.push({
+      id: 'area', label: 'Parceiro da area', rule: `${fmtPct(result.areaSharePct || 0)} sobre ${settings.ownerTransferMode === 'net' ? 'lucro liquido' : 'faturamento'}`,
+      amount: Number(result.areaParticipation || 0), plannedAmount: Number(result.plannedAreaParticipation || 0),
+      actualPerKWh: energy > 0 ? Number(result.areaParticipation || 0) / energy : null,
+      plannedPerKWh: planningKWh > 0 ? Number(result.plannedAreaParticipation || 0) / planningKWh : null
+    });
+  }
+  return items;
+}
+
+function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}) {
+  const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: options.historyCharges || charges, power: options.power });
+  const occupancy = financeMonthOccupancy(charges, mk, options.power);
+  const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  return {
+    key: mk,
+    label: monthLabel(mk),
+    revenue: Number(result.revenue || 0),
+    extraRevenue: Number(result.extraRevenue || 0),
+    totalRevenue: Number(result.totalRevenue || 0),
+    energy: Number(result.energy || 0),
+    charges: charges.length,
+    clients,
+    maxKWh: occupancy.maxKWh,
+    occupancyPct: occupancy.pct,
+    targetOccPct: Number(settings.targetOccPct || 0),
+    planningKWh: Number(result.planning?.planningKWh || 0),
+    totalOperatingCost: Number(result.totalOperatingCost || 0),
+    operationNet: Number(result.operationNet || 0),
+    operationMargin: Number(result.operationMargin || 0),
+    totalCostPerKWh: result.totalCostPerKWh,
+    plannedTotalCostPerKWh: result.plannedTotalCostPerKWh,
+    investmentValue: Number(result.investmentValue || 0),
+    roiMonthly: Number(result.roiMonthly || 0),
+    paybackMonths: Number(result.paybackMonths || 0),
+    saRetention: Number(result.saRetention || 0),
+    investorDistribution: Number(result.investorDistribution || 0),
+    ubyRetained: Number(result.ubyRetained || 0),
+    revenueItems: financeRuleReportItems(result, settings, 'revenue'),
+    costItems: financeRuleReportItems(result, settings, 'cost'),
+    result,
+    settings
+  };
+}
+
+function aggregateInvestorEntries(entries = [], investmentValue = null) {
+  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','operationNet','saRetention','investorDistribution','ubyRetained'];
+  const total = numeric.reduce((acc, key) => ({ ...acc, [key]: entries.reduce((sum, entry) => sum + Number(entry[key] || 0), 0) }), {});
+  total.occupancyPct = total.maxKWh > 0 ? total.energy / total.maxKWh * 100 : 0;
+  total.totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
+  total.operationMargin = total.totalRevenue > 0 ? total.operationNet / total.totalRevenue * 100 : 0;
+  total.investmentValue = investmentValue == null ? Number(entries.at(-1)?.investmentValue || 0) : Number(investmentValue || 0);
+  total.roiMonthly = total.investmentValue > 0 ? total.operationNet / total.investmentValue * 100 : 0;
+  const averageMonthlyResult = entries.length ? total.operationNet / entries.length : 0;
+  total.paybackMonths = total.investmentValue > 0 && averageMonthlyResult > 0 ? total.investmentValue / averageMonthlyResult : 0;
+  return total;
+}
+
+function currentWorkInvestorTimeline(uptoMonth = financeMonthKey(), selectedSettings = null) {
+  const available = [...new Set(allCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
+  const firstMonth = available.find(key => key <= uptoMonth) || uptoMonth;
+  return financeMonthSeries(firstMonth, uptoMonth).map(mk => {
+    const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+    const settings = mk === uptoMonth && selectedSettings ? selectedSettings : financeSettingsForMonth(mk);
+    return financeInvestorEntry(charges, settings, mk, { historyCharges: allCharges, power: workPowerById(currentWorkId) });
+  });
+}
+
+function currentWorkInvestorReportModel(mk = financeMonthKey(), settingsOverride = null) {
+  const settings = settingsOverride || currentFinanceSettingsFromInputs();
+  const timeline = currentWorkInvestorTimeline(mk, settings);
+  const current = timeline.find(entry => entry.key === mk) || financeInvestorEntry([], settings, mk, { power: workPowerById(currentWorkId) });
+  const accumulated = aggregateInvestorEntries(timeline, current.investmentValue);
+  return {
+    report: {
+      station: currentStationReportName || currentWorkName,
+      work: currentWorkName,
+      period: monthLabel(mk),
+      status: mk < new Date().toISOString().slice(0, 7) || monthlyClosings?.[mk] ? 'closed' : 'partial',
+      generatedAt: new Date().toLocaleString('pt-BR')
+    },
+    current,
+    accumulated,
+    timeline,
+    units: [],
+    revenueItems: current.revenueItems,
+    costItems: current.costItems
+  };
+}
+
+function ownerAreaEntryForMonth(mk = '', settings = {}) {
+  const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const revenue = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const report = ownerAreaReportForSummary({ energy, rev: revenue }, settings, charges);
+  return {
+    key: mk,
+    label: monthLabel(mk),
+    revenue: report.revenue,
+    energy: report.energy,
+    charges: charges.length,
+    energyRate: report.energyRate,
+    energyCost: report.energyReimbursement,
+    transferMode: report.transferMode,
+    sharePct: report.selectedSharePct,
+    shareBase: report.selectedShareBase,
+    areaShare: report.selectedShare,
+    partnerTotal: report.ownerTotal,
+    notes: settings.ownerAreaNotes || ''
+  };
+}
+
+function currentWorkOwnerAreaReportModel(mk = financeMonthKey(), settingsOverride = null) {
+  const available = [...new Set(allCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
+  const firstMonth = available.find(key => key <= mk) || mk;
+  const timeline = financeMonthSeries(firstMonth, mk).map(monthKeyValue => ownerAreaEntryForMonth(
+    monthKeyValue,
+    monthKeyValue === mk && settingsOverride ? settingsOverride : financeSettingsForMonth(monthKeyValue)
+  ));
+  const current = timeline.find(entry => entry.key === mk) || ownerAreaEntryForMonth(mk, settingsOverride || financeSettingsForMonth(mk));
+  const accumulated = timeline.reduce((acc, entry) => {
+    ['revenue','energy','charges','energyCost','areaShare','partnerTotal'].forEach(key => { acc[key] = (acc[key] || 0) + Number(entry[key] || 0); });
+    return acc;
+  }, {});
+  return {
+    report: {
+      station: currentStationReportName || currentWorkName,
+      work: currentWorkName,
+      period: monthLabel(mk),
+      status: mk < new Date().toISOString().slice(0, 7) || monthlyClosings?.[mk] ? 'closed' : 'partial',
+      generatedAt: new Date().toLocaleString('pt-BR')
+    },
+    current,
+    accumulated,
+    timeline
+  };
+}
+
+function openFinanceReportDocument(html) {
+  if (!window.UBY_FINANCE_REPORTS) return alert('O gerador visual de relatorios nao foi carregado. Atualize a pagina e tente novamente.');
+  const popup = window.open('', '_blank');
+  if (!popup) return alert('O navegador bloqueou a janela do relatorio. Libere pop-ups para visualizar ou gerar o PDF.');
+  popup.document.write(html);
+  popup.document.close();
+}
+
 function buildFinanceMonthReportSnapshot(mk = financeMonthKey(), settingsOverride = null) {
   const settings = settingsOverride || currentFinanceSettingsFromInputs();
   const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
+  const occupancy = financeMonthOccupancy(charges, mk, workPowerById(currentWorkId));
   const summary = monthSummaryForMonth(mk);
   const owner = ownerAreaReportForSummary(summary, settings, charges);
   const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
   const period = financeReportPeriod(mk);
   return cleanFinanceReportPayload({
+    schemaVersion: 2,
     work: { id: currentWorkId, name: currentWorkName, stationName: currentStationReportName || currentWorkName, stationKey: financeChargerStorageKey() },
     period,
     settings,
-    metrics: { charges: charges.length, clients, energy: result.energy || 0, revenue: result.totalRevenue || result.revenue || 0 },
+    metrics: { charges: charges.length, clients, energy: result.energy || 0, revenue: result.totalRevenue || result.revenue || 0, occupancyPct: occupancy.pct, maxKWh: occupancy.maxKWh },
     result,
-    owner
+    owner,
+    investorModel: currentWorkInvestorReportModel(mk, settings)
   });
 }
 
@@ -4392,7 +4623,7 @@ async function syncHistoricFinanceReportsForCurrentWork() {
       if (currentWorkId !== contextWorkId || financeChargerStorageKey() !== contextStationKey) return;
       const shouldClose = mk < todayMonth || Boolean(monthlyClosings?.[mk]);
       if (!shouldClose) continue;
-      const exists = financeReportArchive.some(item => item.workId === contextWorkId && (item.stationKey || '') === contextStationKey && item.reportType === 'charger_financial' && item.periodKey === mk && item.status === 'closed');
+      const exists = financeReportArchive.some(item => item.workId === contextWorkId && (item.stationKey || '') === contextStationKey && item.reportType === 'charger_financial' && item.periodKey === mk && item.status === 'closed' && Number(item.payload?.schemaVersion || 0) >= 2);
       if (!exists) await persistFinanceReport(financeMonthReportRecord(mk, 'closed', financeSettingsForMonth(mk)));
     }
     renderIndividualFinanceReportLibrary();
@@ -4404,6 +4635,160 @@ function reportStatusLabel(status = '') {
   return status === 'closed' ? 'Fechado' : 'Parcial';
 }
 
+function financeReportTypeLabel(type = '') {
+  if (type === 'partner_area') return 'Dono da area';
+  if (type === 'investor') return 'Investidores UBY';
+  return 'Financeiro / investidor';
+}
+
+function latestReportsByPeriod(rows = []) {
+  const byPeriod = new Map();
+  sortFinanceReports(rows).forEach(report => {
+    const current = byPeriod.get(report.periodKey);
+    const preferredType = report.reportType === 'investor' && current?.reportType === 'charger_financial';
+    if (!current || preferredType || (report.status === 'closed' && current.status !== 'closed') || (report.status === current.status && report.reportType === current.reportType && Number(report.version || 1) > Number(current.version || 1))) {
+      byPeriod.set(report.periodKey, report);
+    }
+  });
+  return [...byPeriod.values()].sort((a, b) => String(a.periodKey).localeCompare(String(b.periodKey)));
+}
+
+function latestReportsByTypeAndPeriod(rows = []) {
+  const byIdentity = new Map();
+  sortFinanceReports(rows).forEach(report => {
+    const key = [report.workId, report.stationKey || '', report.reportType, report.periodKey].join('|');
+    const current = byIdentity.get(key);
+    if (!current || (report.status === 'closed' && current.status !== 'closed') || (report.status === current.status && Number(report.version || 1) > Number(current.version || 1))) {
+      byIdentity.set(key, report);
+    }
+  });
+  return sortFinanceReports([...byIdentity.values()]);
+}
+
+function partnerAreaArchiveEntry(report = {}) {
+  const payload = report.payload || {};
+  const result = payload.result || {};
+  const settings = payload.settings || {};
+  return {
+    key: report.periodKey,
+    label: payload.period?.label || payload.cycle?.label || report.periodKey,
+    revenue: Number(result.revenue || payload.metrics?.revenue || 0),
+    energy: Number(result.energy || payload.metrics?.energy || 0),
+    charges: Number(result.count || payload.metrics?.charges || 0),
+    energyRate: Number(settings.energyRate || settings.ownerEnergyRate || 0),
+    energyCost: Number(result.energyCost || result.energyReimbursement || 0),
+    transferMode: settings.transferMode || settings.ownerTransferMode || 'gross',
+    sharePct: Number(settings.areaSharePct ?? result.selectedSharePct ?? 0),
+    shareBase: Number(result.shareBase ?? result.selectedShareBase ?? result.revenue ?? 0),
+    areaShare: Number(result.areaShare ?? result.selectedShare ?? 0),
+    partnerTotal: Number(result.partnerTotal ?? result.ownerTotal ?? 0),
+    notes: settings.notes || ''
+  };
+}
+
+function archivedPartnerAreaModel(report = {}) {
+  const related = latestReportsByPeriod(financeReportArchive.filter(item =>
+    item.reportType === 'partner_area' && item.workId === report.workId && (item.stationKey || '') === (report.stationKey || '') && item.periodKey <= report.periodKey
+  ));
+  if (!related.some(item => String(item.id) === String(report.id))) related.push(report);
+  const timeline = latestReportsByPeriod(related).map(partnerAreaArchiveEntry);
+  const current = partnerAreaArchiveEntry(report);
+  const accumulated = timeline.reduce((acc, entry) => {
+    ['revenue','energy','charges','energyCost','areaShare','partnerTotal'].forEach(key => { acc[key] = (acc[key] || 0) + Number(entry[key] || 0); });
+    return acc;
+  }, {});
+  return {
+    report: {
+      station: report.stationName || report.payload?.work?.stationName || '-',
+      work: report.payload?.work?.name || '',
+      period: report.payload?.period?.label || report.payload?.cycle?.label || report.periodKey,
+      status: report.status,
+      version: report.version,
+      generatedAt: new Date(report.generatedAt || report.updatedAt || Date.now()).toLocaleString('pt-BR')
+    },
+    current,
+    accumulated,
+    timeline
+  };
+}
+
+function investorEntryFromArchivedPayload(report = {}) {
+  const payload = report.payload || {};
+  if (payload.investorModel?.current) return { ...payload.investorModel.current, key: report.periodKey, label: payload.investorModel.current.label || monthLabel(report.periodKey) };
+  const result = payload.result || {};
+  const settings = payload.settings || {};
+  const metrics = payload.metrics || {};
+  const energy = Number(result.energy ?? metrics.energy ?? 0);
+  const totalCost = Number(result.totalOperatingCost || 0);
+  const totalRevenue = Number(result.totalRevenue ?? metrics.revenue ?? result.revenue ?? 0);
+  return {
+    key: report.periodKey,
+    label: payload.period?.label || monthLabel(report.periodKey),
+    revenue: Number(result.revenue ?? metrics.revenue ?? 0),
+    extraRevenue: Number(result.extraRevenue || 0),
+    totalRevenue,
+    energy,
+    charges: Number(metrics.charges || 0),
+    clients: Number(metrics.clients || 0),
+    maxKWh: Number(metrics.maxKWh || 0),
+    occupancyPct: Number(metrics.occupancyPct || 0),
+    targetOccPct: Number(settings.targetOccPct || 0),
+    totalOperatingCost: totalCost,
+    operationNet: Number(result.operationNet || 0),
+    operationMargin: Number(result.operationMargin ?? (totalRevenue ? Number(result.operationNet || 0) / totalRevenue * 100 : 0)),
+    totalCostPerKWh: result.totalCostPerKWh ?? (energy > 0 ? totalCost / energy : null),
+    plannedTotalCostPerKWh: result.plannedTotalCostPerKWh,
+    investmentValue: Number(result.investmentValue ?? settings.investmentValue ?? 0),
+    roiMonthly: Number(result.roiMonthly || 0),
+    paybackMonths: Number(result.paybackMonths || 0),
+    saRetention: Number(result.saRetention || 0),
+    investorDistribution: Number(result.investorDistribution || 0),
+    ubyRetained: Number(result.ubyRetained || 0),
+    revenueItems: financeRuleReportItems(result, settings, 'revenue'),
+    costItems: financeRuleReportItems(result, settings, 'cost')
+  };
+}
+
+function archivedInvestorModel(report = {}) {
+  if (report.payload?.investorModel) {
+    return {
+      ...report.payload.investorModel,
+      report: {
+        ...(report.payload.investorModel.report || {}),
+        station: report.stationName || report.payload?.work?.stationName || report.payload.investorModel.report?.station || '-',
+        work: report.payload?.work?.name || report.payload.investorModel.report?.work || '',
+        period: report.payload?.period?.label || report.payload.investorModel.report?.period || monthLabel(report.periodKey),
+        status: report.status,
+        version: report.version,
+        generatedAt: new Date(report.generatedAt || report.updatedAt || Date.now()).toLocaleString('pt-BR')
+      }
+    };
+  }
+  const relatedTypes = report.reportType === 'investor' ? ['investor'] : ['charger_financial'];
+  const related = latestReportsByPeriod(financeReportArchive.filter(item =>
+    relatedTypes.includes(item.reportType) && item.workId === report.workId && (item.stationKey || '') === (report.stationKey || '') && item.periodKey <= report.periodKey
+  ));
+  const timeline = related.map(investorEntryFromArchivedPayload);
+  const current = investorEntryFromArchivedPayload(report);
+  const accumulated = aggregateInvestorEntries(timeline, current.investmentValue);
+  return {
+    report: {
+      station: report.stationName || report.payload?.work?.stationName || '-',
+      work: report.payload?.work?.name || '',
+      period: report.payload?.period?.label || monthLabel(report.periodKey),
+      status: report.status,
+      version: report.version,
+      generatedAt: new Date(report.generatedAt || report.updatedAt || Date.now()).toLocaleString('pt-BR')
+    },
+    current,
+    accumulated,
+    timeline,
+    units: report.payload?.units || [],
+    revenueItems: current.revenueItems || [],
+    costItems: current.costItems || []
+  };
+}
+
 function reportLibraryCard(report = {}) {
   const payload = report.payload || {};
   const metrics = payload.metrics || payload.result || {};
@@ -4412,10 +4797,10 @@ function reportLibraryCard(report = {}) {
   const revenue = Number(metrics.revenue ?? metrics.totalRevenue ?? payload.result?.revenue ?? 0);
   const energy = Number(metrics.energy ?? payload.result?.energy ?? 0);
   const count = Number(metrics.charges ?? metrics.count ?? payload.result?.count ?? 0);
-  const resultValue = report.reportType === 'partner_area' ? Number(payload.result?.partnerTotal || 0) : Number(payload.result?.operationNet || 0);
+  const resultValue = report.reportType === 'partner_area' ? Number(payload.result?.partnerTotal || 0) : Number(payload.result?.operationNet ?? payload.investorModel?.current?.operationNet ?? 0);
   const resultLabel = report.reportType === 'partner_area' ? 'Total area' : 'Resultado';
   return `<div class="report-library-card">
-    <div class="report-library-main"><strong>${escapeHtml(stationName)}</strong><span>${escapeHtml(label)} | versao ${Number(report.version || 1)}</span><span class="report-status ${report.status}">${reportStatusLabel(report.status)}</span></div>
+    <div class="report-library-main"><strong>${escapeHtml(stationName)}</strong><span>${financeReportTypeLabel(report.reportType)} | ${escapeHtml(label)} | versao ${Number(report.version || 1)}</span><span class="report-status ${report.status}">${reportStatusLabel(report.status)}</span></div>
     <div class="report-library-value"><b>${fmtBRL(revenue)}</b><span>Receita</span></div>
     <div class="report-library-value"><b>${fmtKWh(energy)}</b><span>Energia</span></div>
     <div class="report-library-value optional"><b>${count}</b><span>Recargas</span></div>
@@ -4434,7 +4819,8 @@ function renderIndividualFinanceReportLibrary() {
   }
   const status = document.getElementById('financeReportStatusFilter')?.value || '';
   const stationKey = financeChargerStorageKey();
-  const rows = financeReportArchive.filter(report => report.reportType === 'charger_financial' && report.workId === currentWorkId && (!stationKey || (report.stationKey || '') === stationKey) && (!status || report.status === status));
+  const candidates = financeReportArchive.filter(report => ['charger_financial','partner_area','investor'].includes(report.reportType) && report.workId === currentWorkId && (!stationKey || (report.stationKey || '') === stationKey) && (!status || report.status === status));
+  const rows = latestReportsByTypeAndPeriod(candidates);
   container.innerHTML = rows.length ? rows.map(reportLibraryCard).join('') : '<div class="report-library-empty">Nenhum relatorio arquivado para esta obra. Os meses anteriores serao preservados automaticamente.</div>';
 }
 
@@ -4448,7 +4834,8 @@ function renderUbyPartnerReportLibrary() {
   }
   const unitFilter = document.getElementById('ubyReportUnitFilter');
   const status = document.getElementById('ubyReportStatusFilter')?.value || '';
-  const allRows = financeReportArchive.filter(report => report.reportType === 'partner_area');
+  const type = document.getElementById('ubyReportTypeFilter')?.value || '';
+  const allRows = financeReportArchive.filter(report => ['partner_area','investor'].includes(report.reportType));
   if (unitFilter) {
     const current = unitFilter.value;
     const units = [...new Map(allRows.map(report => [report.workId, report.stationName || report.payload?.work?.stationName || report.workId])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'pt-BR'));
@@ -4456,39 +4843,18 @@ function renderUbyPartnerReportLibrary() {
     unitFilter.value = units.some(([id]) => id === current) ? current : '';
   }
   const workId = unitFilter?.value || '';
-  const rows = allRows.filter(report => (!workId || report.workId === workId) && (!status || report.status === status));
+  const rows = latestReportsByTypeAndPeriod(allRows.filter(report => (!type || report.reportType === type) && (!workId || report.workId === workId) && (!status || report.status === status)));
   container.innerHTML = rows.length ? rows.map(reportLibraryCard).join('') : '<div class="report-library-empty">Ainda nao ha fechamento arquivado com estes filtros.</div>';
 }
 
 function openFinanceReportArchive(reportId, printAfter = false) {
   const report = financeReportArchive.find(item => String(item.id) === String(reportId));
   if (!report) return alert('Relatorio nao encontrado no historico carregado.');
-  const payload = report.payload || {};
-  const metrics = payload.metrics || payload.result || {};
-  const result = payload.result || {};
-  const settings = payload.settings || {};
-  const title = report.reportType === 'partner_area' ? 'Prestacao de contas UBY' : 'Relatorio financeiro do carregador';
-  const period = payload.period?.label || payload.cycle?.label || report.periodKey;
-  const station = report.stationName || payload.work?.stationName || payload.work?.name || '-';
-  const popup = window.open('', '_blank');
-  if (!popup) return alert('O navegador bloqueou a janela do relatorio. Libere pop-ups para visualizar ou gerar o PDF.');
-  const detailRows = report.reportType === 'partner_area' ? [
-    ['Reembolso de energia', fmtBRL(result.energyCost || 0)],
-    ['Base do repasse', fmtBRL(result.shareBase || 0)],
-    ['Participacao da area', fmtBRL(result.areaShare || 0)],
-    ['Total para a area', fmtBRL(result.partnerTotal || 0)],
-    ['Tarifa de energia', `${fmtBRL(settings.energyRate || 0)}/kWh`],
-    ['Tipo de repasse', settings.transferMode === 'gross' ? 'Faturamento bruto' : 'Lucro liquido']
-  ] : [
-    ['Receitas totais', fmtBRL(result.totalRevenue || result.revenue || 0)],
-    ['Custos operacionais', fmtBRL(result.totalOperatingCost || 0)],
-    ['Resultado operacional', fmtBRL(result.operationNet || 0)],
-    ['Margem', fmtPct(result.operationMargin || 0)],
-    ['Custo efetivo por kWh', fmtPerKWh(result.totalCostPerKWh)],
-    ['Total para parceiro da area', fmtBRL(payload.owner?.ownerTotal || 0)]
-  ];
-  popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeHtml(title)} - ${escapeHtml(period)}</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#10233b;margin:28px;background:#fff;font-size:12px}.head{display:flex;justify-content:space-between;gap:20px;border-bottom:3px solid #2d7ff9;padding-bottom:16px}h1{margin:0 0 8px;font-size:24px}.sub{color:#536b82;line-height:1.5}.badge{height:max-content;border:1px solid #2d7ff9;border-radius:999px;padding:6px 10px;color:#1566c0;font-weight:700}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:18px 0}.metric{padding:12px;border:1px solid #dbe7f4;border-radius:8px;background:#f3f7fc}.metric b{display:block;color:#2d7ff9;font-size:18px}.metric span{display:block;margin-top:4px;color:#60758a;font-size:9px;text-transform:uppercase}table{width:100%;border-collapse:collapse}td{padding:10px 8px;border-bottom:1px solid #dce6f0}td:first-child{font-weight:700}.actions{margin-bottom:16px}button{border:0;border-radius:6px;background:#2d7ff9;color:#fff;padding:9px 14px;font-weight:700}@media print{.actions{display:none}body{margin:14mm}}</style></head><body><div class="actions"><button onclick="window.print()">Salvar como PDF / imprimir</button></div><div class="head"><div><h1>${escapeHtml(title)}</h1><div class="sub"><strong>${escapeHtml(station)}</strong><br>Periodo: ${escapeHtml(period)}<br>Status: ${reportStatusLabel(report.status)} | versao ${Number(report.version || 1)}</div></div><div class="badge">Historico preservado</div></div><div class="metrics"><div class="metric"><b>${fmtBRL(metrics.revenue ?? metrics.totalRevenue ?? result.revenue ?? 0)}</b><span>Receita</span></div><div class="metric"><b>${fmtKWh(metrics.energy ?? result.energy ?? 0)}</b><span>Energia</span></div><div class="metric"><b>${Number(metrics.charges ?? metrics.count ?? result.count ?? 0)}</b><span>Recargas</span></div><div class="metric"><b>${Number(metrics.clients ?? result.clients ?? 0)}</b><span>Clientes</span></div></div><table>${detailRows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`).join('')}</table>${printAfter ? '<script>setTimeout(()=>window.print(),350)<\/script>' : ''}</body></html>`);
-  popup.document.close();
+  const options = { printAfter };
+  const html = report.reportType === 'partner_area'
+    ? window.UBY_FINANCE_REPORTS.areaReport(archivedPartnerAreaModel(report), options)
+    : window.UBY_FINANCE_REPORTS.investorReport(archivedInvestorModel(report), options);
+  openFinanceReportDocument(html);
 }
 
 function financeReportRuleRows(details = [], emptyLabel = 'Nenhum item adicional') {
@@ -4497,7 +4863,27 @@ function financeReportRuleRows(details = [], emptyLabel = 'Nenhum item adicional
   return enabled.map(item => `<tr><td>${escapeHtml(item.label || item.id)}</td><td>${escapeHtml(financeRuleDisplayValue(item))}</td><td>${fmtBRL(item.actual || 0)}</td><td>${fmtPerKWh(item.actualPerKWh)}</td></tr>`).join('');
 }
 
+function generateCurrentOwnerAreaReport() {
+  const mk = financeMonthKey();
+  if (!mk) return;
+  const settings = currentFinanceSettingsFromInputs();
+  persistFinancialSettingsFromInputs(mk);
+  saveFinancialSettingsRecord().catch(err => setStorageState(`Relatorio gerado, mas a sincronizacao financeira falhou: ${err.message}`, true));
+  const model = currentWorkOwnerAreaReportModel(mk, settings);
+  openFinanceReportDocument(window.UBY_FINANCE_REPORTS.areaReport(model, { printAfter: true }));
+}
+
 function generateCurrentFinanceReport() {
+  const mk = financeMonthKey();
+  if (!mk) return;
+  const settings = currentFinanceSettingsFromInputs();
+  persistFinancialSettingsFromInputs(mk);
+  saveFinancialSettingsRecord().catch(err => setStorageState(`Relatorio gerado, mas a sincronizacao financeira falhou: ${err.message}`, true));
+  const model = currentWorkInvestorReportModel(mk, settings);
+  openFinanceReportDocument(window.UBY_FINANCE_REPORTS.investorReport(model, { printAfter: true }));
+}
+
+function generateCurrentFinanceReportLegacy() {
   const mk = financeMonthKey();
   if (!mk) return;
   const popup = window.open('', '_blank');
@@ -8021,6 +8407,7 @@ function ubyAreaReportRecord(row = {}, cycle = {}, status = 'partial') {
     periodEnd: dateOnly(cycle.end),
     status,
     payload: cleanFinanceReportPayload({
+      schemaVersion: 2,
       work: { id: row.workId, name: row.workName, stationName },
       cycle: { key: cycle.key, label: cycle.label, first: cycle.first },
       period: { key: cycle.key, label: cycle.label, start: dateOnly(cycle.start), end: dateOnly(cycle.end) },
@@ -8056,7 +8443,7 @@ async function syncCompletedUbyAreaReports(rows = []) {
       for (const cycle of ubyAreaCyclesUntil(row, currentCycle)) {
         if (cycle.end > now) continue;
         const stationKey = normalizeStationForCompare(canonicalStationNameForWork(row.workId, row.stationName || row.station || row.workName, row.workName));
-        const exists = financeReportArchive.some(item => item.workId === row.workId && (item.stationKey || '') === stationKey && item.reportType === 'partner_area' && item.periodKey === cycle.key && item.status === 'closed');
+        const exists = financeReportArchive.some(item => item.workId === row.workId && (item.stationKey || '') === stationKey && item.reportType === 'partner_area' && item.periodKey === cycle.key && item.status === 'closed' && Number(item.payload?.schemaVersion || 0) >= 2);
         if (!exists) await persistFinanceReport(ubyAreaReportRecord(row, cycle, 'closed'));
       }
     }
@@ -8065,7 +8452,54 @@ async function syncCompletedUbyAreaReports(rows = []) {
   return ubyAreaReportSyncPromise;
 }
 
+function buildUbyAreaReportModel(row = {}, cycle = ubyAreaCurrentCycle(row)) {
+  const cycleReports = ubyAreaCyclesUntil(row, cycle).map(itemCycle => {
+    const settings = ubyAreaSettingsForRow(row, itemCycle);
+    const result = calculateUbyAreaReport(row, itemCycle, settings);
+    return {
+      key: itemCycle.key,
+      label: itemCycle.label,
+      revenue: result.revenue,
+      energy: result.energy,
+      charges: result.count,
+      clients: result.clients,
+      energyRate: settings.energyRate,
+      energyCost: result.energyCost,
+      transferMode: settings.transferMode,
+      sharePct: settings.areaSharePct,
+      shareBase: result.shareBase,
+      areaShare: result.areaShare,
+      partnerTotal: result.partnerTotal,
+      notes: settings.notes || ''
+    };
+  });
+  const current = cycleReports.find(item => item.key === cycle.key) || cycleReports.at(-1) || {};
+  const accumulated = cycleReports.reduce((acc, entry) => {
+    ['revenue','energy','charges','clients','energyCost','areaShare','partnerTotal'].forEach(key => { acc[key] = (acc[key] || 0) + Number(entry[key] || 0); });
+    return acc;
+  }, {});
+  return {
+    report: {
+      station: row.stationName || row.station || row.workName,
+      work: row.workName,
+      period: cycle.label,
+      status: cycle.end <= new Date() ? 'closed' : 'partial',
+      generatedAt: new Date().toLocaleString('pt-BR')
+    },
+    current,
+    accumulated,
+    timeline: cycleReports
+  };
+}
+
 function generateUbyAreaReportPdf(rowKey) {
+  const row = findUbyAreaRow(rowKey);
+  if (!row) return alert('Nao encontrei a base deste ponto para gerar o relatorio.');
+  const model = buildUbyAreaReportModel(row, ubyAreaCurrentCycle(row));
+  openFinanceReportDocument(window.UBY_FINANCE_REPORTS.areaReport(model, { printAfter: true }));
+}
+
+function generateUbyAreaReportPdfLegacy(rowKey) {
   const row = getUbyChargerRows(getGeneralUnitData())
     .map(item => summarizeUbyChargerRow(item, item.charges))
     .find(item => ubyAreaRowKey(item) === rowKey);
@@ -8180,6 +8614,191 @@ function generateUbyAreaReportPdf(rowKey) {
   printable.document.close();
 }
 
+function mergeInvestorReportItems(entries = [], property = 'costItems') {
+  const merged = new Map();
+  entries.forEach(entry => (entry[property] || []).forEach(item => {
+    const key = item.id || normalizeStationForCompare(item.label || 'item');
+    const current = merged.get(key) || { id: key, label: item.label || key, rules: new Set(), amount: 0, plannedAmount: 0 };
+    if (item.rule) current.rules.add(item.rule);
+    current.amount += Number(item.amount || 0);
+    current.plannedAmount += Number(item.plannedAmount || 0);
+    merged.set(key, current);
+  }));
+  const energy = entries.reduce((sum, entry) => sum + Number(entry.energy || 0), 0);
+  const planningKWh = entries.reduce((sum, entry) => sum + Number(entry.planningKWh || 0), 0);
+  return [...merged.values()].map(item => ({
+    id: item.id,
+    label: item.label,
+    rule: item.rules.size === 1 ? [...item.rules][0] : 'Configuracao por ponto',
+    amount: item.amount,
+    plannedAmount: item.plannedAmount,
+    actualPerKWh: energy > 0 ? item.amount / energy : null,
+    plannedPerKWh: planningKWh > 0 ? item.plannedAmount / planningKWh : null
+  }));
+}
+
+function ubyInvestorSourceRows() {
+  return getUbyChargerRows(getGeneralUnitData())
+    .filter(row => row.included)
+    .map(row => summarizeUbyChargerRow(row, row.charges));
+}
+
+function ubyInvestorLatestMonth(rows = ubyInvestorSourceRows()) {
+  return [...new Set(rows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort().at(-1) || '';
+}
+
+function ubyInvestorMonthEntry(rows = [], mk = '') {
+  const [year, month] = String(mk).split('-').map(Number);
+  const monthEnd = new Date(year, month, 0, 23, 59, 59);
+  const unitEntries = rows.filter(row => ubyAreaOperationStart(row) <= monthEnd).map(row => {
+    const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
+    const settings = financeSettingsForUbyRow(row, mk);
+    const entry = financeInvestorEntry(charges, settings, mk, { historyCharges: row.charges, power: workPowerById(row.workId) });
+    return {
+      ...entry,
+      workId: row.workId,
+      stationKey: normalizeStationForCompare(canonicalStationNameForWork(row.workId, row.stationName || row.station || row.workName, row.workName)),
+      name: row.stationName || row.station || row.workName,
+      workName: row.workName,
+      type: String(row.kind || 'unknown').toUpperCase()
+    };
+  });
+  const investmentValue = unitEntries.reduce((sum, entry) => sum + Number(entry.investmentValue || 0), 0);
+  const total = aggregateInvestorEntries(unitEntries, investmentValue);
+  const monthCharges = rows.flatMap(row => (row.charges || []).filter(charge => chargeMonthKey(charge) === mk));
+  total.clients = new Set(monthCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  total.charges = monthCharges.length;
+  total.targetOccPct = total.maxKWh > 0 ? unitEntries.reduce((sum, entry) => sum + Number(entry.targetOccPct || 0) * Number(entry.maxKWh || 0), 0) / total.maxKWh : 0;
+  total.key = mk;
+  total.label = monthLabel(mk);
+  total.units = unitEntries.map(entry => ({
+    name: entry.name,
+    workName: entry.workName,
+    type: entry.type,
+    occupancyPct: entry.occupancyPct,
+    totalRevenue: entry.totalRevenue,
+    energy: entry.energy,
+    totalOperatingCost: entry.totalOperatingCost,
+    operationNet: entry.operationNet
+  }));
+  total.revenueItems = mergeInvestorReportItems(unitEntries, 'revenueItems');
+  total.costItems = mergeInvestorReportItems(unitEntries, 'costItems');
+  return total;
+}
+
+function buildUbyInvestorReportModel(mk = ubyInvestorLatestMonth(), rows = ubyInvestorSourceRows()) {
+  const starts = rows.map(row => ubyAreaOperationStart(row)).filter(date => date && !Number.isNaN(date.getTime()));
+  const firstDate = starts.length ? new Date(Math.min(...starts)) : new Date();
+  const firstMonth = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, '0')}`;
+  const timeline = financeMonthSeries(firstMonth <= mk ? firstMonth : mk, mk).map(monthKeyValue => ubyInvestorMonthEntry(rows, monthKeyValue));
+  const current = timeline.find(entry => entry.key === mk) || ubyInvestorMonthEntry(rows, mk);
+  const accumulatedInvestment = current.investmentValue;
+  const accumulated = aggregateInvestorEntries(timeline, accumulatedInvestment);
+  accumulated.clients = new Set(rows.flatMap(row => row.charges || []).filter(charge => chargeMonthKey(charge) <= mk).map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  return {
+    report: {
+      scope: 'Rede de carregadores UBY',
+      station: 'Consolidado UBY',
+      period: monthLabel(mk),
+      status: mk < new Date().toISOString().slice(0, 7) ? 'closed' : 'partial',
+      generatedAt: new Date().toLocaleString('pt-BR')
+    },
+    current,
+    accumulated,
+    timeline,
+    units: current.units || [],
+    revenueItems: current.revenueItems || [],
+    costItems: current.costItems || []
+  };
+}
+
+function ubyInvestorReportRecord(row = {}, mk = '', status = 'partial') {
+  const settings = financeSettingsForUbyRow(row, mk);
+  const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
+  const entry = financeInvestorEntry(charges, settings, mk, { historyCharges: row.charges, power: workPowerById(row.workId) });
+  const start = ubyAreaOperationStart(row);
+  const firstMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+  const timeline = financeMonthSeries(firstMonth <= mk ? firstMonth : mk, mk).map(monthKeyValue => {
+    const monthCharges = (row.charges || []).filter(charge => chargeMonthKey(charge) === monthKeyValue);
+    return financeInvestorEntry(monthCharges, financeSettingsForUbyRow(row, monthKeyValue), monthKeyValue, { historyCharges: row.charges, power: workPowerById(row.workId) });
+  });
+  const model = {
+    report: {
+      station: row.stationName || row.station || row.workName,
+      work: row.workName,
+      period: monthLabel(mk),
+      status,
+      generatedAt: new Date().toLocaleString('pt-BR')
+    },
+    current: entry,
+    accumulated: aggregateInvestorEntries(timeline, entry.investmentValue),
+    timeline,
+    units: [],
+    revenueItems: entry.revenueItems,
+    costItems: entry.costItems
+  };
+  const period = financeReportPeriod(mk);
+  const stationName = row.stationName || row.station || row.workName || '';
+  return {
+    workId: row.workId,
+    stationKey: normalizeStationForCompare(canonicalStationNameForWork(row.workId, stationName, row.workName)),
+    stationName,
+    reportType: 'investor',
+    periodKey: mk,
+    periodStart: period.start,
+    periodEnd: period.end,
+    status,
+    payload: cleanFinanceReportPayload({
+      schemaVersion: 2,
+      work: { id: row.workId, name: row.workName, stationName },
+      period,
+      settings,
+      metrics: { revenue: entry.totalRevenue, energy: entry.energy, charges: entry.charges, clients: entry.clients, occupancyPct: entry.occupancyPct, maxKWh: entry.maxKWh },
+      result: entry,
+      investorModel: model
+    })
+  };
+}
+
+async function saveCurrentUbyInvestorReport(status = 'partial') {
+  const rows = ubyInvestorSourceRows();
+  const mk = document.getElementById('ubyInvestorMonthSelector')?.value || ubyInvestorLatestMonth(rows);
+  if (!rows.length || !mk) return alert('Nao ha carregadores UBY com dados para gerar o relatorio de investidores.');
+  if (status === 'closed' && !confirm(`Fechar e arquivar os relatorios de investidores de ${monthLabel(mk)}?`)) return;
+  const saved = [];
+  for (const row of rows) saved.push(await persistFinanceReport(ubyInvestorReportRecord(row, mk, status)));
+  renderUbyPartnerReportLibrary();
+  setStorageState(`${status === 'closed' ? 'Fechamento' : 'Parcial'} dos investidores de <strong>${monthLabel(mk)}</strong> salvo para ${saved.length} ponto(s).`);
+}
+
+function generateUbyInvestorReportPdf(mk = '') {
+  const rows = ubyInvestorSourceRows();
+  const monthKeyValue = mk || document.getElementById('ubyInvestorMonthSelector')?.value || ubyInvestorLatestMonth(rows);
+  if (!rows.length || !monthKeyValue) return alert('Nao ha carregadores UBY com dados para gerar o relatorio de investidores.');
+  openFinanceReportDocument(window.UBY_FINANCE_REPORTS.investorReport(buildUbyInvestorReportModel(monthKeyValue, rows), { printAfter: true }));
+}
+
+async function syncHistoricUbyInvestorReports(rows = []) {
+  if (ubyInvestorReportSyncPromise || !rows.length) return ubyInvestorReportSyncPromise;
+  ubyInvestorReportSyncPromise = (async () => {
+    await loadFinanceReportArchive();
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    for (const row of rows) {
+      const start = ubyAreaOperationStart(row);
+      const firstMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+      for (const mk of financeMonthSeries(firstMonth, currentMonth)) {
+        if (mk >= currentMonth) continue;
+        const stationName = row.stationName || row.station || row.workName || '';
+        const stationKey = normalizeStationForCompare(canonicalStationNameForWork(row.workId, stationName, row.workName));
+        const exists = financeReportArchive.some(item => item.workId === row.workId && (item.stationKey || '') === stationKey && item.reportType === 'investor' && item.periodKey === mk && item.status === 'closed' && Number(item.payload?.schemaVersion || 0) >= 2);
+        if (!exists) await persistFinanceReport(ubyInvestorReportRecord(row, mk, 'closed'));
+      }
+    }
+    renderUbyPartnerReportLibrary();
+  })().catch(err => console.warn('Nao foi possivel arquivar os relatorios de investidores:', err)).finally(() => { ubyInvestorReportSyncPromise = null; });
+  return ubyInvestorReportSyncPromise;
+}
+
 function renderUbyPartnerReports(rows = []) {
   const container = document.getElementById('ubyPartnerReports');
   const investor = document.getElementById('ubyInvestorPreview');
@@ -8195,12 +8814,13 @@ function renderUbyPartnerReports(rows = []) {
     const result = calculateUbyAreaReport(row, cycle, settings);
     return { row, cycle, settings, result, rowKey: ubyAreaRowKey(row) };
   }).sort((a, b) => b.result.revenue - a.result.revenue);
-  const totals = reports.reduce((acc, item) => {
-    Object.entries(item.result).forEach(([key, value]) => {
-      if (typeof value === 'number') acc[key] = (acc[key] || 0) + value;
-    });
-    return acc;
-  }, {});
+  const investorMonthSelector = document.getElementById('ubyInvestorMonthSelector');
+  if (investorMonthSelector) {
+    const previous = investorMonthSelector.value;
+    const investorMonths = [...new Set(rows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort().reverse();
+    investorMonthSelector.innerHTML = investorMonths.map(mk => `<option value="${escapeAttr(mk)}">Investidores - ${monthLabel(mk)}</option>`).join('');
+    investorMonthSelector.value = investorMonths.includes(previous) ? previous : (investorMonths[0] || '');
+  }
   container.innerHTML = reports.map(({ row, cycle, settings, result, rowKey }) => {
     const modeLabel = settings.transferMode === 'gross' ? 'Bruto' : 'Lucro liquido';
     return `
@@ -8259,18 +8879,22 @@ function renderUbyPartnerReports(rows = []) {
       </div>
     `;
   }).join('');
+  const investorMonth = investorMonthSelector?.value || ubyInvestorLatestMonth(rows);
+  const investorModel = investorMonth ? buildUbyInvestorReportModel(investorMonth, rows) : null;
+  const investorCurrent = investorModel?.current || {};
   investor.innerHTML = `
-    <strong>Previa para relatorio de investidores do periodo atual:</strong>
+    <strong>Previa do relatorio completo de investidores - ${monthLabel(investorMonth)}:</strong>
     <div class="investor-preview">
-      <div class="accountability-metric"><b>${fmtBRL(totals.revenue || 0)}</b><span>Receita UBY</span></div>
-      <div class="accountability-metric"><b>${fmtBRL(totals.energyCost || 0)}</b><span>Custo energia</span></div>
-      <div class="accountability-metric"><b>${fmtBRL(totals.areaShare || 0)}</b><span>Areas/parceiros</span></div>
-      <div class="accountability-metric"><b>${fmtBRL(totals.ubyResult || 0)}</b><span>Resultado pontos</span></div>
-      <div class="accountability-metric"><b>${reports.length}</b><span>Pontos UBY</span></div>
+      <div class="accountability-metric"><b>${fmtPct(investorCurrent.occupancyPct || 0)}</b><span>Ocupacao</span></div>
+      <div class="accountability-metric"><b>${fmtBRL(investorCurrent.totalRevenue || 0)}</b><span>Receitas totais</span></div>
+      <div class="accountability-metric"><b>${fmtBRL(investorCurrent.totalOperatingCost || 0)}</b><span>Todos os custos</span></div>
+      <div class="accountability-metric"><b>${fmtPerKWh(investorCurrent.totalCostPerKWh)}</b><span>Custo por kWh</span></div>
+      <div class="accountability-metric"><b>${fmtBRL(investorCurrent.operationNet || 0)}</b><span>Resultado operacional</span></div>
     </div>
   `;
   renderUbyPartnerReportLibrary();
   syncCompletedUbyAreaReports(rows);
+  syncHistoricUbyInvestorReports(rows);
 }
 
 function ubyFinanceMonthsForRow(row = {}, sourceMonths = [], isMonthView = true, currentMonth = '') {
