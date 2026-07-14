@@ -127,6 +127,8 @@ assert(bridge.includes('existingCharges > 0 && !explicitEmptyIntents.has(mutatio
 assert(bridge.includes('"remove_file"'), 'cloud must allow an explicit last-file removal');
 assert(!bridge.includes('...(existing.resumo || {}),\n      ...incomingSummary'), 'metadata saves must not replace operational summary fields');
 assert(bridge.includes('const existingSummary = existing.resumo || {};'), 'metadata saves must start from the authoritative cloud summary');
+assert(!html.includes('else await window.UBY_SUPABASE.saveRechargeBase(workId, record)'), 'metadata updates must never fall back to a full recharge overwrite');
+assert(!html.includes('else if (window.UBY_SUPABASE?.saveRechargeBase)'), 'financial settings must never fall back to a full recharge overwrite');
 assert(bridge.includes('async function loadRechargeWorks()'), 'works must be loaded from the shared database');
 assert(backup.includes('const MAX_BACKUPS = 5;'), 'browser backups must be bounded');
 assert(backup.includes('"uby-recargas-db-v1"'), 'heavy cloud-backed recharge cache must be excluded from automatic browser backups');

@@ -5224,8 +5224,6 @@ async function saveFinancialSettingsRecord() {
   markRechargeRecordsDirty();
   if (window.UBY_SUPABASE?.saveRechargeMetadata) {
     await window.UBY_SUPABASE.saveRechargeMetadata(currentWorkId, record);
-  } else if (window.UBY_SUPABASE?.saveRechargeBase) {
-    await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
   }
   return localSave;
 }
@@ -8307,16 +8305,13 @@ async function toggleUbyOperation(workId, key, checked) {
     try {
       if (window.UBY_SUPABASE?.saveRechargeMetadata) {
         await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
-      } else if (window.UBY_SUPABASE?.saveRechargeBase) {
-        await window.UBY_SUPABASE.saveRechargeBase(workId, record);
       }
     } catch (err) {
       setStorageState(`Marcacao UBY salva neste navegador. Supabase pendente: ${err.message}`, true);
     }
-  } else if (window.UBY_SUPABASE?.saveRechargeMetadata || window.UBY_SUPABASE?.saveRechargeBase) {
+  } else if (window.UBY_SUPABASE?.saveRechargeMetadata) {
     try {
-      if (window.UBY_SUPABASE?.saveRechargeMetadata) await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
-      else await window.UBY_SUPABASE.saveRechargeBase(workId, record);
+      await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
     } catch (err) {
       setStorageState(`Marcacao UBY salva neste navegador. Supabase pendente: ${err.message}`, true);
     }
@@ -8431,10 +8426,9 @@ async function saveUbyAreaSetting(rowKey, cycleKey, field, value) {
     const localDb = readJson(RECARGAS_LOCAL_KEY, {});
     localDb[workId] = compactRechargeRecord({ ...(localDb[workId] || {}), ...record, summary: record.summary });
     writeJson(RECARGAS_LOCAL_KEY, localDb);
-    if (window.UBY_SUPABASE?.saveRechargeMetadata || window.UBY_SUPABASE?.saveRechargeBase) {
+    if (window.UBY_SUPABASE?.saveRechargeMetadata) {
       try {
-        if (window.UBY_SUPABASE?.saveRechargeMetadata) await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
-        else await window.UBY_SUPABASE.saveRechargeBase(workId, record);
+        await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
         setStorageState('Prestacao de contas UBY salva no banco.');
       } catch (err) {
         setStorageState(`Prestacao salva neste navegador. Supabase pendente: ${err.message}`, true);
