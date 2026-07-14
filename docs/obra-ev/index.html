@@ -294,11 +294,11 @@
 </div>
 
 <script src="sidebar.js"></script>
-<script src="backup_guard.js"></script>
+<script src="backup_guard.js?v=20260714-integrity1"></script>
 <script src="drive_config.js"></script>
 <script src="supabase_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_bridge.js"></script>
+<script src="supabase_bridge.js?v=20260714-integrity1"></script>
 <script src="app_data.js"></script>
 <script src="app_store.js"></script>
 <script src="activity.js"></script>
@@ -393,7 +393,7 @@ function renderProspects(){document.getElementById("prospectGrid").innerHTML=`<d
 function renderActivityCenter(){if(!window.UBY_ACTIVITY)return;const messages=window.UBY_ACTIVITY.messages({limit:30});document.getElementById("generalMessages").innerHTML=messages.map(item=>`<div class="activity-item"><div class="meta">${window.UBY_ACTIVITY.nowLabel(item.createdAt)} - ${item.user?.label||"Usuario"}</div><strong>${item.workName||"Geral"}</strong><span>${item.text}</span></div>`).join("")||'<div class="activity-item"><strong>Sem mensagens ainda</strong><span>Envie o primeiro recado geral para a equipe.</span></div>';const acts=window.UBY_ACTIVITY.list({limit:35});document.getElementById("globalActivity").innerHTML=acts.map(item=>`<div class="activity-item"><div class="meta">${window.UBY_ACTIVITY.nowLabel(item.createdAt)} - ${item.user?.label||"Usuario"}</div><strong>${item.workName||"Geral"} - ${item.title||window.UBY_ACTIVITY.summarize(item)}</strong><span>${item.detail||""}${item.after?`<br><b>Valor:</b> ${item.after}`:""}</span></div>`).join("")||'<div class="activity-item"><strong>Nenhuma alteracao registrada</strong><span>As proximas edicoes feitas nas obras aparecem aqui.</span></div>'}
 function sendGeneralMessage(){const input=document.getElementById("generalMessageText");const msg=window.UBY_ACTIVITY?.sendMessage({workId:"geral",workName:"Geral",text:input.value});if(msg){input.value="";renderActivityCenter()}}
 function setCloudStatus(message, kind=""){const el=document.getElementById("cloudStatus");const panel=el?.closest(".cloud-panel");if(el)el.textContent=message;if(panel){panel.classList.remove("ok","warn","danger");if(kind)panel.classList.add(kind)}}
-async function refreshCloudData({manual=false}={}){try{if(!window.UBY_SUPABASE?.configured?.()){setCloudStatus("Supabase nao configurado. Este navegador esta usando apenas a copia local.", "danger");return}const user=await window.UBY_SUPABASE.currentUser();if(!user){setCloudStatus("Este navegador ainda nao esta conectado. Entre uma vez para puxar a mesma base dos outros navegadores.", "warn");return}setCloudStatus("Sincronizando automaticamente com a nuvem...", "warn");try{await window.UBY_SUPABASE.ensureCoreWorks(baseObras)}catch(syncErr){console.warn("Base oficial pendente:",syncErr.message)}obras=normalizeDefaults(await window.UBY_STORE.loadWorks(obras)).map(mergeDetailData);prospects=await window.UBY_STORE.loadProspects(prospects);renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();const status=await window.UBY_SUPABASE.cloudStatus();setCloudStatus(`Sincronizado com a nuvem. Usuario: ${user.email}. Obras no banco: ${status.obras}.`, "ok")}catch(err){setCloudStatus("Nao foi possivel sincronizar agora: "+err.message, "danger");if(manual)alert("Nao foi possivel sincronizar: "+err.message)}}
+async function refreshCloudData({manual=false}={}){try{if(!window.UBY_SUPABASE?.configured?.()){setCloudStatus("Supabase nao configurado. Este navegador esta usando apenas a copia local.", "danger");return}const user=await window.UBY_SUPABASE.currentUser();if(!user){setCloudStatus("Este navegador ainda nao esta conectado. Entre uma vez para puxar a mesma base dos outros navegadores.", "warn");return}setCloudStatus("Sincronizando automaticamente com a nuvem...", "warn");obras=normalizeDefaults(await window.UBY_STORE.loadWorks(obras)).map(mergeDetailData);prospects=await window.UBY_STORE.loadProspects(prospects);renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();const status=await window.UBY_SUPABASE.cloudStatus();setCloudStatus(`Sincronizado com a nuvem. Usuario: ${user.email}. Obras no banco: ${status.obras}.`, "ok")}catch(err){setCloudStatus("Nao foi possivel sincronizar agora: "+err.message, "danger");if(manual)alert("Nao foi possivel sincronizar: "+err.message)}}
 document.getElementById("searchInput").addEventListener("input",e=>{
   renderCards(filteredObras());
 });

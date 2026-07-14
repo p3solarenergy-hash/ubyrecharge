@@ -1,5 +1,8 @@
 (function () {
   const config = window.UBY_SUPABASE_CONFIG || {};
+  const USER_CACHE_TTL_MS = 30000;
+  let verifiedUserCache = null;
+  let verifiedUserCachedAt = 0;
   const managedPrefixes = [
     "uby-obra-detalhe-",
     "uby-obras-dashboard",
@@ -178,6 +181,8 @@
     if (!sb) throw new Error("Supabase ainda nao configurado.");
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    verifiedUserCache = data?.user || null;
+    verifiedUserCachedAt = Date.now();
     return data;
   }
 
@@ -186,14 +191,25 @@
     if (!sb) return;
     const { error } = await sb.auth.signOut();
     if (error) throw error;
+    verifiedUserCache = null;
+    verifiedUserCachedAt = 0;
   }
 
   async function currentUser() {
     const sb = client();
     if (!sb) return null;
+    if (verifiedUserCache && Date.now() - verifiedUserCachedAt < USER_CACHE_TTL_MS) {
+      return verifiedUserCache;
+    }
     const { data, error } = await sb.auth.getUser();
-    if (error) return null;
-    return data.user || null;
+    if (error) {
+      verifiedUserCache = null;
+      verifiedUserCachedAt = 0;
+      return null;
+    }
+    verifiedUserCache = data.user || null;
+    verifiedUserCachedAt = Date.now();
+    return verifiedUserCache;
   }
 
   async function currentProfile() {
@@ -240,16 +256,14 @@
     if (!user) throw new Error("Entre com seu usuario Supabase antes de sincronizar a base.");
     const core = (items || []).filter(item => item?.id);
     if (!core.length) return { inserted: 0, existing: 0, total: 0 };
-    const ids = core.map(item => String(item.id));
-    const { data: existingRows, error: readError } = await sb
+    const { count: existingCount, error: readError } = await sb
       .from("obras")
-      .select("id")
-      .in("id", ids);
+      .select("id", { count: "exact", head: true });
     if (readError) throw readError;
-    const existing = new Set((existingRows || []).map(row => row.id));
-    const missing = core.filter(item => !existing.has(String(item.id)));
-    if (!missing.length) return { inserted: 0, existing: existing.size, total: core.length };
-    const payload = missing.map(item => ({
+    if (Number(existingCount || 0) > 0) {
+      return { inserted: 0, existing: Number(existingCount || 0), total: core.length, seeded: false };
+    }
+    const payload = core.map(item => ({
       id: String(item.id),
       nome: item.nome,
       cliente: item.cliente || item.nome || "",
@@ -265,7 +279,34 @@
     }));
     const { error: insertError } = await sb.from("obras").insert(payload);
     if (insertError) throw insertError;
-    return { inserted: payload.length, existing: existing.size, total: core.length };
+    return { inserted: payload.length, existing: 0, total: core.length, seeded: true };
+  }
+
+  async function loadRechargeWorks() {
+    const sb = client();
+    if (!sb) return [];
+    const user = await currentUser();
+    if (!user) return [];
+    const { data, error } = await sb
+      .from("obras")
+      .select("id,nome,cliente,local,status_exec,progresso,potencia_kw,carregadores,criticas,raw_data,updated_at")
+      .order("nome", { ascending: true });
+    if (error) throw error;
+    return (data || []).map(row => ({
+      ...(row.raw_data || {}),
+      id: row.id,
+      nome: row.nome || row.id,
+      cliente: row.cliente || "",
+      local: row.local || "",
+      status: row.status_exec || "",
+      statusExec: row.status_exec || "",
+      pct: Number(row.progresso || 0),
+      kw: Number(row.potencia_kw || 0),
+      carregadores: row.carregadores || "",
+      crit: Number(row.criticas || 0),
+      updatedAt: row.updated_at || "",
+      source: "supabase"
+    }));
   }
 
   function safePathPart(value) {
@@ -324,14 +365,18 @@
     if (error) throw error;
   }
 
-  async function archiveExistingRechargeBase(sb, user, workId, action, origin) {
+  async function archiveExistingRechargeBase(sb, user, workId, action, origin, existingData = null) {
     const id = String(workId || "geral");
-    const { data, error } = await sb
-      .from("obra_recargas_base")
-      .select("obra_id,arquivos,recargas,resumo,updated_at")
-      .eq("obra_id", id)
-      .maybeSingle();
-    if (error) throw error;
+    let data = existingData;
+    if (!data) {
+      const result = await sb
+        .from("obra_recargas_base")
+        .select("obra_id,arquivos,recargas,resumo,updated_at")
+        .eq("obra_id", id)
+        .maybeSingle();
+      if (result.error) throw result.error;
+      data = result.data;
+    }
     if (!data) return null;
 
     const files = data.arquivos || [];
@@ -366,9 +411,22 @@
       monthlyClosings: payload?.monthlyClosings || payload?.summary?.monthlyClosings || {},
       financialSettings: payload?.financialSettings || payload?.summary?.financialSettings || {}
     };
-    const previous = await archiveExistingRechargeBase(sb, user, workId, "before_upsert", "saveRechargeBase");
+    const id = String(workId || "geral");
+    const { data: existing, error: existingError } = await sb
+      .from("obra_recargas_base")
+      .select("obra_id,arquivos,recargas,resumo,updated_at")
+      .eq("obra_id", id)
+      .maybeSingle();
+    if (existingError) throw existingError;
+    const existingCharges = jsonArrayLength(existing?.recargas);
+    const explicitEmptyIntents = new Set(["explicit_empty_replace", "month_correction", "undo_import", "remove_file"]);
+    const mutationIntent = String(payload?.mutationIntent || "save");
+    if (!charges.length && existingCharges > 0 && !explicitEmptyIntents.has(mutationIntent)) {
+      throw new Error(`Gravacao vazia bloqueada: a base em nuvem possui ${existingCharges} recarga(s).`);
+    }
+    const previous = await archiveExistingRechargeBase(sb, user, workId, "before_upsert", "saveRechargeBase", existing);
     const { error } = await sb.from("obra_recargas_base").upsert({
-      obra_id: String(workId || "geral"),
+      obra_id: id,
       arquivos: files,
       recargas: charges,
       resumo: summary,
@@ -381,10 +439,53 @@
       resumo: {
         previous,
         next: { files: files.length, charges: charges.length },
+        mutationIntent,
         workName: summary.workName || payload?.workName || ""
       }
     });
     return { cloud: true, files: files.length, charges: charges.length, history: Boolean(previous) };
+  }
+
+  async function saveRechargeMetadata(workId, payload = {}) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre no Supabase antes de salvar configuracoes de recargas.");
+    const id = String(workId || "geral");
+    const { data: existing, error: readError } = await sb
+      .from("obra_recargas_base")
+      .select("resumo,updated_at")
+      .eq("obra_id", id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!existing) throw new Error("Base de recargas ainda nao criada para esta obra.");
+    const existingSummary = existing.resumo || {};
+    const incomingSummary = payload?.summary || {};
+    const summary = {
+      ...existingSummary,
+      workId: existingSummary.workId || payload?.workId || id,
+      workName: existingSummary.workName || payload?.workName || incomingSummary.workName || "",
+      monthlyClosings: payload?.monthlyClosings || incomingSummary.monthlyClosings || existingSummary.monthlyClosings || {},
+      financialSettings: payload?.financialSettings || incomingSummary.financialSettings || existingSummary.financialSettings || {},
+      ubyOperationOverrides: payload?.ubyOperationOverrides || incomingSummary.ubyOperationOverrides || existingSummary.ubyOperationOverrides || {},
+      ubyAreaAccounting: payload?.ubyAreaAccounting || incomingSummary.ubyAreaAccounting || existingSummary.ubyAreaAccounting || {},
+      updatedAt: new Date().toISOString()
+    };
+    const { error: updateError } = await sb
+      .from("obra_recargas_base")
+      .update({ resumo: summary, updated_at: new Date().toISOString() })
+      .eq("obra_id", id);
+    if (updateError) throw updateError;
+    await insertAuditLog(sb, user, {
+      entidadeId: id,
+      acao: "save_recharge_metadata",
+      resumo: {
+        workName: summary.workName || payload?.workName || "",
+        metadataType: String(payload?.metadataType || "settings"),
+        chargesPreserved: Number(summary.charges || 0)
+      }
+    });
+    return { cloud: true, charges: Number(summary.charges || 0), metadataOnly: true };
   }
 
   async function clearRechargeBase(workId) {
@@ -604,9 +705,11 @@
     currentUser,
     currentProfile,
     ensureCoreWorks,
+    loadRechargeWorks,
     upsertProspects,
     uploadDocumentFile,
     saveRechargeBase,
+    saveRechargeMetadata,
     clearRechargeBase,
     loadRechargeBase,
     loadAllRechargeBases,

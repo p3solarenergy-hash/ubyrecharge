@@ -1759,13 +1759,13 @@
 </main>
 
 <script src="sidebar.js"></script>
-<script src="backup_guard.js"></script>
+<script src="backup_guard.js?v=20260714-integrity1"></script>
 <script src="finance_engine.js"></script>
 <script src="finance_reports.js"></script>
 <script src="supabase_config.js"></script>
 <script src="clube_uby_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_bridge.js"></script>
+<script src="supabase_bridge.js?v=20260714-integrity1"></script>
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1781,6 +1781,7 @@ let allCharges  = [];
 let loadedFiles = [];
 let charts      = {};
 let allRechargeRecords = {};
+let cloudRechargeWorks = [];
 let openingWorkReport = false;
 let monthlyClosings = {};
 let financialSettings = {};
@@ -1796,6 +1797,8 @@ let financeReportArchivePromise = null;
 let financeHistorySyncPromise = null;
 let ubyAreaReportSyncPromise = null;
 let ubyInvestorReportSyncPromise = null;
+let rechargeLoadSequence = 0;
+let generalRefreshSequence = 0;
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -1936,7 +1939,7 @@ function rechargeRecordHasData(record = {}) {
   return Boolean(
     (Array.isArray(record.charges) && record.charges.length) ||
     (Array.isArray(record.files) && record.files.length) ||
-    Number(summary.totalCharges || summary.recharges || 0) > 0 ||
+    Number(summary.charges || summary.totalCharges || summary.recharges || 0) > 0 ||
     Number(summary.energy || summary.energyKWh || 0) > 0 ||
     Number(summary.revenue || 0) > 0
   );
@@ -2004,6 +2007,10 @@ function workOptions() {
       });
     }
   }
+  cloudRechargeWorks.forEach(work => {
+    if (!work?.id) return;
+    byId.set(work.id, { ...(byId.get(work.id) || {}), ...work });
+  });
   const rechargeSources = { ...readJson(RECARGAS_LOCAL_KEY, {}), ...allRechargeRecords };
   Object.entries(rechargeSources).forEach(([workId, record]) => {
     if (!workId || byId.has(workId) || !rechargeRecordHasData(record)) return;
@@ -2133,6 +2140,54 @@ function hydratedRechargeRecord(record, workId = '') {
   };
 }
 
+function expectedRechargeCount(record = {}) {
+  const summary = record.summary || {};
+  return Math.max(
+    Array.isArray(record.charges) ? record.charges.length : 0,
+    Number(summary.charges || summary.totalCharges || summary.recharges || 0)
+  );
+}
+
+function mergeRechargeRecord(existing, incoming, source = 'local') {
+  if (!existing) return hydratedRechargeRecord(incoming, incoming?.workId);
+  if (!incoming) return hydratedRechargeRecord(existing, existing?.workId);
+  const workId = String(incoming.workId || existing.workId || '').trim();
+  const current = hydratedRechargeRecord(existing, workId);
+  const next = hydratedRechargeRecord(incoming, workId);
+  const currentHasDetails = current.charges.length > 0;
+  const nextHasDetails = next.charges.length > 0;
+  const nextIsPartial = Boolean(incoming.summaryOnly || incoming.localCompact);
+  const currentIsNewer = updatedAtMs(current) > updatedAtMs(next);
+
+  if (nextIsPartial && currentHasDetails) {
+    return {
+      ...current,
+      ...next,
+      summary: { ...(current.summary || {}), ...(next.summary || {}) },
+      charges: current.charges,
+      files: next.files.length ? next.files : current.files,
+      localCompact: false,
+      summaryOnly: false
+    };
+  }
+  if (source === 'cloud' && nextHasDetails) {
+    const currentIsFullLocal = currentHasDetails && !existing.localCompact && !existing.summaryOnly;
+    return currentIsFullLocal && currentIsNewer ? current : next;
+  }
+  if (currentHasDetails && !nextHasDetails && (currentIsNewer || expectedRechargeCount(next) > 0)) {
+    return {
+      ...current,
+      ...next,
+      summary: { ...(current.summary || {}), ...(next.summary || {}) },
+      charges: current.charges,
+      files: next.files.length ? next.files : current.files,
+      localCompact: false,
+      summaryOnly: false
+    };
+  }
+  return next;
+}
+
 function syncGeneralRecordsFromLocal() {
   const db = localRechargeDb();
   const entries = Object.entries(db);
@@ -2142,20 +2197,12 @@ function syncGeneralRecordsFromLocal() {
     .sort()
     .join('|');
   if (signature && signature === localRechargeDbSignature) return;
-  const nextRecords = {};
+  const nextRecords = { ...allRechargeRecords };
   entries.forEach(([workId, record]) => {
     if (!record) return;
     const existing = allRechargeRecords[workId];
     const hydrated = hydratedRechargeRecord(record, workId);
-    if (record.localCompact && existing?.charges?.length) {
-      nextRecords[workId] = {
-        ...hydrated,
-        charges: existing.charges,
-        files: existing.files?.length ? existing.files : hydrated.files
-      };
-      return;
-    }
-    nextRecords[workId] = hydrated;
+    nextRecords[workId] = mergeRechargeRecord(existing, hydrated, 'local');
   });
   allRechargeRecords = nextRecords;
   localRechargeDbSignature = signature;
@@ -2168,7 +2215,6 @@ function mergeCloudRechargeRecords(records) {
   records.forEach(record => {
     const workId = String(record?.workId || record?.summary?.workId || '').trim();
     if (!workId) return;
-    if (db[workId] && !isCloudRecordNewer(db[workId], record)) return;
     const normalized = {
       ...record,
       workId,
@@ -2180,20 +2226,17 @@ function mergeCloudRechargeRecords(records) {
       ubyAreaAccounting: record.ubyAreaAccounting || record.summary?.ubyAreaAccounting || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
-    const existing = allRechargeRecords[workId];
-    const keepExistingCharges = record.summaryOnly && existing?.charges?.length;
-    const merged = keepExistingCharges
-      ? { ...normalized, charges: existing.charges, files: normalized.files.length ? normalized.files : existing.files || [] }
-      : normalized;
+    const existing = allRechargeRecords[workId] || db[workId];
+    const merged = mergeRechargeRecord(existing, normalized, record.summaryOnly ? 'cloud-summary' : 'cloud');
     allRechargeRecords[workId] = hydratedRechargeRecord(merged, workId);
     db[workId] = compactRechargeRecord(merged);
   });
   markRechargeRecordsDirty();
-  writeJson(RECARGAS_LOCAL_KEY, db);
+  if (!writeJson(RECARGAS_LOCAL_KEY, db)) window.UBY_BACKUP?.releaseStorage?.();
 }
 
-function localRecord() {
-  return localRechargeDb()[currentWorkId] || null;
+function localRecord(workId = currentWorkId) {
+  return localRechargeDb()[workId] || null;
 }
 
 function rechargeSummary() {
@@ -2270,9 +2313,10 @@ function compactRechargeDb(db, preferredWorkId = '') {
   }));
 }
 
-function saveLocalRechargeBase(record = null) {
+function saveLocalRechargeBase(record = null, options = {}) {
   const db = localRechargeDb();
   if (!allCharges.length && !loadedFiles.length && !record) {
+    if (!options.allowDelete) return { mode: 'skipped-empty' };
     delete db[currentWorkId];
     writeJson(RECARGAS_LOCAL_KEY, db);
     delete allRechargeRecords[currentWorkId];
@@ -2285,13 +2329,13 @@ function saveLocalRechargeBase(record = null) {
   if (!fullSave.ok) {
     if (!storageQuotaExceeded(fullSave.error)) throw fullSave.error;
     const compactDb = compactRechargeDb(db, currentWorkId);
-    const compactSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactDb);
+    window.UBY_BACKUP?.releaseStorage?.();
+    let compactSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactDb);
     if (!compactSave.ok) {
       if (!storageQuotaExceeded(compactSave.error)) throw compactSave.error;
       localStorage.removeItem(RECARGAS_LOCAL_KEY);
-      allRechargeRecords = {};
-      markRechargeRecordsDirty();
-      return { mode: 'none', error: compactSave.error };
+      compactSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactDb);
+      if (!compactSave.ok) return { mode: 'none', error: compactSave.error };
     }
     syncGeneralRecordsFromLocal();
     return { mode: 'compact', error: fullSave.error };
@@ -2306,17 +2350,31 @@ async function clearCloudRechargeBase() {
   return true;
 }
 
-async function saveRechargeBase() {
+async function saveRechargeBase(options = {}) {
   if (currentStationReportName) {
     setStorageState(`Visualizacao filtrada por estacao: <strong>${currentStationReportName}</strong>. A base completa nao foi sobrescrita.`, true);
     return;
   }
   if (!allCharges.length && !loadedFiles.length) {
-    saveLocalRechargeBase();
-    await clearCloudRechargeBase();
+    if (!options.allowEmpty) {
+      setStorageState(`Gravacao vazia bloqueada para <strong>${currentWorkName}</strong>. Use a exclusao confirmada para apagar uma base.`, true);
+      return;
+    }
+    const emptyRecord = buildRechargeRecord();
+    emptyRecord.mutationIntent = options.mutationIntent || 'explicit_empty_replace';
+    emptyRecord.summary = {
+      ...(emptyRecord.summary || {}),
+      clearedAt: new Date().toISOString(),
+      clearReason: emptyRecord.mutationIntent
+    };
+    saveLocalRechargeBase(emptyRecord);
+    if (window.UBY_SUPABASE?.saveRechargeBase) {
+      await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, emptyRecord);
+    }
     return;
   }
   const record = buildRechargeRecord();
+  record.mutationIntent = options.mutationIntent || 'save';
   const localSave = saveLocalRechargeBase(record);
   allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
   markRechargeRecordsDirty();
@@ -2327,9 +2385,6 @@ async function saveRechargeBase() {
     return;
   }
   try {
-    if (window.UBY_SUPABASE.ensureCoreWorks && appData.baseObras?.length) {
-      await window.UBY_SUPABASE.ensureCoreWorks(appData.baseObras);
-    }
     const result = await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
     const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
     setStorageState(`Banco atualizado para <strong>${currentWorkName}</strong>: ${result.files} arquivo(s), ${result.charges} recarga(s).${localMode}`);
@@ -2497,33 +2552,43 @@ function applyRechargeRecord(record, sourceLabel) {
   setStorageState(`Carregado de ${sourceLabel} para <strong>${targetName}</strong>: ${loadedFiles.length} arquivo(s), ${allCharges.length} recarga(s). Ultima atualizacao: ${updated}.${filterNote}`);
 }
 
-async function loadRechargeBase() {
-  const local = localRecord();
-  if (local && !local.localCompact) applyRechargeRecord(local, 'base local');
+async function loadRechargeBase(workId = currentWorkId) {
+  const targetWorkId = String(workId || currentWorkId);
+  const requestSequence = ++rechargeLoadSequence;
+  if (currentWorkId !== targetWorkId) currentWorkId = targetWorkId;
+  currentWorkName = workNameById(targetWorkId, targetWorkId);
+  const local = localRecord(targetWorkId);
+  const memory = allRechargeRecords[targetWorkId];
+  const initial = memory?.charges?.length ? memory : local;
+  if (initial && (!initial.localCompact || initial.charges?.length)) applyRechargeRecord(initial, 'base local');
   else applyRechargeRecord(null, 'base local');
   if (!window.UBY_SUPABASE?.loadRechargeBase) return;
   try {
-    const cloud = await window.UBY_SUPABASE.loadRechargeBase(currentWorkId);
-    if (cloud?.charges?.length) {
-      const currentLocal = localRecord();
+    const cloud = await window.UBY_SUPABASE.loadRechargeBase(targetWorkId);
+    if (requestSequence !== rechargeLoadSequence || currentWorkId !== targetWorkId) return;
+    if (cloud) {
+      const currentLocal = localRecord(targetWorkId);
       if (currentLocal && !currentLocal.localCompact && !isCloudRecordNewer(currentLocal, cloud)) {
         setStorageState(`Base local mais recente preservada para <strong>${currentWorkName}</strong>. Reenvie a planilha para atualizar o banco, se necessario.`);
         return;
       }
+      const merged = mergeRechargeRecord(allRechargeRecords[targetWorkId] || currentLocal, cloud, 'cloud');
       const db = localRechargeDb();
-      db[currentWorkId] = compactRechargeRecord({ ...cloud, workName: cloud.summary?.workName || currentWorkName });
-      writeJson(RECARGAS_LOCAL_KEY, db);
-      allRechargeRecords[currentWorkId] = hydratedRechargeRecord(cloud, currentWorkId);
+      db[targetWorkId] = compactRechargeRecord({ ...merged, workName: cloud.summary?.workName || currentWorkName });
+      if (!writeJson(RECARGAS_LOCAL_KEY, db)) window.UBY_BACKUP?.releaseStorage?.();
+      allRechargeRecords[targetWorkId] = hydratedRechargeRecord(merged, targetWorkId);
       markRechargeRecordsDirty();
-      applyRechargeRecord(cloud, 'Supabase');
+      applyRechargeRecord(merged, 'Supabase');
     }
   } catch (err) {
+    if (requestSequence !== rechargeLoadSequence || currentWorkId !== targetWorkId) return;
     setStorageState(`Base local preservada para <strong>${currentWorkName}</strong>. Supabase pendente: ${err.message}`, true);
   }
 }
 
 function initWorkSelector() {
   const selector = document.getElementById('workSelector');
+  if (!selector) return;
   const works = workOptions();
   if (!works.some(work => work.id === currentWorkId)) currentWorkId = works[0]?.id || 'rio';
   selector.innerHTML = works.map(work => `<option value="${work.id}">${work.nome || work.id}${work.cliente ? ' - ' + work.cliente : ''}</option>`).join('');
@@ -2534,7 +2599,7 @@ function initWorkSelector() {
     document.getElementById('chargerPower').value = power;
     document.getElementById('chargerPowerAcc').value = power;
   }
-  selector.addEventListener('change', () => {
+  selector.onchange = async () => {
     currentStationReportName = '';
     currentWorkId = selector.value;
     localStorage.setItem('uby-recargas-current-work', currentWorkId);
@@ -2544,8 +2609,8 @@ function initWorkSelector() {
       document.getElementById('chargerPower').value = nextPower;
       document.getElementById('chargerPowerAcc').value = nextPower;
     }
-    loadRechargeBase();
-  });
+    await loadRechargeBase(currentWorkId);
+  };
 }
 
 function shouldOpenFullRechargeWork(workId, stationName = '') {
@@ -2568,7 +2633,7 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
   }
   openingWorkReport = true;
   try {
-    await loadRechargeBase();
+    await loadRechargeBase(currentWorkId);
   } finally {
     openingWorkReport = false;
   }
@@ -2636,14 +2701,15 @@ function handleFiles(files) {
   });
 }
 
-function removeFile(fileKey, name = '') {
+async function removeFile(fileKey, name = '') {
   const legacyName = name || fileKey;
+  const removeByKey = Boolean(name);
   loadedFiles = loadedFiles.filter(f => {
     const key = f?.fileKey || fileSourceKey(f?.month, f?.name, f?.station || '');
-    return key !== fileKey && f?.name !== legacyName;
+    return removeByKey ? key !== fileKey : f?.name !== legacyName;
   });
   allCharges = allCharges.filter(c => {
-    return c._fileKey !== fileKey && c._file !== legacyName;
+    return removeByKey ? c._fileKey !== fileKey : c._file !== legacyName;
   });
   updateChips();
   if (!allCharges.length) {
@@ -2659,7 +2725,7 @@ function removeFile(fileKey, name = '') {
     renderAll();
     updateCorrectionButtons();
   }
-  saveRechargeBase();
+  await saveRechargeBase({ allowEmpty: true, mutationIntent: 'remove_file' });
 }
 
 function updateCorrectionButtons() {
@@ -2711,7 +2777,7 @@ async function persistCorrection(message) {
   }
   updateCorrectionButtons();
   setStorageState(`${message} Salvando no banco...`);
-  await saveRechargeBase();
+  await saveRechargeBase({ allowEmpty: true, mutationIntent: 'month_correction' });
 }
 
 async function undoLastImport() {
@@ -2726,7 +2792,7 @@ async function undoLastImport() {
   applyRechargeRecord(undo.record, 'restauração');
   updateCorrectionButtons();
   setStorageState(`Última importação desfeita para <strong>${currentWorkName}</strong>. Salvando no banco...`);
-  await saveRechargeBase();
+  await saveRechargeBase({ allowEmpty: true, mutationIntent: 'undo_import' });
 }
 
 async function clearSelectedMonth() {
@@ -2756,7 +2822,7 @@ async function clearRechargeBase() {
   monthlyClosings = {};
   financialSettings = {};
   ubyOperationOverrides = {};
-  saveLocalRechargeBase();
+  saveLocalRechargeBase(null, { allowDelete: true });
   try {
     await clearCloudRechargeBase();
     setStorageState(`Base de recargas excluida para <strong>${currentWorkName}</strong>.`);
@@ -2779,10 +2845,11 @@ function updateChips() {
   loadedFiles = loadedFiles.filter(f => f?.name);
   document.getElementById('fileChips').innerHTML = loadedFiles.map(f => {
     const name = safeText(f.name);
+    const fileKey = f.fileKey || fileSourceKey(f.month, f.name, f.station || '');
     const month = f.month ? ` · ${monthLabel(f.month)}` : '';
     return `<div class="file-chip">📄 ${name}<span>${month}</span>
        <button class="file-chip-remove"
-         onclick="event.preventDefault();removeFile('${escapeAttr(name)}')">×</button>
+         onclick="event.preventDefault();removeFile('${escapeAttr(fileKey)}','${escapeAttr(name)}')">×</button>
      </div>`;
   }).join('');
 }
@@ -5136,11 +5203,15 @@ function financeRecordWithCurrentSettings() {
 
 async function saveFinancialSettingsRecord() {
   const record = financeRecordWithCurrentSettings();
+  record.metadataType = 'financial_settings';
   const localSave = saveLocalRechargeBase(record);
   allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
   markRechargeRecordsDirty();
-  if (!window.UBY_SUPABASE?.saveRechargeBase) return localSave;
-  await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
+  if (window.UBY_SUPABASE?.saveRechargeMetadata) {
+    await window.UBY_SUPABASE.saveRechargeMetadata(currentWorkId, record);
+  } else if (window.UBY_SUPABASE?.saveRechargeBase) {
+    await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
+  }
   return localSave;
 }
 
@@ -5148,7 +5219,6 @@ function scheduleFinancialSettingsSave() {
   const mk = financeMonthKey();
   if (!mk || !currentWorkId) return;
   const settings = persistFinancialSettingsFromInputs(mk);
-  saveLocalRechargeBase();
   renderFinanceMonthVersionState(settings);
   const savedLabel = document.getElementById('financeVersionSaved');
   if (savedLabel) savedLabel.textContent = 'Salvando...';
@@ -7399,9 +7469,9 @@ function getGeneralStationRows(unitData) {
       byStation.get(stationName).push(charge);
     });
     if (!byStation.size) {
-      const summary = summarizeGeneralUnit(unit, []);
       stationRows.push({
-        ...summary,
+        ...unit,
+        charges: [],
         stationName: unit.stationName || unit.workName,
         stations: unit.stations || [],
         files: unit.files || []
@@ -8203,29 +8273,35 @@ function renderClub() {
 async function toggleUbyOperation(workId, key, checked) {
   syncGeneralRecordsFromLocal();
   const db = localRechargeDb();
-  const record = db[workId] || allRechargeRecords[workId];
+  const record = allRechargeRecords[workId] || db[workId];
   if (!record) return;
   const overrides = { ...(record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {}) };
   overrides[key] = !!checked;
   record.ubyOperationOverrides = overrides;
   record.summary = { ...(record.summary || {}), ubyOperationOverrides: overrides, updatedAt: new Date().toISOString() };
   record.updatedAt = new Date().toISOString();
-  db[workId] = record;
+  record.metadataType = 'uby_operation';
+  db[workId] = compactRechargeRecord(record);
   writeJson(RECARGAS_LOCAL_KEY, db);
   allRechargeRecords[workId] = record;
   markRechargeRecordsDirty();
 
   if (workId === currentWorkId) {
     ubyOperationOverrides = overrides;
-    saveLocalRechargeBase();
+    saveLocalRechargeBase(record);
     try {
-      await saveRechargeBase();
+      if (window.UBY_SUPABASE?.saveRechargeMetadata) {
+        await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
+      } else if (window.UBY_SUPABASE?.saveRechargeBase) {
+        await window.UBY_SUPABASE.saveRechargeBase(workId, record);
+      }
     } catch (err) {
       setStorageState(`Marcacao UBY salva neste navegador. Supabase pendente: ${err.message}`, true);
     }
-  } else if (window.UBY_SUPABASE?.saveRechargeBase) {
+  } else if (window.UBY_SUPABASE?.saveRechargeMetadata || window.UBY_SUPABASE?.saveRechargeBase) {
     try {
-      await window.UBY_SUPABASE.saveRechargeBase(workId, record);
+      if (window.UBY_SUPABASE?.saveRechargeMetadata) await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
+      else await window.UBY_SUPABASE.saveRechargeBase(workId, record);
     } catch (err) {
       setStorageState(`Marcacao UBY salva neste navegador. Supabase pendente: ${err.message}`, true);
     }
@@ -8336,12 +8412,14 @@ async function saveUbyAreaSetting(rowKey, cycleKey, field, value) {
   if (record) {
     record.ubyAreaAccounting = perWork;
     record.summary = { ...(record.summary || {}), ubyAreaAccounting: perWork };
+    record.metadataType = 'uby_area_accounting';
     const localDb = readJson(RECARGAS_LOCAL_KEY, {});
-    localDb[workId] = { ...(localDb[workId] || {}), ...record, summary: record.summary };
+    localDb[workId] = compactRechargeRecord({ ...(localDb[workId] || {}), ...record, summary: record.summary });
     writeJson(RECARGAS_LOCAL_KEY, localDb);
-    if (window.UBY_SUPABASE?.saveRechargeBase) {
+    if (window.UBY_SUPABASE?.saveRechargeMetadata || window.UBY_SUPABASE?.saveRechargeBase) {
       try {
-        await window.UBY_SUPABASE.saveRechargeBase(workId, record);
+        if (window.UBY_SUPABASE?.saveRechargeMetadata) await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
+        else await window.UBY_SUPABASE.saveRechargeBase(workId, record);
         setStorageState('Prestacao de contas UBY salva no banco.');
       } catch (err) {
         setStorageState(`Prestacao salva neste navegador. Supabase pendente: ${err.message}`, true);
@@ -9166,7 +9244,19 @@ function renderVisibleOverviewViews() {
   }
 }
 
+async function loadRechargeWorksFromCloud() {
+  if (!window.UBY_SUPABASE?.loadRechargeWorks) return cloudRechargeWorks;
+  try {
+    const works = await window.UBY_SUPABASE.loadRechargeWorks();
+    if (Array.isArray(works)) cloudRechargeWorks = works;
+  } catch (err) {
+    setStorageState(`Cadastro local de obras preservado. Obras na nuvem pendentes: ${err.message}`, true);
+  }
+  return cloudRechargeWorks;
+}
+
 async function refreshGeneralRechargeBases(forceCloud = false) {
+  const refreshSequence = ++generalRefreshSequence;
   syncGeneralRecordsFromLocal();
   showGeneralWhenCurrentWorkIsEmpty();
   if (forceCloud || !window.UBY_SUPABASE?.loadAllRechargeBases) {
@@ -9176,6 +9266,7 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
   try {
     if (window.UBY_SUPABASE.loadAllRechargeSummaries) {
       const summaries = await window.UBY_SUPABASE.loadAllRechargeSummaries();
+      if (refreshSequence !== generalRefreshSequence) return;
       if (summaries?.length) {
         mergeCloudRechargeRecords(summaries);
         initWorkSelector();
@@ -9186,6 +9277,7 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
       }
     }
     const records = await window.UBY_SUPABASE.loadAllRechargeBases();
+    if (refreshSequence !== generalRefreshSequence) return;
     if (records?.length) {
       mergeCloudRechargeRecords(records);
       initWorkSelector();
@@ -9266,15 +9358,6 @@ function renderGeral() {
     : 'Sem bases salvas para consolidar';
   const occClass = totalOcc < 15 ? 'occ-red' : (totalOcc < 30 ? 'occ-yellow' : 'occ-green');
   const occStatus = totalOcc < 15 ? 'abaixo do objetivo minimo de 15%' : (totalOcc < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
-  const generalComplementCards = `
-    <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
-    <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.stationName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
-    <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
-    <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
-    <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
-    <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
-  `;
-
   document.getElementById('kpiGeneral').innerHTML = `
     <div class="card kpi-feature ${occClass}"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">${occStatus} · meta: 15% minimo / 30% ideal</div></div>
     <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div>${trendCharges}</div>
@@ -9287,7 +9370,6 @@ function renderGeral() {
     <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
   `;
-  document.getElementById('kpiGeneral').innerHTML = generalComplementCards;
   renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
   renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } });
@@ -10102,17 +10184,22 @@ function openGeneralFinanceView() {
 
 async function initializeRechargePage() {
   const params = new URLSearchParams(location.search);
-  const shouldLoadWorkReport = Boolean(params.get('obra'));
-  if (shouldLoadWorkReport) {
-    await loadRechargeBase();
-  }
+  const requestedWorkId = String(params.get('obra') || '').trim();
+  if (requestedWorkId) currentWorkId = requestedWorkId;
+  await loadRechargeWorksFromCloud();
   await refreshGeneralRechargeBases();
+  initWorkSelector();
+  if (requestedWorkId && workOptions().some(work => work.id === requestedWorkId)) {
+    currentWorkId = requestedWorkId;
+    document.getElementById('workSelector').value = requestedWorkId;
+    currentWorkName = workNameById(requestedWorkId, requestedWorkId);
+    await loadRechargeBase(requestedWorkId);
+  }
   await loadFinanceReportArchive();
   renderUbyPartnerReportLibrary();
   openGeneralFinanceView();
 }
 
-initWorkSelector();
 document.getElementById('importMonth').value = new Date().toISOString().slice(0, 7);
 document.getElementById('undoLastImportBtn').addEventListener('click', undoLastImport);
 document.getElementById('clearSelectedMonthBtn').addEventListener('click', clearSelectedMonth);
