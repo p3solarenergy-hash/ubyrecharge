@@ -2158,6 +2158,7 @@ function mergeRechargeRecord(existing, incoming, source = 'local') {
   const nextHasDetails = next.charges.length > 0;
   const nextIsPartial = Boolean(incoming.summaryOnly || incoming.localCompact);
   const currentIsNewer = updatedAtMs(current) > updatedAtMs(next);
+  const currentSyncPending = Boolean(existing.cloudSyncPending || current.cloudSyncPending);
 
   if (nextIsPartial && currentHasDetails) {
     return {
@@ -2172,7 +2173,7 @@ function mergeRechargeRecord(existing, incoming, source = 'local') {
   }
   if (source === 'cloud' && nextHasDetails) {
     const currentIsFullLocal = currentHasDetails && !existing.localCompact && !existing.summaryOnly;
-    return currentIsFullLocal && currentIsNewer ? current : next;
+    return currentIsFullLocal && currentIsNewer && currentSyncPending ? current : next;
   }
   if (currentHasDetails && !nextHasDetails && (currentIsNewer || expectedRechargeCount(next) > 0)) {
     return {
@@ -2367,14 +2368,23 @@ async function saveRechargeBase(options = {}) {
       clearedAt: new Date().toISOString(),
       clearReason: emptyRecord.mutationIntent
     };
+    emptyRecord.cloudSyncPending = true;
     saveLocalRechargeBase(emptyRecord);
+    allRechargeRecords[currentWorkId] = hydratedRechargeRecord(emptyRecord, currentWorkId);
+    markRechargeRecordsDirty();
     if (window.UBY_SUPABASE?.saveRechargeBase) {
       await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, emptyRecord);
+      emptyRecord.cloudSyncPending = false;
+      emptyRecord.cloudSyncedAt = new Date().toISOString();
+      saveLocalRechargeBase(emptyRecord);
+      allRechargeRecords[currentWorkId] = hydratedRechargeRecord(emptyRecord, currentWorkId);
+      markRechargeRecordsDirty();
     }
     return;
   }
   const record = buildRechargeRecord();
   record.mutationIntent = options.mutationIntent || 'save';
+  record.cloudSyncPending = true;
   const localSave = saveLocalRechargeBase(record);
   allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
   markRechargeRecordsDirty();
@@ -2386,6 +2396,11 @@ async function saveRechargeBase(options = {}) {
   }
   try {
     const result = await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
+    record.cloudSyncPending = false;
+    record.cloudSyncedAt = new Date().toISOString();
+    saveLocalRechargeBase(record);
+    allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
+    markRechargeRecordsDirty();
     const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
     setStorageState(`Banco atualizado para <strong>${currentWorkName}</strong>: ${result.files} arquivo(s), ${result.charges} recarga(s).${localMode}`);
   } catch (err) {

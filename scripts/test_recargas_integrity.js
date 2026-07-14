@@ -89,10 +89,15 @@ const unsyncedLocal = {
   ...fullCloud,
   charges: [...charges, { id: 37 }],
   summary: { charges: 37, revenue: 460 },
+  cloudSyncPending: true,
   updatedAt: '2026-07-13T21:00:00Z'
 };
 merged = context.mergeRechargeRecord(unsyncedLocal, fullCloud, 'cloud');
 assert.strictEqual(merged.charges.length, 37, 'a newer full local base must survive until it can be synchronized');
+
+const legacyLocal = { ...unsyncedLocal, cloudSyncPending: false };
+merged = context.mergeRechargeRecord(legacyLocal, fullCloud, 'cloud');
+assert.strictEqual(merged.charges.length, 36, 'cloud must replace a stale legacy cache that has no pending write');
 
 const summaryOnly = { ...compactLocal, summaryOnly: true, localCompact: false };
 merged = context.mergeRechargeRecord(fullCloud, summaryOnly, 'cloud-summary');
@@ -113,6 +118,8 @@ assert(!html.includes("selector.addEventListener('change'"), 'work selector must
 assert(html.includes('selector.onchange = async () =>'), 'work selector must use one idempotent handler');
 assert.strictEqual((html.match(/allRechargeRecords = \{\};/g) || []).length, 1, 'quota fallback must not erase in-memory cloud bases');
 assert(html.includes('Gravacao vazia bloqueada'), 'ordinary empty saves must be blocked');
+assert(html.includes('record.cloudSyncPending = true;'), 'local writes must be marked pending before cloud synchronization');
+assert(html.includes('record.cloudSyncPending = false;'), 'successful cloud writes must clear the pending marker');
 assert(html.includes('clearReason: emptyRecord.mutationIntent'), 'explicit empty saves must carry a server-verifiable reason');
 assert(html.includes("mutationIntent: 'remove_file'"), 'file removal must be an explicit audited mutation');
 assert(html.includes("removeFile('${escapeAttr(fileKey)}','${escapeAttr(name)}')"), 'file chips must remove one import by its stable key');
