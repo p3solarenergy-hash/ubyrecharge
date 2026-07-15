@@ -80,6 +80,20 @@ function assertWorkDetailSafety() {
   }
 }
 
+function assertRechargeRenderSafety() {
+  const recargas = read(path.join(obraDir, "recargas.html"));
+  if (/renderMensal\(\);\s*renderAcumulado\(\);\s*renderFinanceiro\(\);\s*renderGeral\(\);/.test(recargas)) {
+    throw new Error("O painel de recargas nao pode renderizar todas as abas em uma unica atualizacao.");
+  }
+  if (!recargas.includes("if (name === 'mensal') renderMensal();") ||
+      !recargas.includes("else if (name === 'acumulado') renderAcumulado();")) {
+    throw new Error("As abas mensal e acumulado precisam ser renderizadas sob demanda.");
+  }
+  if (!recargas.includes("Chart.defaults.animation = false")) {
+    throw new Error("Os graficos do painel precisam manter animacoes desativadas durante atualizacoes.");
+  }
+}
+
 function main() {
   jsFiles.forEach(file => {
     checkScript(read(file), path.relative(root, file));
@@ -95,6 +109,7 @@ function main() {
   });
 
   assertWorkDetailSafety();
+  assertRechargeRenderSafety();
 
   console.log("obra-ev validation ok");
 }

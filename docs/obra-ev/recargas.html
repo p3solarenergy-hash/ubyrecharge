@@ -1780,6 +1780,12 @@ UBY_AUTH.require('recargas');
 let allCharges  = [];
 let loadedFiles = [];
 let charts      = {};
+// Dashboard data can rebuild several charts at once. Animations add no value on
+// refresh and can monopolize the browser main thread on lower-powered devices.
+if (window.Chart) {
+  Chart.defaults.animation = false;
+  Chart.defaults.responsive = true;
+}
 let allRechargeRecords = {};
 let cloudRechargeWorks = [];
 let openingWorkReport = false;
@@ -2549,10 +2555,9 @@ function applyRechargeRecord(record, sourceLabel) {
     const targetName = currentStationReportName || currentWorkName;
     setStorageState(`Sem planilha salva para <strong>${targetName}</strong>. O Painel Geral continua disponivel.`);
     if (openingWorkReport) return;
-    renderGeral();
-    renderUbyOperation();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
     showTab('uby');
+    renderUbyOperation();
     return;
   }
   uploadZone.classList.add('compact');
@@ -2664,8 +2669,10 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
   document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.report-tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${target}'`)));
   showTab(target);
-  if (target === 'detalhes') renderDetalhes();
-  if (target === 'financeiro') await handleFinanceMonthChange();
+  if (target === 'mensal') renderMensal();
+  else if (target === 'acumulado') renderAcumulado();
+  else if (target === 'detalhes') renderDetalhes();
+  else if (target === 'financeiro') await handleFinanceMonthChange();
   requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }
 
@@ -2732,10 +2739,9 @@ async function removeFile(fileKey, name = '') {
     document.getElementById('tabsBar').style.display    = 'flex';
     document.getElementById('emptyState').style.display = 'none';
     updateCorrectionButtons();
-    renderGeral();
-    renderUbyOperation();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
     showTab('uby');
+    renderUbyOperation();
   } else {
     renderAll();
     updateCorrectionButtons();
@@ -2782,10 +2788,9 @@ async function persistCorrection(message) {
     uploadZone.classList.remove('compact');
     document.getElementById('tabsBar').style.display = 'flex';
     document.getElementById('emptyState').style.display = 'none';
-    renderGeral();
-    renderUbyOperation();
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 0));
     showTab('uby');
+    renderUbyOperation();
   } else {
     uploadZone.classList.add('compact');
     renderAll();
@@ -5817,6 +5822,7 @@ function destroyChart(id) {
 
 function chartAxisOptions(unit = '') {
   return {
+    animation: false,
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
@@ -9268,10 +9274,10 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
   const refreshSequence = ++generalRefreshSequence;
   syncGeneralRecordsFromLocal();
   showGeneralWhenCurrentWorkIsEmpty();
-  if (forceCloud || !window.UBY_SUPABASE?.loadAllRechargeBases) {
+  if (!window.UBY_SUPABASE?.loadAllRechargeBases) {
     renderVisibleOverviewViews();
+    return;
   }
-  if (!window.UBY_SUPABASE?.loadAllRechargeBases) return;
   try {
     if (window.UBY_SUPABASE.loadAllRechargeSummaries) {
       const summaries = await window.UBY_SUPABASE.loadAllRechargeSummaries();
@@ -9280,9 +9286,6 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
         mergeCloudRechargeRecords(summaries);
         initWorkSelector();
         showGeneralWhenCurrentWorkIsEmpty();
-        if (document.getElementById('tabUby')?.style.display === 'none') {
-          renderVisibleOverviewViews();
-        }
       }
     }
     const records = await window.UBY_SUPABASE.loadAllRechargeBases();
@@ -9293,10 +9296,12 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
       showGeneralWhenCurrentWorkIsEmpty();
       renderVisibleOverviewViews();
       if (forceCloud) setStorageState(`Painel geral atualizado com ${records.length} base(s) do Supabase.`);
-    } else if (forceCloud) {
-      setStorageState('Painel geral atualizado com as bases locais. Entre no Supabase para buscar o banco compartilhado.');
+    } else {
+      renderVisibleOverviewViews();
+      if (forceCloud) setStorageState('Painel geral atualizado com as bases locais. Entre no Supabase para buscar o banco compartilhado.');
     }
   } catch (err) {
+    renderVisibleOverviewViews();
     if (forceCloud) setStorageState(`Painel geral local preservado. Supabase pendente: ${err.message}`, true);
   }
 }
@@ -9482,20 +9487,16 @@ function renderAll() {
   if (months.includes(cur)) sel.value = cur;
   else sel.value = months[months.length - 1] || '';
 
-  renderMensal();
-  renderAcumulado();
-  renderFinanceiro();
-  renderGeral();
-  renderUbyOperation();
-  renderClub();
-
   document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${visibleTab}'`)));
   showTab(visibleTab);
-  if (visibleTab === 'uby') renderUbyOperation();
-  if (visibleTab === 'clube') renderClub();
-  if (visibleTab === 'detalhes') renderDetalhes();
-  if (visibleTab === 'financeiro') handleFinanceMonthChange();
-  if (visibleTab === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
+  if (visibleTab === 'mensal') renderMensal();
+  else if (visibleTab === 'acumulado') renderAcumulado();
+  else if (visibleTab === 'financeiro') handleFinanceMonthChange();
+  else if (visibleTab === 'detalhes') renderDetalhes();
+  else if (visibleTab === 'geral') renderGeral();
+  else if (visibleTab === 'uby') renderUbyOperation();
+  else if (visibleTab === 'clube') renderClub();
+  else if (visibleTab === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
 }
 
 // ══════════════════════════════════════════════════════════
@@ -10173,12 +10174,14 @@ function switchTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   showTab(name);
-  if (name === 'geral') renderGeral();
-  if (name === 'uby') renderUbyOperation();
-  if (name === 'clube') renderClub();
-  if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
-  if (name === 'detalhes') renderDetalhes();
-  if (name === 'financeiro') handleFinanceMonthChange();
+  if (name === 'mensal') renderMensal();
+  else if (name === 'acumulado') renderAcumulado();
+  else if (name === 'geral') renderGeral();
+  else if (name === 'uby') renderUbyOperation();
+  else if (name === 'clube') renderClub();
+  else if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
+  else if (name === 'detalhes') renderDetalhes();
+  else if (name === 'financeiro') handleFinanceMonthChange();
 }
 
 function openGeneralFinanceView() {
@@ -10187,7 +10190,6 @@ function openGeneralFinanceView() {
   document.getElementById('emptyState').style.display = 'none';
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.getAttribute('onclick')?.includes("'financeiroGeral'")));
   showTab('financeiroGeral');
-  renderGeral();
   renderGeneralFinance(getGeneralUnitData());
 }
 
