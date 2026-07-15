@@ -27,6 +27,28 @@ RELATORIOS_BASE_URL = "https://p3solarenergy-hash.github.io/p3-energy-relatorios
 
 RELATORIOS = [
     {
+        "id": "posto-jk-central",
+        "title": "Posto JK Central",
+        "cliente": "Posto Central",
+        "cidade": "Maringá - PR",
+        "data": "14/07/2026",
+        "arquivo":           "Relatorio_Analise_Carga_Posto_JK_Central.html",
+        "arquivo_eletrico":  "Relatorio_Eletrico_Posto_JK_Central.html",
+        "arquivo_carregador":"Relatorio_Carregador_Posto_JK_Central.html",
+        "status": "warn",
+        "status_label": "Atenção",
+        "pico_kw": 44.69,
+        "pico_kva": 45.87,
+        "fp": 0.99,
+        "demanda_kw": 31.45,
+        "consumo_kwh": 2260.74,
+        "consumo_dias": 10,
+        "padrao_atual": 200,
+        "padrao_proposto": 300,
+        "ev_kw": 60,
+        "flags": ["FP OK", "Desequilíbrio de corrente", "EV simulado", "127/220 V"],
+    },
+    {
         "id": "malassise-rk",
         "title": "Posto Malassise R.K.",
         "cliente": "Malassise Robert Koch",
