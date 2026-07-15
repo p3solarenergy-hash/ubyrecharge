@@ -123,6 +123,10 @@ assert(html.includes('record.cloudSyncPending = false;'), 'successful cloud writ
 assert(html.includes('clearReason: emptyRecord.mutationIntent'), 'explicit empty saves must carry a server-verifiable reason');
 assert(html.includes("mutationIntent: 'remove_file'"), 'file removal must be an explicit audited mutation');
 assert(html.includes("removeFile('${escapeAttr(fileKey)}','${escapeAttr(name)}')"), 'file chips must remove one import by its stable key');
+assert(html.includes('rechargeImportStationProfile'), 'imports must summarize source stations before saving');
+assert(html.includes('confirmRechargeStationMismatch'), 'station mismatches must require explicit user confirmation');
+assert(html.includes('charge.rawStation || charge.station'), 'station validation must prefer the original platform station name');
+assert(html.includes('derivedFiles = new Map()'), 'legacy bases must rebuild visible attached-file metadata from charges');
 assert(bridge.includes('existingCharges > 0 && !explicitEmptyIntents.has(mutationIntent)'), 'cloud must reject accidental empty overwrite');
 assert(bridge.includes('"remove_file"'), 'cloud must allow an explicit last-file removal');
 assert(!bridge.includes('...(existing.resumo || {}),\n      ...incomingSummary'), 'metadata saves must not replace operational summary fields');

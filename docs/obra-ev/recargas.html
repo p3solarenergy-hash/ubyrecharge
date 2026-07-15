@@ -2873,12 +2873,48 @@ async function clearRechargeBase() {
 }
 
 function updateChips() {
-  loadedFiles = loadedFiles.filter(f => f?.name);
+  const persistedFiles = loadedFiles.filter(f => f?.name);
+  const knownKeys = new Set(persistedFiles.map(f => f.fileKey || fileSourceKey(f.month, f.name, f.station || '')));
+  const derivedFiles = new Map();
+  allCharges.forEach(charge => {
+    if (!charge?._file) return;
+    const month = chargeMonthKey(charge) === 'unknown' ? '' : chargeMonthKey(charge);
+    const key = charge._fileKey || fileSourceKey(month, charge._file, charge._sourceStation || charge.station || '');
+    const current = derivedFiles.get(key) || {
+      fileKey: key,
+      name: charge._file,
+      month,
+      station: '',
+      stations: new Set(),
+      sourcePlatform: charge.sourcePlatform || '',
+      derived: true,
+      charges: 0
+    };
+    const station = safeText(charge.rawStation || charge.station || '').trim();
+    if (station) current.stations.add(station);
+    current.station = [...current.stations].join(' + ');
+    current.charges += 1;
+    derivedFiles.set(key, current);
+  });
+  const derivedFileValues = [...derivedFiles.values()].map(({ stations, ...file }) => file);
+  const derivedByKey = new Map(derivedFileValues.map(file => [file.fileKey, file]));
+  loadedFiles = [
+    ...persistedFiles.map(file => {
+      const key = file.fileKey || fileSourceKey(file.month, file.name, file.station || '');
+      const derived = derivedByKey.get(key);
+      return derived ? { ...file, station: derived.station || file.station, charges: derived.charges } : file;
+    }),
+    ...derivedFileValues.filter(file => !knownKeys.has(file.fileKey))
+  ];
   document.getElementById('fileChips').innerHTML = loadedFiles.map(f => {
     const name = safeText(f.name);
+    const nameHtml = escapeHtml(name);
     const fileKey = f.fileKey || fileSourceKey(f.month, f.name, f.station || '');
     const month = f.month ? ` · ${monthLabel(f.month)}` : '';
-    return `<div class="file-chip">📄 ${name}<span>${month}</span>
+    const station = f.station ? ` · ${safeText(f.station)}` : '';
+    const stationHtml = station ? escapeHtml(station) : '';
+    const count = Number(f.charges || 0) ? ` · ${Number(f.charges)} recarga(s)` : '';
+    return `<div class="file-chip" title="${escapeAttr(`${name}${station}${month}${count}`)}">📄 ${nameHtml}<span>${stationHtml}${month}${count}</span>
        <button class="file-chip-remove"
          onclick="event.preventDefault();removeFile('${escapeAttr(fileKey)}','${escapeAttr(name)}')">×</button>
      </div>`;
@@ -3332,6 +3368,37 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
   };
 }
 
+function rechargeImportStationProfile(charges = []) {
+  const profile = new Map();
+  charges.forEach(charge => {
+    const station = safeText(charge.rawStation || charge.station || '').trim() || '(estacao nao informada)';
+    const current = profile.get(station) || { station, charges: 0, energy: 0, revenue: 0 };
+    current.charges += 1;
+    current.energy += Number(charge.energyKWh || 0);
+    current.revenue += Number(charge.revenue || 0);
+    profile.set(station, current);
+  });
+  return [...profile.values()].sort((a, b) => b.charges - a.charges);
+}
+
+function confirmRechargeStationMismatch(charges = [], layout = {}, file = {}) {
+  const profile = rechargeImportStationProfile(charges);
+  const mismatches = profile.filter(item =>
+    stationBlockedForWork(currentWorkId, item.station) || !stationLooksRelatedToWork(item.station, currentWorkName)
+  );
+  if (!mismatches.length) return true;
+  const details = profile.map(item =>
+    `- ${item.station}: ${item.charges} recarga(s), ${fmtKWh(item.energy)}, ${fmtBRL(item.revenue)}`
+  ).join('\n');
+  return window.confirm(
+    `ATENCAO: a planilha nao corresponde integralmente ao destino selecionado.\n\n` +
+    `Arquivo: ${file.name || '-'}\nPlataforma: ${layout.platform || '-'}\nDestino: ${currentWorkName}\n\n` +
+    `Conteudo identificado:\n${details}\n\n` +
+    `Fora do padrao: ${mismatches.map(item => item.station).join(', ')}\n\n` +
+    `Deseja confirmar a importacao mesmo assim? Os dados destacados serao anexados a ${currentWorkName}.`
+  );
+}
+
 async function readFile(file) {
   const queueNote = queuedRechargeImports > 1 ? ` (${queuedRechargeImports} arquivos na fila)` : '';
   setFeedback(`⏳ Lendo planilha${queueNote}...`, 'up-loading');
@@ -3374,11 +3441,9 @@ async function readFile(file) {
       }
 
       const importMode = file.importMode || document.getElementById('importMode')?.value || 'merge';
-      const sourceStation = [...new Set(importedCharges.map(charge => charge.station).filter(Boolean))].join(' + ');
-      const sourceStations = [...new Set(importedCharges.map(charge => charge.station).filter(Boolean))];
-      const mismatchedStations = sourceStations.filter(station => !stationLooksRelatedToWork(station, currentWorkName));
-      if (mismatchedStations.length) {
-        throw new Error(`A planilha parece ser da estacao ${mismatchedStations.join(' + ')}, mas a obra selecionada e ${currentWorkName}. Selecione a obra correta antes de subir.`);
+      const sourceStation = rechargeImportStationProfile(importedCharges).map(item => item.station).join(' + ');
+      if (!confirmRechargeStationMismatch(importedCharges, layout, file)) {
+        throw new Error('Importacao cancelada: a estacao da planilha nao corresponde ao destino selecionado.');
       }
       const sourceKey = fileSourceKey(selectedMonth, file.name, sourceStation);
       storeImportUndo(`${file.name} em ${monthLabel(selectedMonth)}`);
