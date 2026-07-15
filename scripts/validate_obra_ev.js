@@ -95,6 +95,15 @@ function assertRechargeRenderSafety() {
   if (!recargas.includes("parseRechargeRowsInWorker") || !recargas.includes("rechargeImportQueue")) {
     throw new Error("A importacao de planilhas precisa usar processamento em segundo plano e fila serial.");
   }
+  if (!recargas.includes("ubyReportsRequested") || !recargas.includes("Abra a aba Relatorios para carregar")) {
+    throw new Error("A prestacao de contas deve ser carregada sob demanda para nao bloquear o painel operacional.");
+  }
+  if (!recargas.includes("ubyAreaLatestClosedReport") || !recargas.includes("ubyAreaNextOpenDate")) {
+    throw new Error("O proximo ciclo financeiro deve partir do ultimo relatorio fechado.");
+  }
+  if (!recargas.includes("getMonth() + 1, 0, 23, 59, 59") || recargas.includes("Fechamento dia 10")) {
+    throw new Error("Os novos ciclos de prestacao de contas devem fechar no ultimo dia do mes.");
+  }
   const workerSource = recargas.match(/const workerSource = `([\s\S]*?)`;\s*return new Promise/);
   if (!workerSource) throw new Error("O leitor em segundo plano da planilha nao foi encontrado.");
   checkScript(workerSource[1], "recargas-import-worker.js");

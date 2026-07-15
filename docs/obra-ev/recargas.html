@@ -767,6 +767,7 @@
       <button class="tab" onclick="switchTab('geral',this)">Geral</button>
       <button class="tab" onclick="switchTab('clube',this)">Clube UBY</button>
       <button class="tab" onclick="switchTab('financeiroGeral',this)">Financeiro geral</button>
+      <button class="tab" onclick="openUbyReports(this)">Relatorios</button>
     </div>
     <div class="controls" id="ctrlGeral">
       <span id="generalSourceLabel">Escolha uma estação abaixo para abrir o relatório detalhado</span>
@@ -1243,7 +1244,7 @@
       <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageUbyIdleValueDaily"></canvas></div>
     </section>
 
-    <section class="section" style="margin-top:18px">
+    <section class="section" id="ubyReportsSection" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1">
         <h2>Classificacao dos carregadores</h2>
         <div style="overflow-x:auto">
@@ -1260,10 +1261,10 @@
         <div class="accountability-head">
           <div>
             <h2>Prestacao de contas dos pontos UBY</h2>
-            <p>Fechamento por parceiro de area com custo de energia, participacao da area e ajustes extras. O ciclo fecha todo dia 10; no Robert Koch o primeiro periodo considera 08/06/2026 a 10/07/2026.</p>
+            <p>Fechamento mensal por parceiro de area com custo de energia, participacao da area e ajustes extras. O primeiro periodo considera a data real de inicio da operacao; os seguintes vao do dia 1 ao ultimo dia do mes.</p>
           </div>
           <div class="finance-command-actions">
-            <span class="accountability-pill">Fechamento dia 10</span>
+            <span class="accountability-pill">Fechamento no ultimo dia do mes</span>
             <select class="ctl-select" id="ubyInvestorMonthSelector" aria-label="Competencia do relatorio de investidores" onchange="renderUbyOperation()"></select>
             <button class="btn-recalc" type="button" onclick="saveCurrentUbyInvestorReport('partial')">Salvar parcial investidores</button>
             <button class="btn-recalc" type="button" onclick="generateUbyInvestorReportPdf()">PDF investidores</button>
@@ -1803,6 +1804,8 @@ let financeReportArchivePromise = null;
 let financeHistorySyncPromise = null;
 let ubyAreaReportSyncPromise = null;
 let ubyInvestorReportSyncPromise = null;
+let ubyReportsRequested = false;
+let pendingUbyAccountingRows = [];
 let rechargeLoadSequence = 0;
 let generalRefreshSequence = 0;
 let rechargeImportQueue = Promise.resolve();
@@ -7351,7 +7354,7 @@ function renderCouponSummary(id, details = []) {
   }).join('');
 }
 
-function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = charges, options = {}) {
+async function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = charges, options = {}) {
   const data = usageSeries(charges);
   const daily = dailyFinancialSeries(charges);
   const weekdayPower = options.weekdayPower || options.calendar?.power || getPower();
@@ -7361,14 +7364,17 @@ function renderUsageInsights(charges = [], prefix = 'usage', historyCharges = ch
   renderDayComparison(prefix, charges, historyCharges);
   renderWeekdayOccupancyReport(`${prefix}WeekdayReport`, charges, weekdayPower, 'Dinamica semanal de ocupacao', weekdayBounds);
   renderDailyOperationalMetrics(prefix, charges, historyCharges);
+  await yieldToBrowser();
   renderRecentFailureDiagnostics(prefix, charges);
   renderOperationQuality(prefix, charges);
   renderNewClients(prefix, charges, historyCharges);
   renderAbsentClientAlerts(prefix, historyCharges);
+  await yieldToBrowser();
   renderOperationalCalendar(prefix, charges, historyCharges, options.calendar || {});
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
   renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
+  await yieldToBrowser();
   renderBarChart(`${prefix}StayBuckets`, data.stayLabels, data.stayValues, '#3B32D0');
   renderCouponDonutChart(`${prefix}Coupons`, data.couponLabels, data.couponValues);
   renderCouponDonutChart(`${prefix}CouponRevenue`, data.couponLabels, data.couponRevenueValues, ' R$');
@@ -8449,25 +8455,46 @@ function ubyAreaOperationStart(row = {}) {
 
 function ubyAreaFirstClosingDate(start) {
   if (!start || Number.isNaN(start.getTime())) return new Date();
-  return new Date(start.getFullYear(), start.getMonth() + 1, 10, 23, 59, 59);
+  return new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59);
+}
+
+function ubyAreaLatestClosedReport(row = {}) {
+  const stationKey = normalizeStationForCompare(canonicalStationNameForWork(
+    row.workId,
+    row.stationName || row.station || row.workName,
+    row.workName
+  ));
+  const reports = [...financeReportArchive, ...readLocalFinanceReports()]
+    .filter(item => item?.reportType === 'partner_area'
+      && item?.status === 'closed'
+      && item?.workId === row.workId
+      && (item?.stationKey || '') === stationKey
+      && (item?.periodEnd || item?.payload?.period?.end));
+  return sortFinanceReports(reports)[0] || null;
+}
+
+function ubyAreaNextOpenDate(row = {}) {
+  const latest = ubyAreaLatestClosedReport(row);
+  const closedEnd = parseDate(latest?.periodEnd || latest?.payload?.period?.end);
+  if (closedEnd && !Number.isNaN(closedEnd.getTime())) {
+    return new Date(closedEnd.getFullYear(), closedEnd.getMonth(), closedEnd.getDate() + 1, 0, 0, 0);
+  }
+  return ubyAreaOperationStart(row);
 }
 
 function ubyAreaCurrentCycle(row = {}, reference = new Date()) {
-  const start = ubyAreaOperationStart(row);
-  const firstClose = ubyAreaFirstClosingDate(start);
-  let close = new Date(reference.getFullYear(), reference.getMonth(), 10, 23, 59, 59);
-  if (close < reference) close = new Date(reference.getFullYear(), reference.getMonth() + 1, 10, 23, 59, 59);
-  if (close < firstClose) close = new Date(firstClose);
-  const prevClose = new Date(close.getFullYear(), close.getMonth() - 1, 10, 23, 59, 59);
-  const periodStart = close.getTime() === firstClose.getTime()
-    ? new Date(start)
-    : new Date(prevClose.getFullYear(), prevClose.getMonth(), prevClose.getDate() + 1, 0, 0, 0);
+  const operationStart = ubyAreaOperationStart(row);
+  const nextOpen = ubyAreaNextOpenDate(row);
+  const target = reference < nextOpen ? nextOpen : reference;
+  const close = new Date(target.getFullYear(), target.getMonth() + 1, 0, 23, 59, 59);
+  const sameOpeningMonth = nextOpen.getFullYear() === close.getFullYear() && nextOpen.getMonth() === close.getMonth();
+  const periodStart = sameOpeningMonth ? new Date(nextOpen) : new Date(close.getFullYear(), close.getMonth(), 1, 0, 0, 0);
   return {
     start: periodStart,
     end: close,
-    key: `${close.getFullYear()}-${String(close.getMonth() + 1).padStart(2, '0')}-10`,
+    key: `${close.getFullYear()}-${String(close.getMonth() + 1).padStart(2, '0')}`,
     label: `${fmtDateOnly(periodStart)} a ${fmtDateOnly(close)}`,
-    first: close.getTime() === firstClose.getTime()
+    first: periodStart.getTime() === operationStart.getTime()
   };
 }
 
@@ -8475,7 +8502,9 @@ function ubyAreaSettingsForRow(row = {}, cycle = {}) {
   const saved = readUbyAreaAccounting();
   const rowKey = ubyAreaRowKey(row);
   const savedRow = saved[rowKey] || {};
-  const savedCycle = savedRow[cycle.key] || {};
+  const legacyCycleKey = /^\d{4}-\d{2}$/.test(cycle.key || '') ? `${cycle.key}-10` : '';
+  const latestSavedCycle = Object.keys(savedRow).sort().reverse().map(key => savedRow[key]).find(Boolean) || {};
+  const savedCycle = savedRow[cycle.key] || savedRow[legacyCycleKey] || latestSavedCycle;
   const latestMonth = [...new Set((row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort().at(-1) || '';
   const finance = financeSettingsForUbyRow(row, latestMonth);
   const defaultShare = Number(finance.ownerRevenueSharePct || finance.ownerNetProfitSharePct || 0);
@@ -8541,23 +8570,23 @@ function calculateUbyAreaReport(row = {}, cycle = {}, settings = {}) {
 }
 
 function ubyAreaCyclesUntil(row = {}, currentCycle = ubyAreaCurrentCycle(row)) {
-  const start = ubyAreaOperationStart(row);
+  const operationStart = ubyAreaOperationStart(row);
+  const start = ubyAreaNextOpenDate(row);
   const firstClose = ubyAreaFirstClosingDate(start);
   const cycles = [];
   let close = new Date(firstClose);
   while (close <= currentCycle.end) {
-    const prevClose = new Date(close.getFullYear(), close.getMonth() - 1, 10, 23, 59, 59);
     const periodStart = close.getTime() === firstClose.getTime()
       ? new Date(start)
-      : new Date(prevClose.getFullYear(), prevClose.getMonth(), prevClose.getDate() + 1, 0, 0, 0);
+      : new Date(close.getFullYear(), close.getMonth(), 1, 0, 0, 0);
     cycles.push({
       start: periodStart,
       end: new Date(close),
-      key: `${close.getFullYear()}-${String(close.getMonth() + 1).padStart(2, '0')}-10`,
+      key: `${close.getFullYear()}-${String(close.getMonth() + 1).padStart(2, '0')}`,
       label: `${fmtDateOnly(periodStart)} a ${fmtDateOnly(close)}`,
-      first: close.getTime() === firstClose.getTime()
+      first: periodStart.getTime() === operationStart.getTime()
     });
-    close = new Date(close.getFullYear(), close.getMonth() + 1, 10, 23, 59, 59);
+    close = new Date(close.getFullYear(), close.getMonth() + 2, 0, 23, 59, 59);
   }
   return cycles;
 }
@@ -8770,7 +8799,7 @@ function generateUbyAreaReportPdfLegacy(rowKey) {
           <h1>Prestacao de contas UBY</h1>
           <div class="sub">${escapeHtml(row.stationName || row.workName)}<br>Periodo: ${escapeHtml(cycle.label)}<br>Gerado em ${fmtDT(new Date())}</div>
         </div>
-        <div class="badge">Fechamento dia 10</div>
+        <div class="badge">Fechamento mensal</div>
       </div>
       <div class="kpis">
         <div class="kpi"><b>${fmtBRL(result.revenue)}</b><span>Receita</span></div>
@@ -9151,7 +9180,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   }
 }
 
-function renderUbyOperation() {
+async function renderUbyOperation() {
   const sourceUnitData = getGeneralUnitData();
   const sourceRows = getUbyChargerRows(sourceUnitData);
   const sourceIncluded = sourceRows.filter(row => row.included);
@@ -9230,7 +9259,8 @@ function renderUbyOperation() {
 
   renderVisualSummary('ubyVisualSummary', allUbyCharges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceUbyCharges });
   renderUbyDecisionCockpit([], allUbyCharges, included);
-  renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
+  await yieldToBrowser();
+  await renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower },
     weekdayPower: calendarPower,
     weekdayBounds: { start: firstPeriod, end: lastPeriod }
@@ -9240,6 +9270,7 @@ function renderUbyOperation() {
   const accessRows = [...visibleRows.filter(row => row.included)]
     .sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
   renderUbyFinancialOverview(sourceRows, sourceMonths, isMonthView, currentGeneralMonth, viewLabel);
+  await yieldToBrowser();
   const chartLabels = chartRows.map(row => {
     const label = row.stationName || row.workName || '-';
     return label.length > 24 ? label.slice(0, 24) + '...' : label;
@@ -9258,7 +9289,16 @@ function renderUbyOperation() {
   const accountingRows = sourceIncluded
     .map(row => summarizeUbyChargerRow(row, row.charges))
     .filter(row => row.count > 0);
-  renderUbyPartnerReports(accountingRows);
+  pendingUbyAccountingRows = accountingRows;
+  if (ubyReportsRequested) {
+    renderUbyPartnerReports(accountingRows);
+  } else {
+    const reports = document.getElementById('ubyPartnerReports');
+    const investor = document.getElementById('ubyInvestorPreview');
+    if (reports) reports.innerHTML = '<div class="note">Abra a aba Relatorios para carregar a prestacao de contas e o historico.</div>';
+    if (investor) investor.textContent = 'Os relatorios financeiros sao carregados somente quando solicitados para manter o painel rapido.';
+  }
+  await yieldToBrowser();
 
   const monthData = sourceMonths.map(mk => {
     const monthCharges = sourceUbyCharges.filter(charge => chargeMonthKey(charge) === mk);
@@ -9316,14 +9356,14 @@ function showGeneralWhenCurrentWorkIsEmpty() {
   showTab('uby');
 }
 
-function renderVisibleOverviewViews() {
+async function renderVisibleOverviewViews() {
   const visible = id => document.getElementById(id)?.style.display !== 'none';
   if (visible('tabUby')) {
-    renderUbyOperation();
+    await renderUbyOperation();
     return;
   }
   if (visible('tabGeral')) {
-    renderGeral();
+    await renderGeral();
     return;
   }
   if (visible('tabClube')) {
@@ -9351,7 +9391,7 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
   syncGeneralRecordsFromLocal();
   showGeneralWhenCurrentWorkIsEmpty();
   if (!window.UBY_SUPABASE?.loadAllRechargeBases) {
-    renderVisibleOverviewViews();
+    await renderVisibleOverviewViews();
     return;
   }
   try {
@@ -9370,19 +9410,19 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
       mergeCloudRechargeRecords(records);
       initWorkSelector();
       showGeneralWhenCurrentWorkIsEmpty();
-      renderVisibleOverviewViews();
+      await renderVisibleOverviewViews();
       if (forceCloud) setStorageState(`Painel geral atualizado com ${records.length} base(s) do Supabase.`);
     } else {
-      renderVisibleOverviewViews();
+      await renderVisibleOverviewViews();
       if (forceCloud) setStorageState('Painel geral atualizado com as bases locais. Entre no Supabase para buscar o banco compartilhado.');
     }
   } catch (err) {
-    renderVisibleOverviewViews();
+    await renderVisibleOverviewViews();
     if (forceCloud) setStorageState(`Painel geral local preservado. Supabase pendente: ${err.message}`, true);
   }
 }
 
-function renderGeral() {
+async function renderGeral() {
   const sourceUnitData = getGeneralUnitData();
   const sourceCharges = getAllGeneralCharges(sourceUnitData);
   const sourceMonths = [...new Set(sourceCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
@@ -9462,7 +9502,8 @@ function renderGeral() {
   `;
   renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
-  renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } });
+  await yieldToBrowser();
+  await renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } });
   renderGeneralFinance(sourceUnitData);
 
   document.getElementById('generalUnitRank').innerHTML = rankingStationRows.length ? rankingStationRows.slice(0, 12).map(unit => `
@@ -9569,8 +9610,8 @@ async function renderAll() {
   else if (visibleTab === 'acumulado') renderAcumulado();
   else if (visibleTab === 'financeiro') handleFinanceMonthChange();
   else if (visibleTab === 'detalhes') renderDetalhes();
-  else if (visibleTab === 'geral') renderGeral();
-  else if (visibleTab === 'uby') renderUbyOperation();
+  else if (visibleTab === 'geral') await renderGeral();
+  else if (visibleTab === 'uby') await renderUbyOperation();
   else if (visibleTab === 'clube') renderClub();
   else if (visibleTab === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
 }
@@ -9585,7 +9626,7 @@ async function renderMensal() {
   const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
-  renderUsageInsights(monthCharges, 'usage', allCharges, { weekdayPower: getPower(), weekdayBounds: window });
+  await renderUsageInsights(monthCharges, 'usage', allCharges, { weekdayPower: getPower(), weekdayBounds: window });
   await yieldToBrowser();
   if (renderSequence !== monthlyRenderSequence) return;
   if (!charges.length) {
@@ -10261,12 +10302,25 @@ async function switchTab(name, btn) {
   showTab(name);
   if (name === 'mensal') await renderMensal();
   else if (name === 'acumulado') renderAcumulado();
-  else if (name === 'geral') renderGeral();
-  else if (name === 'uby') renderUbyOperation();
+  else if (name === 'geral') await renderGeral();
+  else if (name === 'uby') {
+    ubyReportsRequested = false;
+    await renderUbyOperation();
+  }
   else if (name === 'clube') renderClub();
   else if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
   else if (name === 'detalhes') renderDetalhes();
   else if (name === 'financeiro') handleFinanceMonthChange();
+}
+
+async function openUbyReports(btn) {
+  document.querySelectorAll('#tabsBar .tab').forEach(tab => tab.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ubyReportsRequested = true;
+  showTab('uby');
+  await renderUbyOperation();
+  await yieldToBrowser();
+  document.getElementById('ubyReportsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function openGeneralFinanceView() {
