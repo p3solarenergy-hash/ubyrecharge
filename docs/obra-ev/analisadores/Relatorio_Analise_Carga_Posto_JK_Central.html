@@ -1,39 +1,632 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="p3-report-version" content="posto-jk-central-20260714">
-<title>UBY Recharge - Relatorio de Analise de Carga | Posto JK Central</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<title>UBY Recharge - Analise de Carga | Posto JK Central</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
-  :root{--bg:#F4F8FB;--card:#fff;--ink:#0B2239;--muted:#5B6B7C;--line:#D9E6F2;--blue:#0B2A4A;--accent:#2D7FF9;--ok:#2AAE66;--warn:#E08E0B;--danger:#C0392B}
-  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.55}.page{max-width:1120px;margin:0 auto;padding:28px 18px 56px}
-  .toolbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}.nav{display:flex;gap:8px;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid #B8CDE2;border-radius:8px;background:#fff;color:var(--blue);padding:10px 14px;font-weight:800;text-decoration:none}.btn.active,.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-  .hero{background:linear-gradient(135deg,#0B2A4A,#125A84);color:#fff;border-radius:14px;padding:28px 30px;margin-bottom:22px;box-shadow:0 10px 28px rgba(11,42,74,.16)}.brand{display:flex;align-items:center;gap:14px;margin-bottom:20px}.logo{width:48px;height:48px;border-radius:11px;background:#2D7FF9;display:grid;place-items:center;font-weight:900;font-size:22px}.brand-k{letter-spacing:4px;text-transform:uppercase;font-size:12px}.brand-s{opacity:.78;font-size:12px}h1{font-size:30px;margin:0 0 8px}.subtitle{font-size:16px;opacity:.9}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px}.meta div{font-size:11px;text-transform:uppercase;letter-spacing:.8px;opacity:.78}.meta strong{display:block;color:#fff;font-size:13px;text-transform:none;letter-spacing:0;opacity:1;margin-top:4px}
-  .notice{display:flex;gap:12px;border-left:5px solid var(--warn);background:#FFF6E6;color:#6A4100;border-radius:10px;padding:14px 16px;margin-bottom:22px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:0 4px 16px rgba(11,42,74,.06)}.label{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);font-weight:800}.value{font-size:28px;font-weight:900;color:var(--blue);margin-top:6px}.unit{font-size:14px;margin-left:4px}.sub{font-size:12px;color:var(--muted)}.badge{display:inline-block;margin-top:10px;border-radius:999px;padding:4px 9px;font-size:10px;font-weight:900;text-transform:uppercase}.ok{background:#DDF5E8;color:#087D3F}.warn{background:#FFF0D5;color:#A25D00}.danger{background:#FBE5E1;color:#B02B22}
-  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 4px 16px rgba(11,42,74,.05)}h2{font-size:19px;margin:0 0 14px;color:var(--blue)}h3{font-size:15px;margin:18px 0 10px;color:var(--blue)}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left}th{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);background:#F2F7FC}.num{text-align:right}.rec-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.rec{border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:14px}.rec.warn{border-left-color:var(--warn);background:#FFFBF2}.rec.danger{border-left-color:var(--danger);background:#FFF6F4}ul{margin:8px 0 0;padding-left:18px}.chart{height:260px}footer{text-align:center;color:var(--muted);font-size:12px;margin-top:26px}
-  @media(max-width:800px){.meta,.kpis,.grid2,.rec-grid{grid-template-columns:1fr}h1{font-size:24px}.hero{padding:22px}.page{padding:18px 12px}}@media print{body{background:#fff}.toolbar{display:none}.hero,section,.kpi{box-shadow:none;break-inside:avoid}.page{padding:0;max-width:none}}
+  :root{--p3-primary:#2D7FF9;--p3-primary-deep:#0B2A4A;--p3-accent:#57B7FF;--p3-accent-2:#FFD66B;--p3-bg:#07111F;--p3-card:#0E1B2D;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#24364E;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#2D7FF9;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--p3-bg);color:var(--p3-text);font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .page{max-width:1180px;margin:0 auto;padding:32px 28px 80px}
+  .header{background:linear-gradient(135deg,#0B2A4A 0%,#134B7A 100%);color:#fff;border-radius:14px;padding:84px 32px 28px;margin-bottom:24px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
+  .header::after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;background:radial-gradient(circle,rgba(45,127,249,.35),transparent 70%);border-radius:50%}
+  .header .brand{display:flex;align-items:center;gap:14px;margin-bottom:18px;position:relative;z-index:1}
+  .logo-mark{width:46px;height:46px;border-radius:10px;background:#0B2A4A;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--p3-accent);font-size:22px;border:1px solid var(--p3-accent);letter-spacing:.5px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+  .brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.85}
+  .brand-tag{font-size:11px;opacity:.7;letter-spacing:1px}
+  .header h1{font-size:26px;font-weight:700;margin-bottom:6px;position:relative;z-index:1}
+  .header .subtitle{opacity:.85;font-size:14px;position:relative;z-index:1}
+  .header-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:22px;position:relative;z-index:1}
+  .header-meta div{font-size:12px}
+  .header-meta .label{opacity:.65;text-transform:uppercase;letter-spacing:1px;font-size:10px;margin-bottom:3px}
+  .header-meta .value{font-weight:600;font-size:13px}
+  .nav-back{position:absolute;top:18px;right:24px;background:rgba(255,255,255,.08);color:#fff;padding:6px 14px;border-radius:18px;font-size:12px;text-decoration:none;backdrop-filter:blur(8px);z-index:2}
+  .nav-back:hover{background:rgba(255,255,255,.14)}
+  .top-nav{position:absolute;top:30px;right:32px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center;z-index:2}
+  .top-nav a{min-width:112px;text-align:center;background:#07111F;color:#fff;padding:9px 14px;border-radius:8px;font-size:12px;text-decoration:none;border:1px solid rgba(255,255,255,.12);box-shadow:0 4px 12px rgba(0,0,0,.18);font-weight:800;white-space:nowrap;line-height:1.15}
+  .top-nav a:hover{background:#0E1B2D;border-color:rgba(255,255,255,.22)}
+  .top-nav a.active{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
+  [data-theme="light"] .top-nav a{background:#0B2A4A;color:#fff;border-color:rgba(11,42,74,.25)}
+  [data-theme="light"] .top-nav a:hover{background:#155340}
+  [data-theme="light"] .top-nav a.active{background:#2D7FF9;border-color:#2D7FF9;color:#fff}
+  @media (max-width:860px){.header{padding-top:28px}.top-nav{position:relative;top:auto;right:auto;margin-bottom:22px;justify-content:flex-start}.top-nav a{min-width:auto;flex:1 1 130px}}
+  .alert{border-left:4px solid var(--p3-warn);background:#2E2310;color:#F2D77F;padding:14px 18px;border-radius:8px;margin-bottom:22px;display:flex;gap:12px;align-items:flex-start}
+  .alert.danger{border-left-color:var(--p3-danger);background:#2E1714;color:#FF8B7C}
+  .alert.ok{border-left-color:var(--p3-ok);background:#0B2A4A;color:#9DCEFF}
+  .alert .ico{font-size:18px;line-height:1.2}
+  .alert strong{display:block;margin-bottom:2px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+  .kpi{background:var(--p3-card);padding:18px;border-radius:12px;box-shadow:var(--p3-shadow);border:1px solid var(--p3-border);position:relative;overflow:hidden}
+  .kpi .kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--p3-muted);font-weight:600}
+  .kpi .kpi-value{font-size:26px;font-weight:700;color:var(--p3-primary);margin-top:6px;line-height:1.1}
+  .kpi .kpi-unit{font-size:13px;color:var(--p3-muted);font-weight:500;margin-left:4px}
+  .kpi .kpi-sub{font-size:11px;color:var(--p3-muted);margin-top:6px}
+  .kpi .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;margin-top:8px;text-transform:uppercase;letter-spacing:.5px}
+  .badge.ok{background:#0B2A4A;color:#9DCEFF}
+  .badge.warn{background:#2E2310;color:#F2D77F}
+  .badge.danger{background:#2E1714;color:#FF8B7C}
+  .part-divider{display:flex;align-items:center;gap:16px;margin:36px 0 18px;padding-top:18px;border-top:2px solid var(--p3-border)}
+  .part-divider .num{background:var(--p3-primary);color:#fff;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0}
+  .part-divider .info{flex:1}
+  .part-divider .info h2{color:var(--p3-primary);font-size:20px;font-weight:700;margin-bottom:2px}
+  .part-divider .info p{font-size:12px;color:var(--p3-muted)}
+  section{background:var(--p3-card);border-radius:12px;padding:24px;margin-bottom:20px;border:1px solid var(--p3-border);box-shadow:var(--p3-shadow)}
+  section h2{font-size:16px;font-weight:700;color:var(--p3-primary);margin-bottom:14px;display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}
+  section h2 .num{width:26px;height:26px;border-radius:6px;background:var(--p3-accent);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  .chart-wrapper{position:relative;height:260px}
+  .chart-wrapper.tall{height:340px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#172A42;color:var(--p3-primary);font-weight:600;text-align:left;padding:9px 10px;border-bottom:2px solid var(--p3-border);font-size:11px;text-transform:uppercase;letter-spacing:.7px}
+  td{padding:8px 10px;border-bottom:1px solid var(--p3-border)}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;text-align:right}
+  td.label{font-weight:500}
+  .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .tag.ok{background:#0B2A4A;color:#9DCEFF}
+  .tag.warn{background:#2E2310;color:#F2D77F}
+  .tag.danger{background:#2E1714;color:#FF8B7C}
+  .scenarios td.label{max-width:280px}
+  .scenarios .verdict{font-weight:700;text-align:center}
+  .controls{background:#172A42;border:1px solid var(--p3-border);border-radius:10px;padding:18px 20px;margin-bottom:18px;display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:18px;align-items:stretch}
+  .ctrl{display:flex;flex-direction:column;gap:6px}
+  .ctrl label.k{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--p3-muted);font-weight:700}
+  .ctrl select{width:100%;height:42px;padding:0 12px;border-radius:8px;border:1px solid var(--p3-border);background:#13243B;font-size:14px;font-weight:600;color:var(--p3-text);font-family:inherit;cursor:pointer}
+  .ctrl select:focus{outline:none;border-color:var(--p3-accent);box-shadow:0 0 0 3px rgba(45,127,249,.15)}
+  .ctrl input[type=range]{width:100%;accent-color:var(--p3-accent);height:42px}
+  .ctrl .range-row{display:flex;align-items:center;gap:10px;height:42px}
+  .ctrl .range-row span{font-weight:700;color:var(--p3-primary);min-width:42px;text-align:right}
+  .toggle{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;height:42px}
+  .toggle input{opacity:0;width:0;height:0;position:absolute}
+  .toggle .track{width:46px;height:24px;background:#3A4842;border-radius:12px;position:relative;transition:.2s;flex-shrink:0}
+  .toggle .track::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .toggle input:checked + .track{background:var(--p3-accent)}
+  .toggle input:checked + .track::after{transform:translateX(22px)}
+  .toggle .lbl{font-size:13px;font-weight:600;color:var(--p3-text)}
+  .ctrl-hint{font-size:11px;color:var(--p3-muted);margin-top:auto;padding-top:6px;line-height:1.4}
+  .scenario-row.active{background:#2A2614 !important;outline:2px solid var(--p3-warn);outline-offset:-2px}
+  .op-summary{background:linear-gradient(135deg,#13243B,#1F2D27);border:1px solid var(--p3-border);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:13px;color:var(--p3-primary);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .op-summary .pill{background:var(--p3-accent);color:#fff;padding:4px 12px;border-radius:8px;font-weight:700;font-size:11px;letter-spacing:.5px}
+  .op-summary .pill.muted{background:var(--p3-primary)}
+  .op-summary .pill.warn{background:var(--p3-warn)}
+  .capacity-bar{display:flex;width:100%;height:54px;border-radius:8px;overflow:hidden;margin-bottom:8px;border:1px solid var(--p3-border);background:#0E1B2D}
+  .cap-segment{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;padding:4px;text-align:center;line-height:1.2;transition:width .3s ease}
+  .cap-segment.posto{background:linear-gradient(135deg,#C0392B,#E55039)}
+  .cap-segment.ev{background:linear-gradient(135deg,#1F8A4C,var(--p3-accent))}
+  .cap-segment.reserve{background:#4A5852}
+  .cap-segment .v{font-size:13px;font-weight:700}
+  .cap-legend{display:flex;gap:18px;font-size:11px;color:var(--p3-muted);margin-bottom:18px;flex-wrap:wrap}
+  .cap-legend .leg{display:flex;align-items:center;gap:6px}
+  .cap-legend .sw{width:12px;height:12px;border-radius:3px}
+  .cap-legend .sw.posto{background:#C0392B}
+  .cap-legend .sw.ev{background:var(--p3-accent)}
+  .cap-legend .sw.reserve{background:#4A5852}
+  .op-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .op-card{background:#13243B;border:1px solid var(--p3-border);border-radius:10px;padding:14px;border-top:3px solid var(--p3-accent);transition:transform .2s}
+  .op-card:hover{transform:translateY(-2px)}
+  .op-card.crit{border-top-color:var(--p3-danger)}
+  .op-card.warn{border-top-color:var(--p3-warn)}
+  .op-card .op-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--p3-muted);font-weight:700}
+  .op-card .op-context{font-size:11px;color:var(--p3-muted);margin-top:2px}
+  .op-card .op-value{font-size:24px;font-weight:700;color:var(--p3-primary);margin:8px 0 6px;line-height:1}
+  .op-card .op-unit{font-size:13px;color:var(--p3-muted);font-weight:500;margin-left:3px}
+  .op-card .op-bar{height:6px;background:#172A42;border-radius:3px;overflow:hidden;margin-bottom:6px}
+  .op-card .op-bar .fill{height:100%;background:var(--p3-accent);border-radius:3px;transition:width .3s}
+  .op-card.crit .op-bar .fill{background:var(--p3-danger)}
+  .op-card.warn .op-bar .fill{background:var(--p3-warn)}
+  .op-card .op-hint{font-size:11px;color:var(--p3-muted)}
+  h3.sub{margin-top:24px;margin-bottom:12px;font-size:13px;color:var(--p3-primary);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .band-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:8px}
+  .band-card{padding:14px 10px;border-radius:10px;background:#13243B;border:1px solid var(--p3-border);text-align:center;border-bottom:4px solid #ccc}
+  .band-card.b0{border-bottom-color:#4A5852}
+  .band-card.b1{border-bottom-color:#F2A93D}
+  .band-card.b2{border-bottom-color:#FFD66B}
+  .band-card.b3{border-bottom-color:#57B7FF}
+  .band-card.b4{border-bottom-color:var(--p3-accent)}
+  .band-card .pct{font-size:11px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+  .band-card .kw{font-size:11px;color:var(--p3-muted);margin-top:2px}
+  .band-card .hours{font-size:24px;font-weight:700;color:var(--p3-primary);margin:8px 0 4px;line-height:1}
+  .band-card .hours small{font-size:11px;color:var(--p3-muted);font-weight:500}
+  .band-card .pct-day{font-size:11px;color:var(--p3-muted);margin-top:2px}
+  .band-bar{display:flex;width:100%;height:12px;border-radius:6px;overflow:hidden;border:1px solid var(--p3-border);margin-top:14px}
+  .band-bar .seg{display:block;height:100%;transition:width .3s}
+  .rec-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .rec{border:1px solid var(--p3-border);border-radius:10px;padding:16px;border-left:4px solid var(--p3-accent);background:#13243B}
+  .rec.danger{border-left-color:var(--p3-danger);background:#2A1816}
+  .rec.warn{border-left-color:var(--p3-warn);background:#2A2614}
+  .rec h3{font-size:13px;color:var(--p3-primary);margin-bottom:8px;display:flex;align-items:center;gap:8px;font-weight:700}
+  .rec h3 .pri{font-size:9px;background:var(--p3-accent);color:#fff;padding:2px 7px;border-radius:8px;letter-spacing:.5px}
+  .rec.danger h3 .pri{background:var(--p3-danger)}
+  .rec.warn h3 .pri{background:var(--p3-warn)}
+  .rec ul{padding-left:18px;color:var(--p3-text)}
+  .rec li{margin-bottom:5px;font-size:12.5px;line-height:1.5}
+  .ind-row{display:flex;align-items:center;gap:14px;padding:8px 0;border-bottom:1px solid var(--p3-border)}
+  .ind-row:last-child{border-bottom:none}
+  .ind-label{flex:1;font-size:13px}
+  .ind-bar{flex:1.6;height:8px;background:#172A42;border-radius:4px;overflow:hidden;position:relative}
+  .ind-bar .fill{height:100%;background:var(--p3-accent);border-radius:4px}
+  .ind-bar .fill.warn{background:var(--p3-warn)}
+  .ind-bar .fill.danger{background:var(--p3-danger)}
+  .ind-value{width:100px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+  footer{text-align:center;padding:24px 0;color:var(--p3-muted);font-size:11px;margin-top:30px;border-top:1px solid var(--p3-border)}
+  footer strong{color:var(--p3-primary)}
+  @media print{body{background:#fff}.page{padding:0;max-width:100%}section,.kpi,.header{box-shadow:none;break-inside:avoid}.header{border-radius:0}section{page-break-inside:avoid}}
+  @media (max-width:880px){.kpis{grid-template-columns:repeat(2,1fr)}.header-meta{grid-template-columns:repeat(2,1fr)}.section-grid,.rec-grid{grid-template-columns:1fr}.op-grid,.band-grid{grid-template-columns:repeat(2,1fr)}}
+
+  /* === THEME TOGGLE === */
+  .theme-toggle{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;border:1px solid var(--p3-border);background:var(--p3-card);color:var(--p3-text);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;z-index:1000;box-shadow:var(--p3-shadow);transition:all .2s;font-family:inherit}
+  .theme-toggle:hover{transform:scale(1.08);border-color:var(--p3-accent)}
+  .theme-toggle:active{transform:scale(0.95)}
+
+  /* === LIGHT THEME OVERRIDES === */
+  [data-theme="light"]{--p3-primary:#0B2A4A;--p3-primary-deep:#0B2A4A;--p3-accent:#2D7FF9;--p3-accent-2:#FFB300;--p3-bg:#F5F7F6;--p3-card:#FFFFFF;--p3-text:#1F2A24;--p3-muted:#5C6B62;--p3-border:#DDE8F6;--p3-danger:#C0392B;--p3-warn:#E08E0B;--p3-ok:#1F8A4C;--p3-shadow:0 1px 3px rgba(11,42,74,.06),0 4px 12px rgba(11,42,74,.05)}
+  [data-theme="light"] .header{background:linear-gradient(135deg,#0B2A4A 0%,#155340 100%)}
+  [data-theme="light"] .logo-mark{background:#2D7FF9 !important;color:#fff !important;border:none !important}
+  [data-theme="light"] .header .bookmark-hint,[data-theme="light"] .nav-back{background:rgba(255,255,255,.15) !important}
+  [data-theme="light"] .nav-back:hover{background:rgba(255,255,255,.25) !important}
+  [data-theme="light"] .alert{background:#FFF8E6;color:#6B4F0A}
+  [data-theme="light"] .alert.danger{background:#FCEDEC;color:#7A1F16}
+  [data-theme="light"] .alert.ok{background:#EDF7F0;color:#0F4824}
+  [data-theme="light"] th{background:#F1F5F2 !important;color:#0B2A4A !important}
+  [data-theme="light"] .badge.ok,[data-theme="light"] .tag.ok,[data-theme="light"] .status-ok,[data-theme="light"] .flag.ok{background:#EAF3FF !important;color:#1F8A4C !important}
+  [data-theme="light"] .badge.warn,[data-theme="light"] .tag.warn,[data-theme="light"] .status-warn,[data-theme="light"] .flag.warn{background:#FFF1D6 !important;color:#E08E0B !important}
+  [data-theme="light"] .badge.danger,[data-theme="light"] .tag.danger,[data-theme="light"] .status-danger,[data-theme="light"] .flag.danger{background:#FBE3E0 !important;color:#C0392B !important}
+  [data-theme="light"] .flag{background:#F1F5F2 !important;color:#5C6B62 !important}
+  [data-theme="light"] .controls{background:#F1F5F2 !important}
+  [data-theme="light"] .ctrl select,[data-theme="light"] .toolbar input{background:#fff !important;color:#0B2A4A !important}
+  [data-theme="light"] .toggle .track{background:#CDD4D0 !important}
+  [data-theme="light"] .ind-bar,[data-theme="light"] .op-card .op-bar{background:#EAEEEC !important}
+  [data-theme="light"] .scenario-row.active,[data-theme="light"] .rec.warn{background:#FFFAEE !important}
+  [data-theme="light"] .rec{background:#F8FBFF !important}
+  [data-theme="light"] .rec.danger{background:#FDF6F5 !important}
+  [data-theme="light"] .op-summary{background:linear-gradient(135deg,#F1F5F2,#E9F1EC) !important}
+  [data-theme="light"] .op-card,[data-theme="light"] .band-card{background:#F8FBFF !important}
+  [data-theme="light"] .capacity-bar{background:#fff !important}
+  [data-theme="light"] .cap-segment.reserve{background:#7B8A82 !important}
+  [data-theme="light"] .band-card.b0{border-bottom-color:#7B8A82 !important}
+  [data-theme="light"] .band-card.b1{border-bottom-color:#FFB300 !important}
+  [data-theme="light"] .band-card.b2{border-bottom-color:#FFC940 !important}
+  [data-theme="light"] .band-card.b3{border-bottom-color:#7DCB97 !important}
+  [data-theme="light"] tr[style*="background:#172A42"]{background:#F1F5F2 !important;color:#1F2A24 !important}
+  [data-theme="light"] .vbtn.completo{background:#0B2A4A !important;color:#fff !important;border-color:transparent !important}
+  [data-theme="light"] .vbtn.completo:hover{background:#155340 !important}
+  [data-theme="light"] .vbtn.eletrico{background:#FFF1D6 !important;color:#7A4F0A !important;border-color:#F0C97D !important}
+  [data-theme="light"] .vbtn.eletrico:hover{background:#FFE6B0 !important}
+  [data-theme="light"] .vbtn.carregador{background:#EAF3FF !important;color:#0F4824 !important;border-color:#A5D9B8 !important}
+  [data-theme="light"] .vbtn.carregador:hover{background:#CCE9D6 !important}
 </style>
 </head>
 <body>
+<button id="themeToggle" class="theme-toggle" title="Alternar tema (claro/escuro)" aria-label="Toggle theme">â˜€</button>
 <div class="page">
-  <div class="toolbar">
-    <div class="nav"><a class="btn" href="dashboard.html">Dashboard</a><a class="btn active" href="Relatorio_Analise_Carga_Posto_JK_Central.html">Completo</a><a class="btn" href="Relatorio_Eletrico_Posto_JK_Central.html">Eletrico</a><a class="btn" href="Relatorio_Carregador_Posto_JK_Central.html">Carregador</a><a class="btn" href="Resumo_Tecnico_Posto_JK_Central.html">Resumo tecnico</a></div>
-    <button class="btn primary" onclick="window.print()">Gerar PDF</button>
+
+
+  <div class="header">
+    <div class="top-nav">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="Relatorio_Analise_Carga_Posto_JK_Central.html" class="active">Completo</a>
+      <a href="Relatorio_Eletrico_Posto_JK_Central.html">El&eacute;trico</a>
+      <a href="Relatorio_Carregador_Posto_JK_Central.html">Carregador</a>
+      <a href="../../">P&aacute;gina inicial</a>
+    </div>
+    <div class="brand">
+      <div class="logo-mark">UBY</div>
+      <div>
+        <div class="brand-name">UBY Recharge</div>
+        <div class="brand-tag">Engenharia em energia &amp; mobilidade el&eacute;trica</div>
+      </div>
+    </div>
+    <h1>Relat&oacute;rio de An&aacute;lise de Carga</h1>
+    <div class="subtitle">Posto JK Central &mdash; Implanta&ccedil;&atilde;o Carregador EV</div>
+    <div class="header-meta">
+      <div><div class="label">Cliente</div><div class="value">Posto Central</div></div>
+      <div><div class="label">Equipamento</div><div class="value">DMI P1000R Black Box</div></div>
+      <div><div class="label">Per&iacute;odo</div><div class="value">14/06/2026 a 14/07/2026</div></div>
+      <div><div class="label">Emiss&atilde;o</div><div class="value">14/07/2026 &mdash; UBY Recharge</div></div>
+    </div>
   </div>
-  <header class="hero"><div class="brand"><div class="logo">UBY</div><div><div class="brand-k">UBY Recharge</div><div class="brand-s">Engenharia em energia e mobilidade eletrica</div></div></div><h1>Relatorio de Analise de Carga</h1><div class="subtitle">Posto JK Central - avaliacao eletrica para implantacao de carregador EV</div><div class="meta"><div>Cliente<strong>Posto Central</strong></div><div>Equipamento<strong>DMI P1000R Black Box</strong></div><div>Periodo<strong>14/06/2026 a 14/07/2026</strong></div><div>Emissao<strong>14/07/2026 - UBY Recharge</strong></div></div></header>
-  <div class="notice"><strong>Base medida:</strong><div>O PDF do Datalog/ISSO Telecom contem registros em <b>10 de 31 dias analisados</b>. A medicao representa a instalacao existente do posto; qualquer informacao de carregador EV abaixo e simulacao de pre-dimensionamento, nao medicao direta de carregador.</div></div>
-  <div class="kpis"><div class="kpi"><div class="label">Pico potencia ativa</div><div class="value">44,69<span class="unit">kW</span></div><div class="sub">30/06/2026 11:08:50</div><span class="badge warn">demanda alta</span></div><div class="kpi"><div class="label">Pico aparente</div><div class="value">45,87<span class="unit">kVA</span></div><div class="sub">Soma vetorial</div><span class="badge ok">base 127/220 V</span></div><div class="kpi"><div class="label">FP medio vetorial</div><div class="value">0,99</div><div class="sub">FP aritmetico medio 0,97</div><span class="badge ok">adequado</span></div><div class="kpi"><div class="label">Consumo medido</div><div class="value">2.260,74<span class="unit">kWh</span></div><div class="sub">10 dias com registros</div><span class="badge ok">amostra util</span></div></div>
-  <section><h2>1. Conclusao tecnica</h2><p>A instalacao apresenta bom fator de potencia medio e tensoes estaveis para sistema 127/220 V. O ponto de atencao principal e o <b>desequilibrio de corrente</b>, com media de 26,36% e pico de 73,25%, indicando necessidade de redistribuicao de cargas antes de acrescentar carregamento EV em potencia elevada.</p><div class="grid2"><div><h3>Pontos favoraveis</h3><ul><li>FP medio vetorial 0,99, acima da referencia minima de 0,92.</li><li>Desequilibrio de tensao baixo: 0,24% fasorial medio e 0,19% por amplitude.</li><li>Frequencia media estavel em 60,01 Hz.</li></ul></div><div><h3>Pontos a corrigir/verificar</h3><ul><li>Desequilibrio de corrente medio alto, com fase C menos carregada.</li><li>Neutro calculado chegou a 100,69 A, exigindo verificacao de distribuicao e harmônicas.</li><li>Confirmar padrao de entrada existente antes de liberar EV acima de 40 kW no pico do posto.</li></ul></div></div></section>
-  <section><h2>2. Correntes por fase</h2><div class="grid2"><table><thead><tr><th>Fase</th><th class="num">Max (A)</th><th class="num">Media (A)</th><th>Status</th></tr></thead><tbody><tr><td>Fase A</td><td class="num">129,76</td><td class="num">36,19</td><td>Referencia alta</td></tr><tr><td>Fase B</td><td class="num">121,11</td><td class="num">36,91</td><td>Referencia alta</td></tr><tr><td>Fase C</td><td class="num">107,91</td><td class="num">25,25</td><td>Menos carregada</td></tr><tr><td>Neutro medido</td><td class="num">31,14</td><td class="num">12,78</td><td>OK</td></tr><tr><td>Neutro calculado</td><td class="num">100,69</td><td class="num">19,52</td><td>Verificar</td></tr></tbody></table><div class="chart"><canvas id="chartCorrentes"></canvas></div></div></section>
-  <section id="eletrico"><h2>3. Potencias, energia e qualidade</h2><div class="grid2"><table><thead><tr><th>Grandeza</th><th class="num">Pico/total</th><th class="num">Media</th></tr></thead><tbody><tr><td>Potencia ativa direta</td><td class="num">44,69 kW</td><td class="num">12,45 kW</td></tr><tr><td>Potencia aparente vetorial</td><td class="num">45,87 kVA</td><td class="num">12,51 kVA</td></tr><tr><td>Demanda maior</td><td class="num">31,45 kW</td><td class="num">-</td></tr><tr><td>Energia medida</td><td class="num">2.260,74 kWh</td><td class="num">226,07 kWh/dia util</td></tr><tr><td>FP real vetorial</td><td class="num">1,00 max</td><td class="num">0,99</td></tr></tbody></table><table><thead><tr><th>Qualidade</th><th class="num">Max</th><th class="num">Media</th></tr></thead><tbody><tr><td>Deseq. tensao fasorial</td><td class="num">0,92%</td><td class="num">0,24%</td></tr><tr><td>Deseq. tensao amplitude</td><td class="num">1,13%</td><td class="num">0,19%</td></tr><tr><td>Deseq. corrente amplitude</td><td class="num">73,25%</td><td class="num">26,36%</td></tr><tr><td>Tensao FN media</td><td class="num">129,68 a 129,71 V</td><td class="num">OK</td></tr><tr><td>Tensao FF media</td><td class="num">224,32 a 224,97 V</td><td class="num">OK</td></tr></tbody></table></div></section>
-  <section id="carregador"><h2>4. Pre-dimensionamento do carregador EV</h2><div class="notice"><strong>Simulacao separada:</strong><div>O analisador mediu somente a carga existente do posto. Para carregador EV de 60 kW, a soma estimada no pico do posto usa a potencia aparente medida do posto mais o EV com FP aproximado de 0,99.</div></div><table><thead><tr><th>Cenario</th><th class="num">S estimada</th><th class="num">Corrente 220 V</th><th>Leitura</th></tr></thead><tbody><tr><td>Posto medido sem EV</td><td class="num">45,87 kVA</td><td class="num">120,4 A</td><td>Base medida</td></tr><tr><td>Posto + EV 60 kW sem DLM</td><td class="num">106,48 kVA</td><td class="num">279,5 A</td><td>Exige padrao superior a 250 A</td></tr><tr><td>Padrao 250 A com 5% reserva</td><td class="num">90,50 kVA uteis</td><td class="num">-</td><td>EV limitado a aprox. 44 kW no pico</td></tr><tr><td>Padrao 300 A com 5% reserva</td><td class="num">108,61 kVA uteis</td><td class="num">-</td><td>Atende 60 kW com pouca margem</td></tr></tbody></table></section>
-  <section><h2>5. Recomendacoes</h2><div class="rec-grid"><div class="rec danger"><h3>Prioridade 1 - Balanceamento de fases</h3><ul><li>Redistribuir cargas monofasicas para reduzir a diferenca entre fases.</li><li>Revalidar corrente por fase depois dos ajustes.</li><li>Meta pratica: aproximar desequilibrio medio de corrente para abaixo de 10%.</li></ul></div><div class="rec warn"><h3>Prioridade 2 - Padrao para EV</h3><ul><li>Para EV 60 kW sem limitacao no pico, considerar padrao de 300 A.</li><li>Se mantiver 250 A, usar DLM/Smart Charger limitando potencia no pico do posto.</li><li>Confirmar padrao e protecoes existentes em vistoria.</li></ul></div><div class="rec"><h3>Prioridade 3 - Neutro e harmonicas</h3><ul><li>Verificar neutro calculado elevado e cargas nao lineares.</li><li>Medir THDi em nova campanha se houver aquecimento ou historico de falha.</li></ul></div><div class="rec"><h3>Prioridade 4 - Nova medicao apos ajustes</h3><ul><li>Repetir medicao apos balanceamento e definicao do EV.</li><li>Registrar curva horaria se o carregador for testado em campo.</li></ul></div></div></section>
-  <footer>UBY Recharge - Relatorio gerado a partir do PDF RELATORIO POSTO CENTRAL.pdf. Conteudo de carregador EV classificado como simulacao de pre-dimensionamento.</footer>
+
+  <div class="alert">
+    <div class="ico">&#9888;</div>
+    <div>
+      <strong>Base medida parcial - 10 de 31 dias</strong>
+      O PDF de 14/07/2026 mede a carga existente do posto por 10 dias validos no periodo de 14/06/2026 a 14/07/2026. A parte do carregador EV neste relatorio e <b>simulacao de pre-dimensionamento</b>, separada dos dados medidos do analisador.
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-label">Pico Potencia Ativa</div><div class="kpi-value">44,69<span class="kpi-unit">kW</span></div><div class="kpi-sub">30/06/2026 11:00</div><span class="badge warn">Demanda relevante</span></div>
+    <div class="kpi"><div class="kpi-label">Pico Aparente</div><div class="kpi-value">45,87<span class="kpi-unit">kVA</span></div><div class="kpi-sub">Media 12,51 kVA</div><span class="badge warn">60% padrao 200 A</span></div>
+    <div class="kpi"><div class="kpi-label">FP Vetorial Medio</div><div class="kpi-value">0,99</div><div class="kpi-sub">Sistema 127/220 V</div><span class="badge ok">Acima de 0,92</span></div>
+    <div class="kpi"><div class="kpi-label">Consumo Medido</div><div class="kpi-value">2.260,74<span class="kpi-unit">kWh</span></div><div class="kpi-sub">10 dias analisados</div><span class="badge ok">Amostra parcial</span></div>
+  </div>
+
+  <div class="part-divider"><div class="num">1</div><div class="info"><h2>Analise Eletrica - Cargas, Potencias e Qualidade</h2><p>Dados medidos pelo analisador: correntes, tensoes, fator de potencia, desequilibrio e consumo por fase</p></div></div>
+
+  <section>
+    <h2><span class="num">1</span>Correntes por fase e neutro</h2>
+    <div class="section-grid">
+      <div>
+        <table><thead><tr><th>Origem</th><th class="num">Max (A)</th><th class="num">Media (A)</th><th>Status</th></tr></thead><tbody>
+          <tr><td class="label">Fase A</td><td class="num">129,76</td><td class="num">36,19</td><td><span class="tag warn">Alta</span></td></tr>
+          <tr><td class="label">Fase B</td><td class="num">121,11</td><td class="num">36,91</td><td><span class="tag warn">Alta</span></td></tr>
+          <tr><td class="label">Fase C</td><td class="num">107,91</td><td class="num">25,25</td><td><span class="tag ok">Menor carga</span></td></tr>
+          <tr><td class="label">Neutro Medido</td><td class="num">31,14</td><td class="num">12,78</td><td><span class="tag ok">Controlado</span></td></tr>
+          <tr><td class="label">Neutro Calculado</td><td class="num">100,69</td><td class="num">19,52</td><td><span class="tag warn">Acompanhar</span></td></tr>
+        </tbody></table>
+        <p style="font-size:12px;color:var(--p3-muted);margin-top:10px;line-height:1.5">A fase C trabalha abaixo das fases A e B. O ponto principal antes do EV e reequilibrar cargas monofasicas para reduzir a diferenca de corrente entre fases.</p>
+      </div>
+      <div class="chart-wrapper"><canvas id="chartCorrente"></canvas></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>Potencias ativa, reativa e aparente</h2>
+    <div class="section-grid"><div class="chart-wrapper"><canvas id="chartPotencia"></canvas></div><div>
+      <table><thead><tr><th>Grandeza</th><th class="num">Maxima</th><th class="num">Media</th><th>Unid.</th></tr></thead><tbody>
+        <tr><td class="label">P. Ativa Total</td><td class="num">44,69</td><td class="num">12,45</td><td>kW</td></tr>
+        <tr><td class="label">P. Aparente Vetorial</td><td class="num">45,87</td><td class="num">12,51</td><td>kVA</td></tr>
+        <tr><td class="label">P. Aparente Aritmetica</td><td class="num">45,95</td><td class="num">12,75</td><td>kVA</td></tr>
+        <tr><td class="label">P. Reativa Total</td><td class="num">10,21</td><td class="num">1,25</td><td>kVAr</td></tr>
+      </tbody></table>
+    </div></div>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>Tensoes e frequencia</h2>
+    <div class="section-grid"><div>
+      <table><thead><tr><th>Origem</th><th class="num">Max (V)</th><th class="num">Media (V)</th><th>Status</th></tr></thead><tbody>
+        <tr><td class="label">A-N</td><td class="num">131,89</td><td class="num">129,68</td><td><span class="tag ok">OK</span></td></tr>
+        <tr><td class="label">B-N</td><td class="num">132,03</td><td class="num">129,71</td><td><span class="tag ok">OK</span></td></tr>
+        <tr><td class="label">C-N</td><td class="num">131,90</td><td class="num">129,68</td><td><span class="tag ok">OK</span></td></tr>
+        <tr><td class="label">A-B</td><td class="num">228,94</td><td class="num">224,97</td><td><span class="tag ok">OK</span></td></tr>
+        <tr><td class="label">B-C</td><td class="num">228,32</td><td class="num">224,32</td><td><span class="tag ok">OK</span></td></tr>
+        <tr><td class="label">C-A</td><td class="num">228,38</td><td class="num">224,60</td><td><span class="tag ok">OK</span></td></tr>
+      </tbody></table>
+    </div><div class="chart-wrapper"><canvas id="chartTensao"></canvas></div></div>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span>Fator de potencia</h2>
+    <div class="section-grid"><div class="chart-wrapper"><canvas id="chartFP"></canvas></div><div>
+      <table><thead><tr><th>Origem</th><th class="num">FP medio</th><th>Status</th></tr></thead><tbody>
+        <tr><td class="label">Fase A</td><td class="num">0,98</td><td><span class="tag ok">OK</span></td></tr>
+        <tr><td class="label">Fase B</td><td class="num">0,98</td><td><span class="tag ok">OK</span></td></tr>
+        <tr><td class="label">Fase C</td><td class="num">0,96</td><td><span class="tag ok">OK</span></td></tr>
+        <tr><td class="label">Soma Vetorial</td><td class="num">0,99</td><td><span class="tag ok">Acima NBR</span></td></tr>
+      </tbody></table>
+      <p style="font-size:12px;color:var(--p3-muted);margin-top:10px">Nao ha indicacao de correcao de FP como prioridade. A prioridade tecnica fica no balanceamento de fases e na definicao correta do padrao para o EV.</p>
+    </div></div>
+  </section>
+
+  <section>
+    <h2><span class="num">5</span>Desequilibrios e qualidade</h2>
+    <div class="ind-row"><div class="ind-label">Desequilibrio de tensao fasorial</div><div class="ind-bar"><div class="fill" style="width:9%"></div></div><div class="ind-value">0,92% <span class="tag ok">OK</span></div></div>
+    <div class="ind-row"><div class="ind-label">Desequilibrio de tensao amplitude</div><div class="ind-bar"><div class="fill" style="width:11%"></div></div><div class="ind-value">1,13% <span class="tag ok">OK</span></div></div>
+    <div class="ind-row"><div class="ind-label">Desequilibrio de corrente amplitude</div><div class="ind-bar"><div class="fill danger" style="width:73%"></div></div><div class="ind-value">73,25% <span class="tag danger">Critico</span></div></div>
+    <p style="font-size:12px;color:var(--p3-muted);margin-top:14px">O desequilibrio de corrente e o ponto eletrico mais relevante do JK Central. Antes de liberar alta potencia no EV, redistribuir cargas por fase e conferir circuitos monofasicos.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">6</span>Consumo de energia</h2>
+    <div class="section-grid"><div>
+      <table><thead><tr><th>Fase</th><th class="num">Consumo (kWh)</th><th class="num">% do Total</th></tr></thead><tbody>
+        <tr><td class="label">Fase A</td><td class="num">832,98</td><td class="num">36,8%</td></tr>
+        <tr><td class="label">Fase B</td><td class="num">847,40</td><td class="num">37,5%</td></tr>
+        <tr><td class="label">Fase C</td><td class="num">580,37</td><td class="num">25,7%</td></tr>
+        <tr style="background:#172A42;font-weight:700"><td class="label">Total medido</td><td class="num">2.260,74</td><td class="num">100,0%</td></tr>
+      </tbody></table>
+      <table style="margin-top:14px"><thead><tr><th>Referencia</th><th class="num">Energia</th></tr></thead><tbody><tr><td>Media nos 10 dias medidos</td><td class="num">226,1 kWh/dia</td></tr><tr><td>Projecao mensal simples</td><td class="num">~ 6,8 MWh</td></tr><tr><td>EV 60 kW por 4 h/dia</td><td class="num">+ 7,2 MWh/mes</td></tr></tbody></table>
+    </div><div class="chart-wrapper"><canvas id="chartConsumo"></canvas></div></div>
+  </section>
+
+  <section>
+    <h2><span class="num">7</span>Recomendacoes da rede interna</h2>
+    <div class="rec-grid">
+      <div class="rec danger"><h3><span class="pri">Prioridade 1</span>Balanceamento de fases</h3><ul><li>Corrente maxima chegou a 129,76 A na fase A contra 107,91 A na fase C.</li><li>Desequilibrio de corrente maximo de 73,25%.</li><li>Redistribuir cargas monofasicas antes de liberar o EV.</li></ul></div>
+      <div class="rec warn"><h3><span class="pri">Prioridade 2</span>Padrao de entrada</h3><ul><li>Pico medido do posto: 45,87 kVA.</li><li>Com EV 60 kW, a soma teorica passa de 106 kVA.</li><li>250 A opera com DLM; 300 A libera 60 kW com mais margem.</li></ul></div>
+      <div class="rec"><h3><span class="pri">Prioridade 3</span>Protecoes e QGBT</h3><ul><li>Prever disjuntor dedicado, DPS e DR conforme especificacao do carregador.</li><li>Conferir barramentos e queda de tensao no trajeto ate o carregador.</li></ul></div>
+      <div class="rec"><h3><span class="pri">Prioridade 4</span>Nova conferencia</h3><ul><li>Revalidar com o EV operando, se possivel.</li><li>Registrar curva real depois da parametrizacao final do DLM.</li></ul></div>
+    </div>
+  </section>
+
+  <div class="part-divider"><div class="num">2</div><div class="info"><h2>Analise do Carregador EV - Dimensionamento e Operacao</h2><p>Simulacao separada dos dados medidos: capacidade do padrao, DLM e potencia disponivel ao EV</p></div></div>
+
+  <section>
+    <h2><span class="num">8</span>Dimensionamento do Padrao de Entrada</h2>
+    <div class="alert info"><div class="ico">&#9432;</div><div><strong>Carregador EV separado da medicao</strong><div>O analisador mede o posto existente. O EV 60 kW abaixo e uma simulacao: posto no pico medido de <b>45,87 kVA</b> somado ao carregador com FP 0,99. Use o DLM para limitar a potencia do EV nos momentos de pico.</div></div></div>
+    <div class="controls"><div class="ctrl"><label class="k" for="evPower">Carregador EV</label><select id="evPower"><option value="50">50 kW</option><option value="55">55 kW</option><option value="60" selected>60 kW</option><option value="65">65 kW</option><option value="70">70 kW</option><option value="75">75 kW</option><option value="80">80 kW</option></select><div class="ctrl-hint">Simulacao padrao: EV 60 kW</div></div><div class="ctrl"><label class="k" for="padrao">Padrao de Entrada</label><select id="padrao"><option value="150">150 A</option><option value="200">200 A</option><option value="250" selected>250 A</option><option value="300">300 A</option><option value="400">400 A</option></select><div class="ctrl-hint">Default UBY: 250 A com Smart Charger</div></div><div class="ctrl"><label class="k">Smart Charger (DLM)</label><label class="toggle"><input type="checkbox" id="dlm" checked><span class="track"></span><span class="lbl" id="dlmLabel">Ativo</span></label><div class="ctrl-hint">Balanceamento dinamico de carga</div></div></div>
+    <div id="verdictBox" class="alert" style="margin-bottom:18px"><div class="ico" id="verdictIcon">&#10003;</div><div><strong id="verdictTitle">Calculando...</strong><span id="verdictMsg"></span></div></div>
+    <table class="scenarios"><thead><tr><th>Cenario</th><th class="num">P (kW)</th><th class="num">S (kVA)</th><th class="num">Corrente (A)</th><th class="num">Cap. padrao (kVA)</th><th class="num">Utilizacao</th><th>Veredito</th></tr></thead><tbody id="scenariosBody"></tbody></table>
+  </section>
+  <section>
+    <h2><span class="num">9</span>OperaÃ§Ã£o do Smart Charger (DLM)</h2>
+    <p style="font-size:13px;color:var(--p3-muted);margin-bottom:16px;line-height:1.6">
+      Como o carregador EV vai operar com o padrÃ£o escolhido em diferentes momentos do dia. O DLM ajusta a potÃªncia entregue ao carregador em funÃ§Ã£o da demanda instantÃ¢nea do posto, garantindo que a soma <b>nunca ultrapasse a capacidade do padrÃ£o</b>.
+    </p>
+
+    <div class="op-summary" id="opSummary"></div>
+
+    <h3 class="sub">AlocaÃ§Ã£o da capacidade â€” momento de pico do posto</h3>
+    <div class="capacity-bar" id="capacityBar"></div>
+    <div class="cap-legend">
+      <div class="leg"><span class="sw posto"></span>Demanda do Posto</div>
+      <div class="leg"><span class="sw ev"></span>DisponÃ­vel ao EV (DLM)</div>
+      <div class="leg"><span class="sw reserve"></span>Reserva tÃ©cnica (5%)</div>
+    </div>
+
+    <h3 class="sub">CenÃ¡rios operacionais ao longo do dia</h3>
+    <div class="op-grid" id="opGrid"></div>
+
+    <h3 class="sub">Perfil 24h â€” Demanda do Posto vs. PotÃªncia DisponÃ­vel ao EV</h3>
+    <div class="chart-wrapper tall"><canvas id="chart24h"></canvas></div>
+    <p style="font-size:11px;color:var(--p3-muted);margin-top:10px;line-height:1.5">
+      Curva de demanda do posto baseada em perfil tÃ­pico de combustÃ­veis (picos de almoÃ§o e jantar). A potÃªncia efetiva entregue ao EV Ã© o <b>complemento</b> entre a capacidade do padrÃ£o e a demanda do posto a cada hora, respeitando o limite nominal do carregador.
+    </p>
+
+    <h3 class="sub">Tempo de operaÃ§Ã£o do carregador por faixa de potÃªncia (24h estimadas)</h3>
+    <div class="band-grid" id="bandGrid"></div>
+    <div class="band-bar" id="bandBar"></div>
+    <p style="font-size:11px;color:var(--p3-muted);margin-top:10px;line-height:1.5">
+      DistribuiÃ§Ã£o estimada de quanto tempo o carregador opera em cada faixa de potÃªncia ao longo de um dia tÃ­pico. Faixas baseadas em % da potÃªncia nominal do carregador EV. <b>Quanto mais tempo nas faixas verdes (alta potÃªncia)</b>, melhor a experiÃªncia do cliente final do EV.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">10</span>Recomenda&ccedil;&otilde;es para o Carregador EV</h2>
+    <div class="rec-grid"><div class="rec warn"><h3><span class="pri">Prioridade 1</span>Padr&atilde;o 250 A com Smart Charger</h3><ul><li>Configura&ccedil;&atilde;o simulada: EV 60 kW com DLM ativo.</li><li>O c&aacute;lculo usa posto em kVA medido e EV separado com FP 0,99.</li><li>250 A fica oper&aacute;vel com DLM, mas limita o EV no pico do posto.</li><li>300 A &eacute; a refer&ecirc;ncia para liberar 60 kW com pequena margem no pico.</li></ul></div><div class="rec danger"><h3><span class="pri">Prioridade 1</span>Balancear fases antes do EV</h3><ul><li>FP m&eacute;dio est&aacute; adequado; o gargalo &eacute; o desequil&iacute;brio de corrente.</li><li>Redistribuir cargas monof&aacute;sicas antes da entrada em opera&ccedil;&atilde;o do EV.</li><li>DLM n&atilde;o corrige desequil&iacute;brio de fases; ele apenas limita pot&ecirc;ncia total.</li></ul></div><div class="rec"><h3><span class="pri">Prioridade 2</span>Posicionamento e Cabeamento</h3><ul><li>Carregador deve ficar pr&oacute;ximo ao QGBT para reduzir queda de tens&atilde;o.</li><li>Cabeamento dimensionado para corrente nominal do carregador.</li><li>Disjuntor dedicado com prote&ccedil;&atilde;o adequada ao equipamento.</li></ul></div><div class="rec"><h3><span class="pri">Prioridade 3</span>Aproveitamento por Gera&ccedil;&atilde;o FV</h3><ul><li>EV adiciona &asymp; 7.200 kWh/m&ecirc;s ao consumo do posto em 4 h/dia a 60 kW.</li><li>Avaliar gera&ccedil;&atilde;o FV combinada para compensar parte do novo consumo.</li><li>Avaliar enquadramento tarif&aacute;rio se houver migra&ccedil;&atilde;o de demanda.</li></ul></div></div>
+  </section>
+
+  <footer>
+    <strong>UBY Recharge</strong> &mdash; Engenharia em energia e mobilidade el&eacute;trica<br>
+    Relat&oacute;rio gerado em 14/07/2026 com base em medi&ccedil;&atilde;o DMI P1000R Black Box (S/N 216A52ACD961) &mdash; Datalog ISSO Telecom<br>
+    Conte&uacute;do de carregador EV classificado como simula&ccedil;&atilde;o de pr&eacute;-dimensionamento
+  </footer>
 </div>
+
 <script>
-new Chart(document.getElementById('chartCorrentes'),{type:'bar',data:{labels:['A','B','C'],datasets:[{label:'Max (A)',data:[129.76,121.11,107.91],backgroundColor:'#0B2A4A'},{label:'Media (A)',data:[36.19,36.91,25.25],backgroundColor:'#2D7FF9'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,title:{display:true,text:'Corrente (A)'}}}}});
+
+// === THEME TOGGLE ===
+(function(){
+  const KEY = 'p3_theme';
+  const root = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  const apply = (t) => {
+    root.setAttribute('data-theme', t);
+    if(btn) btn.textContent = t === 'light' ? 'ðŸŒ™' : 'â˜€';
+    if(btn) btn.title = 'Mudar para tema ' + (t === 'light' ? 'escuro' : 'claro');
+  };
+  let saved = 'dark';
+  try { saved = localStorage.getItem(KEY) || 'dark'; } catch(e){}
+  apply(saved);
+  if(btn) btn.addEventListener('click', () => {
+    const cur = root.getAttribute('data-theme') || 'dark';
+    const nxt = cur === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(KEY, nxt); } catch(e){}
+    apply(nxt);
+  });
+})();
+
+const P3 = { primary:'#0B2A4A', accent:'#2D7FF9', accent2:'#FFB300', danger:'#C0392B', warn:'#E08E0B', muted:'#5C6B62' };
+Chart.defaults.font.family = "'Inter','Segoe UI',Arial,sans-serif";
+Chart.defaults.color = '#1F2A24';
+Chart.defaults.borderColor = '#DDE8F6';
+
+
+new Chart(document.getElementById('chartCorrente'), {
+  type:'bar',
+  data:{labels:['Fase A','Fase B','Fase C','Neutro Med.','Neutro Calc.'],datasets:[
+    {label:'M&aacute;xima (A)', data:[129.76,121.11,107.91,31.14,100.69], backgroundColor:P3.danger, borderRadius:4},
+    {label:'M&eacute;dia (A)', data:[36.19,36.91,25.25,12.78,19.52], backgroundColor:P3.accent, borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Correntes - Maxima vs Media'}},scales:{y:{title:{display:true,text:'Amperes (A)'}}}}
+});
+new Chart(document.getElementById('chartPotencia'), {
+  type:'bar',
+  data:{labels:['Fase A','Fase B','Fase C','Total/Soma'],datasets:[
+    {label:'P. Ativa Max (kW)', data:[16.11,15.27,13.31,44.69], backgroundColor:P3.primary, borderRadius:4},
+    {label:'P. Reativa Max (kVAr)', data:[4.65,3.23,4.40,10.21], backgroundColor:P3.warn, borderRadius:4},
+    {label:'P. Aparente Max (kVA)', data:[16.54,15.58,13.84,45.87], backgroundColor:P3.accent, borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Potencias por fase (Max)'}},scales:{y:{title:{display:true,text:'kW / kVAr / kVA'}}}}
+});
+new Chart(document.getElementById('chartTensao'), {
+  type:'bar',
+  data:{labels:['A-N','B-N','C-N','A-B','B-C','C-A'],datasets:[
+    {label:'Tensao Maxima (V)', data:[131.89,132.03,131.90,228.94,228.32,228.38], backgroundColor:P3.accent, borderRadius:4},
+    {label:'Tensao Media (V)', data:[129.68,129.71,129.68,224.97,224.32,224.60], backgroundColor:P3.primary, borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:'Tensoes Fase-Neutro e Fase-Fase'}}}
+});
+new Chart(document.getElementById('chartFP'), {
+  type:'bar',
+  data:{labels:['Fase A','Fase B','Fase C','Soma Arit.','Soma Vet.'],datasets:[
+    {label:'FP Real medio', data:[0.98,0.98,0.96,0.97,0.99], backgroundColor:[P3.accent,P3.accent,P3.accent,P3.accent,P3.accent], borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'Fator de Potencia medio (min. NBR = 0,92)'}},scales:{y:{min:0,max:1,title:{display:true,text:'FP'}}}}
+});
+new Chart(document.getElementById('chartConsumo'), {
+  type:'doughnut',
+  data:{labels:['Fase A - 832,98 kWh','Fase B - 847,40 kWh','Fase C - 580,37 kWh'],datasets:[{data:[832.98,847.40,580.37], backgroundColor:[P3.primary, P3.accent, P3.warn], borderColor:'#fff', borderWidth:3}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom'},title:{display:true,text:'Distribuicao do Consumo por Fase (10 dias)'}}}
+});
+
+
+
+const STORAGE_KEY = 'uby_JK_Central_completo_v2';
+function saveConfig(){
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      evPower: document.getElementById('evPower').value,
+      padrao: document.getElementById('padrao').value,
+      dlm: document.getElementById('dlm').checked
+    }));
+  } catch(e){}
+}
+function loadConfig(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(!saved) return;
+    if(saved.evPower) document.getElementById('evPower').value = saved.evPower;
+    if(saved.padrao) document.getElementById('padrao').value = saved.padrao;
+    if(saved.dlm !== undefined) document.getElementById('dlm').checked = saved.dlm;
+  } catch(e){}
+}
+const CFG = {V:220, P_posto:44.69, S_posto:45.87, P_med:12.45, FP_atual:0.99, FP_meta:0.92, FP_ev:0.99, EV_ATUAL:60, EV_TESTE:60, P_com_ev:0, S_com_ev:0, RESERVA:0.05, SQRT3:Math.sqrt(3)};
+const POSTO_PROFILE = [0.12,0.10,0.10,0.10,0.13,0.20,0.45,0.65,0.75,0.82,0.88,0.95,1.00,0.95,0.85,0.72,0.68,0.78,0.95,1.00,0.82,0.55,0.30,0.18];
+let chart24hInst = null;
+const fmt = (v, dec=1) => v.toLocaleString('pt-BR',{minimumFractionDigits:dec, maximumFractionDigits:dec});
+
+function capacidadePadrao(amp){ return CFG.SQRT3 * CFG.V * amp / 1000; }
+function correnteDeS(s_kva){ return s_kva * 1000 / (CFG.SQRT3 * CFG.V); }
+function recomendaPadrao(I_req){const ops=[150,200,250,300,400,500];return ops.find(a=>a>=I_req)||600;}
+function vereditoTag(util){if(util<=0.85)return{cls:'ok',txt:'Atende'};if(util<=1.00)return{cls:'warn',txt:'Limite'};return{cls:'danger',txt:'Insuficiente'};}
+
+function evDisponivel(P_posto_kW, cap_kVA, P_ev_max){
+  const reserva_kVA = cap_kVA * CFG.RESERVA;
+  const cap_util_kVA = cap_kVA - reserva_kVA;
+  const S_posto = P_posto_kW === CFG.P_posto ? CFG.S_posto : P_posto_kW / CFG.FP_atual;
+  const disponivel_kVA = Math.max(0, cap_util_kVA - S_posto);
+  return Math.max(0, Math.min(P_ev_max, disponivel_kVA * CFG.FP_ev));
+}
+
+function calcular(){
+  const P_ev = parseFloat(document.getElementById('evPower').value);
+  const padrao = parseInt(document.getElementById('padrao').value);
+  const dlm = document.getElementById('dlm').checked;
+  document.getElementById('dlmLabel').textContent = dlm ? 'Ativo' : 'Inativo';
+  const cap_kVA = capacidadePadrao(padrao);
+  // Salva configuraÃ§Ã£o (persistÃªncia)
+  saveConfig();
+
+  const ev_dlm_pico = evDisponivel(CFG.P_posto, cap_kVA, P_ev);
+  const S_ev_full = P_ev / CFG.FP_ev;
+  const cenarios = [
+    {nome:'Apenas posto sem EV (medido)', P:CFG.P_posto, S:CFG.S_posto, I:correnteDeS(CFG.S_posto)},
+    {nome:`Posto + EV ${P_ev} kW sem DLM (calculo corrigido)`, P:CFG.P_posto+P_ev, S:CFG.S_posto+S_ev_full, I:correnteDeS(CFG.S_posto+S_ev_full)},
+    {nome:`Posto + EV com DLM ativo (no pico do posto)`, P:CFG.P_posto+ev_dlm_pico, S:CFG.S_posto+(ev_dlm_pico/CFG.FP_ev), I:correnteDeS(CFG.S_posto+(ev_dlm_pico/CFG.FP_ev))},
+    {nome:`Apenas EV (${P_ev} kW) em horÃ¡rio nÃ£o-pico`, P:P_ev, S:P_ev/CFG.FP_ev, I:correnteDeS(P_ev/CFG.FP_ev)}
+  ];
+  const tbody = document.getElementById('scenariosBody');
+  tbody.innerHTML = '';
+  const ativo = dlm ? 2 : 1; // DLM=cenÃ¡rio 2 (com DLM); sem DLM=cenÃ¡rio 1 (pior caso)
+  cenarios.forEach((c,idx)=>{
+    const util = c.S/cap_kVA;
+    const v = vereditoTag(util);
+    const tr = document.createElement('tr');
+    if(idx===ativo) tr.classList.add('scenario-row','active');
+    tr.innerHTML = `<td class="label">${c.nome}</td><td class="num">${fmt(c.P)}</td><td class="num">${fmt(c.S)}</td><td class="num">${fmt(c.I,0)}</td><td class="num">${fmt(cap_kVA)}</td><td class="num">${fmt(util*100)}%</td><td class="verdict"><span class="tag ${v.cls}">${v.txt}</span></td>`;
+    tbody.appendChild(tr);
+  });
+
+  const utilAtual = CFG.S_posto/cap_kVA;
+  const kpi = document.getElementById('kpiUtil');
+  kpi.textContent = `${fmt(utilAtual*100,0)}% padrÃ£o ${padrao} A`;
+  kpi.className = 'badge ' + (utilAtual<=0.5 ? 'ok':utilAtual<=0.8 ? 'warn':'danger');
+
+  const cAtivo = cenarios[ativo];
+  const utilAtivo = cAtivo.S/cap_kVA;
+  const v = vereditoTag(utilAtivo);
+  const box = document.getElementById('verdictBox');
+  const folga = cap_kVA - cAtivo.S;
+  box.className = 'alert' + (v.cls==='danger' ? ' danger':v.cls==='ok' ? ' ok':'');
+  document.getElementById('verdictIcon').innerHTML = v.cls==='ok' ? '&#10003;':v.cls==='warn' ? '&#9888;':'&#10005;';
+  let titulo, msg;
+  if(v.cls==='ok'){titulo=`PadrÃ£o ${padrao} A ATENDE com folga`;msg=`ConfiguraÃ§Ã£o: EV ${P_ev} kW${dlm ? ' + DLM' : ''}. Demanda ${fmt(cAtivo.S)} kVA / ${fmt(cap_kVA)} kVA. Folga ${fmt(folga)} kVA.`;}
+  else if(v.cls==='warn'){titulo=`PadrÃ£o ${padrao} A no LIMITE`;msg=`EV ${P_ev} kW${dlm ? ' + DLM' : ''}. UtilizaÃ§Ã£o <b>${fmt(utilAtivo*100)}%</b>. OperÃ¡vel sem folga.`;}
+  else{const padraoRec=recomendaPadrao(cAtivo.I);titulo=`PadrÃ£o ${padrao} A INSUFICIENTE`;msg=`EV ${P_ev} kW${dlm ? ' + DLM' : ''}. Demanda ${fmt(cAtivo.S)} kVA / ${fmt(cAtivo.I,0)} A excede capacidade. Subir para <b>${padraoRec} A</b> ou ativar DLM.`;}
+  document.getElementById('verdictTitle').textContent = titulo;
+  document.getElementById('verdictMsg').innerHTML = ' ' + msg;
+
+  atualizarPainelOperacional(P_ev, padrao, dlm);
+}
+
+function atualizarPainelOperacional(P_ev, padrao, dlm){
+  const cap_kVA = CFG.SQRT3*CFG.V*padrao/1000;
+  const reserva_kVA = cap_kVA*CFG.RESERVA;
+
+  document.getElementById('opSummary').innerHTML = `
+    <span>ConfiguraÃ§Ã£o ativa:</span>
+    <span class="pill">PadrÃ£o ${padrao} A â€” ${fmt(cap_kVA)} kVA</span>
+    <span class="pill">EV ${P_ev} kW</span>
+    <span class="pill ${dlm ? '' : 'warn'}">DLM ${dlm ? 'Ativo' : 'INATIVO'}</span>
+    <span class="pill muted">Posto medido ${fmt(CFG.S_posto)} kVA</span>
+    <span style="margin-left:auto;font-size:11px;color:var(--p3-muted)">Reserva tÃ©cnica: ${(CFG.RESERVA*100).toFixed(0)}% (${fmt(reserva_kVA)} kVA)</span>
+  `;
+
+  const S_posto_pico = CFG.S_posto;
+  const ev_pico_kW = evDisponivel(CFG.P_posto, cap_kVA, P_ev);
+  const ev_pico_kVA = ev_pico_kW/CFG.FP_ev;
+  const pct_posto = (S_posto_pico/cap_kVA)*100;
+  const pct_ev = (ev_pico_kVA/cap_kVA)*100;
+  const pct_reserve = (reserva_kVA/cap_kVA)*100;
+  const pct_folga = Math.max(0, 100-pct_posto-pct_ev-pct_reserve);
+  document.getElementById('capacityBar').innerHTML = `
+    <div class="cap-segment posto" style="width:${Math.min(pct_posto,100)}%"><div>Posto</div><div class="v">${fmt(CFG.P_posto)} kW</div></div>
+    <div class="cap-segment ev" style="width:${pct_ev}%"><div>EV</div><div class="v">${fmt(ev_pico_kW)} kW</div></div>
+    <div class="cap-segment reserve" style="width:${pct_reserve+pct_folga}%"><div>Reserva</div><div class="v">${fmt(reserva_kVA + cap_kVA*pct_folga/100)} kVA</div></div>
+  `;
+
+  const P_baixa = CFG.P_posto*0.12;
+  const cenariosOp = [
+    {nome:'Pico do posto', ctx:'12:55h â€¢ horÃ¡rio comercial', posto:CFG.P_posto, classe:'crit'},
+    {nome:'Demanda mÃ©dia', ctx:'Diurno tÃ­pico', posto:CFG.P_med, classe:'warn'},
+    {nome:'Madrugada baixa', ctx:'02:00â€“05:00h', posto:P_baixa, classe:''},
+    {nome:'Posto fechado', ctx:'Sem operaÃ§Ã£o', posto:0, classe:''}
+  ];
+  document.getElementById('opGrid').innerHTML = cenariosOp.map(c=>{
+    const ev = evDisponivel(c.posto, cap_kVA, P_ev);
+    const pct = (ev/P_ev)*100;
+    return `<div class="op-card ${c.classe}"><div class="op-label">${c.nome}</div><div class="op-context">${c.ctx} â€¢ Posto ${fmt(c.posto)} kW</div><div class="op-value">${fmt(ev)}<span class="op-unit">kW</span></div><div class="op-bar"><div class="fill" style="width:${pct}%"></div></div><div class="op-hint">${fmt(pct,0)}% da potÃªncia nominal do EV</div></div>`;
+  }).join('');
+
+  const horas = Array.from({length:24},(_,i)=>`${String(i).padStart(2,'0')}h`);
+  const postoCurve = POSTO_PROFILE.map(f=>f*CFG.P_posto);
+  const evCurve = postoCurve.map(p=>evDisponivel(p, cap_kVA, P_ev));
+  const capLine = horas.map(()=>cap_kVA*CFG.FP_meta);
+
+  if(chart24hInst) chart24hInst.destroy();
+  const ctx = document.getElementById('chart24h').getContext('2d');
+  const gradPosto = ctx.createLinearGradient(0,0,0,300);
+  gradPosto.addColorStop(0,'rgba(192,57,43,0.45)');gradPosto.addColorStop(1,'rgba(192,57,43,0.05)');
+  const gradEv = ctx.createLinearGradient(0,0,0,300);
+  gradEv.addColorStop(0,'rgba(45,127,249,0.55)');gradEv.addColorStop(1,'rgba(45,127,249,0.05)');
+
+  chart24hInst = new Chart(ctx,{
+    type:'line',
+    data:{labels:horas,datasets:[
+      {label:'Capacidade efetiva do padrÃ£o',data:capLine,borderColor:P3.muted,borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:0},
+      {label:'Demanda do Posto (estimada)',data:postoCurve,borderColor:P3.danger,backgroundColor:gradPosto,borderWidth:2.5,fill:'origin',tension:0.45,pointRadius:0,pointHoverRadius:4},
+      {label:'PotÃªncia disponÃ­vel ao EV',data:evCurve,borderColor:P3.accent,backgroundColor:gradEv,borderWidth:2.5,fill:'origin',tension:0.45,pointRadius:0,pointHoverRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},title:{display:true,text:`Curva diÃ¡ria estimada â€” PadrÃ£o ${padrao} A com EV ${P_ev} kW ${dlm ? '(DLM ativo)' : ''}`}},scales:{y:{title:{display:true,text:'PotÃªncia (kW)'},beginAtZero:true},x:{title:{display:true,text:'Hora do dia'}}},interaction:{mode:'index',intersect:false}}
+  });
+
+  const bands = [
+    {min:0, max:0.001, label:'Bloqueado', color:'#7B8A82', cls:'b0'},
+    {min:0.001, max:0.25, label:'1â€“25%', color:'#FFB300', cls:'b1'},
+    {min:0.25, max:0.50, label:'25â€“50%', color:'#FFC940', cls:'b2'},
+    {min:0.50, max:0.75, label:'50â€“75%', color:'#7DCB97', cls:'b3'},
+    {min:0.75, max:1.001, label:'75â€“100%', color:P3.accent, cls:'b4'}
+  ];
+  const horasPorFaixa = bands.map(b=>{
+    const h = evCurve.filter(ev=>{const r=ev/P_ev;return r>=b.min && r<b.max;}).length;
+    return {...b, horas:h, pct:(h/24)*100};
+  });
+  document.getElementById('bandGrid').innerHTML = horasPorFaixa.map(b=>{
+    const kwRange = b.label==='Bloqueado' ? '0 kW':`${(b.min*P_ev).toFixed(0)}â€“${Math.min(b.max,1)*P_ev|0} kW`;
+    return `<div class="band-card ${b.cls}"><div class="pct">${b.label}</div><div class="kw">${kwRange}</div><div class="hours">${b.horas}<small>h/dia</small></div><div class="pct-day">${fmt(b.pct,0)}% do dia</div></div>`;
+  }).join('');
+  document.getElementById('bandBar').innerHTML = horasPorFaixa.map(b=>`<span class="seg" style="width:${b.pct}%;background:${b.color}" title="${b.label}: ${b.horas}h"></span>`).join('');
+}
+
+['evPower','padrao','dlm'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', calcular);
+  document.getElementById(id).addEventListener('change', calcular);
+});
+loadConfig();
+calcular();
 </script>
-<script src="../auth.js"></script><script>UBY_AUTH.require("analyzers");</script>
+<script src="../auth.js"></script>
+<script>UBY_AUTH.require("analyzers");</script>
 </body>
 </html>
+
+
