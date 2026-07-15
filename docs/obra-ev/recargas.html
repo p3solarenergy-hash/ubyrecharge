@@ -1805,6 +1805,9 @@ let ubyAreaReportSyncPromise = null;
 let ubyInvestorReportSyncPromise = null;
 let rechargeLoadSequence = 0;
 let generalRefreshSequence = 0;
+let rechargeImportQueue = Promise.resolve();
+let queuedRechargeImports = 0;
+let monthlyRenderSequence = 0;
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -2669,7 +2672,7 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
   document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.report-tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${target}'`)));
   showTab(target);
-  if (target === 'mensal') renderMensal();
+  if (target === 'mensal') await renderMensal();
   else if (target === 'acumulado') renderAcumulado();
   else if (target === 'detalhes') renderDetalhes();
   else if (target === 'financeiro') await handleFinanceMonthChange();
@@ -2719,7 +2722,12 @@ function handleFiles(files) {
     f.month = selectedMonth;
     f.importMode = importMode;
     loadedFiles.push(f);
-    readFile(f);
+    queuedRechargeImports += 1;
+    rechargeImportQueue = rechargeImportQueue
+      .then(() => readFile(f))
+      .finally(() => {
+        queuedRechargeImports = Math.max(0, queuedRechargeImports - 1);
+      });
   });
 }
 
@@ -3321,22 +3329,13 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
   };
 }
 
-function readFile(file) {
-  setFeedback('⏳ Lendo planilha...', 'up-loading');
+async function readFile(file) {
+  const queueNote = queuedRechargeImports > 1 ? ` (${queuedRechargeImports} arquivos na fila)` : '';
+  setFeedback(`⏳ Lendo planilha${queueNote}...`, 'up-loading');
   const isCsvFile = /\.csv$/i.test(String(file?.name || ''));
-
-  const reader = new FileReader();
-  reader.onload = async e => {
-    try {
-      let rows = [];
-      if (isCsvFile) {
-        rows = parseCsvRows(new TextDecoder('utf-8').decode(e.target.result));
-      } else {
-        setFeedback('⏳ Preparando leitor de Excel...', 'up-loading');
-        await ensureSpreadsheetLibrary();
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-        rows = rechargeSheetRows(wb).rows;
-      }
+  try {
+      const buffer = await file.arrayBuffer();
+      const rows = await rechargeRowsFromFileBuffer(buffer, isCsvFile);
       if (rows.length < 2) throw new Error('Planilha sem dados de recargas.');
 
       const layout = detectRechargeLayout(rows);
@@ -3352,6 +3351,7 @@ function readFile(file) {
           if (!r || !rowHasData(r)) continue;
           const charge = parseRechargeRow(r, layout, file);
           if (charge) importedCharges.push(charge);
+          if (i % 250 === 0) await yieldToBrowser();
         }
       } else {
       for (let i = 1; i < rows.length; i++) {
@@ -3359,6 +3359,7 @@ function readFile(file) {
         if (!r || r[0] == null) continue;
         const charge = parseRechargeRow(r, layout, file);
         if (charge) importedCharges.push(charge);
+        if (i % 250 === 0) await yieldToBrowser();
       }
       }
       if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
@@ -3426,7 +3427,7 @@ function readFile(file) {
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
       updateCorrectionButtons();
-      renderAll();
+      await renderAll();
       setStorageState(`Planilha importada para <strong>${currentWorkName}</strong>: ${importedCharges.length} recarga(s), ${fmtKWh(importedCharges.reduce((s,c)=>s+c.energyKWh,0))}, ${fmtBRL(importedCharges.reduce((s,c)=>s+c.revenue,0))}. Salvando no banco...`);
       await saveRechargeBase();
       if (replacedCount > 0) {
@@ -3435,18 +3436,11 @@ function readFile(file) {
         setFeedback(`${duplicateCount} recarga(s) duplicada(s) foram atualizadas. As demais foram consolidadas no mês.`, 'up-loading');
       }
 
-    } catch (err) {
+  } catch (err) {
       setFeedback('❌ ' + err.message, 'up-error');
       loadedFiles = loadedFiles.filter(f => f !== file);
       updateChips();
-    }
-  };
-  reader.onerror = () => {
-    setFeedback('❌ Erro ao ler o arquivo. Tente novamente.', 'up-error');
-    loadedFiles = loadedFiles.filter(f => f !== file);
-    updateChips();
-  };
-  reader.readAsArrayBuffer(file);
+  }
 }
 
 // ── Helpers de data / tempo ────────────────────────────────
@@ -4444,6 +4438,88 @@ function financeMonthSeries(firstMonth = '', lastMonth = '') {
     cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
   }
   return rows;
+}
+
+function yieldToBrowser() {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+function parseRechargeRowsInWorker(arrayBuffer, isCsvFile) {
+  if (!window.Worker || !window.Blob || !window.URL?.createObjectURL) {
+    return Promise.reject(new Error('Processamento em segundo plano indisponivel.'));
+  }
+  const workerSource = `
+    function parseCsvRows(text) {
+      const rows = []; let row = []; let value = ''; let quoted = false;
+      const input = String(text || '').replace(/^\\uFEFF/, '');
+      for (let i = 0; i < input.length; i++) {
+        const char = input[i]; const next = input[i + 1];
+        if (char === '"') {
+          if (quoted && next === '"') { value += '"'; i++; }
+          else quoted = !quoted;
+        } else if (char === ',' && !quoted) { row.push(value); value = ''; }
+        else if ((char === '\\n' || char === '\\r') && !quoted) {
+          if (char === '\\r' && next === '\\n') i++;
+          row.push(value);
+          if (row.some(cell => String(cell).trim() !== '')) rows.push(row);
+          row = []; value = '';
+        } else value += char;
+      }
+      row.push(value);
+      if (row.some(cell => String(cell).trim() !== '')) rows.push(row);
+      return rows;
+    }
+    self.onmessage = event => {
+      try {
+        const { buffer, csv, xlsxUrl } = event.data;
+        let rows;
+        if (csv) rows = parseCsvRows(new TextDecoder('utf-8').decode(buffer));
+        else {
+          importScripts(xlsxUrl);
+          const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+          const sheet = workbook.Sheets.Recargas || workbook.Sheets[workbook.SheetNames[0]];
+          if (!sheet) throw new Error('Nenhuma aba encontrada no arquivo.');
+          rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+        }
+        self.postMessage({ ok: true, rows });
+      } catch (error) {
+        self.postMessage({ ok: false, error: error?.message || String(error) });
+      }
+    };
+  `;
+  return new Promise((resolve, reject) => {
+    const workerUrl = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
+    const worker = new Worker(workerUrl);
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      reject(new Error('A leitura da planilha excedeu o tempo esperado.'));
+    }, 90000);
+    const finish = (callback, value) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      callback(value);
+    };
+    worker.onmessage = event => {
+      if (event.data?.ok) finish(resolve, event.data.rows || []);
+      else finish(reject, new Error(event.data?.error || 'Falha ao processar a planilha.'));
+    };
+    worker.onerror = event => finish(reject, new Error(event.message || 'Falha no leitor em segundo plano.'));
+    const transferable = arrayBuffer.slice(0);
+    worker.postMessage({ buffer: transferable, csv: isCsvFile, xlsxUrl: XLSX_CDN_URL }, [transferable]);
+  });
+}
+
+async function rechargeRowsFromFileBuffer(arrayBuffer, isCsvFile) {
+  try {
+    return await parseRechargeRowsInWorker(arrayBuffer, isCsvFile);
+  } catch (workerError) {
+    if (isCsvFile) return parseCsvRows(new TextDecoder('utf-8').decode(arrayBuffer));
+    await ensureSpreadsheetLibrary();
+    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    return rechargeSheetRows(workbook).rows;
+  }
 }
 
 function financeMonthOccupancy(charges = [], mk = '', powerOverride = 0) {
@@ -9465,7 +9541,7 @@ function renderGeral() {
 }
 
 // ── Render All ────────────────────────────────────────────
-function renderAll() {
+async function renderAll() {
   const visibleTab =
     document.getElementById('tabFinanceiroGeral').style.display === 'block' ? 'financeiroGeral' :
     document.getElementById('tabClube').style.display === 'block' ? 'clube' :
@@ -9489,7 +9565,7 @@ function renderAll() {
 
   document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${visibleTab}'`)));
   showTab(visibleTab);
-  if (visibleTab === 'mensal') renderMensal();
+  if (visibleTab === 'mensal') await renderMensal();
   else if (visibleTab === 'acumulado') renderAcumulado();
   else if (visibleTab === 'financeiro') handleFinanceMonthChange();
   else if (visibleTab === 'detalhes') renderDetalhes();
@@ -9502,13 +9578,16 @@ function renderAll() {
 // ══════════════════════════════════════════════════════════
 //  TAB MENSAL
 // ══════════════════════════════════════════════════════════
-function renderMensal() {
+async function renderMensal() {
+  const renderSequence = ++monthlyRenderSequence;
   const mk      = document.getElementById('monthSelector').value;
   if (!mk) return;
   const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
   renderUsageInsights(monthCharges, 'usage', allCharges, { weekdayPower: getPower(), weekdayBounds: window });
+  await yieldToBrowser();
+  if (renderSequence !== monthlyRenderSequence) return;
   if (!charges.length) {
     renderVisualSummary('monthlyVisualSummary', [], { historyCharges: allCharges });
   renderWeekdayOccupancyReport('weekdayOccupancyMensal', [], getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
@@ -9522,15 +9601,21 @@ function renderMensal() {
   renderKPIs(charges, mk, window);
   enhanceIndividualKpis();
   renderWeekdayOccupancyReport('weekdayOccupancyMensal', charges, getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
+  await yieldToBrowser();
+  if (renderSequence !== monthlyRenderSequence) return;
   renderPaymentChart(charges);
   renderUserPieChart(charges);
   renderUserBars(charges, 'userBars');
   renderFinancialNote(charges);
+  await yieldToBrowser();
+  if (renderSequence !== monthlyRenderSequence) return;
   renderMonthlyTable();
   renderBaseTable(charges, mk, window);
   renderMonthClosing(mk);
   renderClientsTable(charges);
   renderIdleAlerts(charges);
+  await yieldToBrowser();
+  if (renderSequence !== monthlyRenderSequence) return;
   renderReviews(charges);
   renderTechDiagnostic(charges);
 }
@@ -10170,11 +10255,11 @@ function showTab(name) {
 
 function hideAllTabs() { showTab('none'); }
 
-function switchTab(name, btn) {
+async function switchTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   showTab(name);
-  if (name === 'mensal') renderMensal();
+  if (name === 'mensal') await renderMensal();
   else if (name === 'acumulado') renderAcumulado();
   else if (name === 'geral') renderGeral();
   else if (name === 'uby') renderUbyOperation();

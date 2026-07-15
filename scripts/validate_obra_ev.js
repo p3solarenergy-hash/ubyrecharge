@@ -85,13 +85,19 @@ function assertRechargeRenderSafety() {
   if (/renderMensal\(\);\s*renderAcumulado\(\);\s*renderFinanceiro\(\);\s*renderGeral\(\);/.test(recargas)) {
     throw new Error("O painel de recargas nao pode renderizar todas as abas em uma unica atualizacao.");
   }
-  if (!recargas.includes("if (name === 'mensal') renderMensal();") ||
+  if (!recargas.includes("if (name === 'mensal') await renderMensal();") ||
       !recargas.includes("else if (name === 'acumulado') renderAcumulado();")) {
     throw new Error("As abas mensal e acumulado precisam ser renderizadas sob demanda.");
   }
   if (!recargas.includes("Chart.defaults.animation = false")) {
     throw new Error("Os graficos do painel precisam manter animacoes desativadas durante atualizacoes.");
   }
+  if (!recargas.includes("parseRechargeRowsInWorker") || !recargas.includes("rechargeImportQueue")) {
+    throw new Error("A importacao de planilhas precisa usar processamento em segundo plano e fila serial.");
+  }
+  const workerSource = recargas.match(/const workerSource = `([\s\S]*?)`;\s*return new Promise/);
+  if (!workerSource) throw new Error("O leitor em segundo plano da planilha nao foi encontrado.");
+  checkScript(workerSource[1], "recargas-import-worker.js");
 }
 
 function main() {
