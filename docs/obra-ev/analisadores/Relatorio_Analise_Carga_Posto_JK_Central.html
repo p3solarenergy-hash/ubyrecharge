@@ -341,35 +341,35 @@
     <table class="scenarios"><thead><tr><th>Cenario</th><th class="num">P (kW)</th><th class="num">S (kVA)</th><th class="num">Corrente (A)</th><th class="num">Cap. padrao (kVA)</th><th class="num">Utilizacao</th><th>Veredito</th></tr></thead><tbody id="scenariosBody"></tbody></table>
   </section>
   <section>
-    <h2><span class="num">9</span>OperaÃ§Ã£o do Smart Charger (DLM)</h2>
+    <h2><span class="num">9</span>Opera&ccedil;&atilde;o do Smart Charger (DLM)</h2>
     <p style="font-size:13px;color:var(--p3-muted);margin-bottom:16px;line-height:1.6">
-      Como o carregador EV vai operar com o padrÃ£o escolhido em diferentes momentos do dia. O DLM ajusta a potÃªncia entregue ao carregador em funÃ§Ã£o da demanda instantÃ¢nea do posto, garantindo que a soma <b>nunca ultrapasse a capacidade do padrÃ£o</b>.
+      Como o carregador EV vai operar com o padr&atilde;o escolhido em diferentes momentos do dia. O DLM ajusta a pot&ecirc;ncia entregue ao carregador em fun&ccedil;&atilde;o da demanda instant&acirc;nea do posto, garantindo que a soma <b>nunca ultrapasse a capacidade do padr&atilde;o</b>.
     </p>
 
     <div class="op-summary" id="opSummary"></div>
 
-    <h3 class="sub">AlocaÃ§Ã£o da capacidade â€” momento de pico do posto</h3>
+    <h3 class="sub">Aloca&ccedil;&atilde;o da capacidade - momento de pico do posto</h3>
     <div class="capacity-bar" id="capacityBar"></div>
     <div class="cap-legend">
       <div class="leg"><span class="sw posto"></span>Demanda do Posto</div>
-      <div class="leg"><span class="sw ev"></span>DisponÃ­vel ao EV (DLM)</div>
-      <div class="leg"><span class="sw reserve"></span>Reserva tÃ©cnica (5%)</div>
+      <div class="leg"><span class="sw ev"></span>Dispon&iacute;vel ao EV (DLM)</div>
+      <div class="leg"><span class="sw reserve"></span>Reserva t&eacute;cnica (5%)</div>
     </div>
 
-    <h3 class="sub">CenÃ¡rios operacionais ao longo do dia</h3>
+    <h3 class="sub">Cen&aacute;rios operacionais ao longo do dia</h3>
     <div class="op-grid" id="opGrid"></div>
 
-    <h3 class="sub">Perfil 24h â€” Demanda do Posto vs. PotÃªncia DisponÃ­vel ao EV</h3>
+    <h3 class="sub">Perfil 24h - Demanda do Posto vs. Pot&ecirc;ncia Dispon&iacute;vel ao EV</h3>
     <div class="chart-wrapper tall"><canvas id="chart24h"></canvas></div>
     <p style="font-size:11px;color:var(--p3-muted);margin-top:10px;line-height:1.5">
-      Curva de demanda do posto baseada em perfil tÃ­pico de combustÃ­veis (picos de almoÃ§o e jantar). A potÃªncia efetiva entregue ao EV Ã© o <b>complemento</b> entre a capacidade do padrÃ£o e a demanda do posto a cada hora, respeitando o limite nominal do carregador.
+      Curva de demanda do posto baseada em perfil t&iacute;pico de combust&iacute;veis (picos de almo&ccedil;o e jantar). A pot&ecirc;ncia efetiva entregue ao EV Ã© o <b>complemento</b> entre a capacidade do padr&atilde;o e a demanda do posto a cada hora, respeitando o limite nominal do carregador.
     </p>
 
-    <h3 class="sub">Tempo de operaÃ§Ã£o do carregador por faixa de potÃªncia (24h estimadas)</h3>
+    <h3 class="sub">Tempo de opera&ccedil;&atilde;o do carregador por faixa de pot&ecirc;ncia (24h estimadas)</h3>
     <div class="band-grid" id="bandGrid"></div>
     <div class="band-bar" id="bandBar"></div>
     <p style="font-size:11px;color:var(--p3-muted);margin-top:10px;line-height:1.5">
-      DistribuiÃ§Ã£o estimada de quanto tempo o carregador opera em cada faixa de potÃªncia ao longo de um dia tÃ­pico. Faixas baseadas em % da potÃªncia nominal do carregador EV. <b>Quanto mais tempo nas faixas verdes (alta potÃªncia)</b>, melhor a experiÃªncia do cliente final do EV.
+      Distribui&ccedil;&atilde;o estimada de quanto tempo o carregador opera em cada faixa de pot&ecirc;ncia ao longo de um dia t&iacute;pico. Faixas baseadas em % da pot&ecirc;ncia nominal do carregador EV. <b>Quanto mais tempo nas faixas verdes (alta pot&ecirc;ncia)</b>, melhor a experi&ecirc;ncia do cliente final do EV.
     </p>
   </section>
 
@@ -409,6 +409,21 @@
 })();
 
 const P3 = { primary:'#0B2A4A', accent:'#2D7FF9', accent2:'#FFB300', danger:'#C0392B', warn:'#E08E0B', muted:'#5C6B62' };
+if(typeof window.Chart === 'undefined'){
+  window.Chart = function(target){
+    const canvas = target && target.canvas ? target.canvas : target;
+    const ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
+    if(ctx){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.font = '13px Segoe UI, Arial';
+      ctx.fillStyle = '#5C6B62';
+      ctx.fillText('Grafico indisponivel: Chart.js nao carregou.', 20, 36);
+      ctx.fillText('Os calculos, cenarios e faixas abaixo continuam ativos.', 20, 58);
+    }
+    return {destroy:function(){}};
+  };
+  window.Chart.defaults = {font:{}};
+}
 Chart.defaults.font.family = "'Inter','Segoe UI',Arial,sans-serif";
 Chart.defaults.color = '#1F2A24';
 Chart.defaults.borderColor = '#DDE8F6';
@@ -518,7 +533,7 @@ function calcular(){
 
   const utilAtual = CFG.S_posto/cap_kVA;
   const kpi = document.getElementById('kpiUtil');
-  kpi.textContent = `${fmt(utilAtual*100,0)}% padrÃ£o ${padrao} A`;
+  kpi.textContent = `${fmt(utilAtual*100,0)}% padr&atilde;o ${padrao} A`;
   kpi.className = 'badge ' + (utilAtual<=0.5 ? 'ok':utilAtual<=0.8 ? 'warn':'danger');
 
   const cAtivo = cenarios[ativo];
@@ -548,7 +563,7 @@ function atualizarPainelOperacional(P_ev, padrao, dlm){
     <span class="pill">EV ${P_ev} kW</span>
     <span class="pill ${dlm ? '' : 'warn'}">DLM ${dlm ? 'Ativo' : 'INATIVO'}</span>
     <span class="pill muted">Posto medido ${fmt(CFG.S_posto)} kVA</span>
-    <span style="margin-left:auto;font-size:11px;color:var(--p3-muted)">Reserva tÃ©cnica: ${(CFG.RESERVA*100).toFixed(0)}% (${fmt(reserva_kVA)} kVA)</span>
+    <span style="margin-left:auto;font-size:11px;color:var(--p3-muted)">Reserva t&eacute;cnica: ${(CFG.RESERVA*100).toFixed(0)}% (${fmt(reserva_kVA)} kVA)</span>
   `;
 
   const S_posto_pico = CFG.S_posto;
@@ -574,7 +589,7 @@ function atualizarPainelOperacional(P_ev, padrao, dlm){
   document.getElementById('opGrid').innerHTML = cenariosOp.map(c=>{
     const ev = evDisponivel(c.posto, cap_kVA, P_ev);
     const pct = (ev/P_ev)*100;
-    return `<div class="op-card ${c.classe}"><div class="op-label">${c.nome}</div><div class="op-context">${c.ctx} â€¢ Posto ${fmt(c.posto)} kW</div><div class="op-value">${fmt(ev)}<span class="op-unit">kW</span></div><div class="op-bar"><div class="fill" style="width:${pct}%"></div></div><div class="op-hint">${fmt(pct,0)}% da potÃªncia nominal do EV</div></div>`;
+    return `<div class="op-card ${c.classe}"><div class="op-label">${c.nome}</div><div class="op-context">${c.ctx} â€¢ Posto ${fmt(c.posto)} kW</div><div class="op-value">${fmt(ev)}<span class="op-unit">kW</span></div><div class="op-bar"><div class="fill" style="width:${pct}%"></div></div><div class="op-hint">${fmt(pct,0)}% da pot&ecirc;ncia nominal do EV</div></div>`;
   }).join('');
 
   const horas = Array.from({length:24},(_,i)=>`${String(i).padStart(2,'0')}h`);
@@ -592,7 +607,7 @@ function atualizarPainelOperacional(P_ev, padrao, dlm){
   chart24hInst = new Chart(ctx,{
     type:'line',
     data:{labels:horas,datasets:[
-      {label:'Capacidade efetiva do padrÃ£o',data:capLine,borderColor:P3.muted,borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:0},
+      {label:'Capacidade efetiva do padr&atilde;o',data:capLine,borderColor:P3.muted,borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:0},
       {label:'Demanda do Posto (estimada)',data:postoCurve,borderColor:P3.danger,backgroundColor:gradPosto,borderWidth:2.5,fill:'origin',tension:0.45,pointRadius:0,pointHoverRadius:4},
       {label:'PotÃªncia disponÃ­vel ao EV',data:evCurve,borderColor:P3.accent,backgroundColor:gradEv,borderWidth:2.5,fill:'origin',tension:0.45,pointRadius:0,pointHoverRadius:4}
     ]},
@@ -628,5 +643,7 @@ calcular();
 <script>UBY_AUTH.require("analyzers");</script>
 </body>
 </html>
+
+
 
 
