@@ -443,6 +443,20 @@
     .station-layout-field { display:grid; gap:6px; min-width:0; color:var(--p3-muted); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
     .station-layout-field.wide { grid-column:1/-1; }
     .station-layout-field input { width:100%; min-height:40px; border:1px solid var(--p3-border); border-radius:8px; background:#091526; color:var(--p3-text); padding:9px 10px; font:inherit; }
+    .station-layout-divider { grid-column:1/-1; margin-top:6px; padding-top:14px; border-top:1px solid var(--surface-border); color:var(--p3-primary); font-size:12px; font-weight:800; }
+    .station-layout-toggle { display:flex; align-items:center; gap:9px; min-height:40px; color:var(--p3-text); font-size:12px; font-weight:700; }
+    .station-layout-toggle input { width:18px; height:18px; accent-color:var(--p3-primary); }
+    .station-weekdays { grid-column:1/-1; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px; }
+    .station-weekdays label { display:grid; place-items:center; gap:5px; min-height:50px; border:1px solid var(--surface-border); border-radius:8px; background:#091526; color:var(--p3-muted); font-size:10px; font-weight:800; }
+    .station-weekdays input { width:16px; height:16px; accent-color:var(--p3-primary); }
+    .station-occupancy-list { display:grid; gap:8px; }
+    .station-occupancy-row { display:grid; grid-template-columns:minmax(210px,1.35fr) minmax(140px,.7fr) minmax(110px,.55fr) auto; gap:16px; align-items:center; padding:13px 0; border-bottom:1px solid var(--surface-border); }
+    .station-occupancy-row:last-child { border-bottom:0; }
+    .station-occupancy-name strong { display:block; color:var(--p3-text); font-size:13px; }
+    .station-occupancy-name span,.station-occupancy-meta { color:var(--p3-muted); font-size:11px; }
+    .station-occupancy-value { color:var(--p3-primary); font-size:21px; font-weight:900; }
+    .station-occupancy-bar { height:7px; margin-top:7px; overflow:hidden; border-radius:99px; background:#1B334F; }
+    .station-occupancy-bar span { display:block; height:100%; border-radius:inherit; background:#57B7FF; }
     .station-layout-actions { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px 18px; border-top:1px solid var(--surface-border); }
     .plant-count { display:inline-grid; gap:2px; min-width:56px; }
     .plant-count strong { color:var(--p3-text); font-size:13px; }
@@ -752,6 +766,9 @@
       .station-layout-grid { grid-template-columns:1fr 1fr; }
       .station-layout-dialog { width:calc(100vw - 18px); }
       .station-layout-body,.station-layout-head { padding-left:14px; padding-right:14px; }
+      .station-weekdays { grid-template-columns:repeat(4,minmax(0,1fr)); }
+      .station-occupancy-row { grid-template-columns:1fr auto; gap:8px; }
+      .station-occupancy-meta { grid-column:1/-1; }
       .finance-result-card { min-height:112px; padding:12px; }
       .finance-result-card strong { font-size:20px; }
       .uby-finance-row { grid-template-columns:1fr 1fr; gap:9px; padding:12px; }
@@ -899,6 +916,14 @@
     <section class="visual-summary" id="generalVisualSummary"></section>
 
     <section class="grid kpis" id="kpiGeneral"></section>
+
+    <section class="section" style="margin-top:18px;grid-template-columns:1fr">
+      <div class="card">
+        <h2>Ocupacao media por eletroposto</h2>
+        <div class="sub" style="margin:-8px 0 12px">Calculada sobre a potencia e os horarios realmente disponiveis de cada unidade.</div>
+        <div class="station-occupancy-list" id="generalStationOccupancy"></div>
+      </div>
+    </section>
 
     <section class="day-compare-grid" id="usageGeneralDayCompare"></section>
     <section class="section weekday-report" id="usageGeneralWeekdayReport"></section>
@@ -1749,11 +1774,24 @@
         <label class="station-layout-field">Plugs AC<input id="stationLayoutAcPlugs" type="number" min="0" step="1" value="0"></label>
         <label class="station-layout-field">Carregadores DC<input id="stationLayoutDcChargers" type="number" min="0" step="1" value="0"></label>
         <label class="station-layout-field">Plugs DC<input id="stationLayoutDcPlugs" type="number" min="0" step="1" value="0"></label>
+        <div class="station-layout-divider">Horario disponivel para recargas</div>
+        <label class="station-layout-toggle wide"><input id="stationLayoutOpen24h" type="checkbox" checked onchange="toggleStationScheduleInputs()"> Aberto 24 horas nos dias selecionados</label>
+        <label class="station-layout-field">Abertura<input id="stationLayoutOpenTime" type="time" value="08:00"></label>
+        <label class="station-layout-field">Fechamento<input id="stationLayoutCloseTime" type="time" value="22:00"></label>
+        <div class="station-weekdays">
+          <label><input class="station-open-day" type="checkbox" value="1" checked>Seg</label>
+          <label><input class="station-open-day" type="checkbox" value="2" checked>Ter</label>
+          <label><input class="station-open-day" type="checkbox" value="3" checked>Qua</label>
+          <label><input class="station-open-day" type="checkbox" value="4" checked>Qui</label>
+          <label><input class="station-open-day" type="checkbox" value="5" checked>Sex</label>
+          <label><input class="station-open-day" type="checkbox" value="6" checked>Sab</label>
+          <label><input class="station-open-day" type="checkbox" value="0" checked>Dom</label>
+        </div>
       </div>
     </div>
     <div class="station-layout-actions">
       <button class="btn-danger" type="button" onclick="document.getElementById('stationLayoutDialog').close()">Cancelar</button>
-      <button class="btn-recalc" type="button" onclick="saveStationLayoutConfiguration()">Salvar organizacao</button>
+      <button class="btn-recalc" type="button" onclick="saveStationLayoutConfiguration()">Salvar configuracao</button>
     </div>
   </dialog>
 
@@ -1792,6 +1830,7 @@ let cloudRechargeWorks = [];
 let openingWorkReport = false;
 let monthlyClosings = {};
 let financialSettings = {};
+let stationAvailability = {};
 let financeSaveTimer = null;
 let financeEditorCurrentSettings = null;
 let ubyOperationOverrides = {};
@@ -1890,6 +1929,149 @@ const DEFAULT_STATION_PHYSICAL_LAYOUTS = [
   { terms: ['santarem ev jardins', 'santarem jardins'], acChargers: 1, acPlugs: 1, dcChargers: 0, dcPlugs: 0 },
   { terms: ['santarem ev sabara', 'santarem sabara'], acChargers: 2, acPlugs: 2, dcChargers: 0, dcPlugs: 0 }
 ];
+
+function stationAvailabilityKey(stationName) {
+  return normalizeStationForCompare(stationName || 'estacao') || 'estacao';
+}
+
+function defaultPhysicalLayout(stationName = '', workName = '') {
+  const normalized = normalizeStationForCompare(`${stationName} ${workName}`);
+  return DEFAULT_STATION_PHYSICAL_LAYOUTS.find(layout => layout.terms.some(term => normalized.includes(normalizeStationForCompare(term)))) || {
+    acChargers: 0, acPlugs: 0, dcChargers: 0, dcPlugs: 0
+  };
+}
+
+function stationAvailabilityFor(workId, stationName, workName = '') {
+  const record = allRechargeRecords[workId] || localRecord(workId) || {};
+  const stored = record.stationAvailability || record.summary?.stationAvailability || {};
+  const key = stationAvailabilityKey(stationName);
+  const physical = defaultPhysicalLayout(stationName, workName);
+  return {
+    plantName: stationName || workName || '',
+    acChargers: Number(physical.acChargers || 0),
+    acPlugs: Number(physical.acPlugs || 0),
+    dcChargers: Number(physical.dcChargers || 0),
+    dcPlugs: Number(physical.dcPlugs || 0),
+    open24h: true,
+    openTime: '08:00',
+    closeTime: '22:00',
+    openDays: [0,1,2,3,4,5,6],
+    ...(stored[key] || {})
+  };
+}
+
+function toggleStationScheduleInputs() {
+  const open24h = document.getElementById('stationLayoutOpen24h')?.checked;
+  ['stationLayoutOpenTime', 'stationLayoutCloseTime'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.disabled = open24h;
+  });
+}
+
+function openStationLayoutConfiguration(workId, stationName) {
+  const workName = workNameById(workId, workId);
+  const config = stationAvailabilityFor(workId, stationName, workName);
+  document.getElementById('stationLayoutWorkId').value = workId;
+  document.getElementById('stationLayoutSourceName').value = stationName;
+  document.getElementById('stationLayoutPlantName').value = config.plantName || stationName;
+  document.getElementById('stationLayoutAcChargers').value = config.acChargers || 0;
+  document.getElementById('stationLayoutAcPlugs').value = config.acPlugs || 0;
+  document.getElementById('stationLayoutDcChargers').value = config.dcChargers || 0;
+  document.getElementById('stationLayoutDcPlugs').value = config.dcPlugs || 0;
+  document.getElementById('stationLayoutOpen24h').checked = config.open24h !== false;
+  document.getElementById('stationLayoutOpenTime').value = config.openTime || '08:00';
+  document.getElementById('stationLayoutCloseTime').value = config.closeTime || '22:00';
+  const openDays = new Set((config.openDays || [0,1,2,3,4,5,6]).map(Number));
+  document.querySelectorAll('.station-open-day').forEach(input => { input.checked = openDays.has(Number(input.value)); });
+  toggleStationScheduleInputs();
+  document.getElementById('stationLayoutDialog').showModal();
+}
+
+async function saveStationLayoutConfiguration() {
+  const workId = document.getElementById('stationLayoutWorkId').value;
+  const sourceName = document.getElementById('stationLayoutSourceName').value;
+  const openDays = [...document.querySelectorAll('.station-open-day:checked')].map(input => Number(input.value));
+  if (!workId || !sourceName || !openDays.length) {
+    alert('Selecione ao menos um dia de funcionamento.');
+    return;
+  }
+  const config = {
+    plantName: document.getElementById('stationLayoutPlantName').value.trim() || sourceName,
+    acChargers: Math.max(0, Number(document.getElementById('stationLayoutAcChargers').value) || 0),
+    acPlugs: Math.max(0, Number(document.getElementById('stationLayoutAcPlugs').value) || 0),
+    dcChargers: Math.max(0, Number(document.getElementById('stationLayoutDcChargers').value) || 0),
+    dcPlugs: Math.max(0, Number(document.getElementById('stationLayoutDcPlugs').value) || 0),
+    open24h: document.getElementById('stationLayoutOpen24h').checked,
+    openTime: document.getElementById('stationLayoutOpenTime').value || '08:00',
+    closeTime: document.getElementById('stationLayoutCloseTime').value || '22:00',
+    openDays
+  };
+  const source = allRechargeRecords[workId] || localRecord(workId);
+  if (!source) {
+    alert('A base desta obra ainda nao foi carregada.');
+    return;
+  }
+  const availability = { ...(source.stationAvailability || source.summary?.stationAvailability || {}) };
+  availability[stationAvailabilityKey(sourceName)] = config;
+  const updatedAt = new Date().toISOString();
+  const record = {
+    ...source,
+    stationAvailability: availability,
+    summary: { ...(source.summary || {}), stationAvailability: availability, updatedAt },
+    updatedAt
+  };
+  allRechargeRecords[workId] = hydratedRechargeRecord(record, workId);
+  if (workId === currentWorkId) stationAvailability = availability;
+  const db = localRechargeDb();
+  db[workId] = compactRechargeRecord(record);
+  writeJson(RECARGAS_LOCAL_KEY, db);
+  markRechargeRecordsDirty();
+  try {
+    if (window.UBY_SUPABASE?.saveRechargeMetadata) await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
+    document.getElementById('stationLayoutDialog').close();
+    await renderGeral();
+    setStorageState(`Horario operacional salvo para <strong>${config.plantName}</strong>.`);
+  } catch (err) {
+    setStorageState(`Configuracao preservada localmente. Banco pendente: ${err.message}`, true);
+  }
+}
+
+function timeMinutes(value, fallback = 0) {
+  const [hours, minutes] = String(value || '').split(':').map(Number);
+  return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : fallback;
+}
+
+function stationAvailableHours(config, start, end) {
+  if (!start || !end || end <= start) return 0;
+  const openDays = new Set((config?.openDays || [0,1,2,3,4,5,6]).map(Number));
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const finalDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  let milliseconds = 0;
+  while (cursor <= finalDay) {
+    if (openDays.has(cursor.getDay())) {
+      let availableStart = new Date(cursor);
+      let availableEnd = new Date(cursor);
+      if (config?.open24h !== false) {
+        availableEnd.setDate(availableEnd.getDate() + 1);
+      } else {
+        availableStart.setMinutes(timeMinutes(config.openTime, 0));
+        availableEnd.setMinutes(timeMinutes(config.closeTime, 24 * 60));
+        if (availableEnd <= availableStart) availableEnd.setDate(availableEnd.getDate() + 1);
+      }
+      const overlapStart = Math.max(start.getTime(), availableStart.getTime());
+      const overlapEnd = Math.min(end.getTime(), availableEnd.getTime());
+      if (overlapEnd > overlapStart) milliseconds += overlapEnd - overlapStart;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return milliseconds / 3_600_000;
+}
+
+function stationScheduleLabel(config) {
+  const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+  const days = (config.openDays || []).map(day => dayNames[Number(day)]).join(', ');
+  return `${days || 'Sem dias'} - ${config.open24h !== false ? '24 horas' : `${config.openTime} as ${config.closeTime}`}`;
+}
 
 function markRechargeRecordsDirty() {
   rechargeRecordsVersion += 1;
@@ -2235,6 +2417,7 @@ function mergeCloudRechargeRecords(records) {
       files: Array.isArray(record.files) ? record.files : [],
       charges: Array.isArray(record.charges) ? record.charges : [],
       financialSettings: record.financialSettings || record.summary?.financialSettings || {},
+      stationAvailability: record.stationAvailability || record.summary?.stationAvailability || {},
       ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
       ubyAreaAccounting: record.ubyAreaAccounting || record.summary?.ubyAreaAccounting || {},
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
@@ -2265,6 +2448,7 @@ function rechargeSummary() {
     clients,
     monthlyClosings,
     financialSettings,
+    stationAvailability,
     ubyOperationOverrides,
     ubyAreaAccounting: readUbyAreaAccounting(),
     energyKWh: energy,
@@ -2294,6 +2478,7 @@ function buildRechargeRecord() {
     charges: allCharges.map(serializeCharge),
     monthlyClosings,
     financialSettings,
+    stationAvailability,
     ubyOperationOverrides,
     ubyAreaAccounting: readUbyAreaAccounting(),
     summary: rechargeSummary(),
@@ -2540,6 +2725,7 @@ function applyRechargeRecord(record, sourceLabel) {
     .filter(charge => chargeBelongsToWork(charge, currentWorkId, currentWorkName)));
   monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
   financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
+  stationAvailability = record?.stationAvailability || record?.summary?.stationAvailability || {};
   ubyOperationOverrides = record?.ubyOperationOverrides || record?.summary?.ubyOperationOverrides || {};
   loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
     fileKey: file.fileKey || fileSourceKey(file.month, file.name, file.station || ''),
@@ -5945,7 +6131,13 @@ function occByInterval(charges, powerOverride, boundsOverride) {
   const power = Number.isFinite(Number(powerOverride)) ? Number(powerOverride) : getPower();
   const bounds = boundsOverride || periodBounds(charges);
   if (!bounds.start || !bounds.end || !bounds.hours) return { pct: 0, hours: 0, maxKWh: 0, energy: 0, power };
-  const hours = bounds.hours;
+  const stationName = currentStationReportName || canonicalStationNameForWork(
+    currentWorkId,
+    charges[0]?.station || currentWorkName,
+    currentWorkName
+  );
+  const config = stationAvailabilityFor(currentWorkId, stationName, currentWorkName);
+  const hours = stationAvailableHours(config, bounds.start, bounds.end);
   const maxKWh = power * hours;
   const energy = charges.reduce((s, c) => s + c.energyKWh, 0);
   return { pct: maxKWh > 0 ? energy / maxKWh * 100 : 0, hours, maxKWh, energy, power };
@@ -5953,7 +6145,14 @@ function occByInterval(charges, powerOverride, boundsOverride) {
 function occByFullMonth(charges, mk) {
   const [y, m] = mk.split('-');
   const power  = getPower();
-  const hours  = daysInMonth(y, m) * 24;
+  const start = monthStartDate(mk);
+  const end = new Date(Number(y), Number(m), 1, 0, 0, 0);
+  const stationName = currentStationReportName || canonicalStationNameForWork(
+    currentWorkId,
+    charges[0]?.station || currentWorkName,
+    currentWorkName
+  );
+  const hours = stationAvailableHours(stationAvailabilityFor(currentWorkId, stationName, currentWorkName), start, end);
   const maxKWh = power * hours;
   const energy = charges.reduce((s, c) => s + c.energyKWh, 0);
   return { pct: maxKWh > 0 ? energy / maxKWh * 100 : 0, hours, maxKWh, energy, power, days: daysInMonth(y, m) };
@@ -7689,6 +7888,38 @@ function getGeneralStationRows(unitData) {
     if (Math.abs(energyDiff) > 0.009) return energyDiff;
     return String(a.stationName).localeCompare(String(b.stationName));
   });
+}
+
+function stationOccupancyForMonths(row, monthKeys, mode = 'mtd') {
+  const config = stationAvailabilityFor(row.workId, row.stationName, row.workName);
+  const power = Number(workPowerById(row.workId) || 0);
+  let energy = 0;
+  let hours = 0;
+  (monthKeys || []).forEach(monthKeyValue => {
+    const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === monthKeyValue);
+    if (!monthCharges.length) return;
+    const window = periodWindow(monthCharges, monthKeyValue, mode);
+    energy += monthCharges.reduce((sum, charge) => sum + charge.energyKWh, 0);
+    hours += stationAvailableHours(config, window.start, window.end);
+  });
+  const maxKWh = power * hours;
+  return { config, power, energy, hours, maxKWh, pct: maxKWh > 0 ? energy / maxKWh * 100 : 0 };
+}
+
+function renderGeneralStationOccupancy(rows, monthKeys) {
+  const target = document.getElementById('generalStationOccupancy');
+  if (!target) return;
+  const occupied = rows.filter(row => row.count > 0)
+    .map(row => ({ row, occupancy: stationOccupancyForMonths(row, monthKeys, 'mtd') }))
+    .sort((a, b) => b.occupancy.pct - a.occupancy.pct);
+  target.innerHTML = occupied.length ? occupied.map(({ row, occupancy }) => `
+    <div class="station-occupancy-row">
+      <div class="station-occupancy-name"><strong>${row.stationName}</strong><span>${row.workName}</span></div>
+      <div><div class="station-occupancy-value">${fmtPct(occupancy.pct)}</div><div class="station-occupancy-bar"><span style="width:${Math.min(occupancy.pct,100).toFixed(1)}%"></span></div></div>
+      <div class="station-occupancy-meta">${occupancy.hours.toFixed(1).replace('.', ',')} h disponiveis<br>${stationScheduleLabel(occupancy.config)}</div>
+      <button class="btn-open" type="button" onclick="openStationLayoutConfiguration('${escapeAttr(row.workId)}','${escapeAttr(row.stationName)}')">Configurar horario</button>
+    </div>
+  `).join('') : '<div class="note">Nenhum eletroposto com recargas no periodo.</div>';
 }
 
 function getUbyChargerRows(unitData = getGeneralUnitData()) {
@@ -9525,13 +9756,14 @@ async function renderGeral() {
   const trendEnergy = kpiDayTrend(charges, 'energy', sourceCharges);
   let totalMaxKWh = 0;
   const generalWindows = [];
-  unitData.forEach(unit => {
+  stationRows.filter(row => row.count > 0).forEach(row => {
     months.forEach(mk => {
-      const monthCharges = unit.charges.filter(charge => chargeMonthKey(charge) === mk);
+      const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === mk);
       if (!monthCharges.length) return;
       const window = periodWindow(monthCharges, mk, 'mtd');
       generalWindows.push(window);
-      totalMaxKWh += occByInterval(monthCharges, workPowerById(unit.workId), window).maxKWh;
+      const config = stationAvailabilityFor(row.workId, row.stationName, row.workName);
+      totalMaxKWh += Number(workPowerById(row.workId) || 0) * stationAvailableHours(config, window.start, window.end);
     });
   });
   const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
@@ -9565,7 +9797,14 @@ async function renderGeral() {
     <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
   `;
+  // The visual summary above is the primary KPI strip. Keep this secondary
+  // strip for complementary metrics only.
+  const duplicateGeneralLabels = new Set(['Ocupacao media', 'Total recargas', 'Energia entregue', 'Receita total']);
+  [...document.getElementById('kpiGeneral').children].forEach(card => {
+    if (duplicateGeneralLabels.has(card.querySelector('.label')?.textContent?.trim())) card.remove();
+  });
   renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
+  renderGeneralStationOccupancy(stationRows, months);
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
   await yieldToBrowser();
   await renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } });

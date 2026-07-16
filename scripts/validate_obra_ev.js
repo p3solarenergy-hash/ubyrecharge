@@ -104,6 +104,12 @@ function assertRechargeRenderSafety() {
   if (!recargas.includes("getMonth() + 1, 0, 23, 59, 59") || recargas.includes("Fechamento dia 10")) {
     throw new Error("Os novos ciclos de prestacao de contas devem fechar no ultimo dia do mes.");
   }
+  if (!recargas.includes('stationAvailableHours') || !recargas.includes('generalStationOccupancy')) {
+    throw new Error('A ocupacao precisa respeitar o horario disponivel de cada eletroposto.');
+  }
+  if (!recargas.includes('saveStationLayoutConfiguration') || !recargas.includes('saveRechargeMetadata(workId, record)')) {
+    throw new Error('A configuracao operacional da estacao precisa ser salva como metadado seguro.');
+  }
   const workerSource = recargas.match(/const workerSource = `([\s\S]*?)`;\s*return new Promise/);
   if (!workerSource) throw new Error("O leitor em segundo plano da planilha nao foi encontrado.");
   checkScript(workerSource[1], "recargas-import-worker.js");

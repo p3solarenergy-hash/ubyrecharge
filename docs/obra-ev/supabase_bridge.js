@@ -467,6 +467,7 @@
       workName: existingSummary.workName || payload?.workName || incomingSummary.workName || "",
       monthlyClosings: payload?.monthlyClosings || incomingSummary.monthlyClosings || existingSummary.monthlyClosings || {},
       financialSettings: payload?.financialSettings || incomingSummary.financialSettings || existingSummary.financialSettings || {},
+      stationAvailability: payload?.stationAvailability || incomingSummary.stationAvailability || existingSummary.stationAvailability || {},
       ubyOperationOverrides: payload?.ubyOperationOverrides || incomingSummary.ubyOperationOverrides || existingSummary.ubyOperationOverrides || {},
       ubyAreaAccounting: payload?.ubyAreaAccounting || incomingSummary.ubyAreaAccounting || existingSummary.ubyAreaAccounting || {},
       updatedAt: new Date().toISOString()

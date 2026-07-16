@@ -131,6 +131,9 @@ assert(bridge.includes('existingCharges > 0 && !explicitEmptyIntents.has(mutatio
 assert(bridge.includes('"remove_file"'), 'cloud must allow an explicit last-file removal');
 assert(!bridge.includes('...(existing.resumo || {}),\n      ...incomingSummary'), 'metadata saves must not replace operational summary fields');
 assert(bridge.includes('const existingSummary = existing.resumo || {};'), 'metadata saves must start from the authoritative cloud summary');
+assert(bridge.includes('stationAvailability: payload?.stationAvailability'), 'station schedules must persist in cloud metadata');
+assert(html.includes('duplicateGeneralLabels'), 'the general dashboard must remove duplicated KPI cards');
+assert(html.includes('stationAvailableHours(config, window.start, window.end)'), 'general occupancy must use station availability windows');
 assert(!html.includes('else await window.UBY_SUPABASE.saveRechargeBase(workId, record)'), 'metadata updates must never fall back to a full recharge overwrite');
 assert(!html.includes('else if (window.UBY_SUPABASE?.saveRechargeBase)'), 'financial settings must never fall back to a full recharge overwrite');
 assert(bridge.includes('async function loadRechargeWorks()'), 'works must be loaded from the shared database');
