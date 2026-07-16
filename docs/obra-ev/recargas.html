@@ -1844,7 +1844,8 @@
 <script src="supabase_config.js"></script>
 <script src="clube_uby_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_bridge.js?v=20260714-integrity1"></script>
+<script src="supabase_bridge.js?v=20260716-architecture1"></script>
+<script src="recharge_runtime.js?v=20260716-architecture1"></script>
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2565,24 +2566,12 @@ function saveLocalRechargeBase(record = null, options = {}) {
     return { mode: 'deleted' };
   }
   const fullRecord = record || buildRechargeRecord();
-  db[currentWorkId] = fullRecord;
-  const fullSave = tryWriteJson(RECARGAS_LOCAL_KEY, db);
-  if (!fullSave.ok) {
-    if (!storageQuotaExceeded(fullSave.error)) throw fullSave.error;
-    const compactDb = compactRechargeDb(db, currentWorkId);
-    window.UBY_BACKUP?.releaseStorage?.();
-    let compactSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactDb);
-    if (!compactSave.ok) {
-      if (!storageQuotaExceeded(compactSave.error)) throw compactSave.error;
-      localStorage.removeItem(RECARGAS_LOCAL_KEY);
-      compactSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactDb);
-      if (!compactSave.ok) return { mode: 'none', error: compactSave.error };
-    }
-    syncGeneralRecordsFromLocal();
-    return { mode: 'compact', error: fullSave.error };
-  }
+  window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`work:${currentWorkId}`, fullRecord).catch(() => {});
+  db[currentWorkId] = compactRechargeRecord(fullRecord);
+  const fullSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactRechargeDb(db, currentWorkId));
+  if (!fullSave.ok) return { mode: 'none', error: fullSave.error };
   syncGeneralRecordsFromLocal();
-  return { mode: 'full', size: fullSave.size };
+  return { mode: 'indexeddb', size: fullSave.size };
 }
 
 async function clearCloudRechargeBase() {
@@ -3724,9 +3713,10 @@ async function readFile(file) {
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
       updateCorrectionButtons();
-      await renderAll();
       setStorageState(`Planilha importada para <strong>${currentWorkName}</strong>: ${importedCharges.length} recarga(s), ${fmtKWh(importedCharges.reduce((s,c)=>s+c.energyKWh,0))}, ${fmtBRL(importedCharges.reduce((s,c)=>s+c.revenue,0))}. Salvando no banco...`);
+      await yieldToBrowser();
       await saveRechargeBase();
+      await renderAll();
       if (replacedCount > 0) {
         setFeedback(`${replacedCount} recarga(s) do mês foram substituidas.`, 'up-loading');
       } else if (duplicateCount > 0) {
@@ -8077,23 +8067,23 @@ function mergeCustomerRegistry(incoming = [], source = 'importacao manual') {
 }
 
 async function saveCustomerRegistryCloud(payload) {
-  if (!window.UBY_SUPABASE?.saveRechargeBase) return false;
-  await window.UBY_SUPABASE.saveRechargeBase(CUSTOMER_REGISTRY_CLOUD_ID, {
-    workId: CUSTOMER_REGISTRY_CLOUD_ID,
-    workName: 'Base geral de clientes',
-    files: [],
-    charges: [],
-    summary: { workId: CUSTOMER_REGISTRY_CLOUD_ID, workName: 'Base geral de clientes', customerRegistry: payload, metadataType: 'customer_registry' },
-    mutationIntent: 'customer_registry_update'
-  });
+  if (!window.UBY_SUPABASE?.upsertRechargeCustomers) return false;
+  await window.UBY_SUPABASE.upsertRechargeCustomers(payload?.rows || []);
   return true;
 }
 
 async function loadCustomerRegistry() {
   try {
-    const cloud = await window.UBY_SUPABASE?.loadRechargeBase?.(CUSTOMER_REGISTRY_CLOUD_ID);
-    const payload = cloud?.summary?.customerRegistry;
-    if (Array.isArray(payload?.rows)) writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, payload);
+    const cloud = await window.UBY_SUPABASE?.loadRechargeCustomers?.({ limit: 500 });
+    if (Array.isArray(cloud?.rows)) {
+      const rows = cloud.rows.map(row => ({
+        customerKey: row.customer_key, name: row.name || '', email: row.email || '', phone: row.phone || '',
+        complement: row.complement || '', chargers: Number(row.chargers_count || 0),
+        transactions: Number(row.transactions_count || 0), energy: Number(row.energy_kwh || 0),
+        chargeTime: row.charge_time_text || '', spent: Number(row.total_spent || 0), source: row.source || 'banco online'
+      }));
+      writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, { rows, total: cloud.count, updatedAt: new Date().toISOString(), source: 'Supabase normalizado' });
+    }
   } catch (err) {
     console.warn('Base de clientes mantida no cache local:', err.message);
   }
@@ -9852,6 +9842,16 @@ async function loadRechargeWorksFromCloud() {
 async function refreshGeneralRechargeBases(forceCloud = false) {
   const refreshSequence = ++generalRefreshSequence;
   syncGeneralRecordsFromLocal();
+  try {
+    const cachedRecords = await window.UBY_RECHARGE_RUNTIME?.cacheGet?.('general-records', 24 * 60 * 60 * 1000);
+    if (Array.isArray(cachedRecords) && cachedRecords.length) {
+      mergeCloudRechargeRecords(cachedRecords);
+      await renderVisibleOverviewViews();
+      await yieldToBrowser();
+    }
+  } catch (err) {
+    console.warn('Cache rapido indisponivel:', err.message);
+  }
   showGeneralWhenCurrentWorkIsEmpty();
   if (!window.UBY_SUPABASE?.loadRechargeBase) {
     await renderVisibleOverviewViews();
@@ -9871,16 +9871,31 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
       }
     }
     const ids = (summaries || []).map(record => String(record.workId || '')).filter(Boolean);
-    const prioritizedIds = [...new Set([currentWorkId, ...ids])].filter(id => ids.includes(id));
     let hydratedCount = 0;
-    for (const workId of prioritizedIds) {
-      if (refreshSequence !== generalRefreshSequence) return;
-      const record = await window.UBY_SUPABASE.loadRechargeBase(workId);
-      if (record) {
-        mergeCloudRechargeRecords([record]);
-        hydratedCount += 1;
+    if (window.UBY_SUPABASE.loadRechargeSessions && ids.length) {
+      const firstPage = await window.UBY_SUPABASE.loadRechargeSessions({ limit: 1000 });
+      const normalizedRows = [...(firstPage.rows || [])];
+      for (let offset = normalizedRows.length; offset < firstPage.count; offset += 1000) {
+        const nextPage = await window.UBY_SUPABASE.loadRechargeSessions({ limit: 1000, offset });
+        normalizedRows.push(...(nextPage.rows || []));
+        await yieldToBrowser();
       }
-      // One base per task keeps large JSON hydration from monopolizing the UI.
+      if (refreshSequence !== generalRefreshSequence) return;
+      const chargesByWork = new Map(ids.map(id => [id, []]));
+      normalizedRows.forEach(charge => {
+        const id = String(charge.workId || '');
+        if (!chargesByWork.has(id)) chargesByWork.set(id, []);
+        chargesByWork.get(id).push(charge);
+      });
+      const compactRecords = (summaries || []).map(record => ({
+        ...record,
+        charges: chargesByWork.get(String(record.workId || '')) || [],
+        summaryOnly: false,
+        normalized: true
+      }));
+      mergeCloudRechargeRecords(compactRecords);
+      window.UBY_RECHARGE_RUNTIME?.cacheSet?.('general-records', compactRecords).catch(() => {});
+      hydratedCount = compactRecords.length;
       await yieldToBrowser();
     }
     if (refreshSequence !== generalRefreshSequence) return;
@@ -10792,7 +10807,10 @@ async function switchTab(name, btn) {
     ubyReportsRequested = false;
     await renderUbyOperation();
   }
-  else if (name === 'clientes') renderCustomerRegistry();
+  else if (name === 'clientes') {
+    await loadCustomerRegistry();
+    renderCustomerRegistry();
+  }
   else if (name === 'clube') renderClub();
   else if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
   else if (name === 'detalhes') renderDetalhes();
@@ -10831,11 +10849,8 @@ async function initializeRechargePage() {
     currentWorkName = workNameById(requestedWorkId, requestedWorkId);
     await loadRechargeBase(requestedWorkId);
   }
-  await loadFinanceReportArchive();
-  await loadCustomerRegistry();
-  renderCustomerRegistry();
-  renderUbyPartnerReportLibrary();
   openGeneralFinanceView();
+  window.UBY_RECHARGE_RUNTIME?.markReady?.({ records: Object.keys(allRechargeRecords || {}).length });
 }
 
 document.getElementById('importMonth').value = new Date().toISOString().slice(0, 7);

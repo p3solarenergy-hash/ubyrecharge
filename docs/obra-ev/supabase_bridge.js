@@ -425,6 +425,7 @@
       throw new Error(`Gravacao vazia bloqueada: a base em nuvem possui ${existingCharges} recarga(s).`);
     }
     const previous = await archiveExistingRechargeBase(sb, user, workId, "before_upsert", "saveRechargeBase", existing);
+    const normalizedCharges = await replaceRechargeSessions(id, charges);
     const { error } = await sb.from("obra_recargas_base").upsert({
       obra_id: id,
       arquivos: files,
@@ -443,7 +444,7 @@
         workName: summary.workName || payload?.workName || ""
       }
     });
-    return { cloud: true, files: files.length, charges: charges.length, history: Boolean(previous) };
+    return { cloud: true, files: files.length, charges: charges.length, normalizedCharges, history: Boolean(previous) };
   }
 
   async function saveRechargeMetadata(workId, payload = {}) {
@@ -495,6 +496,7 @@
     const user = await currentUser();
     if (!user) throw new Error("Entre no Supabase antes de excluir recargas.");
     const previous = await archiveExistingRechargeBase(sb, user, workId, "before_clear", "clearRechargeBase");
+    await replaceRechargeSessions(String(workId || "geral"), []);
     const { error } = await sb.from("obra_recargas_base").upsert({
       obra_id: String(workId || "geral"),
       arquivos: [],
@@ -580,6 +582,133 @@
       summary: row.resumo || {},
       updatedAt: row.updated_at
     }));
+  }
+
+  function normalizedSessionToCharge(row) {
+    const raw = row?.raw_data && typeof row.raw_data === "object" ? row.raw_data : {};
+    const durationSeconds = Number(row.duration_seconds || 0);
+    const idleSeconds = Number(row.idle_seconds || 0);
+    const durationText = `${String(Math.floor(durationSeconds / 3600)).padStart(2, "0")}:${String(Math.floor((durationSeconds % 3600) / 60)).padStart(2, "0")}:${String(durationSeconds % 60).padStart(2, "0")}`;
+    const idleText = `${String(Math.floor(idleSeconds / 3600)).padStart(2, "0")}:${String(Math.floor((idleSeconds % 3600) / 60)).padStart(2, "0")}:${String(idleSeconds % 60).padStart(2, "0")}`;
+    return {
+      ...raw,
+      id: raw.id || row.source_session_id || row.session_key,
+      workId: row.obra_id,
+      station: raw.station || row.station_name || "",
+      _sourceStation: raw._sourceStation || row.source_station || "",
+      connType: raw.connType || row.connector_type || "",
+      startIso: raw.startIso || row.started_at || "",
+      endIso: raw.endIso || row.ended_at || "",
+      startStr: raw.startStr || row.started_at || "",
+      endStr: raw.endStr || row.ended_at || "",
+      _month: raw._month || String(row.month_key || "").slice(0, 7),
+      duration: raw.duration || durationText,
+      idleTime: raw.idleTime || idleText,
+      energyKWh: Number(row.energy_kwh || 0),
+      revenue: Number(row.revenue || 0),
+      idleValue: Number(row.idle_value || 0),
+      userName: raw.userName || row.user_name || "",
+      userEmail: raw.userEmail || row.user_email || "",
+      userPhone: raw.userPhone || row.user_phone || "",
+      paymentType: raw.paymentType || row.payment_type || "",
+      paymentStatus: raw.paymentStatus || row.payment_status || "",
+      rawStatus: raw.rawStatus || row.raw_status || "",
+      failureReason: raw.failureReason || row.failure_reason || "",
+      vehicleBrand: raw.vehicleBrand || row.vehicle_brand || "",
+      vehicleModel: raw.vehicleModel || row.vehicle_model || "",
+      voucher: raw.voucher || row.voucher || "",
+      rating: raw.rating || row.rating || "",
+      reviewComment: raw.reviewComment || row.review_comment || "",
+      _file: raw._file || row.source_file || "",
+      _fileKey: raw._fileKey || row.source_file_key || ""
+    };
+  }
+
+  async function loadRechargeSessions(filters = {}) {
+    const sb = client();
+    if (!sb || !(await currentUser())) return { rows: [], count: 0 };
+    const limit = Math.min(Math.max(Number(filters.limit || 250), 1), 1000);
+    const offset = Math.max(Number(filters.offset || 0), 0);
+    let query = sb.from("recharge_sessions")
+      .select("session_key,obra_id,source_session_id,station_name,source_station,connector_type,started_at,ended_at,month_key,duration_seconds,idle_seconds,energy_kwh,revenue,idle_value,payment_type,payment_status,raw_status,failure_reason,user_name,user_email,user_phone,vehicle_brand,vehicle_model,voucher,rating,review_comment,source_file,source_file_key", { count: "exact" })
+      .order("started_at", { ascending: false, nullsFirst: false })
+      .range(offset, offset + limit - 1);
+    if (filters.workId) query = query.eq("obra_id", String(filters.workId));
+    if (filters.monthKey) query = query.eq("month_key", `${String(filters.monthKey).slice(0, 7)}-01`);
+    if (filters.from) query = query.gte("started_at", filters.from);
+    if (filters.to) query = query.lte("started_at", filters.to);
+    const { data, error, count } = await query;
+    if (error) throw error;
+    return { rows: (data || []).map(normalizedSessionToCharge), count: Number(count || 0) };
+  }
+
+  async function replaceRechargeSessions(workId, charges = []) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    if (!(await currentUser())) throw new Error("Entre no Supabase antes de salvar recargas.");
+    const { data, error } = await sb.rpc("replace_recharge_sessions", {
+      p_obra_id: String(workId || ""),
+      p_charges: Array.isArray(charges) ? charges : []
+    });
+    if (error) throw error;
+    return Number(data || 0);
+  }
+
+  async function loadRechargeMonthlySummaries(workIds = []) {
+    const sb = client();
+    if (!sb || !(await currentUser())) return [];
+    let query = sb.from("recharge_monthly_summary").select("obra_id,month_key,sessions,valid_sessions,customers,energy_kwh,revenue,avg_kwh_valid_session,first_session_at,last_session_at").order("month_key", { ascending: true });
+    if (Array.isArray(workIds) && workIds.length) query = query.in("obra_id", workIds.map(String));
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function loadRechargeDailySummaries(filters = {}) {
+    const sb = client();
+    if (!sb || !(await currentUser())) return [];
+    let query = sb.from("recharge_daily_summary").select("obra_id,session_date,sessions,valid_sessions,customers,energy_kwh,revenue,avg_kwh_valid_session,failures").order("session_date", { ascending: true });
+    if (Array.isArray(filters.workIds) && filters.workIds.length) query = query.in("obra_id", filters.workIds.map(String));
+    if (filters.from) query = query.gte("session_date", filters.from);
+    if (filters.to) query = query.lte("session_date", filters.to);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function loadRechargeCustomers(filters = {}) {
+    const sb = client();
+    if (!sb || !(await currentUser())) return { rows: [], count: 0 };
+    const limit = Math.min(Math.max(Number(filters.limit || 100), 1), 500);
+    const offset = Math.max(Number(filters.offset || 0), 0);
+    let query = sb.from("recharge_customers")
+      .select("customer_key,name,email,phone,complement,chargers_count,transactions_count,energy_kwh,charge_time_text,total_spent,source,raw_data,first_seen_at,last_seen_at,updated_at", { count: "exact" })
+      .order("total_spent", { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (filters.search) query = query.or(`name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`);
+    const { data, error, count } = await query;
+    if (error) throw error;
+    return { rows: data || [], count: Number(count || 0) };
+  }
+
+  async function upsertRechargeCustomers(rows = []) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    if (!(await currentUser())) throw new Error("Entre no Supabase antes de salvar clientes.");
+    const payload = (Array.isArray(rows) ? rows : []).map((row, index) => ({
+      customer_key: String(row.customerKey || row.customer_key || row.email || row.phone || `manual-${index}`).toLowerCase(),
+      name: row.name || "", email: row.email || null, phone: row.phone || null,
+      complement: row.complement || "", chargers_count: Number(row.chargers || row.chargers_count || 0),
+      transactions_count: Number(row.transactions || row.transactions_count || 0),
+      energy_kwh: Number(row.energy || row.energy_kwh || 0), charge_time_text: row.chargeTime || row.charge_time_text || "",
+      total_spent: Number(row.spent || row.total_spent || 0), source: row.source || "importacao manual",
+      raw_data: row.raw_data || row, updated_at: new Date().toISOString()
+    }));
+    for (let index = 0; index < payload.length; index += 200) {
+      const { error } = await sb.from("recharge_customers").upsert(payload.slice(index, index + 200), { onConflict: "customer_key" });
+      if (error) throw error;
+    }
+    return payload.length;
   }
 
   function normalizeFinanceReportRow(row) {
@@ -715,6 +844,12 @@
     loadRechargeBase,
     loadAllRechargeBases,
     loadAllRechargeSummaries,
+    loadRechargeSessions,
+    replaceRechargeSessions,
+    loadRechargeMonthlySummaries,
+    loadRechargeDailySummaries,
+    loadRechargeCustomers,
+    upsertRechargeCustomers,
     loadFinanceReports,
     saveFinanceReport
   };
