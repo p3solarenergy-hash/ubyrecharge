@@ -110,6 +110,15 @@ function assertRechargeRenderSafety() {
   if (!recargas.includes('saveStationLayoutConfiguration') || !recargas.includes('saveRechargeMetadata(workId, record)')) {
     throw new Error('A configuracao operacional da estacao precisa ser salva como metadado seguro.');
   }
+  if (recargas.includes('await window.UBY_SUPABASE.loadAllRechargeBases()')) {
+    throw new Error('A abertura nao pode baixar todas as bases completas em uma unica resposta.');
+  }
+  if (!recargas.includes('for (const workId of prioritizedIds)') || !recargas.includes('await yieldToBrowser();')) {
+    throw new Error('As bases completas precisam ser hidratadas progressivamente sem bloquear a tela.');
+  }
+  if (!recargas.includes('monthlyInsightsTimer = setTimeout')) {
+    throw new Error('As analises secundarias mensais precisam renderizar depois dos indicadores principais.');
+  }
   const workerSource = recargas.match(/const workerSource = `([\s\S]*?)`;\s*return new Promise/);
   if (!workerSource) throw new Error("O leitor em segundo plano da planilha nao foi encontrado.");
   checkScript(workerSource[1], "recargas-import-worker.js");

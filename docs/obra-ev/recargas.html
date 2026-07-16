@@ -1850,6 +1850,7 @@ let generalRefreshSequence = 0;
 let rechargeImportQueue = Promise.resolve();
 let queuedRechargeImports = 0;
 let monthlyRenderSequence = 0;
+let monthlyInsightsTimer = null;
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -9686,32 +9687,41 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
   const refreshSequence = ++generalRefreshSequence;
   syncGeneralRecordsFromLocal();
   showGeneralWhenCurrentWorkIsEmpty();
-  if (!window.UBY_SUPABASE?.loadAllRechargeBases) {
+  if (!window.UBY_SUPABASE?.loadRechargeBase) {
     await renderVisibleOverviewViews();
     return;
   }
   try {
+    let summaries = [];
     if (window.UBY_SUPABASE.loadAllRechargeSummaries) {
-      const summaries = await window.UBY_SUPABASE.loadAllRechargeSummaries();
+      summaries = await window.UBY_SUPABASE.loadAllRechargeSummaries();
       if (refreshSequence !== generalRefreshSequence) return;
       if (summaries?.length) {
         mergeCloudRechargeRecords(summaries);
         initWorkSelector();
         showGeneralWhenCurrentWorkIsEmpty();
+        await renderVisibleOverviewViews();
+        await yieldToBrowser();
       }
     }
-    const records = await window.UBY_SUPABASE.loadAllRechargeBases();
-    if (refreshSequence !== generalRefreshSequence) return;
-    if (records?.length) {
-      mergeCloudRechargeRecords(records);
-      initWorkSelector();
-      showGeneralWhenCurrentWorkIsEmpty();
-      await renderVisibleOverviewViews();
-      if (forceCloud) setStorageState(`Painel geral atualizado com ${records.length} base(s) do Supabase.`);
-    } else {
-      await renderVisibleOverviewViews();
-      if (forceCloud) setStorageState('Painel geral atualizado com as bases locais. Entre no Supabase para buscar o banco compartilhado.');
+    const ids = (summaries || []).map(record => String(record.workId || '')).filter(Boolean);
+    const prioritizedIds = [...new Set([currentWorkId, ...ids])].filter(id => ids.includes(id));
+    let hydratedCount = 0;
+    for (const workId of prioritizedIds) {
+      if (refreshSequence !== generalRefreshSequence) return;
+      const record = await window.UBY_SUPABASE.loadRechargeBase(workId);
+      if (record) {
+        mergeCloudRechargeRecords([record]);
+        hydratedCount += 1;
+      }
+      // One base per task keeps large JSON hydration from monopolizing the UI.
+      await yieldToBrowser();
     }
+    if (refreshSequence !== generalRefreshSequence) return;
+    initWorkSelector();
+    showGeneralWhenCurrentWorkIsEmpty();
+    await renderVisibleOverviewViews();
+    if (forceCloud) setStorageState(`Painel geral atualizado com ${hydratedCount} base(s) do Supabase.`);
   } catch (err) {
     await renderVisibleOverviewViews();
     if (forceCloud) setStorageState(`Painel geral local preservado. Supabase pendente: ${err.message}`, true);
@@ -9925,17 +9935,15 @@ async function renderAll() {
 // ══════════════════════════════════════════════════════════
 async function renderMensal() {
   const renderSequence = ++monthlyRenderSequence;
+  clearTimeout(monthlyInsightsTimer);
   const mk      = document.getElementById('monthSelector').value;
   if (!mk) return;
   const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
-  await renderUsageInsights(monthCharges, 'usage', allCharges, { weekdayPower: getPower(), weekdayBounds: window });
-  await yieldToBrowser();
-  if (renderSequence !== monthlyRenderSequence) return;
   if (!charges.length) {
     renderVisualSummary('monthlyVisualSummary', [], { historyCharges: allCharges });
-  renderWeekdayOccupancyReport('weekdayOccupancyMensal', [], getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
+    renderWeekdayOccupancyReport('weekdayOccupancyMensal', [], getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
     setStorageState(`Sem recargas em ${periodModeLabel(window.mode)} para <strong>${currentWorkName}</strong>.`);
     renderMonthClosing(mk);
     return;
@@ -9963,6 +9971,10 @@ async function renderMensal() {
   if (renderSequence !== monthlyRenderSequence) return;
   renderReviews(charges);
   renderTechDiagnostic(charges);
+  monthlyInsightsTimer = setTimeout(async () => {
+    if (renderSequence !== monthlyRenderSequence || document.getElementById('tabMensal').style.display === 'none') return;
+    await renderUsageInsights(monthCharges, 'usage', allCharges, { weekdayPower: getPower(), weekdayBounds: window });
+  }, 80);
 }
 
 function renderHero(charges, mk, window) {

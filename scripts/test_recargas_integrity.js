@@ -134,6 +134,9 @@ assert(bridge.includes('const existingSummary = existing.resumo || {};'), 'metad
 assert(bridge.includes('stationAvailability: payload?.stationAvailability'), 'station schedules must persist in cloud metadata');
 assert(html.includes('duplicateGeneralLabels'), 'the general dashboard must remove duplicated KPI cards');
 assert(html.includes('stationAvailableHours(config, window.start, window.end)'), 'general occupancy must use station availability windows');
+assert(!html.includes('await window.UBY_SUPABASE.loadAllRechargeBases()'), 'startup must not download every full base in one response');
+assert(html.includes('for (const workId of prioritizedIds)'), 'full bases must load progressively by work');
+assert(html.includes('monthlyInsightsTimer = setTimeout'), 'monthly secondary insights must not block the primary dashboard');
 assert(!html.includes('else await window.UBY_SUPABASE.saveRechargeBase(workId, record)'), 'metadata updates must never fall back to a full recharge overwrite');
 assert(!html.includes('else if (window.UBY_SUPABASE?.saveRechargeBase)'), 'financial settings must never fall back to a full recharge overwrite');
 assert(bridge.includes('async function loadRechargeWorks()'), 'works must be loaded from the shared database');
