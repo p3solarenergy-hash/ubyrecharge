@@ -119,6 +119,9 @@ function assertRechargeRenderSafety() {
   if (!recargas.includes('monthlyInsightsTimer = setTimeout')) {
     throw new Error('As analises secundarias mensais precisam renderizar depois dos indicadores principais.');
   }
+  if (!recargas.includes("switchTab('clientes',this)") || !recargas.includes('handleCustomerRegistryFiles') || !recargas.includes('CUSTOMER_REGISTRY_CLOUD_ID')) {
+    throw new Error('A base geral de clientes precisa manter area propria, importacao e persistencia online.');
+  }
   const workerSource = recargas.match(/const workerSource = `([\s\S]*?)`;\s*return new Promise/);
   if (!workerSource) throw new Error("O leitor em segundo plano da planilha nao foi encontrado.");
   checkScript(workerSource[1], "recargas-import-worker.js");

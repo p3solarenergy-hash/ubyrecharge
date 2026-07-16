@@ -782,6 +782,7 @@
     <div class="tabs">
       <button class="tab active" onclick="switchTab('uby',this)">UBY</button>
       <button class="tab" onclick="switchTab('geral',this)">Geral</button>
+      <button class="tab" onclick="switchTab('clientes',this)">Clientes</button>
       <button class="tab" onclick="switchTab('clube',this)">Clube UBY</button>
       <button class="tab" onclick="switchTab('financeiroGeral',this)">Financeiro geral</button>
       <button class="tab" onclick="openUbyReports(this)">Relatorios</button>
@@ -808,6 +809,11 @@
       <a class="btn-recalc" href="https://docs.google.com/forms/d/1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM/edit#responses" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Abrir Forms</a>
       <button class="btn-recalc" onclick="window.print()">Imprimir ranking</button>
       <input type="file" id="clubParticipantFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" multiple style="display:none" onchange="handleClubParticipantFiles(Array.from(this.files)); this.value=''">
+    </div>
+    <div class="controls" id="ctrlClientes" style="display:none">
+      <span id="customerRegistryStatus">Base geral de motoristas</span>
+      <button class="btn-recalc" onclick="document.getElementById('customerRegistryFileInput').click()">Importar CSV/Excel</button>
+      <input type="file" id="customerRegistryFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" multiple style="display:none" onchange="handleCustomerRegistryFiles(Array.from(this.files)); this.value=''">
     </div>
   </div>
 
@@ -1001,6 +1007,40 @@
           <table>
             <thead><tr><th>Estação</th><th>Obra</th><th>Arquivos</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Total AC</th><th>Total DC</th><th>Carreg. AC</th><th>Carreg. DC</th><th>Ticket medio</th><th>Ultima recarga</th><th>Abrir</th></tr></thead>
             <tbody id="generalUnitTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="tabClientes" style="display:none">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/04_simbolo_badge.svg" alt="UBY"></div>
+          <div><div class="brand-name">Clientes UBY Recharge</div><div class="brand-tag">Cadastro consolidado de motoristas</div></div>
+        </div>
+        <h1>Base geral de clientes</h1>
+        <p id="customerRegistryHero">Importe a listagem de motoristas para iniciar a base.</p>
+      </div>
+      <div class="hero-formula">Novos arquivos atualizam os clientes existentes por e-mail ou telefone, sem somar novamente o acumulado.</div>
+    </section>
+    <section class="kpis" id="customerRegistryKpis"></section>
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="card-heading-row">
+          <div><h2>Motoristas cadastrados</h2><div class="club-form-status" id="customerRegistrySource">Nenhum arquivo importado.</div></div>
+          <div class="controls" style="display:flex">
+            <input class="ctl-input" id="customerRegistrySearch" type="search" placeholder="Buscar nome, e-mail ou telefone" oninput="renderCustomerRegistry()">
+            <select class="ctl-select" id="customerRegistrySort" onchange="renderCustomerRegistry()">
+              <option value="spent">Maior gasto</option><option value="energy">Maior kWh</option><option value="transactions">Mais transacoes</option><option value="name">Nome</option>
+            </select>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Cliente</th><th>Telefone</th><th>E-mail</th><th>Carregadores</th><th>Transacoes</th><th>kWh</th><th>Tempo de recarga</th><th>Total gasto</th></tr></thead>
+            <tbody id="customerRegistryTable"><tr><td colspan="8">Nenhum cliente importado.</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1860,6 +1900,8 @@ const FINANCE_REPORTS_LOCAL_KEY = 'uby-finance-reports-v1';
 const XLSX_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
 const CLUB_PARTNERS_LOCAL_KEY = 'uby-club-partners-v1';
+const CUSTOMER_REGISTRY_LOCAL_KEY = 'uby-customer-registry-v1';
+const CUSTOMER_REGISTRY_CLOUD_ID = '__customer_registry__';
 const CLUB_FORM_ID = '1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM';
 const CLUB_FORM_RESPONSES_URL = `https://docs.google.com/forms/d/${CLUB_FORM_ID}/edit#responses`;
 const CLUB_FORM_SHEET_ID = '19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws';
@@ -7982,6 +8024,130 @@ function normalizePhone(value = '') {
   return safeText(value).replace(/\D+/g, '');
 }
 
+function customerRegistryStore() {
+  const data = readJson(CUSTOMER_REGISTRY_LOCAL_KEY, { rows: [], updatedAt: '', source: '' });
+  return { rows: Array.isArray(data?.rows) ? data.rows : [], updatedAt: data?.updatedAt || '', source: data?.source || '' };
+}
+
+function customerRegistryNumber(value = '') {
+  const clean = safeText(value).trim().replace(/\s/g, '').replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '');
+  return Number(clean) || 0;
+}
+
+function customerRegistryRow(row = [], headers = []) {
+  const email = headerValue(row, headers, ['Email', 'E-mail']).trim().toLowerCase();
+  const phoneRaw = headerValue(row, headers, ['Telefone', 'WhatsApp', 'Whatsapp']);
+  return {
+    name: headerValue(row, headers, ['Nome', 'Motorista']),
+    complement: headerValue(row, headers, ['Complemento']),
+    email,
+    phone: normalizePhone(phoneRaw),
+    phoneDisplay: phoneRaw,
+    chargers: customerRegistryNumber(headerValue(row, headers, ['Carregadores'])),
+    transactions: customerRegistryNumber(headerValue(row, headers, ['Total de transacoes', 'Total de transações', 'Transacoes', 'Transações'])),
+    energy: customerRegistryNumber(headerValue(row, headers, ['Total de kWh', 'kWh'])),
+    chargeTime: headerValue(row, headers, ['Tempo total de recarga', 'Tempo de recarga']),
+    spent: customerRegistryNumber(headerValue(row, headers, ['Total gasto', 'Faturamento', 'Receita']))
+  };
+}
+
+function customerRegistryRowsFromSheet(rows = []) {
+  const headerIndex = rows.findIndex(row => Array.isArray(row) && row.some(cell => ['nome','motorista'].includes(normalizeHeaderName(cell))));
+  const index = headerIndex >= 0 ? headerIndex : 0;
+  const headers = rows[index] || [];
+  return rows.slice(index + 1).filter(rowHasData).map(row => customerRegistryRow(row, headers)).filter(row => row.name || row.email || row.phone);
+}
+
+function customerRegistryIdentityKeys(row = {}) {
+  return [row.email ? `email:${row.email}` : '', row.phone ? `phone:${normalizePhone(row.phone)}` : ''].filter(Boolean);
+}
+
+function mergeCustomerRegistry(incoming = [], source = 'importacao manual') {
+  const current = customerRegistryStore().rows;
+  const rows = [...current];
+  incoming.forEach(next => {
+    const keys = new Set(customerRegistryIdentityKeys(next));
+    const index = rows.findIndex(existing => customerRegistryIdentityKeys(existing).some(key => keys.has(key)));
+    if (index >= 0) rows[index] = { ...rows[index], ...next };
+    else rows.push(next);
+  });
+  const payload = { rows, updatedAt: new Date().toISOString(), source };
+  writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, payload);
+  return payload;
+}
+
+async function saveCustomerRegistryCloud(payload) {
+  if (!window.UBY_SUPABASE?.saveRechargeBase) return false;
+  await window.UBY_SUPABASE.saveRechargeBase(CUSTOMER_REGISTRY_CLOUD_ID, {
+    workId: CUSTOMER_REGISTRY_CLOUD_ID,
+    workName: 'Base geral de clientes',
+    files: [],
+    charges: [],
+    summary: { workId: CUSTOMER_REGISTRY_CLOUD_ID, workName: 'Base geral de clientes', customerRegistry: payload, metadataType: 'customer_registry' },
+    mutationIntent: 'customer_registry_update'
+  });
+  return true;
+}
+
+async function loadCustomerRegistry() {
+  try {
+    const cloud = await window.UBY_SUPABASE?.loadRechargeBase?.(CUSTOMER_REGISTRY_CLOUD_ID);
+    const payload = cloud?.summary?.customerRegistry;
+    if (Array.isArray(payload?.rows)) writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, payload);
+  } catch (err) {
+    console.warn('Base de clientes mantida no cache local:', err.message);
+  }
+}
+
+async function handleCustomerRegistryFiles(files = []) {
+  if (!files.length) return;
+  const imported = [];
+  for (const file of files) {
+    const buffer = await file.arrayBuffer();
+    let rows;
+    if (/\.csv$/i.test(file.name) || /csv/i.test(file.type || '')) rows = parseCsvRows(new TextDecoder('utf-8').decode(buffer));
+    else {
+      const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+      rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, blankrows: false });
+    }
+    imported.push(...customerRegistryRowsFromSheet(rows));
+  }
+  const payload = mergeCustomerRegistry(imported, files.map(file => file.name).join(', '));
+  const status = document.getElementById('customerRegistryStatus');
+  try {
+    await saveCustomerRegistryCloud(payload);
+    if (status) status.textContent = `${imported.length} registro(s) importado(s) e salvo(s) online.`;
+  } catch (err) {
+    if (status) status.textContent = `${imported.length} registro(s) preservado(s) localmente; banco pendente: ${err.message}`;
+  }
+  renderCustomerRegistry();
+}
+
+function renderCustomerRegistry() {
+  const store = customerRegistryStore();
+  const query = normalizeHeaderName(document.getElementById('customerRegistrySearch')?.value || '');
+  const sort = document.getElementById('customerRegistrySort')?.value || 'spent';
+  const all = store.rows;
+  const rows = all.filter(row => !query || normalizeHeaderName(`${row.name} ${row.email} ${row.phone}`).includes(query)).sort((a, b) => {
+    if (sort === 'name') return safeText(a.name).localeCompare(safeText(b.name), 'pt-BR');
+    const field = sort === 'energy' ? 'energy' : sort === 'transactions' ? 'transactions' : 'spent';
+    return Number(b[field] || 0) - Number(a[field] || 0);
+  });
+  const totals = all.reduce((acc, row) => ({ transactions: acc.transactions + Number(row.transactions || 0), energy: acc.energy + Number(row.energy || 0), spent: acc.spent + Number(row.spent || 0) }), { transactions: 0, energy: 0, spent: 0 });
+  const hero = document.getElementById('customerRegistryHero');
+  if (hero) hero.textContent = `${all.length} cliente(s) cadastrados - base atualizada ${store.updatedAt ? new Date(store.updatedAt).toLocaleString('pt-BR') : 'ainda nao importada'}.`;
+  const source = document.getElementById('customerRegistrySource');
+  if (source) source.textContent = store.source ? `Ultima fonte: ${store.source}` : 'Nenhum arquivo importado.';
+  const kpis = document.getElementById('customerRegistryKpis');
+  if (kpis) kpis.innerHTML = `
+    <div class="card"><div class="label">Clientes</div><div class="value">${all.length}</div><div class="sub">cadastros unicos</div></div>
+    <div class="card"><div class="label">Transacoes</div><div class="value">${totals.transactions}</div><div class="sub">acumulado informado</div></div>
+    <div class="card"><div class="label">Energia</div><div class="value">${fmtKWh(totals.energy)}</div><div class="sub">consumo acumulado</div></div>
+    <div class="card"><div class="label">Total gasto</div><div class="value">${fmtBRL(totals.spent)}</div><div class="sub">faturamento informado</div></div>`;
+  const table = document.getElementById('customerRegistryTable');
+  if (table) table.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.name || '-')}</strong>${row.complement ? `<br><span class="sub">${escapeHtml(row.complement)}</span>` : ''}</td><td>${escapeHtml(row.phoneDisplay || row.phone || '-')}</td><td>${escapeHtml(row.email || '-')}</td><td>${Number(row.chargers || 0)}</td><td>${Number(row.transactions || 0)}</td><td>${Number(row.energy || 0).toFixed(2).replace('.', ',')}</td><td>${escapeHtml(row.chargeTime || '-')}</td><td><strong>${fmtBRL(row.spent || 0)}</strong></td></tr>`).join('') : '<tr><td colspan="8" style="text-align:center;padding:20px">Nenhum cliente encontrado.</td></tr>';
+}
+
 function clubParticipantKey(participant = {}) {
   const email = safeText(participant.email).trim().toLowerCase();
   if (email) return `email:${email}`;
@@ -10588,11 +10754,13 @@ function renderDetalhes() {
 function showTab(name) {
   const isGeneral = name === 'geral';
   const isUby = name === 'uby';
+  const isCustomers = name === 'clientes';
   const isClub = name === 'clube';
   const isGeneralFinance = name === 'financeiroGeral';
-  const isWorkReport = !isGeneral && !isUby && !isClub && !isGeneralFinance && name !== 'none';
+  const isWorkReport = !isGeneral && !isUby && !isCustomers && !isClub && !isGeneralFinance && name !== 'none';
   document.getElementById('tabGeral').style.display     = name === 'geral'     ? 'block' : 'none';
   document.getElementById('tabUby').style.display       = name === 'uby'       ? 'block' : 'none';
+  document.getElementById('tabClientes').style.display  = name === 'clientes'  ? 'block' : 'none';
   document.getElementById('tabClube').style.display     = name === 'clube'     ? 'block' : 'none';
   document.getElementById('tabFinanceiroGeral').style.display = name === 'financeiroGeral' ? 'block' : 'none';
   document.getElementById('tabMensal').style.display    = name === 'mensal'    ? 'block' : 'none';
@@ -10600,14 +10768,15 @@ function showTab(name) {
   document.getElementById('tabFinanceiro').style.display = name === 'financeiro' ? 'block' : 'none';
   document.getElementById('tabDetalhes').style.display  = name === 'detalhes'  ? 'block' : 'none';
   document.getElementById('ctrlGeral').style.display    = (isGeneral || isUby) ? 'flex'  : 'none';
+  document.getElementById('ctrlClientes').style.display = isCustomers ? 'flex' : 'none';
   document.getElementById('ctrlClube').style.display    = isClub ? 'flex' : 'none';
   document.getElementById('ctrlFinanceiroGeral').style.display = name === 'financeiroGeral' ? 'flex' : 'none';
   document.getElementById('ctrlMensal').style.display   = name === 'mensal'    ? 'flex'  : 'none';
   document.getElementById('ctrlAcc').style.display      = name === 'acumulado' ? 'flex'  : 'none';
   document.getElementById('ctrlFinanceiro').style.display = name === 'financeiro' ? 'flex' : 'none';
   document.getElementById('workReportTabs').style.display = isWorkReport ? 'flex' : 'none';
-  document.querySelector('.project-bar').style.display   = (isGeneral || isUby || isClub || isGeneralFinance) ? 'none' : '';
-  document.getElementById('uploadZone').style.display    = (isGeneral || isUby || isClub || isGeneralFinance) ? 'none' : '';
+  document.querySelector('.project-bar').style.display   = (isGeneral || isUby || isCustomers || isClub || isGeneralFinance) ? 'none' : '';
+  document.getElementById('uploadZone').style.display    = (isGeneral || isUby || isCustomers || isClub || isGeneralFinance) ? 'none' : '';
 }
 
 function hideAllTabs() { showTab('none'); }
@@ -10623,6 +10792,7 @@ async function switchTab(name, btn) {
     ubyReportsRequested = false;
     await renderUbyOperation();
   }
+  else if (name === 'clientes') renderCustomerRegistry();
   else if (name === 'clube') renderClub();
   else if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
   else if (name === 'detalhes') renderDetalhes();
@@ -10662,6 +10832,8 @@ async function initializeRechargePage() {
     await loadRechargeBase(requestedWorkId);
   }
   await loadFinanceReportArchive();
+  await loadCustomerRegistry();
+  renderCustomerRegistry();
   renderUbyPartnerReportLibrary();
   openGeneralFinanceView();
 }
