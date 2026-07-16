@@ -124,6 +124,22 @@ function assertRechargeRenderSafety() {
   checkScript(workerSource[1], "recargas-import-worker.js");
 }
 
+function assertAnalyzerCatalogSync() {
+  const detail = read(path.join(obraDir, "gestao_obra_ev_detalhe.html"));
+  const dashboard = read(path.join(obraDir, "analisadores", "dashboard.html"));
+  const requiredReports = [
+    "Relatorio_Analise_Carga_Posto_JK_Central.html",
+    "Relatorio_Eletrico_Posto_JK_Central.html",
+    "Relatorio_Carregador_Posto_JK_Central.html",
+    "Resumo_Tecnico_Posto_JK_Central.html"
+  ];
+  for (const report of requiredReports) {
+    if (!dashboard.includes(report) || !detail.includes(`analisadores/${report}`)) {
+      throw new Error(`O relatorio ${report} precisa aparecer no painel e no seletor da obra.`);
+    }
+  }
+}
+
 function main() {
   jsFiles.forEach(file => {
     checkScript(read(file), path.relative(root, file));
@@ -140,6 +156,7 @@ function main() {
 
   assertWorkDetailSafety();
   assertRechargeRenderSafety();
+  assertAnalyzerCatalogSync();
 
   console.log("obra-ev validation ok");
 }
