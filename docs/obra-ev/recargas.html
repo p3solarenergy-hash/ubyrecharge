@@ -923,11 +923,14 @@
 
     <section class="grid kpis" id="kpiGeneral"></section>
 
-    <section class="section" style="margin-top:18px;grid-template-columns:1fr">
+    <section class="section" style="margin-top:18px">
       <div class="card">
-        <h2>Ocupacao media por eletroposto</h2>
-        <div class="sub" style="margin:-8px 0 12px">Calculada sobre a potencia e os horarios realmente disponiveis de cada unidade.</div>
-        <div class="station-occupancy-list" id="generalStationOccupancy"></div>
+        <h2>Ranking de unidades</h2>
+        <div class="unit-rank" id="generalUnitRank"></div>
+      </div>
+      <div class="card">
+        <h2>Evolucao mensal geral</h2>
+        <canvas id="chartGeneralMonth" aria-label="Evolucao mensal geral"></canvas>
       </div>
     </section>
 
@@ -990,17 +993,6 @@
     </section>
 
     <section class="section" style="margin-top:18px">
-      <div class="card">
-        <h2>Ranking de unidades</h2>
-        <div class="unit-rank" id="generalUnitRank"></div>
-      </div>
-      <div class="card">
-        <h2>Evolucao mensal geral</h2>
-        <canvas id="chartGeneralMonth" aria-label="Evolucao mensal geral"></canvas>
-      </div>
-    </section>
-
-    <section class="section" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1">
         <h2>Resumo por unidade</h2>
         <div style="overflow-x:auto">
@@ -1043,6 +1035,14 @@
             <tbody id="customerRegistryTable"><tr><td colspan="8">Nenhum cliente importado.</td></tr></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px;grid-template-columns:1fr">
+      <div class="card">
+        <h2>Ocupacao media e horarios dos eletropostos</h2>
+        <div class="sub" style="margin:-8px 0 12px">Configuracao individual sobre a potencia e os horarios realmente disponiveis de cada unidade.</div>
+        <div class="station-occupancy-list" id="generalStationOccupancy"></div>
       </div>
     </section>
   </div>
