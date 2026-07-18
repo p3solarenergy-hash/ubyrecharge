@@ -6344,6 +6344,12 @@ function eachDateInRange(start, end) {
   return rows;
 }
 
+function calendarDayCount(start, end) {
+  if (!(start instanceof Date) || Number.isNaN(start.getTime())) return 0;
+  if (!(end instanceof Date) || Number.isNaN(end.getTime())) return 0;
+  return eachDateInRange(start, end).length;
+}
+
 function dailySeriesBounds(dated = []) {
   if (!dated.length) return null;
   const minDate = new Date(Math.min(...dated.map(charge => charge.startDate)));
@@ -10209,6 +10215,9 @@ function renderKPIs(charges, mk, window) {
   const occStatus = occ.pct < 15 ? 'abaixo do objetivo minimo de 15%' : (occ.pct < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
   const idleValue = charges.reduce((sum, charge) => sum + Number(charge.idleValue || 0), 0);
   const failedCount = charges.filter(charge => isFailedCharge(charge)).length;
+  const calendarDays = Math.max(calendarDayCount(window.start, window.end), 1);
+  const avgRevenueDay = rev / calendarDays;
+  const avgChargesDay = charges.length / calendarDays;
 
   document.getElementById('kpiGrid').innerHTML = `
     <div class="card"><div class="label">Ticket médio</div>
@@ -10229,6 +10238,12 @@ function renderKPIs(charges, mk, window) {
     <div class="card"><div class="label">Falhas no período</div>
       <div class="value">${failedCount}</div>
       <div class="sub">${charges.length ? fmtPct(failedCount / charges.length * 100) : '0,00%'} das tentativas</div></div>
+    <div class="card"><div class="label">Média de faturamento por dia</div>
+      <div class="value">${fmtBRL(avgRevenueDay)}</div>
+      <div class="sub">${calendarDays} dia(s), incluindo dias sem faturamento</div></div>
+    <div class="card"><div class="label">Média de recargas por dia</div>
+      <div class="value">${avgChargesDay.toFixed(2).replace('.', ',')}</div>
+      <div class="sub">${charges.length} recarga(s) em ${calendarDays} dia(s)</div></div>
   `;
 }
 
@@ -10651,6 +10666,16 @@ function renderAcumulado() {
   const clients = md.reduce((s,d) => s+d.clients, 0);
   const totalMaxKWh = md.reduce((s,d) => s + (d.occI > 0 ? d.energy/(d.occI/100) : 0), 0);
   const totalOcc = totalMaxKWh > 0 ? energy/totalMaxKWh*100 : 0;
+  const datedCharges = allCharges.filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()));
+  const accumulatedBounds = datedCharges.length ? {
+    start: new Date(Math.min(...datedCharges.map(charge => charge.startDate))),
+    end: new Date(Math.max(...datedCharges.map(charge => charge.startDate)))
+  } : null;
+  const calendarDays = accumulatedBounds
+    ? Math.max(calendarDayCount(accumulatedBounds.start, accumulatedBounds.end), 1)
+    : 1;
+  const avgRevenueDay = rev / calendarDays;
+  const avgChargesDay = totalCharges / calendarDays;
 
   document.getElementById('kpiAcc').innerHTML = `
     <div class="card"><div class="label">Total recargas</div>
@@ -10669,6 +10694,12 @@ function renderAcumulado() {
       <div class="value">${fmtPct(totalOcc)}</div>
       <div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div>
       <div class="sub">base mês completo por mês</div></div>
+    <div class="card"><div class="label">Média de faturamento por dia</div>
+      <div class="value">${fmtBRL(avgRevenueDay)}</div>
+      <div class="sub">${calendarDays} dia(s), incluindo dias sem faturamento</div></div>
+    <div class="card"><div class="label">Média de recargas por dia</div>
+      <div class="value">${avgChargesDay.toFixed(2).replace('.', ',')}</div>
+      <div class="sub">${totalCharges} recarga(s) em ${calendarDays} dia(s)</div></div>
   `;
 
   renderVisualSummary('accVisualSummary', allCharges, { occ: { pct: totalOcc, energy, power, hours: 0, maxKWh: 0 }, historyCharges: allCharges });
