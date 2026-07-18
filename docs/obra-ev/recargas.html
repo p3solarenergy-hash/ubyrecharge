@@ -3771,6 +3771,16 @@ function monthKey(date) {
   if (!date) return 'unknown';
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 }
+function monthCanBeClosed(mk, now = new Date()) {
+  if (!mk || mk === 'unknown') return false;
+  const currentMk = monthKey(now);
+  if (mk < currentMk) return true;
+  if (mk > currentMk) return false;
+  return now.getDate() >= daysInMonth(now.getFullYear(), now.getMonth() + 1);
+}
+function monthHasEffectiveClosing(mk) {
+  return monthCanBeClosed(mk) && !!monthlyClosings?.[mk] && closingMatchesMonth(monthlyClosings[mk], mk);
+}
 function chargeMonthKey(charge) {
   const realMonth = monthKey(charge?.startDate);
   return realMonth !== 'unknown' ? realMonth : (charge?._month || 'unknown');
@@ -3782,7 +3792,7 @@ function monthLabel(key) {
 }
 function daysInMonth(y, m) { return new Date(+y, +m, 0).getDate(); }
 function getMonths() {
-  const validClosings = Object.keys(monthlyClosings || {}).filter(mk => closingMatchesMonth(monthlyClosings[mk], mk));
+  const validClosings = Object.keys(monthlyClosings || {}).filter(monthHasEffectiveClosing);
   const current = new Date();
   const currentMk = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
   const financeMonths = [...new Set([
@@ -3905,7 +3915,7 @@ function closingMatchesMonth(closing, mk = closing?.month) {
 }
 
 function monthSummaryForMonth(mk, power = getPower()) {
-  const closedSummary = monthSummaryFromClosing(monthlyClosings?.[mk]);
+  const closedSummary = monthHasEffectiveClosing(mk) ? monthSummaryFromClosing(monthlyClosings?.[mk]) : null;
   if (closedSummary?.source === 'manual') return closedSummary;
   const ch = allCharges.filter(c => chargeMonthKey(c) === mk);
   if (ch.length) {
@@ -3924,6 +3934,11 @@ function renderMonthClosing(mk) {
   const status = document.getElementById('monthClosingStatus');
   const table = document.getElementById('monthClosingTable');
   if (!status || !table) return;
+  if (!monthCanBeClosed(mk)) {
+    status.textContent = `${monthLabel(mk)} esta em andamento.`;
+    table.innerHTML = `<tr><td colspan="9" style="color:var(--p3-muted)">Fechamento liberado somente no ultimo dia de ${monthLabel(mk)}. Os dados atuais continuam como parcial.</td></tr>`;
+    return;
+  }
   if (!closing) {
     status.textContent = `Ainda nao fechado para ${monthLabel(mk)}.`;
     table.innerHTML = `<tr><td colspan="9" style="color:var(--p3-muted)">Clique em Fechar mes para salvar o fechamento de ${monthLabel(mk)}.</td></tr>`;
@@ -3946,6 +3961,11 @@ function renderMonthClosing(mk) {
 async function closeSelectedMonth() {
   const mk = document.getElementById('monthSelector').value;
   if (!mk) return;
+  if (!monthCanBeClosed(mk)) {
+    setFeedback(`${monthLabel(mk)} ainda esta em andamento. O fechamento sera liberado no ultimo dia do mes.`, 'up-error');
+    renderMonthClosing(mk);
+    return;
+  }
   const closing = buildMonthClosing(mk);
   if (!closing) {
     setFeedback(`Nao ha recargas em ${monthLabel(mk)} para fechar.`, 'up-error');
@@ -4949,7 +4969,7 @@ function currentWorkInvestorReportModel(mk = financeMonthKey(), settingsOverride
       period: period.label,
       periodStart: period.start,
       periodEnd: period.end,
-      status: mk < new Date().toISOString().slice(0, 7) || monthlyClosings?.[mk] ? 'closed' : 'partial',
+      status: monthCanBeClosed(mk) ? 'closed' : 'partial',
       generatedAt: new Date().toLocaleString('pt-BR')
     },
     current,
@@ -5003,7 +5023,7 @@ function currentWorkOwnerAreaReportModel(mk = financeMonthKey(), settingsOverrid
       period: period.label,
       periodStart: period.start,
       periodEnd: period.end,
-      status: mk < new Date().toISOString().slice(0, 7) || monthlyClosings?.[mk] ? 'closed' : 'partial',
+      status: monthCanBeClosed(mk) ? 'closed' : 'partial',
       generatedAt: new Date().toLocaleString('pt-BR')
     },
     current,
@@ -9388,7 +9408,7 @@ function buildUbyInvestorReportModel(mk = ubyInvestorLatestMonth(), rows = ubyIn
       period: period.label,
       periodStart: period.start,
       periodEnd: period.end,
-      status: mk < new Date().toISOString().slice(0, 7) ? 'closed' : 'partial',
+      status: monthCanBeClosed(mk) ? 'closed' : 'partial',
       generatedAt: new Date().toLocaleString('pt-BR')
     },
     current,

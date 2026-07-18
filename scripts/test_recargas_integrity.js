@@ -50,6 +50,9 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext([
+  extractFunction(html, 'monthKey'),
+  extractFunction(html, 'daysInMonth'),
+  extractFunction(html, 'monthCanBeClosed'),
   extractFunction(html, 'rechargeRecordHasData'),
   extractFunction(html, 'updatedAtMs'),
   extractFunction(html, 'hydratedRechargeRecord'),
@@ -57,6 +60,11 @@ vm.runInContext([
   extractFunction(html, 'mergeRechargeRecord'),
   extractFunction(html, 'canonicalClubPersonName')
 ].join('\n'), context);
+
+assert.strictEqual(context.monthCanBeClosed('2026-07', new Date(2026, 6, 18)), false, 'current month must remain partial before its last day');
+assert.strictEqual(context.monthCanBeClosed('2026-07', new Date(2026, 6, 31)), true, 'current month may close on its last day');
+assert.strictEqual(context.monthCanBeClosed('2026-06', new Date(2026, 6, 18)), true, 'past months may be closed');
+assert.strictEqual(context.monthCanBeClosed('2026-08', new Date(2026, 6, 18)), false, 'future months must not be closed');
 
 assert.strictEqual(
   context.canonicalClubPersonName('Douglas Hugo De Oliveira Oliveira'),
@@ -142,6 +150,8 @@ assert(bridge.includes('const existingSummary = existing.resumo || {};'), 'metad
 assert(bridge.includes('stationAvailability: payload?.stationAvailability'), 'station schedules must persist in cloud metadata');
 assert(html.includes('duplicateGeneralLabels'), 'the general dashboard must remove duplicated KPI cards');
 assert(html.includes('stationAvailableHours(config, window.start, window.end)'), 'general occupancy must use station availability windows');
+assert(html.indexOf('id="generalUnitRank"') < html.indexOf('id="usageGeneralDayCompare"'), 'unit ranking must stay near the top of the general dashboard');
+assert(html.indexOf('id="generalStationOccupancy"') > html.indexOf('id="generalUnitTable"'), 'station schedule configuration must stay at the end of the general dashboard');
 assert(!html.includes('await window.UBY_SUPABASE.loadAllRechargeBases()'), 'startup must not download every full base in one response');
 assert(html.includes('loadRechargeSessions({ limit: 1000'), 'normalized sessions must load in bounded pages');
 assert(bridge.includes('replace_recharge_sessions'), 'normalized session replacement must be transactional');
