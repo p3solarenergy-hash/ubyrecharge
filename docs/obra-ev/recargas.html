@@ -773,6 +773,23 @@
       .finance-result-card strong { font-size:20px; }
       .uby-finance-row { grid-template-columns:1fr 1fr; gap:9px; padding:12px; }
     }
+    #generalFinanceSection { grid-template-columns: 1fr; }
+    #generalFinanceSection > .card { grid-column: 1 / -1; }
+    .finance-group-row th {
+      padding: 18px 12px 9px;
+      color: #57B7FF;
+      background: transparent;
+      border-bottom: 2px solid #294566;
+      font-size: 13px;
+      letter-spacing: 0;
+      text-transform: none;
+      text-align: left;
+    }
+    .finance-total-row td {
+      color: #EAF4FF;
+      font-weight: 800;
+      background: rgba(87,183,255,.06);
+    }
   </style>
 </head>
 <body>
@@ -1382,7 +1399,7 @@
         <h2>Financeiro por unidade</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Unidade</th><th>Receita</th><th>Receita P3</th><th>Sociedade P3</th><th>UBY liquido</th><th>Investidores</th><th>Socio/local</th><th>Payback</th><th>ROI mensal</th><th>Margem</th></tr></thead>
+            <thead><tr><th>Unidade</th><th>Faturamento</th><th>Custos da operacao</th><th>Gestao P3</th><th>Sociedade P3</th><th>Resultado UBY</th><th>Investidores</th><th>Socio/local</th><th>Payback</th><th>Margem</th></tr></thead>
             <tbody id="generalFinanceUnitTable"></tbody>
           </table>
         </div>
@@ -1892,6 +1909,8 @@ let rechargeImportQueue = Promise.resolve();
 let queuedRechargeImports = 0;
 let monthlyRenderSequence = 0;
 let monthlyInsightsTimer = null;
+let overviewRenderState = { geral: '', uby: '', financeiroGeral: '' };
+let overviewInsightsTimers = { geral: null, uby: null };
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -4751,6 +4770,29 @@ function yieldToBrowser() {
   return new Promise(resolve => setTimeout(resolve, 0));
 }
 
+function overviewRenderSignature(name) {
+  const view = document.getElementById('generalViewMode')?.value || 'month';
+  return `${name}:${rechargeRecordsVersion}:${view}`;
+}
+
+function overviewNeedsRender(name) {
+  return overviewRenderState[name] !== overviewRenderSignature(name);
+}
+
+function markOverviewRendered(name) {
+  overviewRenderState[name] = overviewRenderSignature(name);
+}
+
+function scheduleOverviewInsights(name, callback) {
+  clearTimeout(overviewInsightsTimers[name]);
+  const signature = overviewRenderSignature(name);
+  overviewInsightsTimers[name] = setTimeout(async () => {
+    if (overviewRenderSignature(name) !== signature) return;
+    try { await callback(); }
+    catch (error) { console.warn(`Analise secundaria ${name} pendente:`, error); }
+  }, 180);
+}
+
 function parseRechargeRowsInWorker(arrayBuffer, isCsvFile) {
   if (!window.Worker || !window.Blob || !window.URL?.createObjectURL) {
     return Promise.reject(new Error('Processamento em segundo plano indisponivel.'));
@@ -6025,7 +6067,11 @@ function generalFinanceByUnit(unitData) {
 }
 
 function renderGeneralFinance(unitData) {
-  const rows = generalFinanceByUnit(unitData).sort((a, b) => {
+  const activeUnits = (unitData || []).filter(unit =>
+    Array.isArray(unit.charges) && unit.charges.length > 0 &&
+    (Number(unit.count) > 0 || Number(unit.energy) > 0 || Number(unit.revenue) > 0)
+  );
+  const rows = generalFinanceByUnit(activeUnits).sort((a, b) => {
     const ownDiff = (Number(b.finance?.ownResult) || 0) - (Number(a.finance?.ownResult) || 0);
     if (Math.abs(ownDiff) > 0.009) return ownDiff;
     return (Number(b.finance?.revenue) || 0) - (Number(a.finance?.revenue) || 0);
@@ -6054,42 +6100,43 @@ function renderGeneralFinance(unitData) {
     <div class="card"><div class="label">Payback geral</div><div class="value">${formatPaybackMonths(total.paybackMonths || 0)}</div><div class="sub">investimento / resultado proprio</div></div>
   `;
   document.getElementById('generalFinanceTable').innerHTML = `
-    <tr><td>Receita total das recargas</td><td>${fmtBRL(total.revenue || 0)}</td></tr>
-    <tr><td>Investimento cadastrado</td><td>${fmtBRL(total.investmentValue || 0)}</td></tr>
-    <tr><td>Receita P3 total</td><td>${fmtBRL(total.p3Gross || 0)}</td></tr>
-    <tr><td>App/plataforma terceiros</td><td>${fmtBRL(total.platform || 0)}</td></tr>
-    <tr><td>Sociedade P3 total</td><td>${fmtBRL(total.p3SocietyProfit || 0)}</td></tr>
-    <tr><td>Sociedade P3 em AC</td><td>${fmtBRL(total.p3AcEquity || 0)}</td></tr>
-    <tr><td>Sociedade P3 em DC</td><td>${fmtBRL(total.p3DcEquity || 0)}</td></tr>
+    <tr class="finance-group-row"><th colspan="2">Operacao</th></tr>
+    <tr><td>Faturamento bruto das recargas</td><td>${fmtBRL(total.revenue || 0)}</td></tr>
     <tr><td>Receitas extras</td><td>${fmtBRL(total.extraRevenue || 0)}</td></tr>
-    <tr><td>Custos configurados</td><td>${fmtBRL(total.costs || 0)}</td></tr>
+    <tr><td>App e plataforma de terceiros</td><td>${fmtBRL(total.platform || 0)}</td></tr>
+    <tr><td>Demais custos configurados</td><td>${fmtBRL(total.costs || 0)}</td></tr>
     <tr><td>Participacao dos parceiros de area</td><td>${fmtBRL(total.areaParticipation || 0)}</td></tr>
-    <tr><td>Custo operacional total</td><td>${fmtBRL(total.totalOperatingCost || 0)}</td></tr>
-    <tr><td>Resultado liquido UBY</td><td>${fmtBRL(total.ubyNet || 0)}</td></tr>
+    <tr class="finance-total-row"><td>Custo operacional total</td><td>${fmtBRL(total.totalOperatingCost || 0)}</td></tr>
+    <tr class="finance-group-row"><th colspan="2">Distribuicao do resultado</th></tr>
+    <tr><td>Gestao P3</td><td>${fmtBRL(total.management || 0)}</td></tr>
+    <tr><td>Sociedade P3</td><td>${fmtBRL(total.p3SocietyProfit || 0)}</td></tr>
+    <tr><td>Resultado UBY antes da retencao</td><td>${fmtBRL(total.ubyNet || 0)}</td></tr>
     <tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(total.saRetention || 0)}</td></tr>
-    <tr><td>Base distribuivel UBY</td><td>${fmtBRL(total.ubyDistributable || 0)}</td></tr>
-    <tr><td>Resultado proprio total</td><td>${fmtBRL(total.ownResult || 0)}</td></tr>
-    <tr><td>Repasse investidores</td><td>${fmtBRL(total.investorDistribution || 0)}</td></tr>
-    <tr><td>Retido UBY</td><td>${fmtBRL(total.ubyRetained || 0)}</td></tr>
-    <tr><td>Resultado socio/local</td><td>${fmtBRL(total.partnerShare || 0)}</td></tr>
-    <tr><td>Payback geral</td><td>${formatPaybackMonths(total.paybackMonths || 0)}</td></tr>
-    <tr><td>ROI mensal geral</td><td>${fmtPct(total.roiMonthly || 0)}</td></tr>
+    <tr><td>Repasse aos investidores</td><td>${fmtBRL(total.investorDistribution || 0)}</td></tr>
+    <tr><td>Valor retido pela UBY</td><td>${fmtBRL(total.ubyRetained || 0)}</td></tr>
+    <tr><td>Resultado do socio ou local</td><td>${fmtBRL(total.partnerShare || 0)}</td></tr>
+    <tr class="finance-group-row"><th colspan="2">Retorno</th></tr>
+    <tr><td>Investimento cadastrado</td><td>${fmtBRL(total.investmentValue || 0)}</td></tr>
+    <tr><td>Payback estimado</td><td>${formatPaybackMonths(total.paybackMonths || 0)}</td></tr>
+    <tr><td>ROI mensal</td><td>${fmtPct(total.roiMonthly || 0)}</td></tr>
+    <tr><td>Margem sobre o faturamento</td><td>${fmtPct(total.margin || 0)}</td></tr>
     <tr><td>Melhor unidade financeira</td><td>${best ? `${best.workName} - ${fmtBRL(best.finance.ownResult || 0)}` : '-'}</td></tr>
   `;
   document.getElementById('generalFinanceUnitTable').innerHTML = rows.length ? rows.map(row => `
     <tr>
       <td>${row.workName}</td>
       <td>${fmtBRL(row.finance.revenue || 0)}</td>
-      <td>${fmtBRL(row.finance.p3Gross || 0)}</td>
+      <td>${fmtBRL(row.finance.totalOperatingCost || 0)}</td>
+      <td>${fmtBRL(row.finance.management || 0)}</td>
       <td>${fmtBRL(row.finance.p3SocietyProfit || 0)}</td>
       <td>${fmtBRL(row.finance.ubyNet || 0)}</td>
       <td>${fmtBRL(row.finance.investorDistribution || 0)}</td>
       <td>${fmtBRL(row.finance.partnerShare || 0)}</td>
       <td>${formatPaybackMonths(row.finance.paybackMonths || 0)}</td>
-      <td>${fmtPct(row.finance.roiMonthly || 0)}</td>
       <td>${fmtPct(row.finance.margin || 0)}</td>
     </tr>
   `).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem bases financeiras para consolidar</td></tr>';
+  markOverviewRendered('financeiroGeral');
 }
 
 // ── Potência ──────────────────────────────────────────────
@@ -9754,12 +9801,11 @@ async function renderUbyOperation() {
 
   renderVisualSummary('ubyVisualSummary', allUbyCharges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceUbyCharges });
   renderUbyDecisionCockpit([], allUbyCharges, included);
-  await yieldToBrowser();
-  await renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
+  scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower },
     weekdayPower: calendarPower,
     weekdayBounds: { start: firstPeriod, end: lastPeriod }
-  });
+  }));
 
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
   const accessRows = [...visibleRows.filter(row => row.included)]
@@ -9841,6 +9887,7 @@ async function renderUbyOperation() {
       <td><button class="btn-open" onclick="openWorkReport('${escapeAttr(row.workId)}','mensal','${escapeAttr(row.station)}')">Abrir</button></td>
     </tr>
   `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:20px">Sem carregadores com base salva.</td></tr>';
+  markOverviewRendered('uby');
 }
 
 function showGeneralWhenCurrentWorkIsEmpty() {
@@ -9908,8 +9955,6 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
         mergeCloudRechargeRecords(summaries);
         initWorkSelector();
         showGeneralWhenCurrentWorkIsEmpty();
-        await renderVisibleOverviewViews();
-        await yieldToBrowser();
       }
     }
     const ids = (summaries || []).map(record => String(record.workId || '')).filter(Boolean);
@@ -10039,8 +10084,7 @@ async function renderGeral() {
   renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
   renderGeneralStationOccupancy(stationRows, months);
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
-  await yieldToBrowser();
-  await renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } });
+  scheduleOverviewInsights('geral', () => renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } }));
   renderGeneralFinance(sourceUnitData);
 
   document.getElementById('generalUnitRank').innerHTML = rankingStationRows.length ? rankingStationRows.slice(0, 12).map(unit => `
@@ -10116,6 +10160,7 @@ async function renderGeral() {
       }
     });
   }
+  markOverviewRendered('geral');
 }
 
 // ── Render All ────────────────────────────────────────────
@@ -10869,17 +10914,17 @@ async function switchTab(name, btn) {
   showTab(name);
   if (name === 'mensal') await renderMensal();
   else if (name === 'acumulado') renderAcumulado();
-  else if (name === 'geral') await renderGeral();
+  else if (name === 'geral' && overviewNeedsRender('geral')) await renderGeral();
   else if (name === 'uby') {
     ubyReportsRequested = false;
-    await renderUbyOperation();
+    if (overviewNeedsRender('uby')) await renderUbyOperation();
   }
   else if (name === 'clientes') {
     await loadCustomerRegistry();
     renderCustomerRegistry();
   }
   else if (name === 'clube') renderClub();
-  else if (name === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
+  else if (name === 'financeiroGeral' && overviewNeedsRender('financeiroGeral')) renderGeneralFinance(getGeneralUnitData());
   else if (name === 'detalhes') renderDetalhes();
   else if (name === 'financeiro') handleFinanceMonthChange();
 }
