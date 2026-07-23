@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UBY Recharge - Login</title>
-<link rel="icon" type="image/svg+xml" href="assets/brand/04_simbolo_badge.svg">
-<link rel="stylesheet" href="brand.css">
+<link rel="icon" type="image/png" href="assets/brand/v2/14_icone_app.png">
+<link rel="stylesheet" href="brand.css?v=20260723-brand-v2">
 <style>
   :root{--p3-primary:#2D7FF9;--p3-accent:#57B7FF;--p3-bg:#07111F;--p3-card:#0E1B2D;--p3-text:#E8EFEB;--p3-muted:#9DB5AA;--p3-border:#24364E;--p3-danger:#E55545;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;min-height:100vh}
   body{display:grid;place-items:center;padding:28px}
   .shell{width:min(1040px,100%);display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:stretch}
-  .hero,.login-card{background:linear-gradient(135deg,#0B2A4A 0%,#134B7A 100%);border:1px solid rgba(87,183,255,.24);border-radius:18px;box-shadow:var(--p3-shadow)}
+  .hero,.login-card{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:8px;box-shadow:var(--p3-shadow)}
   .hero{padding:38px;display:flex;flex-direction:column;justify-content:space-between;min-height:560px;overflow:hidden;position:relative}
   .hero::after{content:"";position:absolute;right:-110px;top:-120px;width:360px;height:360px;background:radial-gradient(circle,rgba(87,183,255,.34),transparent 70%);border-radius:50%}
   .brand{display:flex;align-items:center;gap:14px;position:relative;z-index:1}.logo{width:64px;height:64px;border-radius:14px;display:grid;place-items:center;background:#071527;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.26)}.logo img{width:100%;height:100%;object-fit:cover}.brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.88}.brand-tag{font-size:11px;color:#c7d7cf;letter-spacing:1px}
@@ -32,12 +32,9 @@
   <section class="hero">
     <div>
       <div class="brand">
-        <div class="logo"><img src="assets/brand/04_simbolo_badge.svg" alt=""></div>
-        <div>
-          <div class="brand-name">UBY Recharge</div>
-          <div class="brand-tag">Engenharia em Energia Solar &amp; Mobilidade El&eacute;trica</div>
-        </div>
+        <img class="uby-wordmark" src="assets/brand/02_logo_dark.svg" alt="UBY Recharge">
       </div>
+      <div class="brand-tag">Engenharia em Energia Solar &amp; Mobilidade El&eacute;trica</div>
       <h1>Login UBY Recharge</h1>
       <p>Entrada central para obras EV, engenharia, analisadores, tarefas e documentos. Cada perfil abre somente os m&oacute;dulos definidos para sua fun&ccedil;&atilde;o.</p>
     </div>

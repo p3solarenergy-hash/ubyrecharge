@@ -1,31 +1,211 @@
+/*
+ * UBY Recharge - identidade visual oficial v2
+ * Fonte: Manual de Marca UBY Recharge, 2026.
+ * Esta camada centraliza a marca sem alterar regras de negocio ou dados.
+ */
 :root{
-  --uby-navy:#071527;
-  --uby-navy-soft:#10223A;
-  --uby-green:#57B7FF;
-  --uby-cyan:#38D4FF;
+  color-scheme:dark;
+  --uby-midnight:#0A1628;
+  --uby-midnight-deep:#06101F;
+  --uby-midnight-soft:#10213A;
+  --uby-volt:#00FF85;
+  --uby-volt-strong:#00D96F;
+  --uby-solar:#FFD600;
+  --uby-cyan:#00E5FF;
   --uby-white:#FFFFFF;
+  --uby-mist:#F5F7FA;
+  --uby-stone:#8A95A5;
+  --uby-border:#253650;
+  --uby-danger:#FF5F68;
+  --uby-shadow:0 10px 28px rgba(0,0,0,.2);
+
+  /* Compatibilidade com as telas legadas. */
+  --p3-primary:var(--uby-volt)!important;
+  --p3-primary-deep:var(--uby-midnight)!important;
+  --p3-accent:var(--uby-cyan)!important;
+  --p3-accent-2:var(--uby-solar)!important;
+  --p3-bg:var(--uby-midnight-deep)!important;
+  --p3-card:var(--uby-midnight)!important;
+  --p3-card-soft:var(--uby-midnight-soft)!important;
+  --p3-text:var(--uby-mist)!important;
+  --p3-muted:var(--uby-stone)!important;
+  --p3-border:var(--uby-border)!important;
+  --p3-warn:var(--uby-solar)!important;
+  --p3-ok:var(--uby-volt)!important;
+  --p3-danger:var(--uby-danger)!important;
+  --p3-shadow:var(--uby-shadow)!important;
+  --surface-bg:var(--uby-midnight)!important;
+  --surface-border:var(--uby-border)!important;
+
+  /* Compatibilidade com o painel de mercado. */
+  --bg:var(--uby-midnight-deep)!important;
+  --bg2:var(--uby-midnight)!important;
+  --card:var(--uby-midnight)!important;
+  --card2:var(--uby-midnight-soft)!important;
+  --border:rgba(138,149,165,.18)!important;
+  --border2:var(--uby-border)!important;
+  --text:var(--uby-mist)!important;
+  --muted:var(--uby-stone)!important;
+  --muted2:#AAB4C3!important;
+  --green:var(--uby-volt)!important;
+  --green2:rgba(0,255,133,.12)!important;
+  --blue:var(--uby-cyan)!important;
+  --blue2:rgba(0,229,255,.12)!important;
+  --amber:var(--uby-solar)!important;
+  --teal:var(--uby-cyan)!important;
 }
 
 html,
-body,
-button,
-a,
-input,
-select,
-textarea,
-[role="button"]{
-  cursor:url("assets/brand/uby-cursor.svg") 6 2, auto;
+body{
+  background:var(--uby-midnight-deep);
+  color:var(--uby-mist);
+  font-family:Inter,"Segoe UI",Arial,sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+.brand-name,
+.uby-brand-title{
+  font-family:Poppins,Inter,"Segoe UI",Arial,sans-serif;
+  letter-spacing:0;
+}
+
+h1,
+h2,
+h3,
+h4,
+.section-title,
+.section-head h2,
+.panel > h2,
+.card > h2,
+.unit-card h3{
+  color:var(--uby-mist)!important;
+}
+
+a:not(.btn):not(.new-btn):not(.primary-btn):not(.primary-link):not(.btn-open){
+  color:var(--uby-volt);
+}
+
+thead th,
+.table-head,
+.eyebrow,
+.kicker{
+  color:var(--uby-volt)!important;
 }
 
 button,
 a,
 summary,
 label,
-input[type="checkbox"],
-input[type="radio"],
-input[type="file"],
-select{
-  cursor:url("assets/brand/uby-cursor.svg") 6 2, pointer;
+input,
+select,
+textarea,
+[role="button"]{
+  font-family:Inter,"Segoe UI",Arial,sans-serif;
+}
+
+::selection{
+  background:var(--uby-volt);
+  color:var(--uby-midnight);
+}
+
+:focus-visible{
+  outline:2px solid var(--uby-volt);
+  outline-offset:2px;
+}
+
+/* Superficies e controles */
+.card,
+.panel,
+.stat,
+.report-card,
+.compare-section,
+.login-card,
+.scope-card,
+.unit-card{
+  border-color:var(--uby-border)!important;
+}
+
+.btn,
+.new-btn,
+.primary-btn,
+.primary-link,
+.btn-open,
+.btn-recalc,
+button.main,
+a.main{
+  background:var(--uby-volt)!important;
+  border-color:var(--uby-volt)!important;
+  color:var(--uby-midnight)!important;
+  box-shadow:none!important;
+}
+
+.btn:hover,
+.new-btn:hover,
+.primary-btn:hover,
+.primary-link:hover,
+.btn-open:hover,
+.btn-recalc:hover,
+button.main:hover,
+a.main:hover{
+  background:var(--uby-cyan)!important;
+  border-color:var(--uby-cyan)!important;
+  color:var(--uby-midnight)!important;
+}
+
+.value,
+.stat .value,
+.kpi-value,
+.metric-value,
+.unit-value{
+  color:var(--uby-volt)!important;
+}
+
+.tab.active,
+.uby-link.active{
+  border-color:var(--uby-volt)!important;
+}
+
+/* Evita decoracoes antigas que competem com a marca oficial. */
+.header::after,
+.hero::after,
+.uby-brand-glow{
+  display:none!important;
+}
+
+.header{
+  background:var(--uby-midnight)!important;
+  border:1px solid var(--uby-border)!important;
+  border-radius:8px!important;
+}
+
+.hero,
+body.uby-shell > header{
+  background:var(--uby-midnight)!important;
+  border-color:var(--uby-border)!important;
+  border-radius:8px!important;
+  box-shadow:none!important;
+}
+
+.logo,
+.logo-mark,
+.uby-brand-mark{
+  background:var(--uby-midnight)!important;
+  border:1px solid rgba(0,255,133,.22)!important;
+  border-radius:8px!important;
+  box-shadow:none!important;
+}
+
+.logo img,
+.logo-mark img,
+.uby-brand-mark img{
+  object-fit:cover;
+}
+
+img[src*="09_sobre_midnight"]{
+  transform:scale(2.15);
 }
 
 .uby-brand-logo{
@@ -34,40 +214,109 @@ select{
   height:auto;
 }
 
-.uby-brand-mark{
-  display:inline-grid;
-  place-items:center;
-  width:38px;
-  height:38px;
-  border-radius:10px;
-  background:linear-gradient(145deg,var(--uby-navy),var(--uby-navy-soft));
-  box-shadow:0 8px 24px rgba(0,0,0,.22);
-  overflow:hidden;
-}
-
-.uby-brand-mark img{
-  width:100%;
-  height:100%;
+.uby-wordmark{
+  width:142px;
+  height:48px;
   object-fit:cover;
+  object-position:center;
 }
 
-.uby-page-brand{
-  display:flex;
-  align-items:center;
-  gap:14px;
+.uby-official-banner{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:260px;
+  object-fit:cover;
+  object-position:center;
+  border:1px solid var(--uby-border);
+  border-radius:8px;
 }
 
-.uby-page-brand img{
-  height:52px;
-  width:auto;
+/* Tela de carregamento leve, sem bloquear a pagina. */
+.uby-loading-screen{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:grid;
+  place-items:center;
+  background:var(--uby-midnight);
+  opacity:1;
+  transition:opacity .18s ease;
 }
 
-.uby-brand-glow{
-  position:absolute;
+.uby-loading-screen[hidden]{
+  display:none;
+}
+
+.uby-loading-screen.is-leaving{
+  opacity:0;
   pointer-events:none;
-  width:260px;
-  height:260px;
+}
+
+.uby-loading-content{
+  display:grid;
+  justify-items:center;
+  gap:16px;
+}
+
+.uby-loading-mark{
+  width:64px;
+  height:64px;
+  object-fit:cover;
+  border-radius:8px;
+}
+
+.uby-loading-spinner{
+  width:34px;
+  height:34px;
+  border:4px solid #1D314C;
+  border-top-color:var(--uby-volt);
+  border-right-color:var(--uby-cyan);
   border-radius:50%;
-  background:radial-gradient(circle,rgba(87,183,255,.22),rgba(0,229,255,.08),transparent 68%);
-  filter:blur(2px);
+  animation:uby-spin .75s linear infinite;
+}
+
+.uby-loading-label{
+  color:var(--uby-stone);
+  font-size:12px;
+  font-weight:700;
+}
+
+@keyframes uby-spin{
+  to{transform:rotate(360deg)}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .uby-loading-spinner{animation-duration:1.6s}
+}
+
+/* Tema claro oficial. */
+[data-theme="light"],
+body[data-theme="light"]{
+  color-scheme:light;
+  --p3-primary:var(--uby-midnight)!important;
+  --p3-primary-deep:var(--uby-midnight)!important;
+  --p3-accent:var(--uby-volt)!important;
+  --p3-bg:var(--uby-mist)!important;
+  --p3-card:var(--uby-white)!important;
+  --p3-text:var(--uby-midnight)!important;
+  --p3-muted:#667286!important;
+  --p3-border:#D9E0EA!important;
+  --p3-shadow:0 8px 24px rgba(10,22,40,.08)!important;
+}
+
+[data-theme="light"] .header,
+body[data-theme="light"] .header{
+  background:var(--uby-white)!important;
+}
+
+@media(max-width:700px){
+  .uby-wordmark{
+    width:112px;
+    height:40px;
+  }
+  .uby-official-banner{
+    min-height:132px;
+    object-fit:cover;
+  }
 }

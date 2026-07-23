@@ -4704,8 +4704,8 @@ function renderVisualSummary(elId, charges = [], options = {}) {
   const energyDiff = Number(last.energy || 0) - Number(prev.energy || 0);
   const occState = occ.pct < 15 ? 'bad' : (occ.pct < 30 ? 'warn' : '');
   const trendGlyph = value => value > 0 ? '&#8599;' : (value < 0 ? '&#8600;' : '&#8594;');
-  const imgBolt = "url('assets/brand/05_simbolo_raio.svg')";
-  const imgBadge = "url('assets/brand/04_simbolo_badge.svg')";
+  const imgBolt = "url('assets/brand/v2/09_sobre_midnight.png')";
+  const imgBadge = "url('assets/brand/v2/09_sobre_midnight.png')";
   const cards = [
     { title: 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: 'base do periodo selecionado', trend: trendGlyph(occ.pct - 15), cls: occState, img: imgBolt },
     { title: 'Faturamento', value: fmtBRL(revenue), sub: `${signedMoney(revenueDiff)} vs dia anterior`, trend: trendGlyph(revenueDiff), cls: revenueDiff < 0 ? 'bad' : '', img: imgBadge },

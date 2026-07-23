@@ -5,9 +5,9 @@ body.uby-shell{
   position:fixed;
   inset:0 auto 0 0;
   width:244px;
-  background:#0B2A4A;
-  border-right:1px solid rgba(87,183,255,.18);
-  color:#E8EFEB;
+  background:#0A1628;
+  border-right:1px solid rgba(0,255,133,.18);
+  color:#F5F7FA;
   z-index:3000;
   display:flex;
   flex-direction:column;
@@ -19,9 +19,9 @@ body.uby-shell{
   right:0;
   top:0;
   height:54px;
-  background:#0E1B2D;
-  border-bottom:1px solid rgba(87,183,255,.28);
-  color:#E8EFEB;
+  background:#0A1628;
+  border-bottom:1px solid rgba(0,255,133,.2);
+  color:#F5F7FA;
   z-index:2990;
   display:flex;
   align-items:center;
@@ -77,9 +77,10 @@ body.uby-shell .page{
   height:100%;
   display:block;
   object-fit:cover;
+  transform:scale(2.15);
 }
 .uby-recharge{
-  color:#57B7FF;
+  color:#00FF85;
   font-weight:900;
 }
 .uby-collapse{
@@ -101,7 +102,7 @@ body.uby-shell .page{
 }
 .uby-section-title{
   font-size:11px;
-  color:#B7CBC1;
+  color:#8A95A5;
   font-weight:900;
   margin:0 0 7px;
 }
@@ -119,12 +120,12 @@ body.uby-shell .page{
   margin:2px 0;
 }
 .uby-link:hover,.uby-link.active{
-  background:rgba(87,183,255,.20);
+  background:rgba(0,255,133,.12);
 }
 .uby-link-mark{
   width:15px;
   text-align:center;
-  color:#57B7FF;
+  color:#00FF85;
   font-weight:900;
 }
 .uby-topbar .uby-grid-icon{
@@ -144,9 +145,9 @@ body.uby-shell .page{
 }
 .uby-profile-pill{
   margin-left:auto;
-  border:1px solid rgba(87,183,255,.35);
-  background:rgba(87,183,255,.12);
-  color:#E8EFEB;
+  border:1px solid rgba(0,255,133,.36);
+  background:rgba(0,255,133,.1);
+  color:#F5F7FA;
   border-radius:999px;
   padding:7px 11px;
   font-size:12px;

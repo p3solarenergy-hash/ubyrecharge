@@ -95,17 +95,29 @@
     if (!document.querySelector('link[data-uby-brand="css"]')) {
       const css = document.createElement("link");
       css.rel = "stylesheet";
-      css.href = base + "brand.css";
+      css.href = base + "brand.css?v=20260723-brand-v2";
       css.dataset.ubyBrand = "css";
       document.head.appendChild(css);
     }
-    if (!document.querySelector('link[rel="icon"]')) {
-      const icon = document.createElement("link");
-      icon.rel = "icon";
-      icon.type = "image/svg+xml";
-      icon.href = base + "assets/brand/04_simbolo_badge.svg";
-      document.head.appendChild(icon);
+    document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]').forEach((node) => node.remove());
+    const icon = document.createElement("link");
+    icon.rel = "icon";
+    icon.type = "image/png";
+    icon.href = base + "assets/brand/v2/14_icone_app.png";
+    document.head.appendChild(icon);
+    if (!document.querySelector('link[rel="manifest"]')) {
+      const manifest = document.createElement("link");
+      manifest.rel = "manifest";
+      manifest.href = base + "site.webmanifest";
+      document.head.appendChild(manifest);
     }
+    let theme = document.querySelector('meta[name="theme-color"]');
+    if (!theme) {
+      theme = document.createElement("meta");
+      theme.name = "theme-color";
+      document.head.appendChild(theme);
+    }
+    theme.content = "#0A1628";
   }
 
   ensureBrandAssets();
@@ -114,7 +126,7 @@
   shell.innerHTML = `
     <aside class="uby-sidebar">
       <div class="uby-brand">
-        <a class="uby-brand-mark" href="${home}" aria-label="UBY Recharge"><img src="${base}assets/brand/04_simbolo_badge.svg" alt=""></a>
+        <a class="uby-brand-mark" href="${home}" aria-label="UBY Recharge"><img src="${base}assets/brand/v2/09_sobre_midnight.png" alt=""></a>
         <div class="uby-brand-divider"></div>
         <div class="uby-brand-title">UBY Recharge</div>
         <button class="uby-collapse" type="button" aria-label="Recolher menu">&lt;&lt;</button>
@@ -122,7 +134,7 @@
       <nav class="uby-nav">${links.map(navSection).join("")}</nav>
     </aside>
     <div class="uby-topbar">
-      <span class="uby-brand-mark" aria-hidden="true"><img src="${base}assets/brand/04_simbolo_badge.svg" alt=""></span>
+      <span class="uby-brand-mark" aria-hidden="true"><img src="${base}assets/brand/v2/09_sobre_midnight.png" alt=""></span>
       <div class="uby-topbar-divider"></div>
       <strong>UBY Recharge</strong>
       <span>|</span>

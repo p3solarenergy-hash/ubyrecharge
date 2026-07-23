@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 320" width="1000" height="320">
   <rect width="1000" height="320" fill="#0A1628"/>
   <g transform="translate(40,60)">
-    <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="#57B7FF"/>
+    <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="#00FF85"/>
     <path d="M 124 16 L 56 112 L 96 112 L 76 184 L 144 88 L 104 88 Z" fill="#0A1628"/>
   </g>
   <g transform="translate(280,20)">
     <text x="0" y="170" font-family="Poppins, Arial, sans-serif" font-weight="700"
           font-size="170" fill="#FFFFFF" letter-spacing="-6">uby</text>
-    <rect x="4" y="225" width="262" height="5" rx="2.5" fill="#57B7FF"/>
+    <rect x="4" y="225" width="262" height="5" rx="2.5" fill="#00FF85"/>
     <text x="2" y="270" font-family="Poppins, Arial, sans-serif" font-weight="500"
-          font-size="32" fill="#57B7FF" letter-spacing="14">RECHARGE</text>
+          font-size="32" fill="#00FF85" letter-spacing="14">RECHARGE</text>
   </g>
 </svg
 >

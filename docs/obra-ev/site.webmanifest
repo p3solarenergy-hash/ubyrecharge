@@ -1,0 +1,23 @@
+{
+  "name": "UBY Recharge",
+  "short_name": "UBY",
+  "description": "Central de operacao EV UBY Recharge",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0A1628",
+  "theme_color": "#0A1628",
+  "icons": [
+    {
+      "src": "assets/brand/v2/14_icone_app.png",
+      "sizes": "380x380",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/brand/v2/16_squircle_selo_verde.png",
+      "sizes": "380x380",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
