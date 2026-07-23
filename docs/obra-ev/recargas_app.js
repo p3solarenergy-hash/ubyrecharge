@@ -17,6 +17,7 @@ if (window.Chart) {
 let allRechargeRecords = {};
 let cloudRechargeWorks = [];
 let openingWorkReport = false;
+let openWorkReportInFlight = false;
 let monthlyClosings = {};
 let financialSettings = {};
 let stationAvailability = {};
@@ -41,6 +42,7 @@ let queuedRechargeImports = 0;
 let monthlyRenderSequence = 0;
 let monthlyInsightsTimer = null;
 let overviewRenderState = { geral: '', uby: '', financeiroGeral: '' };
+let overviewRenderSequence = { geral: 0, uby: 0, financeiroGeral: 0 };
 let overviewInsightsTimers = { geral: null, uby: null };
 let overviewSessionsFullyHydrated = false;
 let overviewSessionsHydrationPromise = null;
@@ -942,14 +944,14 @@ function applyRechargeRecord(record, sourceLabel) {
   updateCorrectionButtons();
   document.getElementById('tabsBar').style.display = 'flex';
   document.getElementById('emptyState').style.display = 'none';
-  renderAll();
+  if (!openingWorkReport) renderAll();
   const updated = record.updatedAt ? new Date(record.updatedAt).toLocaleString('pt-BR') : 'agora';
   const targetName = currentStationReportName || currentWorkName;
   const filterNote = currentStationReportName ? ' Visualizacao filtrada por estacao; a base completa permanece preservada.' : stationMismatchMessage();
   setStorageState(`Carregado de ${sourceLabel} para <strong>${targetName}</strong>: ${loadedFiles.length} arquivo(s), ${allCharges.length} recarga(s). Ultima atualizacao: ${updated}.${filterNote}`);
 }
 
-async function loadRechargeBase(workId = currentWorkId) {
+async function loadRechargeBase(workId = currentWorkId, options = {}) {
   const targetWorkId = String(workId || currentWorkId);
   const requestSequence = ++rechargeLoadSequence;
   if (currentWorkId !== targetWorkId) currentWorkId = targetWorkId;
@@ -959,6 +961,7 @@ async function loadRechargeBase(workId = currentWorkId) {
   const initial = memory?.charges?.length ? memory : local;
   if (initial && (!initial.localCompact || initial.charges?.length)) applyRechargeRecord(initial, 'base local');
   else applyRechargeRecord(null, 'base local');
+  if (options.skipCloud) return;
   if (!window.UBY_SUPABASE?.loadRechargeBase) return;
   try {
     const cloud = await window.UBY_SUPABASE.loadRechargeBase(targetWorkId);
@@ -1017,40 +1020,54 @@ function shouldOpenFullRechargeWork(workId, stationName = '') {
 }
 
 async function openWorkReport(workId, target = 'mensal', stationName = '') {
+  if (openWorkReportInFlight) return;
+  openWorkReportInFlight = true;
+  overviewRenderSequence.uby += 1;
+  overviewRenderSequence.geral += 1;
+  clearTimeout(overviewInsightsTimers.uby);
+  clearTimeout(overviewInsightsTimers.geral);
   const selector = document.getElementById('workSelector');
-  currentWorkId = String(workId || currentWorkId);
-  currentStationReportName = shouldOpenFullRechargeWork(currentWorkId, stationName) ? '' : safeText(stationName).trim();
-  localStorage.setItem('uby-recargas-current-work', currentWorkId);
-  if (selector) selector.value = currentWorkId;
-  currentWorkName = currentWork().nome || currentWorkId;
-  const nextPower = Number(currentWork().kw || 0);
-  if (nextPower > 0) {
-    document.getElementById('chargerPower').value = nextPower;
-    document.getElementById('chargerPowerAcc').value = nextPower;
-  }
-  openingWorkReport = true;
   try {
-    await loadRechargeBase(currentWorkId);
+    currentWorkId = String(workId || currentWorkId);
+    currentStationReportName = shouldOpenFullRechargeWork(currentWorkId, stationName) ? '' : safeText(stationName).trim();
+    localStorage.setItem('uby-recargas-current-work', currentWorkId);
+    if (selector) selector.value = currentWorkId;
+    currentWorkName = currentWork().nome || currentWorkId;
+    const nextPower = Number(currentWork().kw || 0);
+    if (nextPower > 0) {
+      document.getElementById('chargerPower').value = nextPower;
+      document.getElementById('chargerPowerAcc').value = nextPower;
+    }
+
+    document.getElementById('tabsBar').style.display = 'flex';
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('workReportTabs').style.display = 'flex';
+    document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.report-tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${target}'`)));
+    showTab(target);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    await yieldToBrowser();
+
+    openingWorkReport = true;
+    // A base geral ja foi sincronizada na entrada. Abrir uma estacao deve usar
+    // a copia em memoria imediatamente, sem bloquear a interface aguardando rede.
+    await loadRechargeBase(currentWorkId, { skipCloud: true });
+    openingWorkReport = false;
+
+    updateCorrectionButtons();
+    if (!allCharges.length) {
+      uploadZone.classList.remove('compact');
+      updateChips();
+      setStorageState(`Sem planilha salva para <strong>${currentWorkName}</strong>. Escolha o mes e carregue a planilha desta estacao.`);
+    }
+    if (target === 'mensal') await renderMensal();
+    else if (target === 'acumulado') renderAcumulado();
+    else if (target === 'detalhes') renderDetalhes();
+    else if (target === 'financeiro') await handleFinanceMonthChange();
   } finally {
     openingWorkReport = false;
+    openWorkReportInFlight = false;
   }
-  document.getElementById('tabsBar').style.display = 'flex';
-  document.getElementById('emptyState').style.display = 'none';
-  document.getElementById('workReportTabs').style.display = 'flex';
-  updateCorrectionButtons();
-  if (!allCharges.length) {
-    uploadZone.classList.remove('compact');
-    updateChips();
-    setStorageState(`Sem planilha salva para <strong>${currentWorkName}</strong>. Escolha o mes e carregue a planilha desta estacao.`);
-  }
-  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
-  document.querySelectorAll('.report-tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${target}'`)));
-  showTab(target);
-  if (target === 'mensal') await renderMensal();
-  else if (target === 'acumulado') renderAcumulado();
-  else if (target === 'detalhes') renderDetalhes();
-  else if (target === 'financeiro') await handleFinanceMonthChange();
-  requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }
 
 // ── Prevenção de drop fora da zona ────────────────────────
@@ -7857,6 +7874,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
 }
 
 async function renderUbyOperation() {
+  const renderSequence = ++overviewRenderSequence.uby;
   const sourceUnitData = getGeneralUnitData();
   const sourceRows = getUbyChargerRows(sourceUnitData);
   const sourceIncluded = sourceRows.filter(row => row.included);
@@ -7946,6 +7964,7 @@ async function renderUbyOperation() {
     .sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
   renderUbyFinancialOverview(sourceRows, sourceMonths, isMonthView, currentGeneralMonth, viewLabel);
   await yieldToBrowser();
+  if (renderSequence !== overviewRenderSequence.uby || document.getElementById('tabUby').style.display === 'none') return;
   const chartLabels = chartRows.map(row => {
     const label = row.stationName || row.workName || '-';
     return label.length > 24 ? label.slice(0, 24) + '...' : label;
@@ -7974,6 +7993,7 @@ async function renderUbyOperation() {
     if (investor) investor.textContent = 'Os relatorios financeiros sao carregados somente quando solicitados para manter o painel rapido.';
   }
   await yieldToBrowser();
+  if (renderSequence !== overviewRenderSequence.uby || document.getElementById('tabUby').style.display === 'none') return;
 
   const monthData = sourceMonths.map(mk => {
     const monthCharges = sourceUbyCharges.filter(charge => chargeMonthKey(charge) === mk);
