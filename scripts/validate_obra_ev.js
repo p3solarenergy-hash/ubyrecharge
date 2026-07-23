@@ -81,7 +81,10 @@ function assertWorkDetailSafety() {
 }
 
 function assertRechargeRenderSafety() {
-  const recargas = read(path.join(obraDir, "recargas.html"));
+  const recargas = [
+    read(path.join(obraDir, "recargas.html")),
+    read(path.join(obraDir, "recargas_app.js"))
+  ].join("\n");
   if (/renderMensal\(\);\s*renderAcumulado\(\);\s*renderFinanceiro\(\);\s*renderGeral\(\);/.test(recargas)) {
     throw new Error("O painel de recargas nao pode renderizar todas as abas em uma unica atualizacao.");
   }

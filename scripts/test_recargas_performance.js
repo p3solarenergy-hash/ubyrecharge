@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'docs', 'obra-ev', 'recargas.html'), 'utf8');
+const htmlDocument = fs.readFileSync(path.join(root, 'docs', 'obra-ev', 'recargas.html'), 'utf8');
+const app = fs.readFileSync(path.join(root, 'docs', 'obra-ev', 'recargas_app.js'), 'utf8');
+const html = `${htmlDocument}\n${app}`;
 const bridge = fs.readFileSync(path.join(root, 'docs', 'obra-ev', 'supabase_bridge.js'), 'utf8');
 const migration = fs.readFileSync(
   path.join(root, 'docs', 'obra-ev', 'supabase_recargas_fast_save_20260723.sql'),
@@ -29,6 +31,11 @@ assert(
 assert(
   html.includes('async function ensureAllOverviewSessionsLoaded'),
   'O historico completo deve existir como carregamento sob demanda.'
+);
+assert(
+  htmlDocument.includes('recargas_app.js?v=20260723-performance1') &&
+  htmlDocument.length < 180000,
+  'O motor da pagina deve ficar em arquivo externo cacheavel.'
 );
 assert(
   html.includes("if (document.getElementById('generalViewMode')?.value === 'accumulated')"),

@@ -8,7 +8,10 @@ const htmlPath = path.join(root, 'docs', 'obra-ev', 'recargas.html');
 const bridgePath = path.join(root, 'docs', 'obra-ev', 'supabase_bridge.js');
 const backupPath = path.join(root, 'docs', 'obra-ev', 'backup_guard.js');
 const migrationPath = path.join(root, 'docs', 'obra-ev', 'supabase_recargas_integrity_20260714.sql');
-const html = fs.readFileSync(htmlPath, 'utf8');
+const html = [
+  fs.readFileSync(htmlPath, 'utf8'),
+  fs.readFileSync(path.join(root, 'docs', 'obra-ev', 'recargas_app.js'), 'utf8')
+].join('\n');
 const bridge = fs.readFileSync(bridgePath, 'utf8');
 const backup = fs.readFileSync(backupPath, 'utf8');
 const migration = fs.readFileSync(migrationPath, 'utf8');
