@@ -7,6 +7,8 @@ UBY_AUTH.require('recargas');
 
 let allCharges  = [];
 let loadedFiles = [];
+const DETAIL_PAGE_SIZE = 300;
+let detailRenderLimit = DETAIL_PAGE_SIZE;
 let charts      = {};
 // Dashboard data can rebuild several charts at once. Animations add no value on
 // refresh and can monopolize the browser main thread on lower-powered devices.
@@ -1934,9 +1936,18 @@ function monthCanBeClosed(mk, now = new Date()) {
 function monthHasEffectiveClosing(mk) {
   return monthCanBeClosed(mk) && !!monthlyClosings?.[mk] && closingMatchesMonth(monthlyClosings[mk], mk);
 }
+const _chargeMonthKeyCache = new WeakMap();
 function chargeMonthKey(charge) {
-  const realMonth = monthKey(charge?.startDate);
-  return realMonth !== 'unknown' ? realMonth : (charge?._month || 'unknown');
+  if (!charge || typeof charge !== 'object') {
+    const realMonth = monthKey(charge?.startDate);
+    return realMonth !== 'unknown' ? realMonth : (charge?._month || 'unknown');
+  }
+  const cached = _chargeMonthKeyCache.get(charge);
+  if (cached !== undefined) return cached;
+  const realMonth = monthKey(charge.startDate);
+  const mk = realMonth !== 'unknown' ? realMonth : (charge._month || 'unknown');
+  _chargeMonthKeyCache.set(charge, mk);
+  return mk;
 }
 function monthLabel(key) {
   const n = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -9037,10 +9048,20 @@ function renderAcumulado() {
 // ══════════════════════════════════════════════════════════
 //  TAB DETALHES
 // ══════════════════════════════════════════════════════════
+function showMoreDetalhes() {
+  detailRenderLimit += DETAIL_PAGE_SIZE;
+  renderDetalhes();
+}
+
 function renderDetalhes() {
   const sorted = [...allCharges].sort((a,b) => (b.startDate||0)-(a.startDate||0));
-  document.getElementById('detailCount').textContent = sorted.length + ' registros';
-  document.getElementById('detailTable').innerHTML = sorted.map(c =>
+  const total = sorted.length;
+  if (detailRenderLimit > total) detailRenderLimit = Math.max(DETAIL_PAGE_SIZE, total);
+  const limit = Math.min(detailRenderLimit, total);
+  const visible = sorted.slice(0, limit);
+  document.getElementById('detailCount').textContent =
+    limit < total ? `${total} registros (mostrando ${limit})` : `${total} registros`;
+  document.getElementById('detailTable').innerHTML = visible.map(c =>
     `<tr>
        <td style="color:var(--p3-muted);font-size:11px">#${c.id}</td>
        <td style="font-size:12px">${c.station}</td>
@@ -9054,6 +9075,8 @@ function renderDetalhes() {
        <td style="color:#FFD66B;font-size:12px">${c.rating||'—'}</td>
      </tr>`
   ).join('');
+  const wrap = document.getElementById('detailLoadMoreWrap');
+  if (wrap) wrap.style.display = limit < total ? 'flex' : 'none';
 }
 
 // ── Navegação de abas ─────────────────────────────────────
