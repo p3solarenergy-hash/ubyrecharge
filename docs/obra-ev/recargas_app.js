@@ -1205,7 +1205,7 @@ async function clearSelectedMonth() {
     alert('Escolha o mês que deseja excluir.');
     return;
   }
-  const monthCharges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const monthCharges = chargesForMonth(mk);
   if (!monthCharges.length) {
     alert(`Não há recargas salvas em ${monthLabel(mk)} para esta obra.`);
     return;
@@ -1949,6 +1949,29 @@ function chargeMonthKey(charge) {
   _chargeMonthKeyCache.set(charge, mk);
   return mk;
 }
+
+// Índice de recargas por mês, reconstruído só quando `allCharges` muda de
+// referência (ela é sempre reatribuída, nunca mutada in-place). Substitui os
+// `chargesForMonth(mk)` que rodavam dentro de
+// loops sobre os meses (custo O(meses × recargas)). Devolve sempre uma cópia
+// nova, com a mesma ordem do filter original, para preservar o comportamento.
+let _chargesByMonthIndex = null;
+let _chargesByMonthSrc = null;
+function chargesForMonth(mk) {
+  if (_chargesByMonthSrc !== allCharges || !_chargesByMonthIndex) {
+    const idx = new Map();
+    for (const charge of allCharges) {
+      const key = chargeMonthKey(charge);
+      let bucket = idx.get(key);
+      if (!bucket) { bucket = []; idx.set(key, bucket); }
+      bucket.push(charge);
+    }
+    _chargesByMonthIndex = idx;
+    _chargesByMonthSrc = allCharges;
+  }
+  const bucket = _chargesByMonthIndex.get(mk);
+  return bucket ? bucket.slice() : [];
+}
 function monthLabel(key) {
   const n = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const [y, m] = key.split('-');
@@ -1990,7 +2013,7 @@ function fmtDateOnly(value) {
 }
 
 function buildMonthClosing(mk) {
-  const charges = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const charges = chargesForMonth(mk);
   if (!charges.length) return null;
   const users = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean));
   const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
@@ -2081,7 +2104,7 @@ function closingMatchesMonth(closing, mk = closing?.month) {
 function monthSummaryForMonth(mk, power = getPower()) {
   const closedSummary = monthHasEffectiveClosing(mk) ? monthSummaryFromClosing(monthlyClosings?.[mk]) : null;
   if (closedSummary?.source === 'manual') return closedSummary;
-  const ch = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const ch = chargesForMonth(mk);
   if (ch.length) {
     const revM = ch.reduce((s,c) => s+c.revenue, 0);
     const enerM = ch.reduce((s,c) => s+c.energyKWh, 0);
@@ -2762,11 +2785,11 @@ function renderOwnerAreaReportForCurrentMonth() {
   if (!mk) return;
   const currentSummary = monthSummaryForMonth(mk);
   const currentSettings = ownerAreaSettingsForMonth(mk, true);
-  const currentCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const currentCharges = chargesForMonth(mk);
   const current = ownerAreaReportForSummary(currentSummary, currentSettings, currentCharges);
   const accumulated = getMonths().filter(monthKeyValue => monthKeyValue <= mk).reduce((acc, monthKeyValue) => {
     const settings = monthKeyValue === mk ? currentSettings : ownerAreaSettingsForMonth(monthKeyValue);
-    const charges = allCharges.filter(c => chargeMonthKey(c) === monthKeyValue);
+    const charges = chargesForMonth(monthKeyValue);
     const report = ownerAreaReportForSummary(monthSummaryForMonth(monthKeyValue), settings, charges);
     acc.energy += report.energy;
     acc.revenue += report.revenue;
@@ -3137,7 +3160,7 @@ function currentWorkInvestorTimeline(uptoMonth = financeMonthKey(), selectedSett
   const available = [...new Set(allCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const firstMonth = available.find(key => key <= uptoMonth) || uptoMonth;
   return financeMonthSeries(firstMonth, uptoMonth).map(mk => {
-    const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+    const charges = chargesForMonth(mk);
     const settings = mk === uptoMonth && selectedSettings ? selectedSettings : financeSettingsForMonth(mk);
     return financeInvestorEntry(charges, settings, mk, { historyCharges: allCharges, power: workPowerById(currentWorkId) });
   });
@@ -3169,7 +3192,7 @@ function currentWorkInvestorReportModel(mk = financeMonthKey(), settingsOverride
 }
 
 function ownerAreaEntryForMonth(mk = '', settings = {}) {
-  const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const charges = chargesForMonth(mk);
   const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
   const revenue = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
   const report = ownerAreaReportForSummary({ energy, rev: revenue }, settings, charges);
@@ -3229,7 +3252,7 @@ function openFinanceReportDocument(html) {
 
 function buildFinanceMonthReportSnapshot(mk = financeMonthKey(), settingsOverride = null) {
   const settings = settingsOverride || currentFinanceSettingsFromInputs();
-  const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
   const occupancy = financeMonthOccupancy(charges, mk, workPowerById(currentWorkId));
   const summary = monthSummaryForMonth(mk);
@@ -3561,7 +3584,7 @@ function generateCurrentFinanceReportLegacy() {
     return;
   }
   const settings = currentFinanceSettingsFromInputs();
-  const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
   const summary = monthSummaryForMonth(mk);
   const owner = ownerAreaReportForSummary(summary, settings, charges);
@@ -3629,7 +3652,7 @@ function renderFinanceiro(applySaved = true) {
   const settings = currentFinanceSettingsFromInputs();
   financeEditorCurrentSettings = settings;
   updateFinanceModelVisibility(settings.operationModel);
-  const charges = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
   const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
@@ -8396,7 +8419,7 @@ async function renderMensal() {
   clearTimeout(monthlyInsightsTimer);
   const mk      = document.getElementById('monthSelector').value;
   if (!mk) return;
-  const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const monthCharges = chargesForMonth(mk);
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
   if (!charges.length) {
