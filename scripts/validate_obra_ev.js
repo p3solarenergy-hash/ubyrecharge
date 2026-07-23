@@ -113,8 +113,8 @@ function assertRechargeRenderSafety() {
   if (recargas.includes('await window.UBY_SUPABASE.loadAllRechargeBases()')) {
     throw new Error('A abertura nao pode baixar todas as bases completas em uma unica resposta.');
   }
-  if (!recargas.includes('loadRechargeSessions({ limit: 1000') || !recargas.includes('await yieldToBrowser();')) {
-    throw new Error('As recargas precisam ser carregadas da tabela normalizada em paginas sem bloquear a tela.');
+  if (!recargas.includes('limit: OVERVIEW_PAGE_SIZE') || !recargas.includes('from: currentMonthStart') || !recargas.includes('await yieldToBrowser();')) {
+    throw new Error('As recargas precisam iniciar pelo mes atual, em paginas e sem bloquear a tela.');
   }
   const bridge = read(path.join(obraDir, "supabase_bridge.js"));
   if (!bridge.includes('replace_recharge_sessions') || !bridge.includes('loadRechargeMonthlySummaries')) {

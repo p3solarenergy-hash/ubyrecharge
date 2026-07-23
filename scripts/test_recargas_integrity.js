@@ -148,12 +148,13 @@ assert(bridge.includes('"remove_file"'), 'cloud must allow an explicit last-file
 assert(!bridge.includes('...(existing.resumo || {}),\n      ...incomingSummary'), 'metadata saves must not replace operational summary fields');
 assert(bridge.includes('const existingSummary = existing.resumo || {};'), 'metadata saves must start from the authoritative cloud summary');
 assert(bridge.includes('stationAvailability: payload?.stationAvailability'), 'station schedules must persist in cloud metadata');
-assert(html.includes('duplicateGeneralLabels'), 'the general dashboard must remove duplicated KPI cards');
+assert(!html.includes('duplicateGeneralLabels'), 'the general dashboard must not create duplicated KPI cards');
 assert(html.includes('stationAvailableHours(config, window.start, window.end)'), 'general occupancy must use station availability windows');
 assert(html.indexOf('id="generalUnitRank"') < html.indexOf('id="usageGeneralDayCompare"'), 'unit ranking must stay near the top of the general dashboard');
 assert(html.indexOf('id="generalStationOccupancy"') > html.indexOf('id="generalUnitTable"'), 'station schedule configuration must stay at the end of the general dashboard');
 assert(!html.includes('await window.UBY_SUPABASE.loadAllRechargeBases()'), 'startup must not download every full base in one response');
-assert(html.includes('loadRechargeSessions({ limit: 1000'), 'normalized sessions must load in bounded pages');
+assert(html.includes('limit: OVERVIEW_PAGE_SIZE'), 'normalized sessions must load in bounded pages');
+assert(html.includes('from: currentMonthStart'), 'startup must limit normalized sessions to the current month');
 assert(bridge.includes('replace_recharge_sessions'), 'normalized session replacement must be transactional');
 assert(html.includes('canonicalClubPersonName'), 'club participants must support conservative normalized-name matching');
 assert(html.includes('person:${canonicalName}'), 'club identity keys must include the canonical participant name');

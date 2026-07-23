@@ -807,7 +807,7 @@
     <div class="controls" id="ctrlGeral">
       <span id="generalSourceLabel">Escolha uma estação abaixo para abrir o relatório detalhado</span>
       <span style="margin-left:8px">Visão:</span>
-      <select class="ctl-select" id="generalViewMode" onchange="renderVisibleOverviewViews()">
+      <select class="ctl-select" id="generalViewMode" onchange="handleGeneralViewModeChange()">
         <option value="month">Mês atual</option>
         <option value="accumulated">Acumulado</option>
       </select>
@@ -1861,7 +1861,7 @@
 <script src="supabase_config.js"></script>
 <script src="clube_uby_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_bridge.js?v=20260716-architecture1"></script>
+<script src="supabase_bridge.js?v=20260723-performance1"></script>
 <script src="recharge_runtime.js?v=20260716-architecture1"></script>
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
@@ -1911,6 +1911,8 @@ let monthlyRenderSequence = 0;
 let monthlyInsightsTimer = null;
 let overviewRenderState = { geral: '', uby: '', financeiroGeral: '' };
 let overviewInsightsTimers = { geral: null, uby: null };
+let overviewSessionsFullyHydrated = false;
+let overviewSessionsHydrationPromise = null;
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -1922,6 +1924,7 @@ const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
 const CLUB_PARTNERS_LOCAL_KEY = 'uby-club-partners-v1';
 const CUSTOMER_REGISTRY_LOCAL_KEY = 'uby-customer-registry-v1';
 const CUSTOMER_REGISTRY_CLOUD_ID = '__customer_registry__';
+const OVERVIEW_PAGE_SIZE = 1000;
 const CLUB_FORM_ID = '1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM';
 const CLUB_FORM_RESPONSES_URL = `https://docs.google.com/forms/d/${CLUB_FORM_ID}/edit#responses`;
 const CLUB_FORM_SHEET_ID = '19iPeYks-8P0Fd3henDoTYFPN5hQ6dconJgsQOl30Qws';
@@ -9932,7 +9935,8 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
   const refreshSequence = ++generalRefreshSequence;
   syncGeneralRecordsFromLocal();
   try {
-    const cachedRecords = await window.UBY_RECHARGE_RUNTIME?.cacheGet?.('general-records', 24 * 60 * 60 * 1000);
+    const currentMonthKey = new Date().toISOString().slice(0, 7);
+    const cachedRecords = await window.UBY_RECHARGE_RUNTIME?.cacheGet?.(`general-records:${currentMonthKey}`, 24 * 60 * 60 * 1000);
     if (Array.isArray(cachedRecords) && cachedRecords.length) {
       mergeCloudRechargeRecords(cachedRecords);
       await renderVisibleOverviewViews();
@@ -9960,10 +9964,19 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
     const ids = (summaries || []).map(record => String(record.workId || '')).filter(Boolean);
     let hydratedCount = 0;
     if (window.UBY_SUPABASE.loadRechargeSessions && ids.length) {
-      const firstPage = await window.UBY_SUPABASE.loadRechargeSessions({ limit: 1000 });
+      const now = new Date();
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const firstPage = await window.UBY_SUPABASE.loadRechargeSessions({
+        limit: OVERVIEW_PAGE_SIZE,
+        from: currentMonthStart
+      });
       const normalizedRows = [...(firstPage.rows || [])];
-      for (let offset = normalizedRows.length; offset < firstPage.count; offset += 1000) {
-        const nextPage = await window.UBY_SUPABASE.loadRechargeSessions({ limit: 1000, offset });
+      for (let offset = normalizedRows.length; offset < firstPage.count; offset += OVERVIEW_PAGE_SIZE) {
+        const nextPage = await window.UBY_SUPABASE.loadRechargeSessions({
+          limit: OVERVIEW_PAGE_SIZE,
+          offset,
+          from: currentMonthStart
+        });
         normalizedRows.push(...(nextPage.rows || []));
         await yieldToBrowser();
       }
@@ -9981,8 +9994,9 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
         normalized: true
       }));
       mergeCloudRechargeRecords(compactRecords);
-      window.UBY_RECHARGE_RUNTIME?.cacheSet?.('general-records', compactRecords).catch(() => {});
+      window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`general-records:${currentMonthStart.slice(0, 7)}`, compactRecords).catch(() => {});
       hydratedCount = compactRecords.length;
+      overviewSessionsFullyHydrated = false;
       await yieldToBrowser();
     }
     if (refreshSequence !== generalRefreshSequence) return;
@@ -9994,6 +10008,51 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
     await renderVisibleOverviewViews();
     if (forceCloud) setStorageState(`Painel geral local preservado. Supabase pendente: ${err.message}`, true);
   }
+}
+
+async function ensureAllOverviewSessionsLoaded() {
+  if (overviewSessionsFullyHydrated || !window.UBY_SUPABASE?.loadRechargeSessions) return;
+  if (overviewSessionsHydrationPromise) return overviewSessionsHydrationPromise;
+  overviewSessionsHydrationPromise = (async () => {
+    setStorageState('Carregando historico completo sob demanda...');
+    const firstPage = await window.UBY_SUPABASE.loadRechargeSessions({ limit: OVERVIEW_PAGE_SIZE });
+    const rows = [...(firstPage.rows || [])];
+    for (let offset = rows.length; offset < firstPage.count; offset += OVERVIEW_PAGE_SIZE) {
+      const page = await window.UBY_SUPABASE.loadRechargeSessions({ limit: OVERVIEW_PAGE_SIZE, offset });
+      rows.push(...(page.rows || []));
+      await yieldToBrowser();
+    }
+    const summaries = window.UBY_SUPABASE.loadAllRechargeSummaries
+      ? await window.UBY_SUPABASE.loadAllRechargeSummaries()
+      : Object.values(allRechargeRecords);
+    const byWork = new Map();
+    rows.forEach(charge => {
+      const workId = String(charge.workId || '');
+      if (!byWork.has(workId)) byWork.set(workId, []);
+      byWork.get(workId).push(charge);
+    });
+    const records = summaries.map(record => ({
+      ...record,
+      charges: byWork.get(String(record.workId || '')) || [],
+      summaryOnly: false,
+      normalized: true
+    }));
+    mergeCloudRechargeRecords(records);
+    overviewSessionsFullyHydrated = true;
+    markRechargeRecordsDirty();
+    window.UBY_RECHARGE_RUNTIME?.cacheSet?.('general-records:all', records).catch(() => {});
+    setStorageState(`Historico completo carregado: ${rows.length} recarga(s).`);
+  })().finally(() => {
+    overviewSessionsHydrationPromise = null;
+  });
+  return overviewSessionsHydrationPromise;
+}
+
+async function handleGeneralViewModeChange() {
+  if (document.getElementById('generalViewMode')?.value === 'accumulated') {
+    await ensureAllOverviewSessionsLoaded();
+  }
+  await renderVisibleOverviewViews();
 }
 
 async function renderGeral() {
@@ -10064,28 +10123,17 @@ async function renderGeral() {
   const occClass = totalOcc < 15 ? 'occ-red' : (totalOcc < 30 ? 'occ-yellow' : 'occ-green');
   const occStatus = totalOcc < 15 ? 'abaixo do objetivo minimo de 15%' : (totalOcc < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
   document.getElementById('kpiGeneral').innerHTML = `
-    <div class="card kpi-feature ${occClass}"><div class="label">Ocupacao media</div><div class="value">${fmtPct(totalOcc)}</div><div class="bar"><span style="width:${Math.min(totalOcc,100).toFixed(1)}%"></span></div><div class="sub">${occStatus} · meta: 15% minimo / 30% ideal</div></div>
-    <div class="card"><div class="label">Total recargas</div><div class="value">${totalCharges}</div><div class="sub">${clients} clientes unicos</div>${trendCharges}</div>
-    <div class="card"><div class="label">Energia entregue</div><div class="value">${fmtKWh(energy)}</div><div class="sub">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida</div>${trendEnergy}</div>
     <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
     <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.stationName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
-    <div class="card kpi-feature revenue-card"><div class="label">Receita total</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${units} unidade(s) · ranking por faturamento</div>${trendRevenue}</div>
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
     <div class="card"><div class="label">Carregadores AC</div><div class="value">${acdc.acChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
   `;
-  // The visual summary above is the primary KPI strip. Keep this secondary
-  // strip for complementary metrics only.
-  const duplicateGeneralLabels = new Set(['Ocupacao media', 'Total recargas', 'Energia entregue', 'Receita total']);
-  [...document.getElementById('kpiGeneral').children].forEach(card => {
-    if (duplicateGeneralLabels.has(card.querySelector('.label')?.textContent?.trim())) card.remove();
-  });
   renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
   renderGeneralStationOccupancy(stationRows, months);
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
   scheduleOverviewInsights('geral', () => renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } }));
-  renderGeneralFinance(sourceUnitData);
 
   document.getElementById('generalUnitRank').innerHTML = rankingStationRows.length ? rankingStationRows.slice(0, 12).map(unit => `
     <div class="unit-card">
@@ -10923,8 +10971,14 @@ async function switchTab(name, btn) {
     await loadCustomerRegistry();
     renderCustomerRegistry();
   }
-  else if (name === 'clube') renderClub();
-  else if (name === 'financeiroGeral' && overviewNeedsRender('financeiroGeral')) renderGeneralFinance(getGeneralUnitData());
+  else if (name === 'clube') {
+    await ensureAllOverviewSessionsLoaded();
+    renderClub();
+  }
+  else if (name === 'financeiroGeral') {
+    await ensureAllOverviewSessionsLoaded();
+    renderGeneralFinance(getGeneralUnitData());
+  }
   else if (name === 'detalhes') renderDetalhes();
   else if (name === 'financeiro') handleFinanceMonthChange();
 }

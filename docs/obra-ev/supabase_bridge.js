@@ -412,6 +412,27 @@
       financialSettings: payload?.financialSettings || payload?.summary?.financialSettings || {}
     };
     const id = String(workId || "geral");
+    const mutationIntent = String(payload?.mutationIntent || "save");
+    const { data: atomicResult, error: atomicError } = await sb.rpc("save_recharge_base_atomic", {
+      p_obra_id: id,
+      p_files: files,
+      p_charges: charges,
+      p_summary: summary,
+      p_mutation_intent: mutationIntent
+    });
+    if (!atomicError) {
+      return {
+        cloud: true,
+        files: Number(atomicResult?.files ?? files.length),
+        charges: Number(atomicResult?.charges ?? charges.length),
+        normalizedCharges: Number(atomicResult?.normalizedCharges ?? charges.length),
+        history: Boolean(atomicResult?.history)
+      };
+    }
+    // Keep compatibility while the database migration is being deployed.
+    if (!/save_recharge_base_atomic|schema cache|function/i.test(String(atomicError.message || ""))) {
+      throw atomicError;
+    }
     const { data: existing, error: existingError } = await sb
       .from("obra_recargas_base")
       .select("obra_id,arquivos,recargas,resumo,updated_at")
@@ -420,7 +441,6 @@
     if (existingError) throw existingError;
     const existingCharges = jsonArrayLength(existing?.recargas);
     const explicitEmptyIntents = new Set(["explicit_empty_replace", "month_correction", "undo_import", "remove_file"]);
-    const mutationIntent = String(payload?.mutationIntent || "save");
     if (!charges.length && existingCharges > 0 && !explicitEmptyIntents.has(mutationIntent)) {
       throw new Error(`Gravacao vazia bloqueada: a base em nuvem possui ${existingCharges} recarga(s).`);
     }
