@@ -7952,6 +7952,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
 }
 
 async function renderUbyOperation() {
+  const __t0 = performance.now();
   const renderSequence = ++overviewRenderSequence.uby;
   const sourceUnitData = getGeneralUnitData();
   const sourceRows = getUbyChargerRows(sourceUnitData);
@@ -8120,6 +8121,7 @@ async function renderUbyOperation() {
     </tr>
   `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:20px">Sem carregadores com base salva.</td></tr>';
   markOverviewRendered('uby');
+  console.log(`[UBY-PERF] renderUbyOperation: ${(performance.now() - __t0).toFixed(0)} ms (${totalCharges} recargas, ${included.length} carregadores)`);
 }
 
 function showGeneralWhenCurrentWorkIsEmpty() {
@@ -9243,22 +9245,39 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
+const UBY_APP_VERSION = '20260724-performance7';
+async function __perf(label, fn) {
+  const t0 = performance.now();
+  try { return await fn(); }
+  finally { console.log(`[UBY-PERF] ${label}: ${(performance.now() - t0).toFixed(0)} ms`); }
+}
+
 async function initializeRechargePage() {
+  console.log(`[UBY-PERF] versao carregada: ${UBY_APP_VERSION}`);
+  const bootStart = performance.now();
   const params = new URLSearchParams(location.search);
   const requestedWorkId = String(params.get('obra') || '').trim();
   if (requestedWorkId) currentWorkId = requestedWorkId;
-  await loadRechargeWorksFromCloud();
-  await refreshGeneralRechargeBases();
+  await __perf('loadRechargeWorksFromCloud', () => loadRechargeWorksFromCloud());
+  await __perf('refreshGeneralRechargeBases', () => refreshGeneralRechargeBases());
   initWorkSelector();
   if (requestedWorkId && workOptions().some(work => work.id === requestedWorkId)) {
     currentWorkId = requestedWorkId;
     document.getElementById('workSelector').value = requestedWorkId;
     currentWorkName = workNameById(requestedWorkId, requestedWorkId);
-    await loadRechargeBase(requestedWorkId);
+    await __perf('loadRechargeBase', () => loadRechargeBase(requestedWorkId));
   }
   openGeneralFinanceView();
+  console.log(`[UBY-PERF] BOOT TOTAL: ${(performance.now() - bootStart).toFixed(0)} ms`);
   window.UBY_RECHARGE_RUNTIME?.markReady?.({ records: Object.keys(allRechargeRecords || {}).length });
 }
+
+window.addEventListener('error', (e) => {
+  console.error('[UBY-PERF] ERRO NAO TRATADO:', e.message, 'em', e.filename + ':' + e.lineno);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[UBY-PERF] PROMISE REJEITADA:', e.reason?.message || e.reason);
+});
 
 document.getElementById('importMonth').value = new Date().toISOString().slice(0, 7);
 document.getElementById('undoLastImportBtn').addEventListener('click', undoLastImport);
