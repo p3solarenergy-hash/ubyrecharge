@@ -7975,8 +7975,6 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
 
 async function renderUbyOperation() {
   const __t0 = performance.now();
-  let __lapT = __t0;
-  const __lap = (label) => { const now = performance.now(); console.log(`[UBY-PERF]   ${label}: ${(now - __lapT).toFixed(0)} ms`); __lapT = now; };
   const renderSequence = ++overviewRenderSequence.uby;
   const sourceUnitData = getGeneralUnitData();
   const sourceRows = getUbyChargerRows(sourceUnitData);
@@ -8027,7 +8025,6 @@ async function renderUbyOperation() {
       totalMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window).maxKWh;
     });
   });
-  __lap('setup+kpiTrends+windowsLoop');
   const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
   const firstPeriod = windows.length ? new Date(Math.min(...windows.map(window => window.start).filter(Boolean))) : firstDate;
   const lastPeriod = windows.length ? new Date(Math.max(...windows.map(window => window.end).filter(Boolean))) : lastDate;
@@ -8063,12 +8060,10 @@ async function renderUbyOperation() {
     weekdayBounds: { start: firstPeriod, end: lastPeriod }
   }));
 
-  __lap('visualSummary+decisionCockpit');
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
   const accessRows = [...visibleRows.filter(row => row.included)]
     .sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
   renderUbyFinancialOverview(sourceRows, sourceMonths, isMonthView, currentGeneralMonth, viewLabel);
-  __lap('renderUbyFinancialOverview');
   await yieldToBrowser();
   if (renderSequence !== overviewRenderSequence.uby || document.getElementById('tabUby').style.display === 'none') return;
   const chartLabels = chartRows.map(row => {
@@ -8101,7 +8096,6 @@ async function renderUbyOperation() {
   await yieldToBrowser();
   if (renderSequence !== overviewRenderSequence.uby || document.getElementById('tabUby').style.display === 'none') return;
 
-  __lap('barCharts+unitRank+accountingRows');
   const monthData = sourceMonths.map(mk => {
     const monthCharges = sourceUbyCharges.filter(charge => chargeMonthKey(charge) === mk);
     return {
@@ -8148,7 +8142,6 @@ async function renderUbyOperation() {
       <td><button class="btn-open" onclick="openWorkReport('${escapeAttr(row.workId)}','mensal','${escapeAttr(row.station)}')">Abrir</button></td>
     </tr>
   `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:20px">Sem carregadores com base salva.</td></tr>';
-  __lap('monthChart');
   markOverviewRendered('uby');
   console.log(`[UBY-PERF] renderUbyOperation: ${(performance.now() - __t0).toFixed(0)} ms (${totalCharges} recargas, ${included.length} carregadores)`);
 }
@@ -9274,7 +9267,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260724-performance9';
+const UBY_APP_VERSION = '20260724-performance10';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
