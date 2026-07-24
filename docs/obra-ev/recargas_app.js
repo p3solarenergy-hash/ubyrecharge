@@ -246,7 +246,9 @@ function stationAvailableHours(config, start, end) {
   const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
   const finalDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
   let milliseconds = 0;
-  while (cursor <= finalDay) {
+  let guard = 0;
+  while (cursor <= finalDay && guard < 4000) {
+    guard++;
     if (openDays.has(cursor.getDay())) {
       let availableStart = new Date(cursor);
       let availableEnd = new Date(cursor);
@@ -4567,14 +4569,31 @@ function dateOnly(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+// Uma única recarga com data corrompida (ex.: ano errado numa planilha
+// importada) fazia os laços dia-a-dia abaixo iterarem por milhares de anos,
+// criando milhões de objetos Date e congelando a página inteira — mesmo com
+// pouquíssimos registros. Este limite considera plausível apenas datas de
+// 2015 até o ano que vem.
+function isPlausibleChargeDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+  const year = date.getFullYear();
+  return year >= 2015 && year <= new Date().getFullYear() + 1;
+}
+
+// Teto de segurança absoluto: nenhuma série diária real passa de ~11 anos.
+// Se algo escapar da sanitização, o laço para em vez de travar o navegador.
+const MAX_DAILY_RANGE_DAYS = 4000;
+
 function eachDateInRange(start, end) {
   if (!start || !end) return [];
   const rows = [];
   const cursor = dateOnly(start);
   const limit = dateOnly(end);
-  while (cursor <= limit) {
+  let guard = 0;
+  while (cursor <= limit && guard < MAX_DAILY_RANGE_DAYS) {
     rows.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
+    guard++;
   }
   return rows;
 }
@@ -4587,6 +4606,10 @@ function calendarDayCount(start, end) {
 
 function dailySeriesBounds(dated = []) {
   if (!dated.length) return null;
+  // Ignora datas implausíveis (corrompidas) para não estourar o intervalo.
+  const plausible = dated.filter(charge => isPlausibleChargeDate(charge.startDate));
+  if (!plausible.length) return null;
+  dated = plausible;
   const minDate = new Date(Math.min(...dated.map(charge => charge.startDate)));
   const maxDate = new Date(Math.max(...dated.map(charge => charge.startDate)));
   const sameMonth = dated.every(charge =>
@@ -4888,16 +4911,18 @@ function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
   });
   const validDates = charges
     .map(charge => charge.startDate)
-    .filter(date => date && !Number.isNaN(date.getTime()));
+    .filter(date => isPlausibleChargeDate(date));
   const startBound = bounds?.start || (validDates.length ? new Date(Math.min(...validDates)) : null);
   const endBound = bounds?.end || (validDates.length ? new Date(Math.max(...validDates)) : null);
   if (startBound && endBound) {
     const cursor = new Date(startBound.getFullYear(), startBound.getMonth(), startBound.getDate(), 0, 0, 0);
     const endDay = new Date(endBound.getFullYear(), endBound.getMonth(), endBound.getDate(), 0, 0, 0);
-    while (cursor <= endDay) {
+    let guard = 0;
+    while (cursor <= endDay && guard < MAX_DAILY_RANGE_DAYS) {
       const idx = cursor.getDay();
       groups[idx].dates.add(dateKeyLocal(cursor));
       cursor.setDate(cursor.getDate() + 1);
+      guard++;
     }
   }
   charges
