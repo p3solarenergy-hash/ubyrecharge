@@ -7996,9 +7996,23 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   }
 }
 
+// Dispara (uma vez) o carregamento do histórico completo em segundo plano e
+// re-renderiza a aba quando ele chega. O painel abre já com o mês atual (rápido)
+// e o gráfico de evolução mensal preenche os meses anteriores em seguida.
+function ensureOverviewHistoryThenRerender(tabId, rerender) {
+  if (overviewSessionsFullyHydrated || overviewSessionsHydrationPromise) return;
+  if (!window.UBY_SUPABASE?.loadRechargeSessions) return;
+  ensureAllOverviewSessionsLoaded()
+    .then(() => {
+      if (document.getElementById(tabId)?.style.display !== 'none') rerender();
+    })
+    .catch(() => {});
+}
+
 async function renderUbyOperation() {
   const __t0 = performance.now();
   const renderSequence = ++overviewRenderSequence.uby;
+  ensureOverviewHistoryThenRerender('tabUby', renderUbyOperation);
   const sourceUnitData = getGeneralUnitData();
   const sourceRows = getUbyChargerRows(sourceUnitData);
   const sourceIncluded = sourceRows.filter(row => row.included);
@@ -8332,6 +8346,7 @@ async function handleGeneralViewModeChange() {
 }
 
 async function renderGeral() {
+  ensureOverviewHistoryThenRerender('tabGeral', renderGeral);
   const sourceUnitData = getGeneralUnitData();
   const sourceCharges = getAllGeneralCharges(sourceUnitData);
   const sourceMonths = [...new Set(sourceCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
@@ -9290,7 +9305,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260724-performance12';
+const UBY_APP_VERSION = '20260724-performance13';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
