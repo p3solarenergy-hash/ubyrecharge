@@ -8543,7 +8543,18 @@ async function renderAll() {
 async function renderMensal() {
   const renderSequence = ++monthlyRenderSequence;
   clearTimeout(monthlyInsightsTimer);
-  const mk      = document.getElementById('monthSelector').value;
+  const selEl = document.getElementById('monthSelector');
+  let mk = selEl?.value;
+  // Auto-cura: se o seletor está vazio (corrida de carregamento) mas há meses
+  // disponíveis, repopula e usa o mês mais recente em vez de deixar em branco.
+  if (!mk) {
+    const availableMonths = getMonths();
+    mk = availableMonths[availableMonths.length - 1] || '';
+    if (mk && selEl) {
+      selEl.innerHTML = availableMonths.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+      selEl.value = mk;
+    }
+  }
   if (!mk) return;
   const monthCharges = chargesForMonth(mk);
   const window = periodWindow(monthCharges, mk);
@@ -9305,7 +9316,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260724-performance13';
+const UBY_APP_VERSION = '20260724-performance14';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
