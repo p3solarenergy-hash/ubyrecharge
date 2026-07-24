@@ -376,7 +376,29 @@ function rechargeEligibleWork(work = {}) {
   return completedWorkStatus(work) || workHasRechargeHistory(work.id);
 }
 
+// workOptions() fazia JSON.parse da base inteira de recargas + varredura de
+// todo o localStorage a CADA chamada, e era chamada centenas de vezes por
+// render (uma por recarga, via canonicalStationNameForWork/workNameById).
+// Isso sozinho custava ~10s no render. Agora o resultado é memoizado e só
+// recalculado quando uma assinatura barata (sem parse) muda.
+let _workOptionsCache = null;
+let _workOptionsSig = null;
+function workOptionsSignature() {
+  let recLen = 0, dashLen = 0, lsLen = 0;
+  try { recLen = (localStorage.getItem(RECARGAS_LOCAL_KEY) || '').length; } catch (_) {}
+  try { dashLen = (localStorage.getItem('uby-obras-dashboard-v1') || '').length; } catch (_) {}
+  try { lsLen = localStorage.length; } catch (_) {}
+  return `${rechargeRecordsVersion}|${cloudRechargeWorks.length}|${lsLen}|${recLen}|${dashLen}|${Object.keys(allRechargeRecords || {}).length}`;
+}
 function workOptions() {
+  const sig = workOptionsSignature();
+  if (_workOptionsCache && _workOptionsSig === sig) return _workOptionsCache;
+  const result = workOptionsUncached();
+  _workOptionsCache = result;
+  _workOptionsSig = sig;
+  return result;
+}
+function workOptionsUncached() {
   const byId = new Map();
   (appData.baseObras || []).forEach(work => byId.set(work.id, work));
   readJson('uby-obras-dashboard-v1', []).forEach(work => {
@@ -9252,7 +9274,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260724-performance8';
+const UBY_APP_VERSION = '20260724-performance9';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
