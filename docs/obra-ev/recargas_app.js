@@ -124,6 +124,14 @@ let spreadsheetLibraryPromise = null;
 const RECHARGE_STATION_BLOCKLIST_BY_WORK = {
   malassise: ['posto prata', 'prata cambe', 'prata cambé', 'cambe', 'cambé']
 };
+// Obras/estações removidas do painel de recargas (não aparecem em nenhuma
+// visão nem entram nos totais). Não apaga dados no Supabase — é só filtro.
+const RECHARGE_WORK_BLOCKLIST_TERMS = ['go grid', 'gogrid'];
+function workExcludedFromRecharge(...names) {
+  const hay = normalizeStationForCompare(names.filter(Boolean).join(' '));
+  if (!hay) return false;
+  return RECHARGE_WORK_BLOCKLIST_TERMS.some(term => hay.includes(normalizeStationForCompare(term)));
+}
 const DEFAULT_STATION_PHYSICAL_LAYOUTS = [
   { terms: ['robert koch', 'malassise r k', 'liv 000199'], acChargers: 0, acPlugs: 0, dcChargers: 1, dcPlugs: 2 },
   { terms: ['rio beach'], acChargers: 1, acPlugs: 1, dcChargers: 0, dcPlugs: 0 },
@@ -373,6 +381,7 @@ function completedWorkStatus(work = {}) {
 }
 
 function rechargeEligibleWork(work = {}) {
+  if (workExcludedFromRecharge(work.nome, work.id)) return false;
   return completedWorkStatus(work) || workHasRechargeHistory(work.id);
 }
 
@@ -6132,6 +6141,7 @@ function getGeneralUnitData() {
       };
     })
     .filter(unit => unit.count > 0)
+    .filter(unit => !workExcludedFromRecharge(unit.workName, unit.stationName, ...(unit.stations || [])))
     .sort((a, b) => b.revenue - a.revenue);
   generalUnitDataCache = { version: rechargeRecordsVersion, data };
   return data;
@@ -6222,12 +6232,18 @@ function getGeneralStationRows(unitData) {
   });
 
   const workIdsWithData = new Set(stationRows.map(row => row.workId));
+  const stationNamesWithData = new Set(stationRows.map(row => normalizeStationForCompare(row.stationName)));
   workOptions().forEach(work => {
     if (workIdsWithData.has(work.id)) return;
+    const canonicalName = canonicalStationNameForWork(work.id, work.nome || work.id, work.nome || work.id);
+    // Evita linha fantasma vazia duplicando uma estação que já tem dados
+    // (ex.: uma "Rio Beach EV" zerada além da que já aparece com recargas).
+    if (stationNamesWithData.has(normalizeStationForCompare(canonicalName))) return;
+    stationNamesWithData.add(normalizeStationForCompare(canonicalName));
     stationRows.push({
       workId: work.id,
       workName: work.nome || work.id,
-      stationName: work.nome || work.id,
+      stationName: canonicalName,
       stations: [],
       files: [],
       charges: [],
@@ -9274,7 +9290,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260724-performance11';
+const UBY_APP_VERSION = '20260724-performance12';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
