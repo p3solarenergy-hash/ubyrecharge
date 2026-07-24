@@ -7,6 +7,8 @@ UBY_AUTH.require('recargas');
 
 let allCharges  = [];
 let loadedFiles = [];
+const DETAIL_PAGE_SIZE = 300;
+let detailRenderLimit = DETAIL_PAGE_SIZE;
 let charts      = {};
 // Dashboard data can rebuild several charts at once. Animations add no value on
 // refresh and can monopolize the browser main thread on lower-powered devices.
@@ -246,7 +248,9 @@ function stationAvailableHours(config, start, end) {
   const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
   const finalDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
   let milliseconds = 0;
-  while (cursor <= finalDay) {
+  let guard = 0;
+  while (cursor <= finalDay && guard < 4000) {
+    guard++;
     if (openDays.has(cursor.getDay())) {
       let availableStart = new Date(cursor);
       let availableEnd = new Date(cursor);
@@ -1220,7 +1224,7 @@ async function clearSelectedMonth() {
     alert('Escolha o mês que deseja excluir.');
     return;
   }
-  const monthCharges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const monthCharges = chargesForMonth(mk);
   if (!monthCharges.length) {
     alert(`Não há recargas salvas em ${monthLabel(mk)} para esta obra.`);
     return;
@@ -1951,9 +1955,41 @@ function monthCanBeClosed(mk, now = new Date()) {
 function monthHasEffectiveClosing(mk) {
   return monthCanBeClosed(mk) && !!monthlyClosings?.[mk] && closingMatchesMonth(monthlyClosings[mk], mk);
 }
+const _chargeMonthKeyCache = new WeakMap();
 function chargeMonthKey(charge) {
-  const realMonth = monthKey(charge?.startDate);
-  return realMonth !== 'unknown' ? realMonth : (charge?._month || 'unknown');
+  if (!charge || typeof charge !== 'object') {
+    const realMonth = monthKey(charge?.startDate);
+    return realMonth !== 'unknown' ? realMonth : (charge?._month || 'unknown');
+  }
+  const cached = _chargeMonthKeyCache.get(charge);
+  if (cached !== undefined) return cached;
+  const realMonth = monthKey(charge.startDate);
+  const mk = realMonth !== 'unknown' ? realMonth : (charge._month || 'unknown');
+  _chargeMonthKeyCache.set(charge, mk);
+  return mk;
+}
+
+// Índice de recargas por mês, reconstruído só quando `allCharges` muda de
+// referência (ela é sempre reatribuída, nunca mutada in-place). Substitui os
+// `chargesForMonth(mk)` que rodavam dentro de
+// loops sobre os meses (custo O(meses × recargas)). Devolve sempre uma cópia
+// nova, com a mesma ordem do filter original, para preservar o comportamento.
+let _chargesByMonthIndex = null;
+let _chargesByMonthSrc = null;
+function chargesForMonth(mk) {
+  if (_chargesByMonthSrc !== allCharges || !_chargesByMonthIndex) {
+    const idx = new Map();
+    for (const charge of allCharges) {
+      const key = chargeMonthKey(charge);
+      let bucket = idx.get(key);
+      if (!bucket) { bucket = []; idx.set(key, bucket); }
+      bucket.push(charge);
+    }
+    _chargesByMonthIndex = idx;
+    _chargesByMonthSrc = allCharges;
+  }
+  const bucket = _chargesByMonthIndex.get(mk);
+  return bucket ? bucket.slice() : [];
 }
 function monthLabel(key) {
   const n = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -1996,7 +2032,7 @@ function fmtDateOnly(value) {
 }
 
 function buildMonthClosing(mk) {
-  const charges = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const charges = chargesForMonth(mk);
   if (!charges.length) return null;
   const users = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean));
   const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
@@ -2087,7 +2123,7 @@ function closingMatchesMonth(closing, mk = closing?.month) {
 function monthSummaryForMonth(mk, power = getPower()) {
   const closedSummary = monthHasEffectiveClosing(mk) ? monthSummaryFromClosing(monthlyClosings?.[mk]) : null;
   if (closedSummary?.source === 'manual') return closedSummary;
-  const ch = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const ch = chargesForMonth(mk);
   if (ch.length) {
     const revM = ch.reduce((s,c) => s+c.revenue, 0);
     const enerM = ch.reduce((s,c) => s+c.energyKWh, 0);
@@ -2768,11 +2804,11 @@ function renderOwnerAreaReportForCurrentMonth() {
   if (!mk) return;
   const currentSummary = monthSummaryForMonth(mk);
   const currentSettings = ownerAreaSettingsForMonth(mk, true);
-  const currentCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const currentCharges = chargesForMonth(mk);
   const current = ownerAreaReportForSummary(currentSummary, currentSettings, currentCharges);
   const accumulated = getMonths().filter(monthKeyValue => monthKeyValue <= mk).reduce((acc, monthKeyValue) => {
     const settings = monthKeyValue === mk ? currentSettings : ownerAreaSettingsForMonth(monthKeyValue);
-    const charges = allCharges.filter(c => chargeMonthKey(c) === monthKeyValue);
+    const charges = chargesForMonth(monthKeyValue);
     const report = ownerAreaReportForSummary(monthSummaryForMonth(monthKeyValue), settings, charges);
     acc.energy += report.energy;
     acc.revenue += report.revenue;
@@ -3143,7 +3179,7 @@ function currentWorkInvestorTimeline(uptoMonth = financeMonthKey(), selectedSett
   const available = [...new Set(allCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const firstMonth = available.find(key => key <= uptoMonth) || uptoMonth;
   return financeMonthSeries(firstMonth, uptoMonth).map(mk => {
-    const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+    const charges = chargesForMonth(mk);
     const settings = mk === uptoMonth && selectedSettings ? selectedSettings : financeSettingsForMonth(mk);
     return financeInvestorEntry(charges, settings, mk, { historyCharges: allCharges, power: workPowerById(currentWorkId) });
   });
@@ -3175,7 +3211,7 @@ function currentWorkInvestorReportModel(mk = financeMonthKey(), settingsOverride
 }
 
 function ownerAreaEntryForMonth(mk = '', settings = {}) {
-  const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const charges = chargesForMonth(mk);
   const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
   const revenue = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
   const report = ownerAreaReportForSummary({ energy, rev: revenue }, settings, charges);
@@ -3235,7 +3271,7 @@ function openFinanceReportDocument(html) {
 
 function buildFinanceMonthReportSnapshot(mk = financeMonthKey(), settingsOverride = null) {
   const settings = settingsOverride || currentFinanceSettingsFromInputs();
-  const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
   const occupancy = financeMonthOccupancy(charges, mk, workPowerById(currentWorkId));
   const summary = monthSummaryForMonth(mk);
@@ -3567,7 +3603,7 @@ function generateCurrentFinanceReportLegacy() {
     return;
   }
   const settings = currentFinanceSettingsFromInputs();
-  const charges = allCharges.filter(charge => chargeMonthKey(charge) === mk);
+  const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
   const summary = monthSummaryForMonth(mk);
   const owner = ownerAreaReportForSummary(summary, settings, charges);
@@ -3635,7 +3671,7 @@ function renderFinanceiro(applySaved = true) {
   const settings = currentFinanceSettingsFromInputs();
   financeEditorCurrentSettings = settings;
   updateFinanceModelVisibility(settings.operationModel);
-  const charges = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
   const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
@@ -4550,14 +4586,31 @@ function dateOnly(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+// Uma única recarga com data corrompida (ex.: ano errado numa planilha
+// importada) fazia os laços dia-a-dia abaixo iterarem por milhares de anos,
+// criando milhões de objetos Date e congelando a página inteira — mesmo com
+// pouquíssimos registros. Este limite considera plausível apenas datas de
+// 2015 até o ano que vem.
+function isPlausibleChargeDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+  const year = date.getFullYear();
+  return year >= 2015 && year <= new Date().getFullYear() + 1;
+}
+
+// Teto de segurança absoluto: nenhuma série diária real passa de ~11 anos.
+// Se algo escapar da sanitização, o laço para em vez de travar o navegador.
+const MAX_DAILY_RANGE_DAYS = 4000;
+
 function eachDateInRange(start, end) {
   if (!start || !end) return [];
   const rows = [];
   const cursor = dateOnly(start);
   const limit = dateOnly(end);
-  while (cursor <= limit) {
+  let guard = 0;
+  while (cursor <= limit && guard < MAX_DAILY_RANGE_DAYS) {
     rows.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
+    guard++;
   }
   return rows;
 }
@@ -4570,6 +4623,10 @@ function calendarDayCount(start, end) {
 
 function dailySeriesBounds(dated = []) {
   if (!dated.length) return null;
+  // Ignora datas implausíveis (corrompidas) para não estourar o intervalo.
+  const plausible = dated.filter(charge => isPlausibleChargeDate(charge.startDate));
+  if (!plausible.length) return null;
+  dated = plausible;
   const minDate = new Date(Math.min(...dated.map(charge => charge.startDate)));
   const maxDate = new Date(Math.max(...dated.map(charge => charge.startDate)));
   const sameMonth = dated.every(charge =>
@@ -4871,16 +4928,18 @@ function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
   });
   const validDates = charges
     .map(charge => charge.startDate)
-    .filter(date => date && !Number.isNaN(date.getTime()));
+    .filter(date => isPlausibleChargeDate(date));
   const startBound = bounds?.start || (validDates.length ? new Date(Math.min(...validDates)) : null);
   const endBound = bounds?.end || (validDates.length ? new Date(Math.max(...validDates)) : null);
   if (startBound && endBound) {
     const cursor = new Date(startBound.getFullYear(), startBound.getMonth(), startBound.getDate(), 0, 0, 0);
     const endDay = new Date(endBound.getFullYear(), endBound.getMonth(), endBound.getDate(), 0, 0, 0);
-    while (cursor <= endDay) {
+    let guard = 0;
+    while (cursor <= endDay && guard < MAX_DAILY_RANGE_DAYS) {
       const idx = cursor.getDay();
       groups[idx].dates.add(dateKeyLocal(cursor));
       cursor.setDate(cursor.getDate() + 1);
+      guard++;
     }
   }
   charges
@@ -8405,7 +8464,7 @@ async function renderMensal() {
   clearTimeout(monthlyInsightsTimer);
   const mk      = document.getElementById('monthSelector').value;
   if (!mk) return;
-  const monthCharges = allCharges.filter(c => chargeMonthKey(c) === mk);
+  const monthCharges = chargesForMonth(mk);
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
   if (!charges.length) {
@@ -9057,10 +9116,20 @@ function renderAcumulado() {
 // ══════════════════════════════════════════════════════════
 //  TAB DETALHES
 // ══════════════════════════════════════════════════════════
+function showMoreDetalhes() {
+  detailRenderLimit += DETAIL_PAGE_SIZE;
+  renderDetalhes();
+}
+
 function renderDetalhes() {
   const sorted = [...allCharges].sort((a,b) => (b.startDate||0)-(a.startDate||0));
-  document.getElementById('detailCount').textContent = sorted.length + ' registros';
-  document.getElementById('detailTable').innerHTML = sorted.map(c =>
+  const total = sorted.length;
+  if (detailRenderLimit > total) detailRenderLimit = Math.max(DETAIL_PAGE_SIZE, total);
+  const limit = Math.min(detailRenderLimit, total);
+  const visible = sorted.slice(0, limit);
+  document.getElementById('detailCount').textContent =
+    limit < total ? `${total} registros (mostrando ${limit})` : `${total} registros`;
+  document.getElementById('detailTable').innerHTML = visible.map(c =>
     `<tr>
        <td style="color:var(--p3-muted);font-size:11px">#${c.id}</td>
        <td style="font-size:12px">${c.station}</td>
@@ -9074,6 +9143,8 @@ function renderDetalhes() {
        <td style="color:#FFD66B;font-size:12px">${c.rating||'—'}</td>
      </tr>`
   ).join('');
+  const wrap = document.getElementById('detailLoadMoreWrap');
+  if (wrap) wrap.style.display = limit < total ? 'flex' : 'none';
 }
 
 // ── Navegação de abas ─────────────────────────────────────
