@@ -5285,6 +5285,13 @@ function calendarLocationForCharges(charges = []) {
 
 async function fetchWeatherContext(charges = [], startDate, endDate) {
   const location = calendarLocationForCharges(charges);
+  // Sem coordenadas válidas (obra sem lat/lon) a API responde 400. Pula a
+  // busca de clima em vez de disparar requisições que sempre falham.
+  const _lat = validCoordinate(location?.lat);
+  const _lon = validCoordinate(location?.lon);
+  if (_lat === null || _lon === null || (_lat === 0 && _lon === 0)) {
+    return { map: {}, location: location || {} };
+  }
   try {
     const params = new URLSearchParams({
       latitude: String(location.lat),
@@ -9267,7 +9274,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260724-performance10';
+const UBY_APP_VERSION = '20260724-performance11';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
