@@ -1955,16 +1955,29 @@ function monthCanBeClosed(mk, now = new Date()) {
 function monthHasEffectiveClosing(mk) {
   return monthCanBeClosed(mk) && !!monthlyClosings?.[mk] && closingMatchesMonth(monthlyClosings[mk], mk);
 }
+// Um mês só é válido de 2015 até o ano que vem. Impede que uma data
+// corrompida (ex.: ano 3000) gere um mês fantasma tipo "3000-01" que
+// depois faz as séries mensais iterarem milhares de meses e congelarem.
+function isPlausibleMonthKey(mk) {
+  if (!/^\d{4}-\d{2}$/.test(String(mk || ''))) return false;
+  const year = Number(String(mk).slice(0, 4));
+  return year >= 2015 && year <= new Date().getFullYear() + 1;
+}
+
+function resolveChargeMonthKey(charge) {
+  const realMonth = monthKey(charge?.startDate);
+  if (realMonth !== 'unknown' && isPlausibleMonthKey(realMonth)) return realMonth;
+  // startDate ausente ou corrompida: usa o mês do arquivo importado, se válido.
+  if (isPlausibleMonthKey(charge?._month)) return charge._month;
+  return 'unknown';
+}
+
 const _chargeMonthKeyCache = new WeakMap();
 function chargeMonthKey(charge) {
-  if (!charge || typeof charge !== 'object') {
-    const realMonth = monthKey(charge?.startDate);
-    return realMonth !== 'unknown' ? realMonth : (charge?._month || 'unknown');
-  }
+  if (!charge || typeof charge !== 'object') return resolveChargeMonthKey(charge);
   const cached = _chargeMonthKeyCache.get(charge);
   if (cached !== undefined) return cached;
-  const realMonth = monthKey(charge.startDate);
-  const mk = realMonth !== 'unknown' ? realMonth : (charge._month || 'unknown');
+  const mk = resolveChargeMonthKey(charge);
   _chargeMonthKeyCache.set(charge, mk);
   return mk;
 }
@@ -2011,7 +2024,7 @@ function getMonths() {
     ...financeMonths,
     ...(currentWorkId ? [currentMk] : [])
   ])]
-    .filter(k => k !== 'unknown').sort();
+    .filter(isPlausibleMonthKey).sort();
 }
 
 // ── Formatadores ──────────────────────────────────────────
@@ -2939,14 +2952,16 @@ function financeReportPeriod(mk = '') {
   return { key: mk, label: monthLabel(mk), start: iso(start), end: iso(end) };
 }
 
+const MAX_FINANCE_MONTHS = 600; // ~50 anos: nenhuma série real chega perto.
 function financeMonthSeries(firstMonth = '', lastMonth = '') {
   if (!/^\d{4}-\d{2}$/.test(firstMonth) || !/^\d{4}-\d{2}$/.test(lastMonth) || firstMonth > lastMonth) return [];
+  if (!isPlausibleMonthKey(firstMonth) || !isPlausibleMonthKey(lastMonth)) return [];
   const [startYear, startMonth] = firstMonth.split('-').map(Number);
   const [endYear, endMonth] = lastMonth.split('-').map(Number);
   const rows = [];
   let cursor = new Date(startYear, startMonth - 1, 1);
   const end = new Date(endYear, endMonth - 1, 1);
-  while (cursor <= end) {
+  while (cursor <= end && rows.length < MAX_FINANCE_MONTHS) {
     rows.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`);
     cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
   }
@@ -7327,7 +7342,7 @@ function ubyAreaCyclesUntil(row = {}, currentCycle = ubyAreaCurrentCycle(row)) {
   const firstClose = ubyAreaFirstClosingDate(start);
   const cycles = [];
   let close = new Date(firstClose);
-  while (close <= currentCycle.end) {
+  while (close <= currentCycle.end && cycles.length < MAX_FINANCE_MONTHS) {
     const periodStart = close.getTime() === firstClose.getTime()
       ? new Date(start)
       : new Date(close.getFullYear(), close.getMonth(), 1, 0, 0, 0);
