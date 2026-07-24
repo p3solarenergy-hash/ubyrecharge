@@ -494,11 +494,15 @@ function serializeCharge(charge) {
 }
 
 function hydrateCharge(charge) {
-  return {
-    ...charge,
-    startDate: charge.startIso ? new Date(charge.startIso) : parseDate(charge.startStr),
-    endDate: charge.endIso ? new Date(charge.endIso) : parseDate(charge.endStr)
-  };
+  let startDate = charge.startIso ? new Date(charge.startIso) : parseDate(charge.startStr);
+  let endDate = charge.endIso ? new Date(charge.endIso) : parseDate(charge.endStr);
+  // Correção central: uma data corrompida (ex.: ano 3000 por erro de planilha)
+  // inflava os intervalos de dia/mês e travava a página. Descartar aqui, na
+  // entrada, mantém a recarga nos totais gerais mas a remove de todo cálculo
+  // baseado em data (o código já trata startDate/endDate nulos).
+  if (startDate && !isPlausibleChargeDate(startDate)) startDate = null;
+  if (endDate && !isPlausibleChargeDate(endDate)) endDate = null;
+  return { ...charge, startDate, endDate };
 }
 
 function chargeDateKey(charge) {
