@@ -48,6 +48,8 @@ let overviewRenderSequence = { geral: 0, uby: 0, financeiroGeral: 0 };
 let overviewInsightsTimers = { geral: null, uby: null };
 let overviewSessionsFullyHydrated = false;
 let overviewSessionsHydrationPromise = null;
+let fullRechargeWorkIds = new Set();
+let rechargeFullLoadPromises = new Map();
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -564,7 +566,7 @@ function hydratedRechargeRecord(record, workId = '') {
     workId: id,
     workName: record.workName || record.summary?.workName || workNameById(id),
     files: Array.isArray(record.files) ? record.files : [],
-    charges: Array.isArray(record.charges) ? record.charges.map(hydrateCharge) : [],
+    charges: Array.isArray(record.charges) ? dedupeChargesByUniqueKey(record.charges.map(hydrateCharge)) : [],
     financialSettings: record.financialSettings || record.summary?.financialSettings || {},
     ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
     ubyAreaAccounting: record.ubyAreaAccounting || record.summary?.ubyAreaAccounting || {},
@@ -580,6 +582,16 @@ function expectedRechargeCount(record = {}) {
   );
 }
 
+function recordHasFullRechargeDetails(record = {}) {
+  return Boolean(
+    record &&
+    Array.isArray(record.charges) &&
+    !record.summaryOnly &&
+    !record.localCompact &&
+    !record.partialDetails
+  );
+}
+
 function mergeRechargeRecord(existing, incoming, source = 'local') {
   if (!existing) return hydratedRechargeRecord(incoming, incoming?.workId);
   if (!incoming) return hydratedRechargeRecord(existing, existing?.workId);
@@ -588,7 +600,7 @@ function mergeRechargeRecord(existing, incoming, source = 'local') {
   const next = hydratedRechargeRecord(incoming, workId);
   const currentHasDetails = current.charges.length > 0;
   const nextHasDetails = next.charges.length > 0;
-  const nextIsPartial = Boolean(incoming.summaryOnly || incoming.localCompact);
+  const nextIsPartial = Boolean(incoming.summaryOnly || incoming.localCompact || incoming.partialDetails);
   const currentIsNewer = updatedAtMs(current) > updatedAtMs(next);
   const currentSyncPending = Boolean(existing.cloudSyncPending || current.cloudSyncPending);
 
@@ -604,7 +616,7 @@ function mergeRechargeRecord(existing, incoming, source = 'local') {
     };
   }
   if (source === 'cloud' && nextHasDetails) {
-    const currentIsFullLocal = currentHasDetails && !existing.localCompact && !existing.summaryOnly;
+    const currentIsFullLocal = recordHasFullRechargeDetails(existing);
     return currentIsFullLocal && currentIsNewer && currentSyncPending ? current : next;
   }
   if (currentHasDetails && !nextHasDetails && (currentIsNewer || expectedRechargeCount(next) > 0)) {
@@ -661,7 +673,7 @@ function mergeCloudRechargeRecords(records) {
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
     const existing = allRechargeRecords[workId] || db[workId];
-    const merged = mergeRechargeRecord(existing, normalized, record.summaryOnly ? 'cloud-summary' : 'cloud');
+    const merged = mergeRechargeRecord(existing, normalized, (record.summaryOnly || record.partialDetails) ? 'cloud-summary' : 'cloud');
     allRechargeRecords[workId] = hydratedRechargeRecord(merged, workId);
     db[workId] = compactRechargeRecord(merged);
   });
@@ -806,6 +818,7 @@ async function saveRechargeBase(options = {}) {
     return;
   }
   const record = buildRechargeRecord();
+  record.partialDetails = false;
   record.mutationIntent = options.mutationIntent || 'save';
   record.cloudSyncPending = true;
   const localSave = saveLocalRechargeBase(record);
@@ -821,6 +834,7 @@ async function saveRechargeBase(options = {}) {
     const result = await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
     record.cloudSyncPending = false;
     record.cloudSyncedAt = new Date().toISOString();
+    fullRechargeWorkIds.add(String(currentWorkId));
     saveLocalRechargeBase(record);
     allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
     markRechargeRecordsDirty();
@@ -997,13 +1011,30 @@ async function loadRechargeBase(workId = currentWorkId, options = {}) {
   currentWorkName = workNameById(targetWorkId, targetWorkId);
   const local = localRecord(targetWorkId);
   const memory = allRechargeRecords[targetWorkId];
-  const initial = memory?.charges?.length ? memory : local;
-  if (initial && (!initial.localCompact || initial.charges?.length)) applyRechargeRecord(initial, 'base local');
-  else applyRechargeRecord(null, 'base local');
-  if (options.skipCloud) return;
-  if (!window.UBY_SUPABASE?.loadRechargeBase) return;
+  let cached = null;
   try {
-    const cloud = await window.UBY_SUPABASE.loadRechargeBase(targetWorkId);
+    cached = await window.UBY_RECHARGE_RUNTIME?.cacheGet?.(`work:${targetWorkId}`, 24 * 60 * 60 * 1000);
+  } catch (err) {
+    console.warn('Cache integral indisponivel:', err.message);
+  }
+  const initialCandidates = [memory, cached, local].filter(Boolean);
+  const initial = initialCandidates.find(recordHasFullRechargeDetails) || initialCandidates[0] || null;
+  if (recordHasFullRechargeDetails(initial)) fullRechargeWorkIds.add(targetWorkId);
+  if (initial && (!initial.localCompact || initial.charges?.length)) applyRechargeRecord(initial, cached === initial ? 'cache integral' : 'base local');
+  else applyRechargeRecord(null, 'base local');
+  if (options.skipCloud && recordHasFullRechargeDetails(initial)) return initial;
+  if (!window.UBY_SUPABASE?.loadRechargeBase) {
+    if (options.requireCloud) throw new Error('Supabase indisponivel. A importacao foi bloqueada para preservar o historico.');
+    return initial;
+  }
+  try {
+    let cloudPromise = rechargeFullLoadPromises.get(targetWorkId);
+    if (!cloudPromise) {
+      cloudPromise = window.UBY_SUPABASE.loadRechargeBase(targetWorkId)
+        .finally(() => rechargeFullLoadPromises.delete(targetWorkId));
+      rechargeFullLoadPromises.set(targetWorkId, cloudPromise);
+    }
+    const cloud = await cloudPromise;
     if (requestSequence !== rechargeLoadSequence || currentWorkId !== targetWorkId) return;
     if (cloud) {
       const currentLocal = localRecord(targetWorkId);
@@ -1012,16 +1043,39 @@ async function loadRechargeBase(workId = currentWorkId, options = {}) {
         return;
       }
       const merged = mergeRechargeRecord(allRechargeRecords[targetWorkId] || currentLocal, cloud, 'cloud');
+      merged.summaryOnly = false;
+      merged.localCompact = false;
+      merged.partialDetails = false;
       const db = localRechargeDb();
       db[targetWorkId] = compactRechargeRecord({ ...merged, workName: cloud.summary?.workName || currentWorkName });
       if (!writeJson(RECARGAS_LOCAL_KEY, db)) window.UBY_BACKUP?.releaseStorage?.();
       allRechargeRecords[targetWorkId] = hydratedRechargeRecord(merged, targetWorkId);
+      fullRechargeWorkIds.add(targetWorkId);
+      window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`work:${targetWorkId}`, merged).catch(() => {});
       markRechargeRecordsDirty();
       applyRechargeRecord(merged, 'Supabase');
+      return merged;
     }
+    if (expectedRechargeCount(memory || local || {}) > 0) {
+      throw new Error('O banco informa recargas existentes, mas nao retornou a base integral.');
+    }
+    const emptyRecord = hydratedRechargeRecord({
+      workId: targetWorkId,
+      workName: currentWorkName,
+      files: [],
+      charges: [],
+      summaryOnly: false,
+      localCompact: false,
+      partialDetails: false
+    }, targetWorkId);
+    allRechargeRecords[targetWorkId] = emptyRecord;
+    fullRechargeWorkIds.add(targetWorkId);
+    return emptyRecord;
   } catch (err) {
     if (requestSequence !== rechargeLoadSequence || currentWorkId !== targetWorkId) return;
     setStorageState(`Base local preservada para <strong>${currentWorkName}</strong>. Supabase pendente: ${err.message}`, true);
+    if (options.requireCloud) throw err;
+    return initial;
   }
 }
 
@@ -1088,9 +1142,9 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
     await yieldToBrowser();
 
     openingWorkReport = true;
-    // A base geral ja foi sincronizada na entrada. Abrir uma estacao deve usar
-    // a copia em memoria imediatamente, sem bloquear a interface aguardando rede.
-    await loadRechargeBase(currentWorkId, { skipCloud: true });
+    // A tela geral usa apenas o mes atual. Antes de abrir uma estacao, carregue
+    // a base integral para impedir que um recorte parcial substitua o historico.
+    await loadRechargeBase(currentWorkId);
     openingWorkReport = false;
 
     updateCorrectionButtons();
@@ -1134,7 +1188,22 @@ fileInput.addEventListener('change', e => {
   fileInput.value = '';
 });
 
-function handleFiles(files) {
+async function ensureCurrentWorkBaseReadyForImport() {
+  const targetWorkId = String(currentWorkId || '');
+  setFeedback('Carregando o historico completo antes de importar...', 'up-loading');
+  const record = await loadRechargeBase(targetWorkId, { requireCloud: true });
+  if (String(currentWorkId || '') !== targetWorkId) {
+    throw new Error('A obra selecionada mudou durante a leitura. Selecione novamente o arquivo.');
+  }
+  const fullRecord = allRechargeRecords[targetWorkId] || record;
+  if (!recordHasFullRechargeDetails(fullRecord) || !fullRechargeWorkIds.has(targetWorkId)) {
+    throw new Error('Nao foi possivel confirmar a base integral. A importacao foi bloqueada para preservar o acumulado.');
+  }
+  applyRechargeRecord(fullRecord, 'Supabase');
+  return fullRecord;
+}
+
+async function handleFiles(files) {
   currentStationReportName = '';
   const selectedMonth = document.getElementById('importMonth')?.value || '';
   const importMode = document.getElementById('importMode')?.value || 'merge';
@@ -1146,6 +1215,12 @@ function handleFiles(files) {
     .filter(f => f?.name && /\.(xlsx|xls|csv)$/i.test(String(f.name)));
   if (!acceptedFiles.length) {
     setFeedback('Arquivo nao reconhecido. Envie .xlsx, .xls ou .csv exportado da plataforma.', 'up-error');
+    return;
+  }
+  try {
+    await ensureCurrentWorkBaseReadyForImport();
+  } catch (err) {
+    setFeedback('Importacao bloqueada: ' + err.message, 'up-error');
     return;
   }
   acceptedFiles.forEach(f => {
@@ -1450,20 +1525,75 @@ function fileSourceKey(month = '', name = '', station = '') {
   return [clean(month), clean(name), clean(station)].join('|');
 }
 
+function rechargePersonIdentity(charge = {}) {
+  const nameTokens = normalizeStationForCompare(charge.userName || '').split(/\s+/).filter(Boolean);
+  const name = [...new Set(nameTokens)].join(' ');
+  return name ||
+    normalizeHeaderName(charge.userEmail || '') ||
+    normalizePhone(charge.userPhone || '') ||
+    normalizeHeaderName(`${charge.vehicleBrand || ''} ${charge.vehicleModel || ''}`);
+}
+
 function rechargeUniqueKey(charge = {}) {
+  const workId = safeText(charge.workId || currentWorkId).trim().toLowerCase();
+  const station = canonicalStationNameForWork(workId, charge.station, charge.workName);
+  const startDate = charge.startDate && typeof charge.startDate.getTime === 'function'
+    ? charge.startDate
+    : (charge.startIso ? new Date(charge.startIso) : parseDate(charge.startStr));
+  const startMinute = startDate && !Number.isNaN(startDate.getTime())
+    ? String(Math.floor(startDate.getTime() / 60000))
+    : '';
+  const person = rechargePersonIdentity(charge);
+  if (startMinute) {
+    return [
+      'session',
+      workId || normalizeHeaderName(station),
+      normalizeHeaderName(station),
+      startMinute,
+      person
+    ].join('|');
+  }
   const id = safeText(charge.id).trim();
   const platform = normalizeStationForCompare(charge.sourcePlatform || charge.platform || '');
-  if (id && platform !== 'spott' && !id.includes('|')) return `id:${id}`;
-  const station = canonicalStationNameForWork(charge.workId, charge.station, charge.workName);
+  if (id) return `id:${platform}:${id}`;
   return [
     'fallback',
-    platform === 'spott' ? 'spott' : safeText(station || charge.station).trim().toLowerCase(),
-    platform === 'spott' ? '' : safeText(charge.connType).trim().toLowerCase(),
-    safeText(charge.startStr || charge.startIso || charge.startDate?.toISOString?.()).trim(),
-    safeText(charge.userEmail || charge.userName).trim().toLowerCase(),
-    Number(charge.energyKWh || 0).toFixed(3),
-    Number(charge.revenue || 0).toFixed(2)
+    workId,
+    normalizeHeaderName(station || charge.station),
+    normalizeHeaderName(charge.connType),
+    person,
+    Number(charge.energyKWh || 0).toFixed(3)
   ].join('|');
+}
+
+function preferredRechargeVersion(current = {}, candidate = {}) {
+  const currentEnergy = Number(current.energyKWh || 0);
+  const candidateEnergy = Number(candidate.energyKWh || 0);
+  if (Math.abs(candidateEnergy - currentEnergy) > 0.01) {
+    return candidateEnergy > currentEnergy ? candidate : current;
+  }
+  const currentEnd = current.endDate && typeof current.endDate.getTime === 'function'
+    ? current.endDate
+    : (current.endIso ? new Date(current.endIso) : parseDate(current.endStr));
+  const candidateEnd = candidate.endDate && typeof candidate.endDate.getTime === 'function'
+    ? candidate.endDate
+    : (candidate.endIso ? new Date(candidate.endIso) : parseDate(candidate.endStr));
+  const currentEndMs = currentEnd && !Number.isNaN(currentEnd.getTime()) ? currentEnd.getTime() : 0;
+  const candidateEndMs = candidateEnd && !Number.isNaN(candidateEnd.getTime()) ? candidateEnd.getTime() : 0;
+  if (candidateEndMs !== currentEndMs) return candidateEndMs > currentEndMs ? candidate : current;
+  const detailScore = charge => [
+    charge.userEmail,
+    charge.userPhone,
+    charge.vehicleBrand,
+    charge.vehicleModel,
+    charge.voucher,
+    charge.paymentStatus,
+    charge.sourcePlatform
+  ].filter(value => safeText(value).trim()).length;
+  const currentDetails = detailScore(current);
+  const candidateDetails = detailScore(candidate);
+  if (candidateDetails !== currentDetails) return candidateDetails > currentDetails ? candidate : current;
+  return candidate;
 }
 
 function dedupeChargesByUniqueKey(charges = []) {
@@ -1471,7 +1601,8 @@ function dedupeChargesByUniqueKey(charges = []) {
   charges.forEach(charge => {
     const key = rechargeUniqueKey(charge);
     if (!key) return;
-    byKey.set(key, charge);
+    const current = byKey.get(key);
+    byKey.set(key, current ? preferredRechargeVersion(current, charge) : charge);
   });
   return [...byKey.values()];
 }
@@ -8228,7 +8359,11 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
     const currentMonthKey = new Date().toISOString().slice(0, 7);
     const cachedRecords = await window.UBY_RECHARGE_RUNTIME?.cacheGet?.(`general-records:${currentMonthKey}`, 24 * 60 * 60 * 1000);
     if (Array.isArray(cachedRecords) && cachedRecords.length) {
-      mergeCloudRechargeRecords(cachedRecords);
+      mergeCloudRechargeRecords(cachedRecords.map(record => ({
+        ...record,
+        summaryOnly: false,
+        partialDetails: true
+      })));
       await renderVisibleOverviewViews();
       await yieldToBrowser();
     }
@@ -8281,6 +8416,7 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
         ...record,
         charges: chargesByWork.get(String(record.workId || '')) || [],
         summaryOnly: false,
+        partialDetails: true,
         normalized: true
       }));
       mergeCloudRechargeRecords(compactRecords);
@@ -8325,9 +8461,11 @@ async function ensureAllOverviewSessionsLoaded() {
       ...record,
       charges: byWork.get(String(record.workId || '')) || [],
       summaryOnly: false,
+      partialDetails: false,
       normalized: true
     }));
     mergeCloudRechargeRecords(records);
+    records.forEach(record => fullRechargeWorkIds.add(String(record.workId || '')));
     overviewSessionsFullyHydrated = true;
     markRechargeRecordsDirty();
     window.UBY_RECHARGE_RUNTIME?.cacheSet?.('general-records:all', records).catch(() => {});

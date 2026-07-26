@@ -48,6 +48,12 @@ function extractFunction(source, name) {
 const context = {
   hydrateCharge: charge => ({ ...charge }),
   workNameById: id => id,
+  currentWorkId: 'malassise',
+  safeText: value => String(value == null ? '' : value),
+  normalizeStationForCompare: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
+  canonicalStationNameForWork: workId => String(workId) === 'malassise' ? 'UBY RECHARGE - POSTO ROBERT KOCH' : String(workId || ''),
+  normalizePhone: value => String(value || '').replace(/\D+/g, ''),
+  parseDate: value => value ? new Date(value) : null,
   normalizeHeaderName: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
   console
 };
@@ -58,8 +64,13 @@ vm.runInContext([
   extractFunction(html, 'monthCanBeClosed'),
   extractFunction(html, 'rechargeRecordHasData'),
   extractFunction(html, 'updatedAtMs'),
+  extractFunction(html, 'rechargePersonIdentity'),
+  extractFunction(html, 'rechargeUniqueKey'),
+  extractFunction(html, 'preferredRechargeVersion'),
+  extractFunction(html, 'dedupeChargesByUniqueKey'),
   extractFunction(html, 'hydratedRechargeRecord'),
   extractFunction(html, 'expectedRechargeCount'),
+  extractFunction(html, 'recordHasFullRechargeDetails'),
   extractFunction(html, 'mergeRechargeRecord'),
   extractFunction(html, 'canonicalClubPersonName')
 ].join('\n'), context);
@@ -122,6 +133,52 @@ const summaryOnly = { ...compactLocal, summaryOnly: true, localCompact: false };
 merged = context.mergeRechargeRecord(fullCloud, summaryOnly, 'cloud-summary');
 assert.strictEqual(merged.charges.length, 36, 'summary refresh must preserve detailed charges');
 
+const partialDetails = {
+  ...fullCloud,
+  charges: charges.slice(0, 5),
+  partialDetails: true,
+  summary: { charges: 36, revenue: 447.8 }
+};
+merged = context.mergeRechargeRecord(fullCloud, partialDetails, 'cloud-summary');
+assert.strictEqual(merged.charges.length, 36, 'current-month overview data must not replace full history');
+assert.strictEqual(context.recordHasFullRechargeDetails(partialDetails), false, 'current-month overview must be marked partial');
+assert.strictEqual(context.recordHasFullRechargeDetails(fullCloud), true, 'full cloud record must be import-safe');
+
+const partialSession = {
+  workId: 'malassise',
+  station: 'UBY RECHARGE - POSTO ROBERT KOCH',
+  userName: 'Lucas Pereira Godoi',
+  startDate: new Date('2026-07-15T22:02:00-03:00'),
+  endDate: new Date('2026-07-15T22:40:00-03:00'),
+  energyKWh: 20.2,
+  revenue: 36.16
+};
+const laterPartialSession = {
+  ...partialSession,
+  endDate: new Date('2026-07-15T23:02:00-03:00'),
+  energyKWh: 32.6,
+  revenue: 58.35
+};
+const finalSession = {
+  ...partialSession,
+  sourcePlatform: 'Spott',
+  userName: 'Lucas Pereira Godoi Godoi',
+  endDate: new Date('2026-07-15T23:04:00-03:00'),
+  energyKWh: 33.2,
+  revenue: 59.43
+};
+const nextSession = {
+  ...finalSession,
+  startDate: new Date('2026-07-15T22:03:00-03:00'),
+  endDate: new Date('2026-07-15T23:10:00-03:00'),
+  energyKWh: 34.1,
+  revenue: 61.04
+};
+const dedupedSessions = context.dedupeChargesByUniqueKey([partialSession, laterPartialSession, finalSession, nextSession]);
+assert.strictEqual(dedupedSessions.length, 2, 'partial and final exports of one session must consolidate without merging a later session');
+assert.strictEqual(dedupedSessions[0].energyKWh, 33.2, 'deduplication must keep the most complete session version');
+assert.strictEqual(dedupedSessions[0].sourcePlatform, 'Spott', 'the final Spott session must replace legacy partial exports');
+
 const clearedCloud = {
   workId: 'mercado-santarem-centro',
   charges: [],
@@ -144,6 +201,9 @@ assert(html.includes("mutationIntent: 'remove_file'"), 'file removal must be an 
 assert(html.includes("removeFile('${escapeAttr(fileKey)}','${escapeAttr(name)}')"), 'file chips must remove one import by its stable key');
 assert(html.includes('rechargeImportStationProfile'), 'imports must summarize source stations before saving');
 assert(html.includes('confirmRechargeStationMismatch'), 'station mismatches must require explicit user confirmation');
+assert(html.includes('await ensureCurrentWorkBaseReadyForImport();'), 'imports must load the authoritative full base before reading files');
+assert(!html.includes("loadRechargeBase(currentWorkId, { skipCloud: true })"), 'opening a station must not trust a current-month-only overview');
+assert(html.includes('partialDetails: true'), 'current-month overview records must be explicitly partial');
 assert(html.includes('charge.rawStation || charge.station'), 'station validation must prefer the original platform station name');
 assert(html.includes('derivedFiles = new Map()'), 'legacy bases must rebuild visible attached-file metadata from charges');
 assert(bridge.includes('existingCharges > 0 && !explicitEmptyIntents.has(mutationIntent)'), 'cloud must reject accidental empty overwrite');
