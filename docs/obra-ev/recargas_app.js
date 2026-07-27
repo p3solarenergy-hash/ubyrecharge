@@ -8236,20 +8236,30 @@ function ubyFinanceMonthsForRow(row = {}, sourceMonths = [], isMonthView = true,
   return (sourceMonths || []).filter(mk => !firstMonth || mk >= firstMonth);
 }
 
+let _matrizShareByMonth = {};
 function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true, currentMonth = '') {
   const months = ubyFinanceMonthsForRow(row, sourceMonths, isMonthView, currentMonth);
+  let matrizCostTotal = 0;
   const results = months.map(mk => {
     const monthCharges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
-    const settings = financeSettingsForUbyRow(row, mk);
+    let settings = financeSettingsForUbyRow(row, mk);
+    // Injeta a fatia da matriz do mês como custo fixo, para o engine já levar
+    // ao resultado, ubyNet, retenção e distribuição a investidores.
+    const matrizShare = Number(_matrizShareByMonth[mk] || 0);
+    if (matrizShare > 0 && monthCharges.length) {
+      matrizCostTotal += matrizShare;
+      settings = { ...settings, costRules: [...(settings.costRules || []), { id: '__matriz', label: 'Custos da matriz UBY', basis: 'fixed', value: matrizShare, enabled: true }] };
+    }
     return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId) });
   });
   const totals = results.reduce((acc, result) => {
-    ['revenue','extraRevenue','totalRevenue','energy','energyCost','extraCosts','management','platform','totalOperatingCost','operationNet','plannedTotalCost'].forEach(key => {
+    ['revenue','extraRevenue','totalRevenue','energy','energyCost','extraCosts','management','platform','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
       acc[key] += Number(result[key] || 0);
     });
     acc.planningKWh += Number(result.planning?.planningKWh || 0);
     return acc;
-  }, { revenue:0, extraRevenue:0, totalRevenue:0, energy:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0 });
+  }, { revenue:0, extraRevenue:0, totalRevenue:0, energy:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  totals.matrizCost = matrizCostTotal;
   totals.totalCostPerKWh = totals.energy > 0 ? totals.totalOperatingCost / totals.energy : null;
   totals.plannedTotalCostPerKWh = totals.planningKWh > 0 ? totals.plannedTotalCost / totals.planningKWh : null;
   totals.resultPerKWh = totals.energy > 0 ? totals.operationNet / totals.energy : null;
@@ -8257,29 +8267,65 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
   return { ...row, financeMonths: months, finance: totals };
 }
 
+function renderUbyDistribution(total) {
+  const el = document.getElementById('ubyDistribution');
+  if (!el) return;
+  const ubyNet = Number(total.ubyNet || 0);
+  const saRet = Number(total.saRetention || 0);
+  const investor = Number(total.investorDistribution || 0);
+  const retained = Number(total.ubyRetained || 0);
+  if (ubyNet === 0 && investor === 0 && saRet === 0) { el.innerHTML = ''; return; }
+  const quotaPct = (ubyNet - saRet) > 0 ? investor / (ubyNet - saRet) * 100 : 0;
+  const card = (label, value, sub, color) =>
+    `<div class="card" style="margin:0;padding:14px"><div style="font-size:12px;color:var(--p3-muted)">${label}</div><div style="font-weight:700;font-size:20px${color ? ';color:' + color : ''}">${fmtBRL(value)}</div><div style="font-size:11px;color:var(--p3-muted)">${sub}</div></div>`;
+  el.innerHTML = `
+    <div class="card">
+      <h2 style="margin:0 0 4px">Distribuição UBY</h2>
+      <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:70ch">Como o resultado UBY (já com os custos da matriz descontados) se divide entre a retenção estatutária e o repasse aos investidores por cotas.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        ${card('Resultado UBY', ubyNet, 'após custos e matriz', ubyNet >= 0 ? 'var(--p3-ok)' : 'var(--p3-danger)')}
+        ${card('Retenção S.A.', saRet, 'retenção estatutária', '')}
+        ${card(`Investidores (${fmtPct(quotaPct)})`, investor, 'repasse por cotas', 'var(--p3-primary)')}
+        ${card('UBY retido', retained, 'fica na UBY', '')}
+      </div>
+    </div>`;
+}
+
 function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthView = true, currentMonth = '', viewLabel = '') {
   const summary = document.getElementById('ubyFinanceSummary');
   const rowsEl = document.getElementById('ubyFinanceRows');
   const periodLabel = document.getElementById('ubyFinancePeriodLabel');
   if (!summary || !rowsEl) return;
-  const rows = sourceRows
-    .filter(row => row.included)
+  const includedRows = sourceRows.filter(row => row.included);
+  // Fatia da matriz por mês = total ativo ÷ carregadores UBY com recarga no mês.
+  const matrizTotal = loadMatrizCosts().filter(c => c.ativo !== false).reduce((s, c) => s + Number(c.valor || 0), 0);
+  _matrizShareByMonth = {};
+  if (matrizTotal > 0) {
+    const monthCount = {};
+    includedRows.forEach(row => {
+      new Set((row.charges || []).map(chargeMonthKey).filter(m => m !== 'unknown')).forEach(mk => { monthCount[mk] = (monthCount[mk] || 0) + 1; });
+    });
+    Object.entries(monthCount).forEach(([mk, n]) => { _matrizShareByMonth[mk] = n > 0 ? matrizTotal / n : 0; });
+  }
+  const rows = includedRows
     .map(row => aggregateUbyFinanceRow(row, sourceMonths, isMonthView, currentMonth))
     .sort((a, b) => Number(b.finance.operationNet || 0) - Number(a.finance.operationNet || 0));
   const total = rows.reduce((acc, row) => {
     Object.keys(acc).forEach(key => { acc[key] += Number(row.finance?.[key] || 0); });
     return acc;
-  }, { revenue:0, totalRevenue:0, energy:0, totalOperatingCost:0, operationNet:0, planningKWh:0, plannedTotalCost:0 });
+  }, { revenue:0, totalRevenue:0, energy:0, totalOperatingCost:0, operationNet:0, planningKWh:0, plannedTotalCost:0, matrizCost:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
   const totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
   const plannedCostPerKWh = total.planningKWh > 0 ? total.plannedTotalCost / total.planningKWh : null;
   const margin = total.totalRevenue > 0 ? total.operationNet / total.totalRevenue * 100 : 0;
   if (periodLabel) periodLabel.textContent = viewLabel || (isMonthView ? monthLabel(currentMonth) : 'Acumulado');
   summary.innerHTML = `
     <div class="accountability-metric"><b>${fmtBRL(total.revenue)}</b><span>Faturamento recargas</span></div>
-    <div class="accountability-metric"><b>${fmtBRL(total.totalOperatingCost)}</b><span>Custos operacionais</span></div>
+    <div class="accountability-metric"><b>${fmtBRL(total.totalOperatingCost)}</b><span>Custos operacionais${total.matrizCost > 0 ? ' (inclui matriz)' : ''}</span></div>
+    ${total.matrizCost > 0 ? `<div class="accountability-metric"><b>${fmtBRL(total.matrizCost)}</b><span>Custos da matriz (rateados)</span></div>` : ''}
     <div class="accountability-metric"><b>${fmtPerKWh(totalCostPerKWh)}</b><span>Custo efetivo por kWh</span></div>
     <div class="accountability-metric"><b>${fmtBRL(total.operationNet)}</b><span>Resultado UBY ${fmtPct(margin)}</span></div>
   `;
+  renderUbyDistribution(total);
   rowsEl.innerHTML = rows.length ? rows.map(row => {
     const finance = row.finance;
     const resultClass = finance.operationNet >= 0 ? 'result-positive' : 'result-negative';
@@ -9625,7 +9671,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260727-financeiro3';
+const UBY_APP_VERSION = '20260727-financeiro4';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
