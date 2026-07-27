@@ -60,7 +60,7 @@ const context = {
   },
   monthLabel: value => value,
   MAX_FINANCE_MONTHS: 600,
-  normalizeHeaderName: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
+  normalizeHeaderName: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, ''),
   console
 };
 vm.createContext(context);
@@ -78,7 +78,13 @@ vm.runInContext([
   extractFunction(html, 'expectedRechargeCount'),
   extractFunction(html, 'recordHasFullRechargeDetails'),
   extractFunction(html, 'mergeRechargeRecord'),
+  extractFunction(html, 'clientIdentityKey'),
+  extractFunction(html, 'clientKeyFromCharge'),
+  extractFunction(html, 'normalizeClubEmail'),
+  extractFunction(html, 'clubPersonTokens'),
   extractFunction(html, 'canonicalClubPersonName'),
+  extractFunction(html, 'clubParticipantKeys'),
+  extractFunction(html, 'clubClientRows'),
   extractFunction(html, 'financeReportPeriod'),
   extractFunction(html, 'isLegacyCrossMonthAreaReport'),
   extractFunction(html, 'operationStartForCharges'),
@@ -96,6 +102,37 @@ assert.strictEqual(
   context.canonicalClubPersonName('Douglas Hugo De Oliveira Oliveira'),
   context.canonicalClubPersonName('Douglas Hugo de Oliveira'),
   'a repeated surname from the platform must still match the same club participant'
+);
+
+assert.strictEqual(
+  context.normalizeClubEmail('gilberto.tobias82@hormail.com'),
+  context.normalizeClubEmail('gilberto.tobias82@hotmail.com'),
+  'a known Hotmail domain typo must resolve to the same club identity'
+);
+
+const clubPeople = context.clubClientRows([
+  { userName: 'Douglas Hugo de Oliveira', userEmail: 'douglas.oliver698@gmail.com', revenue: 171.96, energyKWh: 101, startDate: new Date('2026-07-03') },
+  { userName: 'Douglas Hugo de Oliveira Oliveira', userEmail: 'douglas.oliver698@gmail.com', revenue: 260.98, energyKWh: 162, startDate: new Date('2026-07-24') },
+  { userName: 'Gilberto Francisco Tobias', userEmail: 'gilberto.tobias82@hormail.com', revenue: 325.89, energyKWh: 187.1, startDate: new Date('2026-07-20') },
+  { userName: 'Gilberto Francisco Tobias', userEmail: 'gilberto.tobias82@hotmail.com', revenue: 263.11, energyKWh: 151.8, startDate: new Date('2026-07-24') }
+]);
+assert.strictEqual(clubPeople.length, 2, 'club ranking must consolidate alternate identities for Douglas and Gilberto');
+const douglasClub = clubPeople.find(row => /douglas/i.test(row.name));
+const gilbertoClub = clubPeople.find(row => /gilberto/i.test(row.name));
+assert.strictEqual(douglasClub.count, 2, 'Douglas transactions must stay in one ranking row');
+assert.strictEqual(Number(douglasClub.revenue.toFixed(2)), 432.94, 'Douglas revenue must be summed after identity matching');
+assert.strictEqual(gilbertoClub.count, 2, 'Gilberto typo variants must stay in one ranking row');
+assert.strictEqual(Number(gilbertoClub.revenue.toFixed(2)), 589, 'Gilberto revenue must include both email spellings');
+assert.strictEqual(gilbertoClub.email, 'gilberto.tobias82@hotmail.com', 'the displayed Gilberto email must use the corrected domain');
+const douglasParticipantKeys = context.clubParticipantKeys({
+  name: 'Douglas Hugo de Oliveira',
+  email: 'Dou',
+  phone: '43999685570'
+});
+const douglasRankingKeys = context.clubParticipantKeys(douglasClub);
+assert(
+  douglasParticipantKeys.some(key => douglasRankingKeys.includes(key)),
+  'Douglas form registration must match his charging history even when the form email is invalid'
 );
 
 assert.strictEqual(

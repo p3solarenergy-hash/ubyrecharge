@@ -6652,25 +6652,52 @@ function renderCustomerRegistry() {
 }
 
 function clubParticipantKey(participant = {}) {
-  const email = safeText(participant.email).trim().toLowerCase();
+  const email = normalizeClubEmail(participant.email);
   if (email) return `email:${email}`;
   const phone = normalizePhone(participant.phone);
   if (phone) return `phone:${phone}`;
-  return `name:${normalizeHeaderName(participant.name || '')}`;
+  const canonicalName = canonicalClubPersonName(participant.name || '');
+  return canonicalName ? `person:${canonicalName}` : `name:${normalizeHeaderName(participant.name || '')}`;
 }
 
 function clubParticipantKeys(participant = {}) {
+  const email = normalizeClubEmail(participant.email);
+  const phone = normalizePhone(participant.phone);
+  const exactName = normalizeHeaderName(participant.name || '');
   const canonicalName = canonicalClubPersonName(participant.name || '');
   return [
-    safeText(participant.email).trim().toLowerCase(),
-    normalizePhone(participant.phone),
-    normalizeHeaderName(participant.name || ''),
+    email ? `email:${email}` : '',
+    phone ? `phone:${phone}` : '',
+    exactName ? `name:${exactName}` : '',
     canonicalName ? `person:${canonicalName}` : ''
   ].filter(Boolean);
 }
 
+function normalizeClubEmail(value = '') {
+  const raw = safeText(value).trim().toLowerCase().replace(/\s+/g, '');
+  if (!/^[^@]+@[^@]+\.[^@]+$/.test(raw)) return '';
+  const at = raw.lastIndexOf('@');
+  const local = raw.slice(0, at);
+  const domain = raw.slice(at + 1);
+  const domainAliases = {
+    'hormail.com': 'hotmail.com'
+  };
+  return `${local}@${domainAliases[domain] || domain}`;
+}
+
+function clubPersonTokens(value = '') {
+  return safeText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
 function canonicalClubPersonName(value = '') {
-  const tokens = normalizeHeaderName(value).split(/\s+/).filter(Boolean);
+  const tokens = clubPersonTokens(value);
   if (tokens.length < 3) return '';
   const uniqueTokens = [];
   const seen = new Set();
@@ -7169,14 +7196,23 @@ async function handleClubParticipantFiles(files = []) {
 
 function clubClientRows(charges = []) {
   const byClient = new Map();
+  const identityIndex = new Map();
   charges.forEach(charge => {
-    const key = clientKeyFromCharge(charge);
+    const identity = {
+      name: charge.userName || charge.userEmail || 'Cliente sem nome',
+      email: charge.userEmail || '',
+      phone: charge.userPhone || ''
+    };
+    const keys = clubParticipantKeys(identity);
+    const key = keys.map(item => identityIndex.get(item)).find(Boolean)
+      || keys[0]
+      || clientKeyFromCharge(charge);
     if (!key) return;
     if (!byClient.has(key)) {
       byClient.set(key, {
         key,
-        name: charge.userName || charge.userEmail || 'Cliente sem nome',
-        email: charge.userEmail || '',
+        name: identity.name,
+        email: normalizeClubEmail(identity.email) || identity.email,
         phone: charge.userPhone || '',
         revenue: 0,
         energy: 0,
@@ -7184,9 +7220,19 @@ function clubClientRows(charges = []) {
         lastDate: null
       });
     }
+    keys.forEach(item => identityIndex.set(item, key));
     const row = byClient.get(key);
     if (!row.phone && charge.userPhone) row.phone = charge.userPhone;
-    if (!row.email && charge.userEmail) row.email = charge.userEmail;
+    if (!row.email && charge.userEmail) row.email = normalizeClubEmail(charge.userEmail) || charge.userEmail;
+    const currentNameTokens = clubPersonTokens(row.name);
+    const nextNameTokens = clubPersonTokens(charge.userName);
+    if (
+      charge.userName &&
+      canonicalClubPersonName(row.name) === canonicalClubPersonName(charge.userName) &&
+      nextNameTokens.length < currentNameTokens.length
+    ) {
+      row.name = charge.userName;
+    }
     if ((!row.name || row.name === 'Cliente sem nome') && (charge.userName || charge.userEmail)) row.name = charge.userName || charge.userEmail;
     row.revenue += Number(charge.revenue || 0);
     row.energy += Number(charge.energyKWh || 0);
