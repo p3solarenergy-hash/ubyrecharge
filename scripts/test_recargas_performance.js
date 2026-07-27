@@ -37,6 +37,15 @@ assert(
   htmlDocument.length < 180000,
   'O motor da pagina deve ficar em arquivo externo cacheavel.'
 );
+const generalTabStart = htmlDocument.indexOf('id="tabGeral"');
+const customerTabStart = htmlDocument.indexOf('id="tabClientes"');
+const stationOccupancyPanel = htmlDocument.indexOf('id="generalStationOccupancy"');
+assert(
+  generalTabStart >= 0 &&
+  stationOccupancyPanel > generalTabStart &&
+  stationOccupancyPanel < customerTabStart,
+  'O painel de ocupacao e horarios deve permanecer dentro da aba Geral.'
+);
 assert(
   html.includes("if (document.getElementById('generalViewMode')?.value === 'accumulated')"),
   'A visao acumulada deve hidratar o historico explicitamente.'
