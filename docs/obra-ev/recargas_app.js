@@ -3040,9 +3040,21 @@ function writeLocalFinanceReports(items = financeReportArchive) {
   writeJson(FINANCE_REPORTS_LOCAL_KEY, sortFinanceReports(items).slice(0, 600));
 }
 
+function isLegacyCrossMonthAreaReport(report = {}) {
+  if (report.reportType !== 'partner_area') return false;
+  const start = String(report.periodStart || report.payload?.period?.start || '');
+  const end = String(report.periodEnd || report.payload?.period?.end || '');
+  const legacyDatedKey = /^\d{4}-\d{2}-\d{2}$/.test(String(report.periodKey || ''));
+  return legacyDatedKey || (
+    /^\d{4}-\d{2}-\d{2}$/.test(start) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(end) &&
+    start.slice(0, 7) !== end.slice(0, 7)
+  );
+}
+
 function mergeFinanceReportArchive(...collections) {
   const merged = new Map();
-  collections.flat().filter(Boolean).forEach(report => {
+  collections.flat().filter(report => report && !isLegacyCrossMonthAreaReport(report)).forEach(report => {
     const key = financeReportTuple(report);
     const current = merged.get(key);
     if (!current || (!String(report.id || '').startsWith('local-') && String(current.id || '').startsWith('local-'))) merged.set(key, report);
@@ -3108,11 +3120,22 @@ async function persistFinanceReport(report = {}) {
   return saved;
 }
 
-function financeReportPeriod(mk = '') {
+function financeReportPeriod(mk = '', operationStart = currentWorkOperationStart(), reference = new Date()) {
   const [year, month] = String(mk).split('-').map(Number);
-  const start = new Date(year, month - 1, 1);
+  let start = new Date(year, month - 1, 1);
+  const firstOperation = operationStart && typeof operationStart.getTime === 'function'
+    ? new Date(operationStart)
+    : parseDate(operationStart);
+  if (
+    firstOperation &&
+    !Number.isNaN(firstOperation.getTime()) &&
+    firstOperation.getFullYear() === year &&
+    firstOperation.getMonth() === month - 1
+  ) {
+    start = new Date(year, month - 1, firstOperation.getDate());
+  }
   const monthEnd = new Date(year, month, 0);
-  const today = new Date();
+  const today = reference && typeof reference.getTime === 'function' ? new Date(reference) : new Date();
   const end = year === today.getFullYear() && month === today.getMonth() + 1 ? today : monthEnd;
   const iso = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   return { key: mk, label: monthLabel(mk), start: iso(start), end: iso(end) };
@@ -3239,10 +3262,21 @@ async function rechargeRowsFromFileBuffer(arrayBuffer, isCsvFile) {
   }
 }
 
-function financeMonthOccupancy(charges = [], mk = '', powerOverride = 0) {
+function financeMonthOccupancy(charges = [], mk = '', powerOverride = 0, operationStart = currentWorkOperationStart()) {
   if (!/^\d{4}-\d{2}$/.test(mk)) return { pct: 0, maxKWh: 0, energy: 0, hours: 0 };
   const [year, month] = mk.split('-').map(Number);
-  const start = new Date(year, month - 1, 1, 0, 0, 0);
+  let start = new Date(year, month - 1, 1, 0, 0, 0);
+  const firstOperation = operationStart && typeof operationStart.getTime === 'function'
+    ? new Date(operationStart)
+    : parseDate(operationStart);
+  if (
+    firstOperation &&
+    !Number.isNaN(firstOperation.getTime()) &&
+    firstOperation.getFullYear() === year &&
+    firstOperation.getMonth() === month - 1
+  ) {
+    start = new Date(year, month - 1, firstOperation.getDate(), 0, 0, 0);
+  }
   const monthAfter = new Date(year, month, 1, 0, 0, 0);
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -3310,7 +3344,7 @@ function financeRuleReportItems(result = {}, settings = {}, type = 'cost') {
 
 function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}) {
   const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: options.historyCharges || charges, power: options.power });
-  const occupancy = financeMonthOccupancy(charges, mk, options.power);
+  const occupancy = financeMonthOccupancy(charges, mk, options.power, options.operationStart);
   const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
   return {
     key: mk,
@@ -3359,10 +3393,11 @@ function aggregateInvestorEntries(entries = [], investmentValue = null) {
 function currentWorkInvestorTimeline(uptoMonth = financeMonthKey(), selectedSettings = null) {
   const available = [...new Set(allCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const firstMonth = available.find(key => key <= uptoMonth) || uptoMonth;
+  const operationStart = currentWorkOperationStart();
   return financeMonthSeries(firstMonth, uptoMonth).map(mk => {
     const charges = chargesForMonth(mk);
     const settings = mk === uptoMonth && selectedSettings ? selectedSettings : financeSettingsForMonth(mk);
-    return financeInvestorEntry(charges, settings, mk, { historyCharges: allCharges, power: workPowerById(currentWorkId) });
+    return financeInvestorEntry(charges, settings, mk, { historyCharges: allCharges, power: workPowerById(currentWorkId), operationStart });
   });
 }
 
@@ -3370,7 +3405,7 @@ function currentWorkInvestorReportModel(mk = financeMonthKey(), settingsOverride
   const settings = settingsOverride || currentFinanceSettingsFromInputs();
   const period = financeReportPeriod(mk);
   const timeline = currentWorkInvestorTimeline(mk, settings);
-  const current = timeline.find(entry => entry.key === mk) || financeInvestorEntry([], settings, mk, { power: workPowerById(currentWorkId) });
+  const current = timeline.find(entry => entry.key === mk) || financeInvestorEntry([], settings, mk, { power: workPowerById(currentWorkId), operationStart: currentWorkOperationStart() });
   const accumulated = aggregateInvestorEntries(timeline, current.investmentValue);
   return {
     report: {
@@ -3454,7 +3489,7 @@ function buildFinanceMonthReportSnapshot(mk = financeMonthKey(), settingsOverrid
   const settings = settingsOverride || currentFinanceSettingsFromInputs();
   const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
-  const occupancy = financeMonthOccupancy(charges, mk, workPowerById(currentWorkId));
+  const occupancy = financeMonthOccupancy(charges, mk, workPowerById(currentWorkId), currentWorkOperationStart());
   const summary = monthSummaryForMonth(mk);
   const owner = ownerAreaReportForSummary(summary, settings, charges);
   const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
@@ -7393,49 +7428,39 @@ function ubyAreaRowKey(row = {}) {
   return `${row.workId || 'obra'}|${normalizeStationForCompare(row.stationName || row.station || row.workName || '')}`;
 }
 
-function ubyAreaOperationStart(row = {}) {
-  const label = normalizeStationForCompare([row.stationName, row.station, row.workName].filter(Boolean).join(' '));
+function operationStartForCharges(charges = [], context = {}) {
+  const label = normalizeStationForCompare([
+    context.stationName,
+    context.station,
+    context.workName
+  ].filter(Boolean).join(' '));
   if (label.includes('robert koch')) return new Date(2026, 5, 8, 0, 0, 0);
-  const dates = (row.charges || []).map(charge => charge.startDate).filter(Boolean);
-  return dates.length ? new Date(Math.min(...dates)) : new Date();
+  const dates = (charges || []).map(charge => {
+    if (charge?.startDate && typeof charge.startDate.getTime === 'function') return new Date(charge.startDate);
+    return parseDate(charge?.startIso || charge?.startStr);
+  }).filter(date => date && !Number.isNaN(date.getTime()));
+  if (!dates.length) return null;
+  const first = new Date(Math.min(...dates.map(date => date.getTime())));
+  return new Date(first.getFullYear(), first.getMonth(), first.getDate(), 0, 0, 0);
 }
 
-function ubyAreaFirstClosingDate(start) {
-  if (!start || Number.isNaN(start.getTime())) return new Date();
-  return new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59);
+function currentWorkOperationStart() {
+  return operationStartForCharges(allCharges, {
+    stationName: currentStationReportName,
+    workName: currentWorkName
+  });
 }
 
-function ubyAreaLatestClosedReport(row = {}) {
-  const stationKey = normalizeStationForCompare(canonicalStationNameForWork(
-    row.workId,
-    row.stationName || row.station || row.workName,
-    row.workName
-  ));
-  const reports = [...financeReportArchive, ...readLocalFinanceReports()]
-    .filter(item => item?.reportType === 'partner_area'
-      && item?.status === 'closed'
-      && item?.workId === row.workId
-      && (item?.stationKey || '') === stationKey
-      && (item?.periodEnd || item?.payload?.period?.end));
-  return sortFinanceReports(reports)[0] || null;
-}
-
-function ubyAreaNextOpenDate(row = {}) {
-  const latest = ubyAreaLatestClosedReport(row);
-  const closedEnd = parseDate(latest?.periodEnd || latest?.payload?.period?.end);
-  if (closedEnd && !Number.isNaN(closedEnd.getTime())) {
-    return new Date(closedEnd.getFullYear(), closedEnd.getMonth(), closedEnd.getDate() + 1, 0, 0, 0);
-  }
-  return ubyAreaOperationStart(row);
+function ubyAreaOperationStart(row = {}) {
+  return operationStartForCharges(row.charges, row) || new Date();
 }
 
 function ubyAreaCurrentCycle(row = {}, reference = new Date()) {
   const operationStart = ubyAreaOperationStart(row);
-  const nextOpen = ubyAreaNextOpenDate(row);
-  const target = reference < nextOpen ? nextOpen : reference;
+  const target = reference < operationStart ? operationStart : reference;
   const close = new Date(target.getFullYear(), target.getMonth() + 1, 0, 23, 59, 59);
-  const sameOpeningMonth = nextOpen.getFullYear() === close.getFullYear() && nextOpen.getMonth() === close.getMonth();
-  const periodStart = sameOpeningMonth ? new Date(nextOpen) : new Date(close.getFullYear(), close.getMonth(), 1, 0, 0, 0);
+  const sameOpeningMonth = operationStart.getFullYear() === close.getFullYear() && operationStart.getMonth() === close.getMonth();
+  const periodStart = sameOpeningMonth ? new Date(operationStart) : new Date(close.getFullYear(), close.getMonth(), 1, 0, 0, 0);
   return {
     start: periodStart,
     end: close,
@@ -7518,22 +7543,18 @@ function calculateUbyAreaReport(row = {}, cycle = {}, settings = {}) {
 
 function ubyAreaCyclesUntil(row = {}, currentCycle = ubyAreaCurrentCycle(row)) {
   const operationStart = ubyAreaOperationStart(row);
-  const start = ubyAreaNextOpenDate(row);
-  const firstClose = ubyAreaFirstClosingDate(start);
   const cycles = [];
-  let close = new Date(firstClose);
-  while (close <= currentCycle.end && cycles.length < MAX_FINANCE_MONTHS) {
-    const periodStart = close.getTime() === firstClose.getTime()
-      ? new Date(start)
-      : new Date(close.getFullYear(), close.getMonth(), 1, 0, 0, 0);
+  let periodStart = new Date(operationStart);
+  while (periodStart <= currentCycle.end && cycles.length < MAX_FINANCE_MONTHS) {
+    const close = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0, 23, 59, 59);
     cycles.push({
-      start: periodStart,
+      start: new Date(periodStart),
       end: new Date(close),
       key: `${close.getFullYear()}-${String(close.getMonth() + 1).padStart(2, '0')}`,
       label: `${fmtDateOnly(periodStart)} a ${fmtDateOnly(close)}`,
       first: periodStart.getTime() === operationStart.getTime()
     });
-    close = new Date(close.getFullYear(), close.getMonth() + 2, 0, 23, 59, 59);
+    periodStart = new Date(close.getFullYear(), close.getMonth() + 1, 1, 0, 0, 0);
   }
   return cycles;
 }
@@ -7808,9 +7829,14 @@ function ubyInvestorMonthEntry(rows = [], mk = '') {
   const [year, month] = String(mk).split('-').map(Number);
   const monthEnd = new Date(year, month, 0, 23, 59, 59);
   const unitEntries = rows.filter(row => ubyAreaOperationStart(row) <= monthEnd).map(row => {
+    const operationStart = ubyAreaOperationStart(row);
     const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
     const settings = financeSettingsForUbyRow(row, mk);
-    const entry = financeInvestorEntry(charges, settings, mk, { historyCharges: row.charges, power: workPowerById(row.workId) });
+    const entry = financeInvestorEntry(charges, settings, mk, {
+      historyCharges: row.charges,
+      power: workPowerById(row.workId),
+      operationStart
+    });
     return {
       ...entry,
       workId: row.workId,
@@ -7844,9 +7870,9 @@ function ubyInvestorMonthEntry(rows = [], mk = '') {
 }
 
 function buildUbyInvestorReportModel(mk = ubyInvestorLatestMonth(), rows = ubyInvestorSourceRows()) {
-  const period = financeReportPeriod(mk);
   const starts = rows.map(row => ubyAreaOperationStart(row)).filter(date => date && !Number.isNaN(date.getTime()));
   const firstDate = starts.length ? new Date(Math.min(...starts)) : new Date();
+  const period = financeReportPeriod(mk, firstDate);
   const firstMonth = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, '0')}`;
   const timeline = financeMonthSeries(firstMonth <= mk ? firstMonth : mk, mk).map(monthKeyValue => ubyInvestorMonthEntry(rows, monthKeyValue));
   const current = timeline.find(entry => entry.key === mk) || ubyInvestorMonthEntry(rows, mk);
@@ -7874,14 +7900,22 @@ function buildUbyInvestorReportModel(mk = ubyInvestorLatestMonth(), rows = ubyIn
 
 function ubyInvestorReportRecord(row = {}, mk = '', status = 'partial') {
   const settings = financeSettingsForUbyRow(row, mk);
-  const period = financeReportPeriod(mk);
-  const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
-  const entry = financeInvestorEntry(charges, settings, mk, { historyCharges: row.charges, power: workPowerById(row.workId) });
   const start = ubyAreaOperationStart(row);
+  const period = financeReportPeriod(mk, start);
+  const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
+  const entry = financeInvestorEntry(charges, settings, mk, {
+    historyCharges: row.charges,
+    power: workPowerById(row.workId),
+    operationStart: start
+  });
   const firstMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
   const timeline = financeMonthSeries(firstMonth <= mk ? firstMonth : mk, mk).map(monthKeyValue => {
     const monthCharges = (row.charges || []).filter(charge => chargeMonthKey(charge) === monthKeyValue);
-    return financeInvestorEntry(monthCharges, financeSettingsForUbyRow(row, monthKeyValue), monthKeyValue, { historyCharges: row.charges, power: workPowerById(row.workId) });
+    return financeInvestorEntry(monthCharges, financeSettingsForUbyRow(row, monthKeyValue), monthKeyValue, {
+      historyCharges: row.charges,
+      power: workPowerById(row.workId),
+      operationStart: start
+    });
   });
   const model = {
     report: {

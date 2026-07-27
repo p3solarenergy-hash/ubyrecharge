@@ -54,6 +54,12 @@ const context = {
   canonicalStationNameForWork: workId => String(workId) === 'malassise' ? 'UBY RECHARGE - POSTO ROBERT KOCH' : String(workId || ''),
   normalizePhone: value => String(value || '').replace(/\D+/g, ''),
   parseDate: value => value ? new Date(value) : null,
+  fmtDateOnly: value => {
+    const date = new Date(value);
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+  },
+  monthLabel: value => value,
+  MAX_FINANCE_MONTHS: 600,
   normalizeHeaderName: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
   console
 };
@@ -72,7 +78,13 @@ vm.runInContext([
   extractFunction(html, 'expectedRechargeCount'),
   extractFunction(html, 'recordHasFullRechargeDetails'),
   extractFunction(html, 'mergeRechargeRecord'),
-  extractFunction(html, 'canonicalClubPersonName')
+  extractFunction(html, 'canonicalClubPersonName'),
+  extractFunction(html, 'financeReportPeriod'),
+  extractFunction(html, 'isLegacyCrossMonthAreaReport'),
+  extractFunction(html, 'operationStartForCharges'),
+  extractFunction(html, 'ubyAreaOperationStart'),
+  extractFunction(html, 'ubyAreaCurrentCycle'),
+  extractFunction(html, 'ubyAreaCyclesUntil')
 ].join('\n'), context);
 
 assert.strictEqual(context.monthCanBeClosed('2026-07', new Date(2026, 6, 18)), false, 'current month must remain partial before its last day');
@@ -178,6 +190,63 @@ const dedupedSessions = context.dedupeChargesByUniqueKey([partialSession, laterP
 assert.strictEqual(dedupedSessions.length, 2, 'partial and final exports of one session must consolidate without merging a later session');
 assert.strictEqual(dedupedSessions[0].energyKWh, 33.2, 'deduplication must keep the most complete session version');
 assert.strictEqual(dedupedSessions[0].sourcePlatform, 'Spott', 'the final Spott session must replace legacy partial exports');
+
+const robertRow = {
+  workId: 'malassise',
+  stationName: 'UBY RECHARGE - POSTO ROBERT KOCH',
+  workName: 'Posto Malassise R.K.',
+  charges: [
+    { startDate: new Date('2026-06-08T08:00:00-03:00') },
+    { startDate: new Date('2026-07-20T10:00:00-03:00') }
+  ]
+};
+const robertJune = context.ubyAreaCurrentCycle(robertRow, new Date(2026, 5, 20, 12));
+assert.strictEqual(context.fmtDateOnly(robertJune.start), '08/06/2026', 'Robert Koch first report must start on the first operation day');
+assert.strictEqual(context.fmtDateOnly(robertJune.end), '30/06/2026', 'Robert Koch first report must close on the last day of June');
+const robertJuly = context.ubyAreaCurrentCycle(robertRow, new Date(2026, 6, 26, 12));
+assert.strictEqual(context.fmtDateOnly(robertJuly.start), '01/07/2026', 'subsequent reports must start on day one');
+assert.strictEqual(context.fmtDateOnly(robertJuly.end), '31/07/2026', 'subsequent reports must close on the last day');
+const robertCycles = context.ubyAreaCyclesUntil(robertRow, robertJuly);
+assert.deepStrictEqual(
+  Array.from(robertCycles, cycle => cycle.label),
+  ['08/06/2026 a 30/06/2026', '01/07/2026 a 31/07/2026'],
+  'monthly accounting must never carry a first-month cycle into the next month'
+);
+
+const futureRow = {
+  workId: 'future',
+  stationName: 'UBY FUTURA',
+  charges: [{ startDate: new Date('2026-08-17T14:00:00-03:00') }]
+};
+const futureAugust = context.ubyAreaCurrentCycle(futureRow, new Date(2026, 7, 20, 12));
+const futureSeptember = context.ubyAreaCurrentCycle(futureRow, new Date(2026, 8, 10, 12));
+assert.strictEqual(context.fmtDateOnly(futureAugust.start), '17/08/2026', 'a future charger first report must start on its real operation day');
+assert.strictEqual(context.fmtDateOnly(futureAugust.end), '31/08/2026', 'a future charger first report must end with its opening month');
+assert.strictEqual(context.fmtDateOnly(futureSeptember.start), '01/09/2026', 'future charger reports after opening month must use calendar months');
+const juneFinancePeriod = context.financeReportPeriod('2026-06', new Date(2026, 5, 8), new Date(2026, 6, 26));
+const julyFinancePeriod = context.financeReportPeriod('2026-07', new Date(2026, 5, 8), new Date(2026, 6, 26));
+assert.deepStrictEqual(
+  { start: juneFinancePeriod.start, end: juneFinancePeriod.end },
+  { start: '2026-06-08', end: '2026-06-30' },
+  'financial report first competency must follow the operation start'
+);
+assert.deepStrictEqual(
+  { start: julyFinancePeriod.start, end: julyFinancePeriod.end },
+  { start: '2026-07-01', end: '2026-07-26' },
+  'current financial report must start on day one and remain partial through today'
+);
+assert.strictEqual(context.isLegacyCrossMonthAreaReport({
+  reportType: 'partner_area',
+  periodKey: '2026-07-10',
+  periodStart: '2026-06-08',
+  periodEnd: '2026-07-10'
+}), true, 'old cross-month area reports must be removed from browser caches');
+assert.strictEqual(context.isLegacyCrossMonthAreaReport({
+  reportType: 'partner_area',
+  periodKey: '2026-06',
+  periodStart: '2026-06-08',
+  periodEnd: '2026-06-30'
+}), false, 'the corrected first monthly report must remain available');
 
 const clearedCloud = {
   workId: 'mercado-santarem-centro',
