@@ -1392,6 +1392,34 @@
 
     <section class="grid kpis" id="kpiGeneralFinance"></section>
 
+    <section class="section" id="matrizCostsSection" style="margin-top:18px">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+          <h2 style="margin:0">Custos da matriz UBY</h2>
+          <span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span>
+        </div>
+        <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:70ch">
+          Despesas da matriz UBY (não são de um carregador só). O total é dividido <strong>igualmente entre os carregadores UBY que tiveram recarga no mês</strong>. Cadastre uma vez — o rateio se ajusta sozinho.
+        </p>
+
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Custo</th><th style="text-align:right">Valor / mês</th><th style="text-align:right">÷ por carregador</th><th style="text-align:right">Ação</th></tr></thead>
+            <tbody id="matrizCostList"></tbody>
+            <tfoot id="matrizCostFoot"></tfoot>
+          </table>
+        </div>
+
+        <div id="matrizAddRow" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+          <input id="matrizNewName" type="text" placeholder="Nome do custo (ex.: Aluguel matriz)" style="flex:1;min-width:200px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
+          <input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Valor R$/mês" style="width:150px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
+          <button class="btn-open" type="button" onclick="addMatrizCost()">＋ Adicionar custo</button>
+        </div>
+
+        <div id="matrizRateio" style="margin-top:18px"></div>
+      </div>
+    </section>
+
     <section class="section" id="generalFinanceSection" style="margin-top:18px">
       <div class="card">
         <h2>Financeiro consolidado</h2>
@@ -1874,6 +1902,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260727-club-identity1"></script>
+<script src="recargas_app.js?v=20260727-financeiro2"></script>
 </body>
 </html>

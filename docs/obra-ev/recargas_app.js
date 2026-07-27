@@ -4444,6 +4444,96 @@ function financeForCharges(charges, settings = {}, options = {}) {
   };
 }
 
+// ── Custos da matriz UBY (compartilhados, rateio igual) ───────────────────────
+// Camada nova, separada do engine financeiro: cadastra custos da matriz e os
+// divide igualmente entre os carregadores UBY que tiveram recarga no mês.
+const MATRIZ_COSTS_KEY = 'uby-matriz-costs-v1';
+
+function loadMatrizCosts() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(MATRIZ_COSTS_KEY) || '[]');
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) { return []; }
+}
+function saveMatrizCosts(list) {
+  try { localStorage.setItem(MATRIZ_COSTS_KEY, JSON.stringify(Array.isArray(list) ? list : [])); } catch (_) {}
+}
+function addMatrizCost() {
+  const nameEl = document.getElementById('matrizNewName');
+  const valEl = document.getElementById('matrizNewValue');
+  const nome = (nameEl?.value || '').trim();
+  const valor = Math.max(0, parseFloat(valEl?.value) || 0);
+  if (!nome || valor <= 0) { setStorageState('Informe o nome e um valor maior que zero para o custo da matriz.', true); return; }
+  const list = loadMatrizCosts();
+  list.push({ id: 'm' + Date.now().toString(36), nome, valor, ativo: true });
+  saveMatrizCosts(list);
+  if (nameEl) nameEl.value = '';
+  if (valEl) valEl.value = '';
+  renderMatrizCosts(getGeneralUnitData());
+}
+function removeMatrizCost(id) {
+  saveMatrizCosts(loadMatrizCosts().filter(c => c.id !== id));
+  renderMatrizCosts(getGeneralUnitData());
+}
+
+// Carregadores UBY (incluídos na operação UBY) com pelo menos 1 recarga no mês mk.
+function ubyChargersWithRechargeInMonth(unitData, mk) {
+  return getUbyChargerRows(unitData)
+    .filter(row => row.included)
+    .filter(row => (row.charges || []).some(charge => chargeMonthKey(charge) === mk));
+}
+
+function renderMatrizCosts(unitData) {
+  const listEl = document.getElementById('matrizCostList');
+  if (!listEl) return;
+  const costs = loadMatrizCosts();
+
+  // Mês de referência: o mais recente com recargas UBY.
+  const ubyRows = getUbyChargerRows(unitData).filter(row => row.included);
+  const ubyCharges = ubyRows.flatMap(row => row.charges || []);
+  const months = [...new Set(ubyCharges.map(chargeMonthKey).filter(m => m !== 'unknown'))].sort();
+  const mk = months[months.length - 1] || '';
+  const activeChargers = mk ? ubyChargersWithRechargeInMonth(unitData, mk) : [];
+  const n = activeChargers.length;
+
+  const monthEl = document.getElementById('matrizMonthLabel');
+  if (monthEl) monthEl.textContent = mk ? `rateio de ${monthLabel(mk)} · ${n} carregador(es) UBY com recarga` : 'sem recargas UBY neste período';
+
+  const activeCosts = costs.filter(c => c.ativo !== false);
+  const total = activeCosts.reduce((s, c) => s + Number(c.valor || 0), 0);
+  const perCharger = n > 0 ? total / n : 0;
+
+  listEl.innerHTML = costs.length ? costs.map(c => `
+    <tr>
+      <td>${escapeHtml(c.nome)}</td>
+      <td style="text-align:right" class="num">${fmtBRL(Number(c.valor || 0))}</td>
+      <td style="text-align:right;color:var(--p3-primary);font-weight:600" class="num">${n > 0 ? fmtBRL(Number(c.valor || 0) / n) : '—'}</td>
+      <td style="text-align:right"><button class="btn-open" type="button" onclick="removeMatrizCost('${c.id}')">Remover</button></td>
+    </tr>`).join('') : '<tr><td colspan="4" style="color:var(--p3-muted);text-align:center;padding:16px">Nenhum custo da matriz cadastrado. Adicione abaixo (ex.: Aluguel matriz — R$ 349,36).</td></tr>';
+
+  const footEl = document.getElementById('matrizCostFoot');
+  if (footEl) footEl.innerHTML = costs.length ? `
+    <tr style="border-top:2px solid var(--p3-border);font-weight:700">
+      <td>Total da matriz</td>
+      <td style="text-align:right" class="num">${fmtBRL(total)}</td>
+      <td style="text-align:right;color:var(--p3-primary)" class="num">${n > 0 ? fmtBRL(perCharger) : '—'}</td>
+      <td></td>
+    </tr>` : '';
+
+  const rateioEl = document.getElementById('matrizRateio');
+  if (!rateioEl) return;
+  if (!costs.length || n === 0) { rateioEl.innerHTML = ''; return; }
+  rateioEl.innerHTML = `
+    <div style="color:var(--p3-muted);font-size:12px;margin-bottom:8px">Fatia da matriz por carregador UBY em ${monthLabel(mk)} (cada um paga o mesmo):</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px">
+      ${activeChargers.map(row => `
+        <div class="card" style="padding:10px 14px;min-width:180px;margin:0">
+          <div style="font-size:12px;color:var(--p3-muted)">${escapeHtml(row.station || row.workName || 'Carregador')}</div>
+          <div style="font-weight:700;color:var(--p3-danger)">− ${fmtBRL(perCharger)}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
 function generalFinanceByUnit(unitData) {
   return unitData.map(unit => {
     const byMonth = {};
@@ -4470,6 +4560,7 @@ function generalFinanceByUnit(unitData) {
 }
 
 function renderGeneralFinance(unitData) {
+  try { renderMatrizCosts(unitData); } catch (e) { console.error('[matriz]', e); }
   const activeUnits = (unitData || []).filter(unit =>
     Array.isArray(unit.charges) && unit.charges.length > 0 &&
     (Number(unit.count) > 0 || Number(unit.energy) > 0 || Number(unit.revenue) > 0)
@@ -9534,7 +9625,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260724-performance14';
+const UBY_APP_VERSION = '20260727-financeiro2';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
