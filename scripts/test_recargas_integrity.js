@@ -48,7 +48,19 @@ function extractFunction(source, name) {
 const context = {
   hydrateCharge: charge => ({ ...charge }),
   workNameById: id => id,
-  normalizeHeaderName: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
+  currentWorkId: 'malassise',
+  safeText: value => String(value == null ? '' : value),
+  normalizeStationForCompare: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
+  canonicalStationNameForWork: workId => String(workId) === 'malassise' ? 'UBY RECHARGE - POSTO ROBERT KOCH' : String(workId || ''),
+  normalizePhone: value => String(value || '').replace(/\D+/g, ''),
+  parseDate: value => value ? new Date(value) : null,
+  fmtDateOnly: value => {
+    const date = new Date(value);
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+  },
+  monthLabel: value => value,
+  MAX_FINANCE_MONTHS: 600,
+  normalizeHeaderName: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, ''),
   console
 };
 vm.createContext(context);
@@ -58,10 +70,27 @@ vm.runInContext([
   extractFunction(html, 'monthCanBeClosed'),
   extractFunction(html, 'rechargeRecordHasData'),
   extractFunction(html, 'updatedAtMs'),
+  extractFunction(html, 'rechargePersonIdentity'),
+  extractFunction(html, 'rechargeUniqueKey'),
+  extractFunction(html, 'preferredRechargeVersion'),
+  extractFunction(html, 'dedupeChargesByUniqueKey'),
   extractFunction(html, 'hydratedRechargeRecord'),
   extractFunction(html, 'expectedRechargeCount'),
+  extractFunction(html, 'recordHasFullRechargeDetails'),
   extractFunction(html, 'mergeRechargeRecord'),
-  extractFunction(html, 'canonicalClubPersonName')
+  extractFunction(html, 'clientIdentityKey'),
+  extractFunction(html, 'clientKeyFromCharge'),
+  extractFunction(html, 'normalizeClubEmail'),
+  extractFunction(html, 'clubPersonTokens'),
+  extractFunction(html, 'canonicalClubPersonName'),
+  extractFunction(html, 'clubParticipantKeys'),
+  extractFunction(html, 'clubClientRows'),
+  extractFunction(html, 'financeReportPeriod'),
+  extractFunction(html, 'isLegacyCrossMonthAreaReport'),
+  extractFunction(html, 'operationStartForCharges'),
+  extractFunction(html, 'ubyAreaOperationStart'),
+  extractFunction(html, 'ubyAreaCurrentCycle'),
+  extractFunction(html, 'ubyAreaCyclesUntil')
 ].join('\n'), context);
 
 assert.strictEqual(context.monthCanBeClosed('2026-07', new Date(2026, 6, 18)), false, 'current month must remain partial before its last day');
@@ -73,6 +102,37 @@ assert.strictEqual(
   context.canonicalClubPersonName('Douglas Hugo De Oliveira Oliveira'),
   context.canonicalClubPersonName('Douglas Hugo de Oliveira'),
   'a repeated surname from the platform must still match the same club participant'
+);
+
+assert.strictEqual(
+  context.normalizeClubEmail('gilberto.tobias82@hormail.com'),
+  context.normalizeClubEmail('gilberto.tobias82@hotmail.com'),
+  'a known Hotmail domain typo must resolve to the same club identity'
+);
+
+const clubPeople = context.clubClientRows([
+  { userName: 'Douglas Hugo de Oliveira', userEmail: 'douglas.oliver698@gmail.com', revenue: 171.96, energyKWh: 101, startDate: new Date('2026-07-03') },
+  { userName: 'Douglas Hugo de Oliveira Oliveira', userEmail: 'douglas.oliver698@gmail.com', revenue: 260.98, energyKWh: 162, startDate: new Date('2026-07-24') },
+  { userName: 'Gilberto Francisco Tobias', userEmail: 'gilberto.tobias82@hormail.com', revenue: 325.89, energyKWh: 187.1, startDate: new Date('2026-07-20') },
+  { userName: 'Gilberto Francisco Tobias', userEmail: 'gilberto.tobias82@hotmail.com', revenue: 263.11, energyKWh: 151.8, startDate: new Date('2026-07-24') }
+]);
+assert.strictEqual(clubPeople.length, 2, 'club ranking must consolidate alternate identities for Douglas and Gilberto');
+const douglasClub = clubPeople.find(row => /douglas/i.test(row.name));
+const gilbertoClub = clubPeople.find(row => /gilberto/i.test(row.name));
+assert.strictEqual(douglasClub.count, 2, 'Douglas transactions must stay in one ranking row');
+assert.strictEqual(Number(douglasClub.revenue.toFixed(2)), 432.94, 'Douglas revenue must be summed after identity matching');
+assert.strictEqual(gilbertoClub.count, 2, 'Gilberto typo variants must stay in one ranking row');
+assert.strictEqual(Number(gilbertoClub.revenue.toFixed(2)), 589, 'Gilberto revenue must include both email spellings');
+assert.strictEqual(gilbertoClub.email, 'gilberto.tobias82@hotmail.com', 'the displayed Gilberto email must use the corrected domain');
+const douglasParticipantKeys = context.clubParticipantKeys({
+  name: 'Douglas Hugo de Oliveira',
+  email: 'Dou',
+  phone: '43999685570'
+});
+const douglasRankingKeys = context.clubParticipantKeys(douglasClub);
+assert(
+  douglasParticipantKeys.some(key => douglasRankingKeys.includes(key)),
+  'Douglas form registration must match his charging history even when the form email is invalid'
 );
 
 assert.strictEqual(
@@ -122,6 +182,109 @@ const summaryOnly = { ...compactLocal, summaryOnly: true, localCompact: false };
 merged = context.mergeRechargeRecord(fullCloud, summaryOnly, 'cloud-summary');
 assert.strictEqual(merged.charges.length, 36, 'summary refresh must preserve detailed charges');
 
+const partialDetails = {
+  ...fullCloud,
+  charges: charges.slice(0, 5),
+  partialDetails: true,
+  summary: { charges: 36, revenue: 447.8 }
+};
+merged = context.mergeRechargeRecord(fullCloud, partialDetails, 'cloud-summary');
+assert.strictEqual(merged.charges.length, 36, 'current-month overview data must not replace full history');
+assert.strictEqual(context.recordHasFullRechargeDetails(partialDetails), false, 'current-month overview must be marked partial');
+assert.strictEqual(context.recordHasFullRechargeDetails(fullCloud), true, 'full cloud record must be import-safe');
+
+const partialSession = {
+  workId: 'malassise',
+  station: 'UBY RECHARGE - POSTO ROBERT KOCH',
+  userName: 'Lucas Pereira Godoi',
+  startDate: new Date('2026-07-15T22:02:00-03:00'),
+  endDate: new Date('2026-07-15T22:40:00-03:00'),
+  energyKWh: 20.2,
+  revenue: 36.16
+};
+const laterPartialSession = {
+  ...partialSession,
+  endDate: new Date('2026-07-15T23:02:00-03:00'),
+  energyKWh: 32.6,
+  revenue: 58.35
+};
+const finalSession = {
+  ...partialSession,
+  sourcePlatform: 'Spott',
+  userName: 'Lucas Pereira Godoi Godoi',
+  endDate: new Date('2026-07-15T23:04:00-03:00'),
+  energyKWh: 33.2,
+  revenue: 59.43
+};
+const nextSession = {
+  ...finalSession,
+  startDate: new Date('2026-07-15T22:03:00-03:00'),
+  endDate: new Date('2026-07-15T23:10:00-03:00'),
+  energyKWh: 34.1,
+  revenue: 61.04
+};
+const dedupedSessions = context.dedupeChargesByUniqueKey([partialSession, laterPartialSession, finalSession, nextSession]);
+assert.strictEqual(dedupedSessions.length, 2, 'partial and final exports of one session must consolidate without merging a later session');
+assert.strictEqual(dedupedSessions[0].energyKWh, 33.2, 'deduplication must keep the most complete session version');
+assert.strictEqual(dedupedSessions[0].sourcePlatform, 'Spott', 'the final Spott session must replace legacy partial exports');
+
+const robertRow = {
+  workId: 'malassise',
+  stationName: 'UBY RECHARGE - POSTO ROBERT KOCH',
+  workName: 'Posto Malassise R.K.',
+  charges: [
+    { startDate: new Date('2026-06-08T08:00:00-03:00') },
+    { startDate: new Date('2026-07-20T10:00:00-03:00') }
+  ]
+};
+const robertJune = context.ubyAreaCurrentCycle(robertRow, new Date(2026, 5, 20, 12));
+assert.strictEqual(context.fmtDateOnly(robertJune.start), '08/06/2026', 'Robert Koch first report must start on the first operation day');
+assert.strictEqual(context.fmtDateOnly(robertJune.end), '30/06/2026', 'Robert Koch first report must close on the last day of June');
+const robertJuly = context.ubyAreaCurrentCycle(robertRow, new Date(2026, 6, 26, 12));
+assert.strictEqual(context.fmtDateOnly(robertJuly.start), '01/07/2026', 'subsequent reports must start on day one');
+assert.strictEqual(context.fmtDateOnly(robertJuly.end), '31/07/2026', 'subsequent reports must close on the last day');
+const robertCycles = context.ubyAreaCyclesUntil(robertRow, robertJuly);
+assert.deepStrictEqual(
+  Array.from(robertCycles, cycle => cycle.label),
+  ['08/06/2026 a 30/06/2026', '01/07/2026 a 31/07/2026'],
+  'monthly accounting must never carry a first-month cycle into the next month'
+);
+
+const futureRow = {
+  workId: 'future',
+  stationName: 'UBY FUTURA',
+  charges: [{ startDate: new Date('2026-08-17T14:00:00-03:00') }]
+};
+const futureAugust = context.ubyAreaCurrentCycle(futureRow, new Date(2026, 7, 20, 12));
+const futureSeptember = context.ubyAreaCurrentCycle(futureRow, new Date(2026, 8, 10, 12));
+assert.strictEqual(context.fmtDateOnly(futureAugust.start), '17/08/2026', 'a future charger first report must start on its real operation day');
+assert.strictEqual(context.fmtDateOnly(futureAugust.end), '31/08/2026', 'a future charger first report must end with its opening month');
+assert.strictEqual(context.fmtDateOnly(futureSeptember.start), '01/09/2026', 'future charger reports after opening month must use calendar months');
+const juneFinancePeriod = context.financeReportPeriod('2026-06', new Date(2026, 5, 8), new Date(2026, 6, 26));
+const julyFinancePeriod = context.financeReportPeriod('2026-07', new Date(2026, 5, 8), new Date(2026, 6, 26));
+assert.deepStrictEqual(
+  { start: juneFinancePeriod.start, end: juneFinancePeriod.end },
+  { start: '2026-06-08', end: '2026-06-30' },
+  'financial report first competency must follow the operation start'
+);
+assert.deepStrictEqual(
+  { start: julyFinancePeriod.start, end: julyFinancePeriod.end },
+  { start: '2026-07-01', end: '2026-07-26' },
+  'current financial report must start on day one and remain partial through today'
+);
+assert.strictEqual(context.isLegacyCrossMonthAreaReport({
+  reportType: 'partner_area',
+  periodKey: '2026-07-10',
+  periodStart: '2026-06-08',
+  periodEnd: '2026-07-10'
+}), true, 'old cross-month area reports must be removed from browser caches');
+assert.strictEqual(context.isLegacyCrossMonthAreaReport({
+  reportType: 'partner_area',
+  periodKey: '2026-06',
+  periodStart: '2026-06-08',
+  periodEnd: '2026-06-30'
+}), false, 'the corrected first monthly report must remain available');
+
 const clearedCloud = {
   workId: 'mercado-santarem-centro',
   charges: [],
@@ -144,6 +307,9 @@ assert(html.includes("mutationIntent: 'remove_file'"), 'file removal must be an 
 assert(html.includes("removeFile('${escapeAttr(fileKey)}','${escapeAttr(name)}')"), 'file chips must remove one import by its stable key');
 assert(html.includes('rechargeImportStationProfile'), 'imports must summarize source stations before saving');
 assert(html.includes('confirmRechargeStationMismatch'), 'station mismatches must require explicit user confirmation');
+assert(html.includes('await ensureCurrentWorkBaseReadyForImport();'), 'imports must load the authoritative full base before reading files');
+assert(!html.includes("loadRechargeBase(currentWorkId, { skipCloud: true })"), 'opening a station must not trust a current-month-only overview');
+assert(html.includes('partialDetails: true'), 'current-month overview records must be explicitly partial');
 assert(html.includes('charge.rawStation || charge.station'), 'station validation must prefer the original platform station name');
 assert(html.includes('derivedFiles = new Map()'), 'legacy bases must rebuild visible attached-file metadata from charges');
 assert(bridge.includes('existingCharges > 0 && !explicitEmptyIntents.has(mutationIntent)'), 'cloud must reject accidental empty overwrite');

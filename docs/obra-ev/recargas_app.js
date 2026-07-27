@@ -48,6 +48,8 @@ let overviewRenderSequence = { geral: 0, uby: 0, financeiroGeral: 0 };
 let overviewInsightsTimers = { geral: null, uby: null };
 let overviewSessionsFullyHydrated = false;
 let overviewSessionsHydrationPromise = null;
+let fullRechargeWorkIds = new Set();
+let rechargeFullLoadPromises = new Map();
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -564,7 +566,7 @@ function hydratedRechargeRecord(record, workId = '') {
     workId: id,
     workName: record.workName || record.summary?.workName || workNameById(id),
     files: Array.isArray(record.files) ? record.files : [],
-    charges: Array.isArray(record.charges) ? record.charges.map(hydrateCharge) : [],
+    charges: Array.isArray(record.charges) ? dedupeChargesByUniqueKey(record.charges.map(hydrateCharge)) : [],
     financialSettings: record.financialSettings || record.summary?.financialSettings || {},
     ubyOperationOverrides: record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {},
     ubyAreaAccounting: record.ubyAreaAccounting || record.summary?.ubyAreaAccounting || {},
@@ -580,6 +582,16 @@ function expectedRechargeCount(record = {}) {
   );
 }
 
+function recordHasFullRechargeDetails(record = {}) {
+  return Boolean(
+    record &&
+    Array.isArray(record.charges) &&
+    !record.summaryOnly &&
+    !record.localCompact &&
+    !record.partialDetails
+  );
+}
+
 function mergeRechargeRecord(existing, incoming, source = 'local') {
   if (!existing) return hydratedRechargeRecord(incoming, incoming?.workId);
   if (!incoming) return hydratedRechargeRecord(existing, existing?.workId);
@@ -588,7 +600,7 @@ function mergeRechargeRecord(existing, incoming, source = 'local') {
   const next = hydratedRechargeRecord(incoming, workId);
   const currentHasDetails = current.charges.length > 0;
   const nextHasDetails = next.charges.length > 0;
-  const nextIsPartial = Boolean(incoming.summaryOnly || incoming.localCompact);
+  const nextIsPartial = Boolean(incoming.summaryOnly || incoming.localCompact || incoming.partialDetails);
   const currentIsNewer = updatedAtMs(current) > updatedAtMs(next);
   const currentSyncPending = Boolean(existing.cloudSyncPending || current.cloudSyncPending);
 
@@ -604,7 +616,7 @@ function mergeRechargeRecord(existing, incoming, source = 'local') {
     };
   }
   if (source === 'cloud' && nextHasDetails) {
-    const currentIsFullLocal = currentHasDetails && !existing.localCompact && !existing.summaryOnly;
+    const currentIsFullLocal = recordHasFullRechargeDetails(existing);
     return currentIsFullLocal && currentIsNewer && currentSyncPending ? current : next;
   }
   if (currentHasDetails && !nextHasDetails && (currentIsNewer || expectedRechargeCount(next) > 0)) {
@@ -661,7 +673,7 @@ function mergeCloudRechargeRecords(records) {
       updatedAt: record.updatedAt || record.summary?.updatedAt || new Date().toISOString()
     };
     const existing = allRechargeRecords[workId] || db[workId];
-    const merged = mergeRechargeRecord(existing, normalized, record.summaryOnly ? 'cloud-summary' : 'cloud');
+    const merged = mergeRechargeRecord(existing, normalized, (record.summaryOnly || record.partialDetails) ? 'cloud-summary' : 'cloud');
     allRechargeRecords[workId] = hydratedRechargeRecord(merged, workId);
     db[workId] = compactRechargeRecord(merged);
   });
@@ -806,6 +818,7 @@ async function saveRechargeBase(options = {}) {
     return;
   }
   const record = buildRechargeRecord();
+  record.partialDetails = false;
   record.mutationIntent = options.mutationIntent || 'save';
   record.cloudSyncPending = true;
   const localSave = saveLocalRechargeBase(record);
@@ -821,6 +834,7 @@ async function saveRechargeBase(options = {}) {
     const result = await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
     record.cloudSyncPending = false;
     record.cloudSyncedAt = new Date().toISOString();
+    fullRechargeWorkIds.add(String(currentWorkId));
     saveLocalRechargeBase(record);
     allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
     markRechargeRecordsDirty();
@@ -997,13 +1011,30 @@ async function loadRechargeBase(workId = currentWorkId, options = {}) {
   currentWorkName = workNameById(targetWorkId, targetWorkId);
   const local = localRecord(targetWorkId);
   const memory = allRechargeRecords[targetWorkId];
-  const initial = memory?.charges?.length ? memory : local;
-  if (initial && (!initial.localCompact || initial.charges?.length)) applyRechargeRecord(initial, 'base local');
-  else applyRechargeRecord(null, 'base local');
-  if (options.skipCloud) return;
-  if (!window.UBY_SUPABASE?.loadRechargeBase) return;
+  let cached = null;
   try {
-    const cloud = await window.UBY_SUPABASE.loadRechargeBase(targetWorkId);
+    cached = await window.UBY_RECHARGE_RUNTIME?.cacheGet?.(`work:${targetWorkId}`, 24 * 60 * 60 * 1000);
+  } catch (err) {
+    console.warn('Cache integral indisponivel:', err.message);
+  }
+  const initialCandidates = [memory, cached, local].filter(Boolean);
+  const initial = initialCandidates.find(recordHasFullRechargeDetails) || initialCandidates[0] || null;
+  if (recordHasFullRechargeDetails(initial)) fullRechargeWorkIds.add(targetWorkId);
+  if (initial && (!initial.localCompact || initial.charges?.length)) applyRechargeRecord(initial, cached === initial ? 'cache integral' : 'base local');
+  else applyRechargeRecord(null, 'base local');
+  if (options.skipCloud && recordHasFullRechargeDetails(initial)) return initial;
+  if (!window.UBY_SUPABASE?.loadRechargeBase) {
+    if (options.requireCloud) throw new Error('Supabase indisponivel. A importacao foi bloqueada para preservar o historico.');
+    return initial;
+  }
+  try {
+    let cloudPromise = rechargeFullLoadPromises.get(targetWorkId);
+    if (!cloudPromise) {
+      cloudPromise = window.UBY_SUPABASE.loadRechargeBase(targetWorkId)
+        .finally(() => rechargeFullLoadPromises.delete(targetWorkId));
+      rechargeFullLoadPromises.set(targetWorkId, cloudPromise);
+    }
+    const cloud = await cloudPromise;
     if (requestSequence !== rechargeLoadSequence || currentWorkId !== targetWorkId) return;
     if (cloud) {
       const currentLocal = localRecord(targetWorkId);
@@ -1012,16 +1043,39 @@ async function loadRechargeBase(workId = currentWorkId, options = {}) {
         return;
       }
       const merged = mergeRechargeRecord(allRechargeRecords[targetWorkId] || currentLocal, cloud, 'cloud');
+      merged.summaryOnly = false;
+      merged.localCompact = false;
+      merged.partialDetails = false;
       const db = localRechargeDb();
       db[targetWorkId] = compactRechargeRecord({ ...merged, workName: cloud.summary?.workName || currentWorkName });
       if (!writeJson(RECARGAS_LOCAL_KEY, db)) window.UBY_BACKUP?.releaseStorage?.();
       allRechargeRecords[targetWorkId] = hydratedRechargeRecord(merged, targetWorkId);
+      fullRechargeWorkIds.add(targetWorkId);
+      window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`work:${targetWorkId}`, merged).catch(() => {});
       markRechargeRecordsDirty();
       applyRechargeRecord(merged, 'Supabase');
+      return merged;
     }
+    if (expectedRechargeCount(memory || local || {}) > 0) {
+      throw new Error('O banco informa recargas existentes, mas nao retornou a base integral.');
+    }
+    const emptyRecord = hydratedRechargeRecord({
+      workId: targetWorkId,
+      workName: currentWorkName,
+      files: [],
+      charges: [],
+      summaryOnly: false,
+      localCompact: false,
+      partialDetails: false
+    }, targetWorkId);
+    allRechargeRecords[targetWorkId] = emptyRecord;
+    fullRechargeWorkIds.add(targetWorkId);
+    return emptyRecord;
   } catch (err) {
     if (requestSequence !== rechargeLoadSequence || currentWorkId !== targetWorkId) return;
     setStorageState(`Base local preservada para <strong>${currentWorkName}</strong>. Supabase pendente: ${err.message}`, true);
+    if (options.requireCloud) throw err;
+    return initial;
   }
 }
 
@@ -1088,9 +1142,9 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
     await yieldToBrowser();
 
     openingWorkReport = true;
-    // A base geral ja foi sincronizada na entrada. Abrir uma estacao deve usar
-    // a copia em memoria imediatamente, sem bloquear a interface aguardando rede.
-    await loadRechargeBase(currentWorkId, { skipCloud: true });
+    // A tela geral usa apenas o mes atual. Antes de abrir uma estacao, carregue
+    // a base integral para impedir que um recorte parcial substitua o historico.
+    await loadRechargeBase(currentWorkId);
     openingWorkReport = false;
 
     updateCorrectionButtons();
@@ -1134,7 +1188,22 @@ fileInput.addEventListener('change', e => {
   fileInput.value = '';
 });
 
-function handleFiles(files) {
+async function ensureCurrentWorkBaseReadyForImport() {
+  const targetWorkId = String(currentWorkId || '');
+  setFeedback('Carregando o historico completo antes de importar...', 'up-loading');
+  const record = await loadRechargeBase(targetWorkId, { requireCloud: true });
+  if (String(currentWorkId || '') !== targetWorkId) {
+    throw new Error('A obra selecionada mudou durante a leitura. Selecione novamente o arquivo.');
+  }
+  const fullRecord = allRechargeRecords[targetWorkId] || record;
+  if (!recordHasFullRechargeDetails(fullRecord) || !fullRechargeWorkIds.has(targetWorkId)) {
+    throw new Error('Nao foi possivel confirmar a base integral. A importacao foi bloqueada para preservar o acumulado.');
+  }
+  applyRechargeRecord(fullRecord, 'Supabase');
+  return fullRecord;
+}
+
+async function handleFiles(files) {
   currentStationReportName = '';
   const selectedMonth = document.getElementById('importMonth')?.value || '';
   const importMode = document.getElementById('importMode')?.value || 'merge';
@@ -1146,6 +1215,12 @@ function handleFiles(files) {
     .filter(f => f?.name && /\.(xlsx|xls|csv)$/i.test(String(f.name)));
   if (!acceptedFiles.length) {
     setFeedback('Arquivo nao reconhecido. Envie .xlsx, .xls ou .csv exportado da plataforma.', 'up-error');
+    return;
+  }
+  try {
+    await ensureCurrentWorkBaseReadyForImport();
+  } catch (err) {
+    setFeedback('Importacao bloqueada: ' + err.message, 'up-error');
     return;
   }
   acceptedFiles.forEach(f => {
@@ -1450,20 +1525,75 @@ function fileSourceKey(month = '', name = '', station = '') {
   return [clean(month), clean(name), clean(station)].join('|');
 }
 
+function rechargePersonIdentity(charge = {}) {
+  const nameTokens = normalizeStationForCompare(charge.userName || '').split(/\s+/).filter(Boolean);
+  const name = [...new Set(nameTokens)].join(' ');
+  return name ||
+    normalizeHeaderName(charge.userEmail || '') ||
+    normalizePhone(charge.userPhone || '') ||
+    normalizeHeaderName(`${charge.vehicleBrand || ''} ${charge.vehicleModel || ''}`);
+}
+
 function rechargeUniqueKey(charge = {}) {
+  const workId = safeText(charge.workId || currentWorkId).trim().toLowerCase();
+  const station = canonicalStationNameForWork(workId, charge.station, charge.workName);
+  const startDate = charge.startDate && typeof charge.startDate.getTime === 'function'
+    ? charge.startDate
+    : (charge.startIso ? new Date(charge.startIso) : parseDate(charge.startStr));
+  const startMinute = startDate && !Number.isNaN(startDate.getTime())
+    ? String(Math.floor(startDate.getTime() / 60000))
+    : '';
+  const person = rechargePersonIdentity(charge);
+  if (startMinute) {
+    return [
+      'session',
+      workId || normalizeHeaderName(station),
+      normalizeHeaderName(station),
+      startMinute,
+      person
+    ].join('|');
+  }
   const id = safeText(charge.id).trim();
   const platform = normalizeStationForCompare(charge.sourcePlatform || charge.platform || '');
-  if (id && platform !== 'spott' && !id.includes('|')) return `id:${id}`;
-  const station = canonicalStationNameForWork(charge.workId, charge.station, charge.workName);
+  if (id) return `id:${platform}:${id}`;
   return [
     'fallback',
-    platform === 'spott' ? 'spott' : safeText(station || charge.station).trim().toLowerCase(),
-    platform === 'spott' ? '' : safeText(charge.connType).trim().toLowerCase(),
-    safeText(charge.startStr || charge.startIso || charge.startDate?.toISOString?.()).trim(),
-    safeText(charge.userEmail || charge.userName).trim().toLowerCase(),
-    Number(charge.energyKWh || 0).toFixed(3),
-    Number(charge.revenue || 0).toFixed(2)
+    workId,
+    normalizeHeaderName(station || charge.station),
+    normalizeHeaderName(charge.connType),
+    person,
+    Number(charge.energyKWh || 0).toFixed(3)
   ].join('|');
+}
+
+function preferredRechargeVersion(current = {}, candidate = {}) {
+  const currentEnergy = Number(current.energyKWh || 0);
+  const candidateEnergy = Number(candidate.energyKWh || 0);
+  if (Math.abs(candidateEnergy - currentEnergy) > 0.01) {
+    return candidateEnergy > currentEnergy ? candidate : current;
+  }
+  const currentEnd = current.endDate && typeof current.endDate.getTime === 'function'
+    ? current.endDate
+    : (current.endIso ? new Date(current.endIso) : parseDate(current.endStr));
+  const candidateEnd = candidate.endDate && typeof candidate.endDate.getTime === 'function'
+    ? candidate.endDate
+    : (candidate.endIso ? new Date(candidate.endIso) : parseDate(candidate.endStr));
+  const currentEndMs = currentEnd && !Number.isNaN(currentEnd.getTime()) ? currentEnd.getTime() : 0;
+  const candidateEndMs = candidateEnd && !Number.isNaN(candidateEnd.getTime()) ? candidateEnd.getTime() : 0;
+  if (candidateEndMs !== currentEndMs) return candidateEndMs > currentEndMs ? candidate : current;
+  const detailScore = charge => [
+    charge.userEmail,
+    charge.userPhone,
+    charge.vehicleBrand,
+    charge.vehicleModel,
+    charge.voucher,
+    charge.paymentStatus,
+    charge.sourcePlatform
+  ].filter(value => safeText(value).trim()).length;
+  const currentDetails = detailScore(current);
+  const candidateDetails = detailScore(candidate);
+  if (candidateDetails !== currentDetails) return candidateDetails > currentDetails ? candidate : current;
+  return candidate;
 }
 
 function dedupeChargesByUniqueKey(charges = []) {
@@ -1471,7 +1601,8 @@ function dedupeChargesByUniqueKey(charges = []) {
   charges.forEach(charge => {
     const key = rechargeUniqueKey(charge);
     if (!key) return;
-    byKey.set(key, charge);
+    const current = byKey.get(key);
+    byKey.set(key, current ? preferredRechargeVersion(current, charge) : charge);
   });
   return [...byKey.values()];
 }
@@ -2909,9 +3040,21 @@ function writeLocalFinanceReports(items = financeReportArchive) {
   writeJson(FINANCE_REPORTS_LOCAL_KEY, sortFinanceReports(items).slice(0, 600));
 }
 
+function isLegacyCrossMonthAreaReport(report = {}) {
+  if (report.reportType !== 'partner_area') return false;
+  const start = String(report.periodStart || report.payload?.period?.start || '');
+  const end = String(report.periodEnd || report.payload?.period?.end || '');
+  const legacyDatedKey = /^\d{4}-\d{2}-\d{2}$/.test(String(report.periodKey || ''));
+  return legacyDatedKey || (
+    /^\d{4}-\d{2}-\d{2}$/.test(start) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(end) &&
+    start.slice(0, 7) !== end.slice(0, 7)
+  );
+}
+
 function mergeFinanceReportArchive(...collections) {
   const merged = new Map();
-  collections.flat().filter(Boolean).forEach(report => {
+  collections.flat().filter(report => report && !isLegacyCrossMonthAreaReport(report)).forEach(report => {
     const key = financeReportTuple(report);
     const current = merged.get(key);
     if (!current || (!String(report.id || '').startsWith('local-') && String(current.id || '').startsWith('local-'))) merged.set(key, report);
@@ -2977,11 +3120,22 @@ async function persistFinanceReport(report = {}) {
   return saved;
 }
 
-function financeReportPeriod(mk = '') {
+function financeReportPeriod(mk = '', operationStart = currentWorkOperationStart(), reference = new Date()) {
   const [year, month] = String(mk).split('-').map(Number);
-  const start = new Date(year, month - 1, 1);
+  let start = new Date(year, month - 1, 1);
+  const firstOperation = operationStart && typeof operationStart.getTime === 'function'
+    ? new Date(operationStart)
+    : parseDate(operationStart);
+  if (
+    firstOperation &&
+    !Number.isNaN(firstOperation.getTime()) &&
+    firstOperation.getFullYear() === year &&
+    firstOperation.getMonth() === month - 1
+  ) {
+    start = new Date(year, month - 1, firstOperation.getDate());
+  }
   const monthEnd = new Date(year, month, 0);
-  const today = new Date();
+  const today = reference && typeof reference.getTime === 'function' ? new Date(reference) : new Date();
   const end = year === today.getFullYear() && month === today.getMonth() + 1 ? today : monthEnd;
   const iso = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   return { key: mk, label: monthLabel(mk), start: iso(start), end: iso(end) };
@@ -3108,10 +3262,21 @@ async function rechargeRowsFromFileBuffer(arrayBuffer, isCsvFile) {
   }
 }
 
-function financeMonthOccupancy(charges = [], mk = '', powerOverride = 0) {
+function financeMonthOccupancy(charges = [], mk = '', powerOverride = 0, operationStart = currentWorkOperationStart()) {
   if (!/^\d{4}-\d{2}$/.test(mk)) return { pct: 0, maxKWh: 0, energy: 0, hours: 0 };
   const [year, month] = mk.split('-').map(Number);
-  const start = new Date(year, month - 1, 1, 0, 0, 0);
+  let start = new Date(year, month - 1, 1, 0, 0, 0);
+  const firstOperation = operationStart && typeof operationStart.getTime === 'function'
+    ? new Date(operationStart)
+    : parseDate(operationStart);
+  if (
+    firstOperation &&
+    !Number.isNaN(firstOperation.getTime()) &&
+    firstOperation.getFullYear() === year &&
+    firstOperation.getMonth() === month - 1
+  ) {
+    start = new Date(year, month - 1, firstOperation.getDate(), 0, 0, 0);
+  }
   const monthAfter = new Date(year, month, 1, 0, 0, 0);
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -3179,7 +3344,7 @@ function financeRuleReportItems(result = {}, settings = {}, type = 'cost') {
 
 function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}) {
   const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: options.historyCharges || charges, power: options.power });
-  const occupancy = financeMonthOccupancy(charges, mk, options.power);
+  const occupancy = financeMonthOccupancy(charges, mk, options.power, options.operationStart);
   const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
   return {
     key: mk,
@@ -3228,10 +3393,11 @@ function aggregateInvestorEntries(entries = [], investmentValue = null) {
 function currentWorkInvestorTimeline(uptoMonth = financeMonthKey(), selectedSettings = null) {
   const available = [...new Set(allCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const firstMonth = available.find(key => key <= uptoMonth) || uptoMonth;
+  const operationStart = currentWorkOperationStart();
   return financeMonthSeries(firstMonth, uptoMonth).map(mk => {
     const charges = chargesForMonth(mk);
     const settings = mk === uptoMonth && selectedSettings ? selectedSettings : financeSettingsForMonth(mk);
-    return financeInvestorEntry(charges, settings, mk, { historyCharges: allCharges, power: workPowerById(currentWorkId) });
+    return financeInvestorEntry(charges, settings, mk, { historyCharges: allCharges, power: workPowerById(currentWorkId), operationStart });
   });
 }
 
@@ -3239,7 +3405,7 @@ function currentWorkInvestorReportModel(mk = financeMonthKey(), settingsOverride
   const settings = settingsOverride || currentFinanceSettingsFromInputs();
   const period = financeReportPeriod(mk);
   const timeline = currentWorkInvestorTimeline(mk, settings);
-  const current = timeline.find(entry => entry.key === mk) || financeInvestorEntry([], settings, mk, { power: workPowerById(currentWorkId) });
+  const current = timeline.find(entry => entry.key === mk) || financeInvestorEntry([], settings, mk, { power: workPowerById(currentWorkId), operationStart: currentWorkOperationStart() });
   const accumulated = aggregateInvestorEntries(timeline, current.investmentValue);
   return {
     report: {
@@ -3323,7 +3489,7 @@ function buildFinanceMonthReportSnapshot(mk = financeMonthKey(), settingsOverrid
   const settings = settingsOverride || currentFinanceSettingsFromInputs();
   const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
-  const occupancy = financeMonthOccupancy(charges, mk, workPowerById(currentWorkId));
+  const occupancy = financeMonthOccupancy(charges, mk, workPowerById(currentWorkId), currentWorkOperationStart());
   const summary = monthSummaryForMonth(mk);
   const owner = ownerAreaReportForSummary(summary, settings, charges);
   const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
@@ -6577,25 +6743,52 @@ function renderCustomerRegistry() {
 }
 
 function clubParticipantKey(participant = {}) {
-  const email = safeText(participant.email).trim().toLowerCase();
+  const email = normalizeClubEmail(participant.email);
   if (email) return `email:${email}`;
   const phone = normalizePhone(participant.phone);
   if (phone) return `phone:${phone}`;
-  return `name:${normalizeHeaderName(participant.name || '')}`;
+  const canonicalName = canonicalClubPersonName(participant.name || '');
+  return canonicalName ? `person:${canonicalName}` : `name:${normalizeHeaderName(participant.name || '')}`;
 }
 
 function clubParticipantKeys(participant = {}) {
+  const email = normalizeClubEmail(participant.email);
+  const phone = normalizePhone(participant.phone);
+  const exactName = normalizeHeaderName(participant.name || '');
   const canonicalName = canonicalClubPersonName(participant.name || '');
   return [
-    safeText(participant.email).trim().toLowerCase(),
-    normalizePhone(participant.phone),
-    normalizeHeaderName(participant.name || ''),
+    email ? `email:${email}` : '',
+    phone ? `phone:${phone}` : '',
+    exactName ? `name:${exactName}` : '',
     canonicalName ? `person:${canonicalName}` : ''
   ].filter(Boolean);
 }
 
+function normalizeClubEmail(value = '') {
+  const raw = safeText(value).trim().toLowerCase().replace(/\s+/g, '');
+  if (!/^[^@]+@[^@]+\.[^@]+$/.test(raw)) return '';
+  const at = raw.lastIndexOf('@');
+  const local = raw.slice(0, at);
+  const domain = raw.slice(at + 1);
+  const domainAliases = {
+    'hormail.com': 'hotmail.com'
+  };
+  return `${local}@${domainAliases[domain] || domain}`;
+}
+
+function clubPersonTokens(value = '') {
+  return safeText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
 function canonicalClubPersonName(value = '') {
-  const tokens = normalizeHeaderName(value).split(/\s+/).filter(Boolean);
+  const tokens = clubPersonTokens(value);
   if (tokens.length < 3) return '';
   const uniqueTokens = [];
   const seen = new Set();
@@ -7094,14 +7287,23 @@ async function handleClubParticipantFiles(files = []) {
 
 function clubClientRows(charges = []) {
   const byClient = new Map();
+  const identityIndex = new Map();
   charges.forEach(charge => {
-    const key = clientKeyFromCharge(charge);
+    const identity = {
+      name: charge.userName || charge.userEmail || 'Cliente sem nome',
+      email: charge.userEmail || '',
+      phone: charge.userPhone || ''
+    };
+    const keys = clubParticipantKeys(identity);
+    const key = keys.map(item => identityIndex.get(item)).find(Boolean)
+      || keys[0]
+      || clientKeyFromCharge(charge);
     if (!key) return;
     if (!byClient.has(key)) {
       byClient.set(key, {
         key,
-        name: charge.userName || charge.userEmail || 'Cliente sem nome',
-        email: charge.userEmail || '',
+        name: identity.name,
+        email: normalizeClubEmail(identity.email) || identity.email,
         phone: charge.userPhone || '',
         revenue: 0,
         energy: 0,
@@ -7109,9 +7311,19 @@ function clubClientRows(charges = []) {
         lastDate: null
       });
     }
+    keys.forEach(item => identityIndex.set(item, key));
     const row = byClient.get(key);
     if (!row.phone && charge.userPhone) row.phone = charge.userPhone;
-    if (!row.email && charge.userEmail) row.email = charge.userEmail;
+    if (!row.email && charge.userEmail) row.email = normalizeClubEmail(charge.userEmail) || charge.userEmail;
+    const currentNameTokens = clubPersonTokens(row.name);
+    const nextNameTokens = clubPersonTokens(charge.userName);
+    if (
+      charge.userName &&
+      canonicalClubPersonName(row.name) === canonicalClubPersonName(charge.userName) &&
+      nextNameTokens.length < currentNameTokens.length
+    ) {
+      row.name = charge.userName;
+    }
     if ((!row.name || row.name === 'Cliente sem nome') && (charge.userName || charge.userEmail)) row.name = charge.userName || charge.userEmail;
     row.revenue += Number(charge.revenue || 0);
     row.energy += Number(charge.energyKWh || 0);
@@ -7353,49 +7565,39 @@ function ubyAreaRowKey(row = {}) {
   return `${row.workId || 'obra'}|${normalizeStationForCompare(row.stationName || row.station || row.workName || '')}`;
 }
 
-function ubyAreaOperationStart(row = {}) {
-  const label = normalizeStationForCompare([row.stationName, row.station, row.workName].filter(Boolean).join(' '));
+function operationStartForCharges(charges = [], context = {}) {
+  const label = normalizeStationForCompare([
+    context.stationName,
+    context.station,
+    context.workName
+  ].filter(Boolean).join(' '));
   if (label.includes('robert koch')) return new Date(2026, 5, 8, 0, 0, 0);
-  const dates = (row.charges || []).map(charge => charge.startDate).filter(Boolean);
-  return dates.length ? new Date(Math.min(...dates)) : new Date();
+  const dates = (charges || []).map(charge => {
+    if (charge?.startDate && typeof charge.startDate.getTime === 'function') return new Date(charge.startDate);
+    return parseDate(charge?.startIso || charge?.startStr);
+  }).filter(date => date && !Number.isNaN(date.getTime()));
+  if (!dates.length) return null;
+  const first = new Date(Math.min(...dates.map(date => date.getTime())));
+  return new Date(first.getFullYear(), first.getMonth(), first.getDate(), 0, 0, 0);
 }
 
-function ubyAreaFirstClosingDate(start) {
-  if (!start || Number.isNaN(start.getTime())) return new Date();
-  return new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59);
+function currentWorkOperationStart() {
+  return operationStartForCharges(allCharges, {
+    stationName: currentStationReportName,
+    workName: currentWorkName
+  });
 }
 
-function ubyAreaLatestClosedReport(row = {}) {
-  const stationKey = normalizeStationForCompare(canonicalStationNameForWork(
-    row.workId,
-    row.stationName || row.station || row.workName,
-    row.workName
-  ));
-  const reports = [...financeReportArchive, ...readLocalFinanceReports()]
-    .filter(item => item?.reportType === 'partner_area'
-      && item?.status === 'closed'
-      && item?.workId === row.workId
-      && (item?.stationKey || '') === stationKey
-      && (item?.periodEnd || item?.payload?.period?.end));
-  return sortFinanceReports(reports)[0] || null;
-}
-
-function ubyAreaNextOpenDate(row = {}) {
-  const latest = ubyAreaLatestClosedReport(row);
-  const closedEnd = parseDate(latest?.periodEnd || latest?.payload?.period?.end);
-  if (closedEnd && !Number.isNaN(closedEnd.getTime())) {
-    return new Date(closedEnd.getFullYear(), closedEnd.getMonth(), closedEnd.getDate() + 1, 0, 0, 0);
-  }
-  return ubyAreaOperationStart(row);
+function ubyAreaOperationStart(row = {}) {
+  return operationStartForCharges(row.charges, row) || new Date();
 }
 
 function ubyAreaCurrentCycle(row = {}, reference = new Date()) {
   const operationStart = ubyAreaOperationStart(row);
-  const nextOpen = ubyAreaNextOpenDate(row);
-  const target = reference < nextOpen ? nextOpen : reference;
+  const target = reference < operationStart ? operationStart : reference;
   const close = new Date(target.getFullYear(), target.getMonth() + 1, 0, 23, 59, 59);
-  const sameOpeningMonth = nextOpen.getFullYear() === close.getFullYear() && nextOpen.getMonth() === close.getMonth();
-  const periodStart = sameOpeningMonth ? new Date(nextOpen) : new Date(close.getFullYear(), close.getMonth(), 1, 0, 0, 0);
+  const sameOpeningMonth = operationStart.getFullYear() === close.getFullYear() && operationStart.getMonth() === close.getMonth();
+  const periodStart = sameOpeningMonth ? new Date(operationStart) : new Date(close.getFullYear(), close.getMonth(), 1, 0, 0, 0);
   return {
     start: periodStart,
     end: close,
@@ -7478,22 +7680,18 @@ function calculateUbyAreaReport(row = {}, cycle = {}, settings = {}) {
 
 function ubyAreaCyclesUntil(row = {}, currentCycle = ubyAreaCurrentCycle(row)) {
   const operationStart = ubyAreaOperationStart(row);
-  const start = ubyAreaNextOpenDate(row);
-  const firstClose = ubyAreaFirstClosingDate(start);
   const cycles = [];
-  let close = new Date(firstClose);
-  while (close <= currentCycle.end && cycles.length < MAX_FINANCE_MONTHS) {
-    const periodStart = close.getTime() === firstClose.getTime()
-      ? new Date(start)
-      : new Date(close.getFullYear(), close.getMonth(), 1, 0, 0, 0);
+  let periodStart = new Date(operationStart);
+  while (periodStart <= currentCycle.end && cycles.length < MAX_FINANCE_MONTHS) {
+    const close = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0, 23, 59, 59);
     cycles.push({
-      start: periodStart,
+      start: new Date(periodStart),
       end: new Date(close),
       key: `${close.getFullYear()}-${String(close.getMonth() + 1).padStart(2, '0')}`,
       label: `${fmtDateOnly(periodStart)} a ${fmtDateOnly(close)}`,
       first: periodStart.getTime() === operationStart.getTime()
     });
-    close = new Date(close.getFullYear(), close.getMonth() + 2, 0, 23, 59, 59);
+    periodStart = new Date(close.getFullYear(), close.getMonth() + 1, 1, 0, 0, 0);
   }
   return cycles;
 }
@@ -7768,9 +7966,14 @@ function ubyInvestorMonthEntry(rows = [], mk = '') {
   const [year, month] = String(mk).split('-').map(Number);
   const monthEnd = new Date(year, month, 0, 23, 59, 59);
   const unitEntries = rows.filter(row => ubyAreaOperationStart(row) <= monthEnd).map(row => {
+    const operationStart = ubyAreaOperationStart(row);
     const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
     const settings = financeSettingsForUbyRow(row, mk);
-    const entry = financeInvestorEntry(charges, settings, mk, { historyCharges: row.charges, power: workPowerById(row.workId) });
+    const entry = financeInvestorEntry(charges, settings, mk, {
+      historyCharges: row.charges,
+      power: workPowerById(row.workId),
+      operationStart
+    });
     return {
       ...entry,
       workId: row.workId,
@@ -7804,9 +8007,9 @@ function ubyInvestorMonthEntry(rows = [], mk = '') {
 }
 
 function buildUbyInvestorReportModel(mk = ubyInvestorLatestMonth(), rows = ubyInvestorSourceRows()) {
-  const period = financeReportPeriod(mk);
   const starts = rows.map(row => ubyAreaOperationStart(row)).filter(date => date && !Number.isNaN(date.getTime()));
   const firstDate = starts.length ? new Date(Math.min(...starts)) : new Date();
+  const period = financeReportPeriod(mk, firstDate);
   const firstMonth = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, '0')}`;
   const timeline = financeMonthSeries(firstMonth <= mk ? firstMonth : mk, mk).map(monthKeyValue => ubyInvestorMonthEntry(rows, monthKeyValue));
   const current = timeline.find(entry => entry.key === mk) || ubyInvestorMonthEntry(rows, mk);
@@ -7834,14 +8037,22 @@ function buildUbyInvestorReportModel(mk = ubyInvestorLatestMonth(), rows = ubyIn
 
 function ubyInvestorReportRecord(row = {}, mk = '', status = 'partial') {
   const settings = financeSettingsForUbyRow(row, mk);
-  const period = financeReportPeriod(mk);
-  const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
-  const entry = financeInvestorEntry(charges, settings, mk, { historyCharges: row.charges, power: workPowerById(row.workId) });
   const start = ubyAreaOperationStart(row);
+  const period = financeReportPeriod(mk, start);
+  const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
+  const entry = financeInvestorEntry(charges, settings, mk, {
+    historyCharges: row.charges,
+    power: workPowerById(row.workId),
+    operationStart: start
+  });
   const firstMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
   const timeline = financeMonthSeries(firstMonth <= mk ? firstMonth : mk, mk).map(monthKeyValue => {
     const monthCharges = (row.charges || []).filter(charge => chargeMonthKey(charge) === monthKeyValue);
-    return financeInvestorEntry(monthCharges, financeSettingsForUbyRow(row, monthKeyValue), monthKeyValue, { historyCharges: row.charges, power: workPowerById(row.workId) });
+    return financeInvestorEntry(monthCharges, financeSettingsForUbyRow(row, monthKeyValue), monthKeyValue, {
+      historyCharges: row.charges,
+      power: workPowerById(row.workId),
+      operationStart: start
+    });
   });
   const model = {
     report: {
@@ -8319,7 +8530,11 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
     const currentMonthKey = new Date().toISOString().slice(0, 7);
     const cachedRecords = await window.UBY_RECHARGE_RUNTIME?.cacheGet?.(`general-records:${currentMonthKey}`, 24 * 60 * 60 * 1000);
     if (Array.isArray(cachedRecords) && cachedRecords.length) {
-      mergeCloudRechargeRecords(cachedRecords);
+      mergeCloudRechargeRecords(cachedRecords.map(record => ({
+        ...record,
+        summaryOnly: false,
+        partialDetails: true
+      })));
       await renderVisibleOverviewViews();
       await yieldToBrowser();
     }
@@ -8372,6 +8587,7 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
         ...record,
         charges: chargesByWork.get(String(record.workId || '')) || [],
         summaryOnly: false,
+        partialDetails: true,
         normalized: true
       }));
       mergeCloudRechargeRecords(compactRecords);
@@ -8416,9 +8632,11 @@ async function ensureAllOverviewSessionsLoaded() {
       ...record,
       charges: byWork.get(String(record.workId || '')) || [],
       summaryOnly: false,
+      partialDetails: false,
       normalized: true
     }));
     mergeCloudRechargeRecords(records);
+    records.forEach(record => fullRechargeWorkIds.add(String(record.workId || '')));
     overviewSessionsFullyHydrated = true;
     markRechargeRecordsDirty();
     window.UBY_RECHARGE_RUNTIME?.cacheSet?.('general-records:all', records).catch(() => {});
@@ -9407,7 +9625,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260724-financeiro1';
+const UBY_APP_VERSION = '20260727-financeiro2';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }

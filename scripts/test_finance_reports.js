@@ -2,15 +2,15 @@ const assert = require('assert');
 const reports = require('../docs/obra-ev/finance_reports.js');
 
 const areaModel = {
-  report: { station: 'UBY RECHARGE - POSTO ROBERT KOCH', work: 'Posto Malassise R.K.', period: '08/06/2026 a 10/07/2026', status: 'closed', version: 1, generatedAt: '10/07/2026 10:00' },
+  report: { station: 'UBY RECHARGE - POSTO ROBERT KOCH', work: 'Posto Malassise R.K.', period: '08/06/2026 a 30/06/2026', status: 'closed', version: 1, generatedAt: '30/06/2026 23:59' },
   current: { revenue: 5139.53, energy: 3073.8, energyRate: 0.86, energyCost: 2643.47, transferMode: 'gross', sharePct: 10, shareBase: 5139.53, areaShare: 513.95, partnerTotal: 3157.42 },
   accumulated: { revenue: 5139.53, energy: 3073.8, energyCost: 2643.47, areaShare: 513.95, partnerTotal: 3157.42 },
-  timeline: [{ label: '08/06/2026 a 10/07/2026', revenue: 5139.53, energy: 3073.8, energyRate: 0.86, sharePct: 10, areaShare: 513.95, partnerTotal: 3157.42 }]
+  timeline: [{ label: '08/06/2026 a 30/06/2026', revenue: 2809.08, energy: 1701.4, energyRate: 0.86, sharePct: 10, areaShare: 280.91, partnerTotal: 1744.11 }]
 };
 
 const areaHtml = reports.areaReport(areaModel);
 assert.ok(areaHtml.includes('Periodo do relatorio'));
-assert.ok(areaHtml.includes('08/06/2026 a 10/07/2026'));
+assert.ok(areaHtml.includes('08/06/2026 a 30/06/2026'));
 assert.ok(areaHtml.includes('Faturamento do periodo'));
 assert.ok(areaHtml.includes('Tarifa de energia'));
 assert.ok(areaHtml.includes('Percentual contratado'));
