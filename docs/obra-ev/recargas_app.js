@@ -4560,7 +4560,6 @@ function generalFinanceByUnit(unitData) {
 }
 
 function renderGeneralFinance(unitData) {
-  try { renderMatrizCosts(unitData); } catch (e) { console.error('[matriz]', e); }
   const activeUnits = (unitData || []).filter(unit =>
     Array.isArray(unit.charges) && unit.charges.length > 0 &&
     (Number(unit.count) > 0 || Number(unit.energy) > 0 || Number(unit.revenue) > 0)
@@ -8403,6 +8402,7 @@ async function renderUbyOperation() {
   const accessRows = [...visibleRows.filter(row => row.included)]
     .sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
   renderUbyFinancialOverview(sourceRows, sourceMonths, isMonthView, currentGeneralMonth, viewLabel);
+  try { renderMatrizCosts(sourceUnitData); } catch (e) { console.error('[matriz]', e); }
   await yieldToBrowser();
   if (renderSequence !== overviewRenderSequence.uby || document.getElementById('tabUby').style.display === 'none') return;
   const chartLabels = chartRows.map(row => {
@@ -9625,7 +9625,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260727-financeiro2';
+const UBY_APP_VERSION = '20260727-financeiro3';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
