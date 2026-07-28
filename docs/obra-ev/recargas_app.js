@@ -1168,25 +1168,31 @@ document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop',     e => e.preventDefault());
 
 // ── Upload zone ───────────────────────────────────────────
+// Não existe na página financeira dedicada (financeiro.html, sem a parte
+// operacional) — sem essa guarda, addEventListener em null travava a
+// execução do restante do script inteiro, inclusive a inicialização
+// automática da página (initializeRechargePage nunca rodava sozinha).
 const uploadZone = document.getElementById('uploadZone');
 const fileInput  = document.getElementById('fileInput');
 
-uploadZone.addEventListener('dragover', e => {
-  e.preventDefault(); e.stopPropagation();
-  uploadZone.classList.add('dragover');
-});
-uploadZone.addEventListener('dragleave', e => {
-  if (!uploadZone.contains(e.relatedTarget)) uploadZone.classList.remove('dragover');
-});
-uploadZone.addEventListener('drop', e => {
-  e.preventDefault(); e.stopPropagation();
-  uploadZone.classList.remove('dragover');
-  handleFiles(Array.from(e.dataTransfer.files));
-});
-fileInput.addEventListener('change', e => {
-  handleFiles(Array.from(e.target.files));
-  fileInput.value = '';
-});
+if (uploadZone && fileInput) {
+  uploadZone.addEventListener('dragover', e => {
+    e.preventDefault(); e.stopPropagation();
+    uploadZone.classList.add('dragover');
+  });
+  uploadZone.addEventListener('dragleave', e => {
+    if (!uploadZone.contains(e.relatedTarget)) uploadZone.classList.remove('dragover');
+  });
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault(); e.stopPropagation();
+    uploadZone.classList.remove('dragover');
+    handleFiles(Array.from(e.dataTransfer.files));
+  });
+  fileInput.addEventListener('change', e => {
+    handleFiles(Array.from(e.target.files));
+    fileInput.value = '';
+  });
+}
 
 async function ensureCurrentWorkBaseReadyForImport() {
   const targetWorkId = String(currentWorkId || '');
@@ -2138,13 +2144,15 @@ function resolveChargeMonthKey(charge) {
   return 'unknown';
 }
 
-const _chargeMonthKeyCache = new WeakMap();
 function chargeMonthKey(charge) {
   if (!charge || typeof charge !== 'object') return resolveChargeMonthKey(charge);
-  const cached = _chargeMonthKeyCache.get(charge);
+  // Cache preso à própria função (em vez de um `const` de módulo) para nunca
+  // esbarrar em temporal dead zone, não importa a ordem/momento de chamada.
+  const cache = chargeMonthKey._cache || (chargeMonthKey._cache = new WeakMap());
+  const cached = cache.get(charge);
   if (cached !== undefined) return cached;
   const mk = resolveChargeMonthKey(charge);
-  _chargeMonthKeyCache.set(charge, mk);
+  cache.set(charge, mk);
   return mk;
 }
 
@@ -4704,11 +4712,17 @@ function renderGeneralFinance(unitData) {
 
 // ── Potência ──────────────────────────────────────────────
 function getPower() {
-  const v = parseFloat(document.getElementById('chargerPower').value);
-  const v2 = parseFloat(document.getElementById('chargerPowerAcc').value);
+  // Os inputs de potência só existem na página operacional (recargas.html);
+  // na página financeira dedicada (financeiro.html) eles não existem, então
+  // cai no padrão de 7 kW em vez de travar lendo `.value` de null.
+  const chargerPowerEl = document.getElementById('chargerPower');
+  const chargerPowerAccEl = document.getElementById('chargerPowerAcc');
+  if (!chargerPowerEl && !chargerPowerAccEl) return 7;
+  const v = parseFloat(chargerPowerEl?.value);
+  const v2 = parseFloat(chargerPowerAccEl?.value);
   // Sincroniza ambos os inputs
-  if (!isNaN(v))  document.getElementById('chargerPowerAcc').value = v;
-  if (!isNaN(v2) && isNaN(v)) document.getElementById('chargerPower').value = v2;
+  if (!isNaN(v) && chargerPowerAccEl) chargerPowerAccEl.value = v;
+  if (!isNaN(v2) && isNaN(v) && chargerPowerEl) chargerPowerEl.value = v2;
   return isNaN(v) ? (isNaN(v2) ? 7 : v2) : v;
 }
 
@@ -9786,7 +9800,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260728-financeiro9';
+const UBY_APP_VERSION = '20260728-financeiro10';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }

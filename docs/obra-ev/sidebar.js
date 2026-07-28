@@ -18,7 +18,7 @@
   const isDetail = current === "gestao_obra_ev_detalhe.html";
   const isEngineering = current === "engenharia.html";
   const isMarket = current === "mercado.html";
-  const isRecargas = current === "recargas.html" || current === "recargas-financeiro.html";
+  const isRecargas = current === "recargas.html" || current === "recargas-financeiro.html" || current === "financeiro.html";
   const isLogin = current === "login.html";
   const isAnalyzer = inAnalyzers;
   const isDashboard = (current === "index.html" && inObras && !inAnalyzers) || current === "gestao_obra_ev.html";
