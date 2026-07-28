@@ -4569,9 +4569,14 @@ async function renderFinanceOnly() {
   console.log(`[fin] registros=${nRec} unidades=${unitData.length} carregadores=${ubyRows.length} carregadoresUBY=${includedRows.length}`);
   if (!includedRows.length) {
     const msg = nRec === 0
-      ? 'Nenhum dado carregado. Se você não estiver logado, entre pela página de login e volte.'
-      : `Dados carregados (${nRec} registro(s)), mas nenhum carregador marcado como operação UBY foi encontrado.`;
+      ? 'Nenhum dado carregado ainda. Se você não estiver logado, entre pela página de login e volte — os dados do financeiro vêm do mesmo banco do painel.'
+      : `Dados carregados (${nRec} registro(s)), mas nenhum carregador marcado como operação UBY foi encontrado neste período.`;
     setStorageState(msg, true);
+    const sumEl = document.getElementById('ubyFinanceSummary');
+    if (sumEl) sumEl.innerHTML = `<div class="note" style="padding:16px;color:var(--p3-warn)">${msg} <br><span style="color:var(--p3-muted);font-size:12px">(diagnóstico: registros=${nRec}, carregadores=${ubyRows.length}, marcados como UBY=${includedRows.length})</span></div>`;
+    const rowsEl = document.getElementById('ubyFinanceRows'); if (rowsEl) rowsEl.innerHTML = '';
+    const treeEl = document.getElementById('costTree'); if (treeEl) treeEl.innerHTML = '';
+    return;
   }
   const ubyCharges = includedRows.flatMap(r => r.charges || []);
   const sourceMonths = [...new Set(ubyCharges.map(chargeMonthKey).filter(k => k !== 'unknown'))].sort();
@@ -8291,6 +8296,47 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
   return { ...row, financeMonths: months, finance: totals };
 }
 
+// Árvore visual: raiz = custos da matriz, ramos = carregadores UBY com seus custos.
+function renderCostTree(rows, matrizTotal) {
+  const el = document.getElementById('costTree');
+  if (!el) return;
+  if (!rows || !rows.length) { el.innerHTML = ''; return; }
+  const n = rows.length;
+  const perCharger = n > 0 ? matrizTotal / n : 0;
+  const line = (label, value, cls) =>
+    `<div class="tree-line ${cls || ''}"><span>${label}</span><b>${value}</b></div>`;
+  el.innerHTML = `
+    <div class="cost-tree">
+      <div class="tree-root-wrap">
+        <div class="tree-node root">
+          <div class="tn-tag">◆ Matriz UBY</div>
+          <div class="tn-title">Custos da matriz</div>
+          <div class="tn-big">${fmtBRL(matrizTotal)}<small>/mês</small></div>
+          <div class="tn-sub">dividido igualmente entre ${n} carregador(es) UBY = <b>${fmtBRL(perCharger)}</b> cada</div>
+        </div>
+      </div>
+      <div class="tree-branches">
+        ${rows.map(r => {
+          const f = r.finance || {};
+          const ops = Number(f.management || 0) + Number(f.extraCosts || 0);
+          const res = Number(f.operationNet || 0);
+          return `
+          <div class="tree-branch">
+            <div class="tree-node charger">
+              <div class="tn-title">${escapeHtml(r.stationName || r.station || r.workName)}</div>
+              <div class="tn-workname">${escapeHtml(r.workName || '')}</div>
+              ${line('Faturamento', fmtBRL(Number(f.revenue || 0)), 'in')}
+              ${line('− Energia', fmtBRL(Number(f.energyCost || 0)), 'out')}
+              ${line('− Gestão / operação', fmtBRL(ops), 'out')}
+              ${line('− Fatia da matriz', fmtBRL(Number(f.matrizCost || 0)), 'out matriz')}
+              ${line('= Resultado', fmtBRL(res), 'total ' + (res >= 0 ? 'pos' : 'neg'))}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 function renderUbyDistribution(total) {
   const el = document.getElementById('ubyDistribution');
   if (!el) return;
@@ -8365,6 +8411,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   if (rows.length && !Number.isFinite(totalCostPerKWh) && Number.isFinite(plannedCostPerKWh)) {
     rowsEl.insertAdjacentHTML('beforeend', `<div class="finance-empty-guidance">Ainda nao houve venda de energia neste periodo. O custo inicial planejado da operacao esta em <strong>${fmtPerKWh(plannedCostPerKWh)}</strong>.</div>`);
   }
+  try { renderCostTree(rows, matrizTotal); } catch (e) { console.error('[fin-tree]', e); }
 }
 
 // Dispara (uma vez) o carregamento do histórico completo em segundo plano e
@@ -9698,7 +9745,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260727-financeiro6';
+const UBY_APP_VERSION = '20260727-financeiro7';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
@@ -9717,13 +9764,13 @@ async function initializeRechargePage() {
       const u = await window.UBY_SUPABASE?.currentUser?.();
       console.log('[fin] usuário:', u?.email || 'NÃO AUTENTICADO (dados não carregam sem login)');
     } catch (e) { console.log('[fin] erro currentUser:', e.message); }
-    await __perf('loadRechargeWorksFromCloud', () => loadRechargeWorksFromCloud());
+    try { await loadRechargeWorksFromCloud(); } catch (e) { console.error('[fin] loadWorks:', e.message); }
     console.log('[fin] obras na nuvem:', cloudRechargeWorks.length);
-    await __perf('refreshGeneralRechargeBases', () => refreshGeneralRechargeBases());
+    try { await refreshGeneralRechargeBases(); } catch (e) { console.error('[fin] refresh:', e.message); }
     console.log('[fin] após refresh, registros:', Object.keys(allRechargeRecords || {}).length);
-    await ensureAllOverviewSessionsLoaded();
+    try { await ensureAllOverviewSessionsLoaded(); } catch (e) { console.error('[fin] histórico:', e.message); }
     console.log('[fin] após histórico completo, registros:', Object.keys(allRechargeRecords || {}).length);
-    await renderFinanceOnly();
+    try { await renderFinanceOnly(); } catch (e) { console.error('[fin] render:', e.message, e.stack); }
     console.log(`[UBY-PERF] BOOT TOTAL (financeiro): ${(performance.now() - bootStart).toFixed(0)} ms`);
     window.UBY_RECHARGE_RUNTIME?.markReady?.({ finance: true });
     return;
