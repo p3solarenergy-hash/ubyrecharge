@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Financeiro UBY</title>
+  <link rel="icon" type="image/png" href="assets/brand/v2/14_icone_app.png">
+  <link rel="stylesheet" href="sidebar.css">
+  <link rel="stylesheet" href="brand.css?v=20260723-brand-v2">
+  <link rel="stylesheet" href="recargas-panel.css?v=20260727-fin">
+  <script>window.UBY_FINANCE_ONLY = true;</script>
+</head>
+<body>
+<main class="wrap page">
+
+  <section class="hero general-hero">
+    <div>
+      <div class="brand">
+        <div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt="UBY"></div>
+        <div>
+          <div class="brand-name">UBY Recharge</div>
+          <div class="brand-tag">Painel financeiro dedicado</div>
+        </div>
+      </div>
+      <h1>Financeiro UBY</h1>
+      <div class="meta">Resultado da operação UBY, custos da matriz e distribuição aos investidores. Página dedicada — sem a parte operacional.</div>
+    </div>
+    <div class="formula">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span>Visão:</span>
+        <select class="ctl-select" id="financeViewMode" onchange="renderFinanceOnly()">
+          <option value="accumulated" selected>Acumulado</option>
+          <option value="month">Mês atual</option>
+        </select>
+        <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar</button>
+      </div>
+      <div id="storageState" style="margin-top:10px;font-size:12px;color:var(--p3-muted)"></div>
+    </div>
+  </section>
+
+  <!-- Resultado por carregador UBY -->
+  <section class="section" style="margin-top:18px">
+    <div class="accountability-head" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <div>
+        <h2>Resultado financeiro por carregador UBY</h2>
+        <p style="color:var(--p3-muted);font-size:13px;margin:4px 0 0">Faturamento, custos e resultado de cada carregador — já com a fatia da matriz descontada.</p>
+      </div>
+      <span class="accountability-pill" id="ubyFinancePeriodLabel">Acumulado</span>
+    </div>
+    <div class="uby-finance-summary" id="ubyFinanceSummary"></div>
+    <div class="uby-finance-list" id="ubyFinanceRows"></div>
+  </section>
+
+  <!-- Distribuição UBY -->
+  <section class="section"><div id="ubyDistribution"></div></section>
+
+  <!-- Custos da matriz UBY -->
+  <section class="section">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0">Custos da matriz UBY</h2>
+        <span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span>
+      </div>
+      <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:70ch">
+        Despesas da matriz UBY que não são de um carregador só (ex.: aluguel da matriz). O total é dividido <strong>igualmente entre os carregadores UBY que tiveram recarga no mês</strong>. Cadastre uma vez — o rateio se ajusta sozinho.
+      </p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Custo</th><th style="text-align:right">Valor / mês</th><th style="text-align:right">÷ por carregador</th><th style="text-align:right">Ação</th></tr></thead>
+          <tbody id="matrizCostList"></tbody>
+          <tfoot id="matrizCostFoot"></tfoot>
+        </table>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+        <input id="matrizNewName" type="text" placeholder="Nome do custo (ex.: Aluguel matriz)" style="flex:1;min-width:200px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
+        <input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Valor R$/mês" style="width:150px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
+        <button class="btn-open" type="button" onclick="addMatrizCost()">＋ Adicionar custo</button>
+      </div>
+      <div id="matrizRateio" style="margin-top:18px"></div>
+    </div>
+  </section>
+
+  <!-- Financeiro Geral (consolidado P3 / UBY / investidores) -->
+  <section class="section">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+        <h2 style="margin:0">Financeiro Geral (consolidado)</h2>
+        <span style="color:var(--p3-muted);font-size:12px">P3 gestão · UBY · investidores</span>
+      </div>
+      <div class="meta" id="generalFinanceHeroMeta" style="margin-bottom:6px"></div>
+      <div class="formula" id="generalFinanceHeroFormula" style="margin-bottom:14px"></div>
+      <section class="grid kpis" id="kpiGeneralFinance" style="margin-bottom:16px"></section>
+      <h3 style="margin:12px 0 6px;font-size:14px">Consolidado</h3>
+      <div style="overflow-x:auto"><table><tbody id="generalFinanceTable"></tbody></table></div>
+      <h3 style="margin:18px 0 6px;font-size:14px">Por unidade</h3>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Unidade</th><th>Faturamento</th><th>Custos da operacao</th><th>Gestao P3</th><th>Sociedade P3</th><th>Resultado UBY</th><th>Investidores</th><th>Socio/local</th><th>Payback</th><th>Margem</th></tr></thead>
+          <tbody id="generalFinanceUnitTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="sidebar.js"></script>
+<script src="backup_guard.js?v=20260714-integrity1"></script>
+<script src="finance_engine.js"></script>
+<script src="finance_reports.js"></script>
+<script src="supabase_config.js"></script>
+<script src="clube_uby_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_bridge.js?v=20260723-performance1"></script>
+<script src="recharge_runtime.js?v=20260716-architecture1"></script>
+<script src="auth.js"></script>
+<script src="app_data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="recargas_app.js?v=20260727-financeiro5"></script>
+</body>
+</html>

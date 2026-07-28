@@ -4559,6 +4559,21 @@ function generalFinanceByUnit(unitData) {
   });
 }
 
+// Página dedicada só ao financeiro (financeiro.html): reaproveita o mesmo
+// motor, renderizando apenas as seções financeiras.
+async function renderFinanceOnly() {
+  const unitData = getGeneralUnitData();
+  const ubyRows = getUbyChargerRows(unitData);
+  const ubyCharges = ubyRows.filter(r => r.included).flatMap(r => r.charges || []);
+  const sourceMonths = [...new Set(ubyCharges.map(chargeMonthKey).filter(k => k !== 'unknown'))].sort();
+  const currentMonth = sourceMonths[sourceMonths.length - 1] || '';
+  const isMonthView = (document.getElementById('financeViewMode')?.value || 'accumulated') === 'month' && !!currentMonth;
+  const viewLabel = isMonthView ? `Mês atual (${monthLabel(currentMonth)})` : 'Acumulado';
+  try { renderUbyFinancialOverview(ubyRows, sourceMonths, isMonthView, currentMonth, viewLabel); } catch (e) { console.error('[fin-uby]', e); }
+  try { renderMatrizCosts(unitData); } catch (e) { console.error('[fin-matriz]', e); }
+  try { renderGeneralFinance(unitData); } catch (e) { console.error('[fin-geral]', e); }
+}
+
 function renderGeneralFinance(unitData) {
   const activeUnits = (unitData || []).filter(unit =>
     Array.isArray(unit.charges) && unit.charges.length > 0 &&
@@ -8532,6 +8547,7 @@ async function renderUbyOperation() {
 }
 
 function showGeneralWhenCurrentWorkIsEmpty() {
+  if (window.UBY_FINANCE_ONLY) return;
   if (allCharges.length) return;
   document.getElementById('tabsBar').style.display = 'flex';
   document.getElementById('emptyState').style.display = 'none';
@@ -8540,6 +8556,7 @@ function showGeneralWhenCurrentWorkIsEmpty() {
 }
 
 async function renderVisibleOverviewViews() {
+  if (window.UBY_FINANCE_ONLY) return renderFinanceOnly();
   const visible = id => document.getElementById(id)?.style.display !== 'none';
   if (visible('tabUby')) {
     await renderUbyOperation();
@@ -9596,6 +9613,7 @@ function renderDetalhes() {
 
 // ── Navegação de abas ─────────────────────────────────────
 function showTab(name) {
+  if (window.UBY_FINANCE_ONLY) return; // página financeira dedicada não usa as abas operacionais
   const isGeneral = name === 'geral';
   const isUby = name === 'uby';
   const isCustomers = name === 'clientes';
@@ -9671,7 +9689,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260727-financeiro4';
+const UBY_APP_VERSION = '20260727-financeiro5';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
@@ -9684,6 +9702,15 @@ async function initializeRechargePage() {
   const params = new URLSearchParams(location.search);
   const requestedWorkId = String(params.get('obra') || '').trim();
   if (requestedWorkId) currentWorkId = requestedWorkId;
+  if (window.UBY_FINANCE_ONLY) {
+    await __perf('loadRechargeWorksFromCloud', () => loadRechargeWorksFromCloud());
+    await __perf('refreshGeneralRechargeBases', () => refreshGeneralRechargeBases());
+    await ensureAllOverviewSessionsLoaded();
+    await renderFinanceOnly();
+    console.log(`[UBY-PERF] BOOT TOTAL (financeiro): ${(performance.now() - bootStart).toFixed(0)} ms`);
+    window.UBY_RECHARGE_RUNTIME?.markReady?.({ finance: true });
+    return;
+  }
   await __perf('loadRechargeWorksFromCloud', () => loadRechargeWorksFromCloud());
   await __perf('refreshGeneralRechargeBases', () => refreshGeneralRechargeBases());
   initWorkSelector();
@@ -9705,8 +9732,9 @@ window.addEventListener('unhandledrejection', (e) => {
   console.error('[UBY-PERF] PROMISE REJEITADA:', e.reason?.message || e.reason);
 });
 
-document.getElementById('importMonth').value = new Date().toISOString().slice(0, 7);
-document.getElementById('undoLastImportBtn').addEventListener('click', undoLastImport);
-document.getElementById('clearSelectedMonthBtn').addEventListener('click', clearSelectedMonth);
-document.getElementById('clearRechargeBaseBtn').addEventListener('click', clearRechargeBase);
+const _importMonthEl = document.getElementById('importMonth');
+if (_importMonthEl) _importMonthEl.value = new Date().toISOString().slice(0, 7);
+document.getElementById('undoLastImportBtn')?.addEventListener('click', undoLastImport);
+document.getElementById('clearSelectedMonthBtn')?.addEventListener('click', clearSelectedMonth);
+document.getElementById('clearRechargeBaseBtn')?.addEventListener('click', clearRechargeBase);
 initializeRechargePage();
