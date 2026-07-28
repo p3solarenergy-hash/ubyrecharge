@@ -790,6 +790,32 @@
       font-weight: 800;
       background: rgba(87,183,255,.06);
     }
+    /* Árvore de custos */
+    .cost-tree { padding: 8px 0; }
+    .tree-root-wrap { display: flex; justify-content: center; margin-bottom: 6px; }
+    .tree-node { border: 1px solid var(--p3-border); border-radius: 12px; background: var(--p3-card-soft); padding: 14px 18px; }
+    .tree-node.root { text-align: center; border-color: color-mix(in srgb, var(--uby-volt, #00FF85) 45%, transparent); background: color-mix(in srgb, var(--uby-volt, #00FF85) 8%, transparent); min-width: 260px; position: relative; }
+    .tree-node.root::after { content: ""; position: absolute; left: 50%; bottom: -18px; width: 2px; height: 18px; background: var(--p3-border); transform: translateX(-50%); }
+    .tn-tag { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: var(--uby-volt, #00FF85); }
+    .tn-title { font-weight: 700; font-size: 15px; margin-top: 2px; }
+    .tn-workname { font-size: 11px; color: var(--p3-muted); margin-bottom: 8px; }
+    .tn-big { font-size: 26px; font-weight: 800; margin: 6px 0 2px; color: var(--uby-volt, #00FF85); }
+    .tn-big small { font-size: 13px; color: var(--p3-muted); font-weight: 500; margin-left: 4px; }
+    .tn-sub { font-size: 12px; color: var(--p3-muted); }
+    .tree-branches { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; position: relative; padding-top: 18px; }
+    .tree-branches::before { content: ""; position: absolute; top: 0; left: 12%; right: 12%; height: 2px; background: var(--p3-border); }
+    .tree-branch { position: relative; }
+    .tree-branch::before { content: ""; position: absolute; top: -18px; left: 50%; width: 2px; height: 18px; background: var(--p3-border); transform: translateX(-50%); }
+    .tree-node.charger { min-width: 230px; flex: 1 1 230px; max-width: 320px; }
+    .tree-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 3px 0; }
+    .tree-line span { color: var(--p3-muted); }
+    .tree-line.out b { color: var(--p3-danger, #FF5F68); }
+    .tree-line.matriz span { color: var(--uby-volt, #00FF85); font-weight: 600; }
+    .tree-line.total { border-top: 1px solid var(--p3-border); margin-top: 6px; padding-top: 8px; font-size: 15px; font-weight: 700; }
+    .tree-line.total span { color: var(--p3-text); }
+    .tree-line.total b.pos { color: var(--uby-volt, #00FF85); }
+    .tree-line.total b.neg { color: var(--p3-danger, #FF5F68); }
+    @media (max-width: 640px) { .tree-node.charger { min-width: 100%; max-width: none; } .tree-branches::before { display: none; } }
   </style>
   <script>window.UBY_FINANCE_ONLY = true;</script>
 </head>
@@ -832,6 +858,15 @@
     </div>
     <div class="uby-finance-summary" id="ubyFinanceSummary"></div>
     <div class="uby-finance-list" id="ubyFinanceRows"></div>
+  </section>
+
+  <!-- Árvore de custos: matriz -> carregadores -->
+  <section class="section">
+    <div class="card">
+      <h2 style="margin:0 0 4px">Árvore de custos</h2>
+      <p style="color:var(--p3-muted);font-size:13px;margin:0 0 6px;max-width:70ch">Do topo (custos da matriz UBY) para cada carregador, com os custos e o resultado de cada um.</p>
+      <div id="costTree"></div>
+    </div>
   </section>
 
   <!-- Distribuição UBY -->
@@ -899,6 +934,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260727-financeiro6"></script>
+<script src="recargas_app.js?v=20260727-financeiro7"></script>
 </body>
 </html>
