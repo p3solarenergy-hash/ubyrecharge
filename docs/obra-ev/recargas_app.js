@@ -4458,22 +4458,46 @@ function loadMatrizCosts() {
 function saveMatrizCosts(list) {
   try { localStorage.setItem(MATRIZ_COSTS_KEY, JSON.stringify(Array.isArray(list) ? list : [])); } catch (_) {}
 }
+function setMatrizFeedback(msg, isError) {
+  const el = document.getElementById('matrizFeedback');
+  if (el) {
+    el.textContent = msg || '';
+    el.style.color = isError ? 'var(--p3-danger)' : 'var(--p3-primary)';
+  }
+  // Mantém também o storageState como fallback (páginas antigas sem o elemento).
+  if (msg) setStorageState(msg, !!isError);
+}
 function addMatrizCost() {
-  const nameEl = document.getElementById('matrizNewName');
-  const valEl = document.getElementById('matrizNewValue');
-  const nome = (nameEl?.value || '').trim();
-  const valor = Math.max(0, parseFloat(valEl?.value) || 0);
-  if (!nome || valor <= 0) { setStorageState('Informe o nome e um valor maior que zero para o custo da matriz.', true); return; }
-  const list = loadMatrizCosts();
-  list.push({ id: 'm' + Date.now().toString(36), nome, valor, ativo: true });
-  saveMatrizCosts(list);
-  if (nameEl) nameEl.value = '';
-  if (valEl) valEl.value = '';
-  renderMatrizCosts(getGeneralUnitData());
+  try {
+    const nameEl = document.getElementById('matrizNewName');
+    const valEl = document.getElementById('matrizNewValue');
+    const nome = (nameEl?.value || '').trim();
+    const valor = Math.max(0, parseFloat(valEl?.value) || 0);
+    if (!nome || valor <= 0) {
+      setMatrizFeedback('Informe o nome e um valor maior que zero para o custo da matriz.', true);
+      return;
+    }
+    const list = loadMatrizCosts();
+    list.push({ id: 'm' + Date.now().toString(36), nome, valor, ativo: true });
+    saveMatrizCosts(list);
+    if (nameEl) nameEl.value = '';
+    if (valEl) valEl.value = '';
+    renderMatrizCosts(getGeneralUnitData());
+    setMatrizFeedback(`Custo "${nome}" adicionado (${fmtBRL(valor)}).`, false);
+  } catch (e) {
+    console.error('[fin-matriz-add]', e);
+    setMatrizFeedback('Não foi possível adicionar o custo agora. Recarregue a página e tente novamente.', true);
+  }
 }
 function removeMatrizCost(id) {
-  saveMatrizCosts(loadMatrizCosts().filter(c => c.id !== id));
-  renderMatrizCosts(getGeneralUnitData());
+  try {
+    saveMatrizCosts(loadMatrizCosts().filter(c => c.id !== id));
+    renderMatrizCosts(getGeneralUnitData());
+    setMatrizFeedback('Custo removido.', false);
+  } catch (e) {
+    console.error('[fin-matriz-remove]', e);
+    setMatrizFeedback('Não foi possível remover o custo agora. Recarregue a página e tente novamente.', true);
+  }
 }
 
 // Carregadores UBY (incluídos na operação UBY) com pelo menos 1 recarga no mês mk.
@@ -4567,6 +4591,10 @@ async function renderFinanceOnly() {
   const includedRows = ubyRows.filter(r => r.included);
   const nRec = Object.keys(allRechargeRecords || {}).length;
   console.log(`[fin] registros=${nRec} unidades=${unitData.length} carregadores=${ubyRows.length} carregadoresUBY=${includedRows.length}`);
+  // O cadastro de custos da matriz é independente dos dados de recarga: ele
+  // sempre renderiza, para que a pessoa possa cadastrar custos mesmo antes de
+  // qualquer carregador ter recarga no período (o rateio aparece quando houver).
+  try { renderMatrizCosts(unitData); } catch (e) { console.error('[fin-matriz]', e); }
   if (!includedRows.length) {
     const msg = nRec === 0
       ? 'Nenhum dado carregado ainda. Se você não estiver logado, entre pela página de login e volte — os dados do financeiro vêm do mesmo banco do painel.'
@@ -4584,7 +4612,6 @@ async function renderFinanceOnly() {
   const isMonthView = (document.getElementById('financeViewMode')?.value || 'accumulated') === 'month' && !!currentMonth;
   const viewLabel = isMonthView ? `Mês atual (${monthLabel(currentMonth)})` : 'Acumulado';
   try { renderUbyFinancialOverview(ubyRows, sourceMonths, isMonthView, currentMonth, viewLabel); } catch (e) { console.error('[fin-uby]', e); }
-  try { renderMatrizCosts(unitData); } catch (e) { console.error('[fin-matriz]', e); }
   try { renderGeneralFinance(unitData); } catch (e) { console.error('[fin-geral]', e); }
 }
 
@@ -9745,7 +9772,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260727-financeiro7';
+const UBY_APP_VERSION = '20260728-financeiro8';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
