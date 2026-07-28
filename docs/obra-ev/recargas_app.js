@@ -4564,7 +4564,16 @@ function generalFinanceByUnit(unitData) {
 async function renderFinanceOnly() {
   const unitData = getGeneralUnitData();
   const ubyRows = getUbyChargerRows(unitData);
-  const ubyCharges = ubyRows.filter(r => r.included).flatMap(r => r.charges || []);
+  const includedRows = ubyRows.filter(r => r.included);
+  const nRec = Object.keys(allRechargeRecords || {}).length;
+  console.log(`[fin] registros=${nRec} unidades=${unitData.length} carregadores=${ubyRows.length} carregadoresUBY=${includedRows.length}`);
+  if (!includedRows.length) {
+    const msg = nRec === 0
+      ? 'Nenhum dado carregado. Se você não estiver logado, entre pela página de login e volte.'
+      : `Dados carregados (${nRec} registro(s)), mas nenhum carregador marcado como operação UBY foi encontrado.`;
+    setStorageState(msg, true);
+  }
+  const ubyCharges = includedRows.flatMap(r => r.charges || []);
   const sourceMonths = [...new Set(ubyCharges.map(chargeMonthKey).filter(k => k !== 'unknown'))].sort();
   const currentMonth = sourceMonths[sourceMonths.length - 1] || '';
   const isMonthView = (document.getElementById('financeViewMode')?.value || 'accumulated') === 'month' && !!currentMonth;
@@ -9689,7 +9698,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260727-financeiro5';
+const UBY_APP_VERSION = '20260727-financeiro6';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
@@ -9703,9 +9712,17 @@ async function initializeRechargePage() {
   const requestedWorkId = String(params.get('obra') || '').trim();
   if (requestedWorkId) currentWorkId = requestedWorkId;
   if (window.UBY_FINANCE_ONLY) {
+    console.log('[fin] modo financeiro iniciando…');
+    try {
+      const u = await window.UBY_SUPABASE?.currentUser?.();
+      console.log('[fin] usuário:', u?.email || 'NÃO AUTENTICADO (dados não carregam sem login)');
+    } catch (e) { console.log('[fin] erro currentUser:', e.message); }
     await __perf('loadRechargeWorksFromCloud', () => loadRechargeWorksFromCloud());
+    console.log('[fin] obras na nuvem:', cloudRechargeWorks.length);
     await __perf('refreshGeneralRechargeBases', () => refreshGeneralRechargeBases());
+    console.log('[fin] após refresh, registros:', Object.keys(allRechargeRecords || {}).length);
     await ensureAllOverviewSessionsLoaded();
+    console.log('[fin] após histórico completo, registros:', Object.keys(allRechargeRecords || {}).length);
     await renderFinanceOnly();
     console.log(`[UBY-PERF] BOOT TOTAL (financeiro): ${(performance.now() - bootStart).toFixed(0)} ms`);
     window.UBY_RECHARGE_RUNTIME?.markReady?.({ finance: true });
