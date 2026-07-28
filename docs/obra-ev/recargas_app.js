@@ -4585,23 +4585,37 @@ function generalFinanceByUnit(unitData) {
 
 // Página dedicada só ao financeiro (financeiro.html): reaproveita o mesmo
 // motor, renderizando apenas as seções financeiras.
+function countDetailedCharges() {
+  return Object.values(allRechargeRecords || {}).reduce((sum, record) => sum + (Array.isArray(record?.charges) ? record.charges.length : 0), 0);
+}
+
 async function renderFinanceOnly() {
   const unitData = getGeneralUnitData();
   const ubyRows = getUbyChargerRows(unitData);
   const includedRows = ubyRows.filter(r => r.included);
   const nRec = Object.keys(allRechargeRecords || {}).length;
-  console.log(`[fin] registros=${nRec} unidades=${unitData.length} carregadores=${ubyRows.length} carregadoresUBY=${includedRows.length}`);
+  const nDetail = countDetailedCharges();
+  console.log(`[fin] registros=${nRec} recargasDetalhadas=${nDetail} unidades=${unitData.length} carregadores=${ubyRows.length} carregadoresUBY=${includedRows.length}`);
   // O cadastro de custos da matriz é independente dos dados de recarga: ele
   // sempre renderiza, para que a pessoa possa cadastrar custos mesmo antes de
   // qualquer carregador ter recarga no período (o rateio aparece quando houver).
   try { renderMatrizCosts(unitData); } catch (e) { console.error('[fin-matriz]', e); }
   if (!includedRows.length) {
-    const msg = nRec === 0
-      ? 'Nenhum dado carregado ainda. Se você não estiver logado, entre pela página de login e volte — os dados do financeiro vêm do mesmo banco do painel.'
-      : `Dados carregados (${nRec} registro(s)), mas nenhum carregador marcado como operação UBY foi encontrado neste período.`;
+    let msg;
+    if (nRec === 0) {
+      msg = 'Nenhum dado carregado ainda. Se você não estiver logado, entre pela página de login e volte — os dados do financeiro vêm do mesmo banco do painel.';
+    } else if (nDetail === 0) {
+      msg = `Encontrei ${nRec} obra(s) cadastrada(s), mas o histórico detalhado de recargas ainda não carregou (só o resumo). Aguarde alguns segundos e clique em "Atualizar" — se persistir, pode ser bloqueio de acesso (RLS) no Supabase para as sessões detalhadas.`;
+    } else if (unitData.length === 0) {
+      msg = `Há ${nDetail} recarga(s) detalhada(s) carregada(s), mas nenhuma ficou associada a uma obra válida (podem ter sido filtradas por nome de obra/estação bloqueada).`;
+    } else if (ubyRows.length === 0) {
+      msg = `Há ${unitData.length} unidade(s) com recarga, mas nenhuma teve carregador agrupado neste período.`;
+    } else {
+      msg = `Há ${ubyRows.length} carregador(es) identificado(s), mas nenhum está marcado como operação UBY. Marque ao menos um carregador como UBY no painel principal.`;
+    }
     setStorageState(msg, true);
     const sumEl = document.getElementById('ubyFinanceSummary');
-    if (sumEl) sumEl.innerHTML = `<div class="note" style="padding:16px;color:var(--p3-warn)">${msg} <br><span style="color:var(--p3-muted);font-size:12px">(diagnóstico: registros=${nRec}, carregadores=${ubyRows.length}, marcados como UBY=${includedRows.length})</span></div>`;
+    if (sumEl) sumEl.innerHTML = `<div class="note" style="padding:16px;color:var(--p3-warn)">${msg} <br><span style="color:var(--p3-muted);font-size:12px">(diagnóstico: registros=${nRec}, recargasDetalhadas=${nDetail}, unidades=${unitData.length}, carregadores=${ubyRows.length}, marcados como UBY=${includedRows.length})</span></div>`;
     const rowsEl = document.getElementById('ubyFinanceRows'); if (rowsEl) rowsEl.innerHTML = '';
     const treeEl = document.getElementById('costTree'); if (treeEl) treeEl.innerHTML = '';
     return;
@@ -9772,7 +9786,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260728-financeiro8';
+const UBY_APP_VERSION = '20260728-financeiro9';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
@@ -9794,9 +9808,9 @@ async function initializeRechargePage() {
     try { await loadRechargeWorksFromCloud(); } catch (e) { console.error('[fin] loadWorks:', e.message); }
     console.log('[fin] obras na nuvem:', cloudRechargeWorks.length);
     try { await refreshGeneralRechargeBases(); } catch (e) { console.error('[fin] refresh:', e.message); }
-    console.log('[fin] após refresh, registros:', Object.keys(allRechargeRecords || {}).length);
+    console.log('[fin] após refresh, registros:', Object.keys(allRechargeRecords || {}).length, '· recargas detalhadas:', countDetailedCharges());
     try { await ensureAllOverviewSessionsLoaded(); } catch (e) { console.error('[fin] histórico:', e.message); }
-    console.log('[fin] após histórico completo, registros:', Object.keys(allRechargeRecords || {}).length);
+    console.log('[fin] após histórico completo, registros:', Object.keys(allRechargeRecords || {}).length, '· recargas detalhadas:', countDetailedCharges());
     try { await renderFinanceOnly(); } catch (e) { console.error('[fin] render:', e.message, e.stack); }
     console.log(`[UBY-PERF] BOOT TOTAL (financeiro): ${(performance.now() - bootStart).toFixed(0)} ms`);
     window.UBY_RECHARGE_RUNTIME?.markReady?.({ finance: true });
