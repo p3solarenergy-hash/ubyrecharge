@@ -4634,7 +4634,6 @@ async function renderFinanceOnly() {
   const isMonthView = (document.getElementById('financeViewMode')?.value || 'accumulated') === 'month' && !!currentMonth;
   const viewLabel = isMonthView ? `Mês atual (${monthLabel(currentMonth)})` : 'Acumulado';
   try { renderUbyFinancialOverview(ubyRows, sourceMonths, isMonthView, currentMonth, viewLabel); } catch (e) { console.error('[fin-uby]', e); }
-  try { renderGeneralFinance(unitData); } catch (e) { console.error('[fin-geral]', e); }
 }
 
 function renderGeneralFinance(unitData) {
@@ -9800,7 +9799,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260728-financeiro10';
+const UBY_APP_VERSION = '20260728-financeiro11';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
