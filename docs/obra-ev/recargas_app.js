@@ -9799,7 +9799,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260728-financeiro11';
+const UBY_APP_VERSION = '20260728-financeiro12';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
