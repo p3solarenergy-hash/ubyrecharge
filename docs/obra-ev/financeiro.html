@@ -860,6 +860,15 @@
     <div class="uby-finance-list" id="ubyFinanceRows"></div>
   </section>
 
+  <!-- Evolução mensal: Receita, Custos e Resultado UBY -->
+  <section class="section" style="grid-template-columns:1fr">
+    <div class="card">
+      <h2 style="margin:0 0 4px">Evolução mensal</h2>
+      <p style="color:var(--p3-muted);font-size:13px;margin:0 0 12px;max-width:70ch">Receita, custos totais e resultado UBY mês a mês — mostra sempre o histórico completo, independente do filtro "Visão" acima.</p>
+      <div style="height:300px"><canvas id="chartUbyFinanceMonthly"></canvas></div>
+    </div>
+  </section>
+
   <!-- Árvore de custos: matriz -> carregadores -->
   <section class="section" style="grid-template-columns:1fr">
     <div class="card">
@@ -871,6 +880,15 @@
 
   <!-- Distribuição UBY -->
   <section class="section" style="grid-template-columns:1fr"><div id="ubyDistribution"></div></section>
+
+  <!-- Composição dos custos UBY -->
+  <section class="section" style="grid-template-columns:1fr">
+    <div class="card pie-card">
+      <h2 style="margin:0 0 4px">Composição dos custos UBY</h2>
+      <p style="color:var(--p3-muted);font-size:13px;margin:0 0 12px;max-width:70ch">De onde vêm os custos totais da operação UBY no período.</p>
+      <canvas id="costCompositionPie"></canvas>
+    </div>
+  </section>
 
   <!-- Custos da matriz UBY -->
   <section class="section" style="grid-template-columns:1fr">
@@ -914,6 +932,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260728-financeiro12"></script>
+<script src="recargas_app.js?v=20260729-financeiro13"></script>
 </body>
 </html>
