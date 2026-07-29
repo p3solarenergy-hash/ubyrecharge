@@ -8350,6 +8350,36 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
   return { ...row, financeMonths: months, finance: totals };
 }
 
+// Série mensal financeira da operação UBY (todos os carregadores somados por
+// mês), pro gráfico de evolução e pra tendência dos KPIs. Sempre pega o
+// histórico completo de cada carregador (ignora o toggle "Visão" da página),
+// já que uma evolução mensal não faz sentido presa a 1 mês só.
+function buildUbyMonthlySeries(includedRows = [], sourceMonths = [], matrizShareByMonth = {}) {
+  const byMonth = new Map(sourceMonths.map(mk => [mk, {
+    mk, label: monthLabel(mk), revenue: 0, totalOperatingCost: 0, operationNet: 0, matrizCost: 0, energy: 0
+  }]));
+  includedRows.forEach(row => {
+    const months = ubyFinanceMonthsForRow(row, sourceMonths, false, '');
+    months.forEach(mk => {
+      const bucket = byMonth.get(mk);
+      if (!bucket) return;
+      const monthCharges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
+      let settings = financeSettingsForUbyRow(row, mk);
+      const matrizShare = Number(matrizShareByMonth[mk] || 0);
+      if (matrizShare > 0 && monthCharges.length) {
+        settings = { ...settings, costRules: [...(settings.costRules || []), { id: '__matriz', label: 'Custos da matriz UBY', basis: 'fixed', value: matrizShare, enabled: true }] };
+        bucket.matrizCost += matrizShare;
+      }
+      const result = financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId) });
+      bucket.revenue += Number(result.revenue || 0);
+      bucket.totalOperatingCost += Number(result.totalOperatingCost || 0);
+      bucket.operationNet += Number(result.operationNet || 0);
+      bucket.energy += Number(result.energy || 0);
+    });
+  });
+  return sourceMonths.map(mk => byMonth.get(mk));
+}
+
 // Árvore visual: raiz = custos da matriz, ramos = carregadores UBY com seus custos.
 function renderCostTree(rows, matrizTotal) {
   const el = document.getElementById('costTree');
@@ -8415,6 +8445,59 @@ function renderUbyDistribution(total) {
     </div>`;
 }
 
+// Evolução mensal de Receita, Custos totais e Resultado UBY — sempre mostra
+// todos os meses disponíveis, independente do seletor "Visão" da página.
+function renderUbyFinanceMonthlyChart(monthlySeries = []) {
+  destroyChart('chartUbyFinanceMonthly');
+  const ctx = document.getElementById('chartUbyFinanceMonthly');
+  if (!ctx) return;
+  charts['chartUbyFinanceMonthly'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: monthlySeries.map(row => row.label),
+      datasets: [
+        { label: 'Receita', data: monthlySeries.map(row => +row.revenue.toFixed(2)), borderColor: '#57B7FF', backgroundColor: 'rgba(87,183,255,.12)', tension: .35, fill: true },
+        { label: 'Custos totais', data: monthlySeries.map(row => +row.totalOperatingCost.toFixed(2)), borderColor: '#F2A93D', backgroundColor: 'rgba(242,169,61,.10)', tension: .35 },
+        { label: 'Resultado UBY', data: monthlySeries.map(row => +row.operationNet.toFixed(2)), borderColor: '#38C96F', backgroundColor: 'rgba(56,201,111,.10)', tension: .35 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#8FA39A' } },
+        tooltip: { callbacks: { label: context => `${context.dataset.label}: ${fmtBRL(context.raw)}` } }
+      },
+      scales: {
+        y: { ticks: { color: '#8FA39A', callback: value => fmtBRL(value) }, grid: { color: '#24364E' } },
+        x: { ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } }
+      }
+    }
+  });
+}
+
+// Tendência de uma métrica vs. o mês anterior, a partir da série mensal.
+// `invert` = true pra métricas onde cair é bom (custos): sobe -> vermelho.
+function ubyKpiTrendFromSeries(monthlySeries, valueFn, opts = {}) {
+  const dataMonths = (monthlySeries || []).filter(m => m.revenue || m.totalOperatingCost || m.operationNet);
+  if (dataMonths.length < 2) return null;
+  const curr = valueFn(dataMonths[dataMonths.length - 1]);
+  const prior = valueFn(dataMonths[dataMonths.length - 2]);
+  if (curr == null || prior == null || !Number.isFinite(curr) || !Number.isFinite(prior)) return null;
+  const pct = prior !== 0 ? (curr - prior) / Math.abs(prior) * 100 : (curr !== 0 ? 100 : 0);
+  let cls = 'flat';
+  if (Math.abs(pct) >= 1) {
+    const rising = pct > 0;
+    const good = opts.invert ? !rising : rising;
+    cls = good ? 'up' : 'down';
+  }
+  const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '■';
+  return { pct, cls, arrow };
+}
+function ubyKpiTrendBadge(trend) {
+  return trend ? `<div class="kpi-trend ${trend.cls}">${trend.arrow} ${fmtPct(Math.abs(trend.pct))}</div>` : '';
+}
+
 function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthView = true, currentMonth = '', viewLabel = '') {
   const summary = document.getElementById('ubyFinanceSummary');
   const rowsEl = document.getElementById('ubyFinanceRows');
@@ -8437,19 +8520,45 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   const total = rows.reduce((acc, row) => {
     Object.keys(acc).forEach(key => { acc[key] += Number(row.finance?.[key] || 0); });
     return acc;
-  }, { revenue:0, totalRevenue:0, energy:0, totalOperatingCost:0, operationNet:0, planningKWh:0, plannedTotalCost:0, matrizCost:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  }, { revenue:0, totalRevenue:0, energy:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, planningKWh:0, plannedTotalCost:0, matrizCost:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
   const totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
   const plannedCostPerKWh = total.planningKWh > 0 ? total.plannedTotalCost / total.planningKWh : null;
   const margin = total.totalRevenue > 0 ? total.operationNet / total.totalRevenue * 100 : 0;
   if (periodLabel) periodLabel.textContent = viewLabel || (isMonthView ? monthLabel(currentMonth) : 'Acumulado');
-  summary.innerHTML = `
-    <div class="accountability-metric"><b>${fmtBRL(total.revenue)}</b><span>Faturamento recargas</span></div>
-    <div class="accountability-metric"><b>${fmtBRL(total.totalOperatingCost)}</b><span>Custos operacionais${total.matrizCost > 0 ? ' (inclui matriz)' : ''}</span></div>
-    ${total.matrizCost > 0 ? `<div class="accountability-metric"><b>${fmtBRL(total.matrizCost)}</b><span>Custos da matriz (rateados)</span></div>` : ''}
-    <div class="accountability-metric"><b>${fmtPerKWh(totalCostPerKWh)}</b><span>Custo efetivo por kWh</span></div>
-    <div class="accountability-metric"><b>${fmtBRL(total.operationNet)}</b><span>Resultado UBY ${fmtPct(margin)}</span></div>
-  `;
+  // Série mensal só é calculada na página financeira dedicada (evita custo
+  // extra de recalcular por mês na aba operacional, que não usa isso).
+  const monthlySeries = window.UBY_FINANCE_ONLY ? buildUbyMonthlySeries(includedRows, sourceMonths, _matrizShareByMonth) : null;
+  if (window.UBY_FINANCE_ONLY) {
+    const revenueTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.revenue));
+    const costTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.totalOperatingCost, { invert: true }));
+    const perKWhTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.energy > 0 ? m.totalOperatingCost / m.energy : null, { invert: true }));
+    const netTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.operationNet));
+    summary.innerHTML = `
+      <div class="card kpi-feature revenue-card"><div class="label">Faturamento recargas</div><div class="value">${fmtBRL(total.revenue)}</div>${revenueTrend}</div>
+      <div class="card kpi-feature"><div class="label">Custos operacionais${total.matrizCost > 0 ? ' (inclui matriz)' : ''}</div><div class="value">${fmtBRL(total.totalOperatingCost)}</div>${costTrend}</div>
+      ${total.matrizCost > 0 ? `<div class="card kpi-feature"><div class="label">Custos da matriz (rateados)</div><div class="value">${fmtBRL(total.matrizCost)}</div></div>` : ''}
+      <div class="card kpi-feature"><div class="label">Custo efetivo por kWh</div><div class="value">${fmtPerKWh(totalCostPerKWh)}</div>${perKWhTrend}</div>
+      <div class="card kpi-feature ${total.operationNet >= 0 ? 'occ-green' : 'occ-red'}"><div class="label">Resultado UBY ${fmtPct(margin)}</div><div class="value">${fmtBRL(total.operationNet)}</div>${netTrend}</div>
+    `;
+  } else {
+    summary.innerHTML = `
+      <div class="accountability-metric"><b>${fmtBRL(total.revenue)}</b><span>Faturamento recargas</span></div>
+      <div class="accountability-metric"><b>${fmtBRL(total.totalOperatingCost)}</b><span>Custos operacionais${total.matrizCost > 0 ? ' (inclui matriz)' : ''}</span></div>
+      ${total.matrizCost > 0 ? `<div class="accountability-metric"><b>${fmtBRL(total.matrizCost)}</b><span>Custos da matriz (rateados)</span></div>` : ''}
+      <div class="accountability-metric"><b>${fmtPerKWh(totalCostPerKWh)}</b><span>Custo efetivo por kWh</span></div>
+      <div class="accountability-metric"><b>${fmtBRL(total.operationNet)}</b><span>Resultado UBY ${fmtPct(margin)}</span></div>
+    `;
+  }
   renderUbyDistribution(total);
+  if (window.UBY_FINANCE_ONLY) {
+    try {
+      const opsCost = Math.max(total.extraCosts - total.matrizCost, 0);
+      renderCouponDonutChart('costCompositionPie',
+        ['Energia', 'Gestão / plataforma', 'Operação por carregador', 'Custos da matriz (rateados)'],
+        [total.energyCost, total.management + total.platform, opsCost, total.matrizCost],
+        ' R$');
+    } catch (e) { console.error('[fin-cost-pie]', e); }
+  }
   rowsEl.innerHTML = rows.length ? rows.map(row => {
     const finance = row.finance;
     const resultClass = finance.operationNet >= 0 ? 'result-positive' : 'result-negative';
@@ -8466,6 +8575,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
     rowsEl.insertAdjacentHTML('beforeend', `<div class="finance-empty-guidance">Ainda nao houve venda de energia neste periodo. O custo inicial planejado da operacao esta em <strong>${fmtPerKWh(plannedCostPerKWh)}</strong>.</div>`);
   }
   try { renderCostTree(rows, matrizTotal); } catch (e) { console.error('[fin-tree]', e); }
+  if (monthlySeries) { try { renderUbyFinanceMonthlyChart(monthlySeries); } catch (e) { console.error('[fin-monthly-chart]', e); } }
 }
 
 // Dispara (uma vez) o carregamento do histórico completo em segundo plano e
@@ -9799,7 +9909,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260728-financeiro12';
+const UBY_APP_VERSION = '20260729-financeiro13';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
