@@ -8562,13 +8562,21 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   rowsEl.innerHTML = rows.length ? rows.map(row => {
     const finance = row.finance;
     const resultClass = finance.operationNet >= 0 ? 'result-positive' : 'result-negative';
+    const stationName = row.stationName || row.station || '';
+    // Na página financeira dedicada (sem a parte operacional) não existem as
+    // abas/elementos que openWorkReport() manipula direto no DOM — em vez de
+    // travar silenciosamente, navega para a página operacional já com o
+    // relatório financeiro dessa estação aberto.
+    const openAction = window.UBY_FINANCE_ONLY
+      ? `location.href='recargas.html?obra=${encodeURIComponent(row.workId)}&openReport=financeiro&station=${encodeURIComponent(stationName)}'`
+      : `openWorkReport('${escapeAttr(row.workId)}','financeiro','${escapeAttr(stationName)}')`;
     return `<div class="uby-finance-row">
-      <div><strong>${escapeHtml(row.stationName || row.station || row.workName)}</strong><span>${escapeHtml(row.workName)} | ${row.financeMonths.length} periodo(s) calculado(s)</span></div>
+      <div><strong>${escapeHtml(stationName || row.workName)}</strong><span>${escapeHtml(row.workName)} | ${row.financeMonths.length} periodo(s) calculado(s)</span></div>
       <div class="uby-finance-cell"><b>${fmtBRL(finance.revenue)}</b><em>faturamento</em></div>
       <div class="uby-finance-cell"><b>${fmtBRL(finance.totalOperatingCost)}</b><em>custos totais</em></div>
       <div class="uby-finance-cell"><b>${fmtPerKWh(finance.totalCostPerKWh)}</b><em>custo atual</em></div>
       <div class="uby-finance-cell ${resultClass}"><b>${fmtBRL(finance.operationNet)}</b><em>resultado | ${fmtPct(finance.operationMargin)}</em></div>
-      <div class="unit-actions"><button class="btn-open" type="button" onclick="openWorkReport('${escapeAttr(row.workId)}','financeiro','${escapeAttr(row.stationName || row.station)}')">Abrir financeiro</button></div>
+      <div class="unit-actions"><button class="btn-open" type="button" onclick="${openAction}">Abrir financeiro</button></div>
     </div>`;
   }).join('') : '<div class="note">Nenhum carregador UBY marcado para o periodo.</div>';
   if (rows.length && !Number.isFinite(totalCostPerKWh) && Number.isFinite(plannedCostPerKWh)) {
@@ -9909,7 +9917,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260729-financeiro13';
+const UBY_APP_VERSION = '20260729-financeiro14';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
@@ -9942,13 +9950,23 @@ async function initializeRechargePage() {
   await __perf('loadRechargeWorksFromCloud', () => loadRechargeWorksFromCloud());
   await __perf('refreshGeneralRechargeBases', () => refreshGeneralRechargeBases());
   initWorkSelector();
+  let workBaseLoaded = false;
   if (requestedWorkId && workOptions().some(work => work.id === requestedWorkId)) {
     currentWorkId = requestedWorkId;
     document.getElementById('workSelector').value = requestedWorkId;
     currentWorkName = workNameById(requestedWorkId, requestedWorkId);
     await __perf('loadRechargeBase', () => loadRechargeBase(requestedWorkId));
+    workBaseLoaded = true;
   }
-  openGeneralFinanceView();
+  // Vindo do botão "Abrir financeiro" da página financeira dedicada
+  // (financeiro.html?...&openReport=financeiro&station=...): abre direto o
+  // relatório daquela estação, em vez do fluxo padrão (openGeneralFinanceView).
+  const openReport = params.get('openReport');
+  if (workBaseLoaded && openReport) {
+    await openWorkReport(requestedWorkId, openReport, params.get('station') || '');
+  } else {
+    openGeneralFinanceView();
+  }
   console.log(`[UBY-PERF] BOOT TOTAL: ${(performance.now() - bootStart).toFixed(0)} ms`);
   window.UBY_RECHARGE_RUNTIME?.markReady?.({ records: Object.keys(allRechargeRecords || {}).length });
 }
