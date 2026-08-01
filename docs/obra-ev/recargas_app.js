@@ -5775,12 +5775,29 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
   const firstDay = new Date(bounds.year, bounds.month, 1);
   const lastDay = new Date(bounds.year, bounds.month, totalDays);
   const dated = charges.filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()));
-  const periodStart = dated.length ? new Date(Math.min(...dated.map(charge => charge.startDate))) : firstDay;
-  const periodEnd = dated.length ? new Date(Math.max(...dated.map(charge => charge.startDate))) : lastDay;
+  // Usa os mesmos limites do card "Ocupação do período" e do relatório
+  // semanal (options.bounds, vindo de reportEndForCharges/periodWindow —
+  // baseado no fim real da última recarga) quando disponíveis, em vez de
+  // recalcular com base só no início da última recarga: isso já causava uma
+  // divergência mesmo antes de considerar o recorte de horas do dia.
+  const periodStart = options.bounds?.start || (dated.length ? new Date(Math.min(...dated.map(charge => charge.startDate))) : firstDay);
+  const periodEnd = options.bounds?.end || (dated.length ? new Date(Math.max(...dated.map(charge => charge.startDate))) : lastDay);
   const calendarPower = Math.max(Number(options.power || getPower() || 0), 0);
-  const dayOccupation = (energy = 0, dayCount = 1) => {
+  // `date` recorta as horas do dia ao intervalo real de dados (igual ao card
+  // "Ocupação do período" e ao relatório semanal): o dia de hoje/último dia
+  // com recarga (ainda em andamento) conta só as horas já passadas, em vez
+  // de 24h fixas — senão esse dia mostra uma ocupação menor do que deveria
+  // comparado ao resto do painel.
+  const dayOccupation = (energy = 0, dayCount = 1, date = null) => {
     const days = Math.max(Number(dayCount || 1), 1);
-    const maxKWh = calendarPower * 24 * days;
+    let hours = 24 * days;
+    if (date && periodEnd) {
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      hours = Math.max((Math.min(dayEnd.getTime(), periodEnd.getTime()) - dayStart.getTime()) / 3_600_000, 0);
+    }
+    const maxKWh = calendarPower * hours;
     const pct = maxKWh > 0 ? Number(energy || 0) / maxKWh * 100 : 0;
     const cls = pct < 15 ? 'low' : (pct < 30 ? 'mid' : 'good');
     return { pct, cls };
@@ -5824,7 +5841,7 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
       const prev = historyMap[dateKeyLocal(prevDate)] || { revenue: 0, count: 0, energy: 0, failed: 0 };
       const change = pctChange(item.revenue, prev.revenue);
       const hasMovement = item.count > 0 || item.revenue > 0;
-      const occ = dayOccupation(item.energy);
+      const occ = dayOccupation(item.energy, 1, date);
       const cls = !hasMovement ? '' : (change >= 10 ? 'good' : (change <= -10 ? 'down' : 'warn'));
       const changeText = prev.revenue > 0 || item.revenue > 0 ? `${change >= 0 ? '+' : ''}${fmtPct(change)} vs ${String(prevDate.getDate()).padStart(2,'0')}/${String(prevDate.getMonth()+1).padStart(2,'0')}` : 'sem base mes anterior';
       const tags = contextTagsForDate(date, external).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
@@ -6358,7 +6375,7 @@ async function renderUsageInsights(charges = [], prefix = 'usage', historyCharge
   renderNewClients(prefix, charges, historyCharges);
   renderAbsentClientAlerts(prefix, historyCharges);
   await yieldToBrowser();
-  renderOperationalCalendar(prefix, charges, historyCharges, options.calendar || {});
+  renderOperationalCalendar(prefix, charges, historyCharges, { ...(options.calendar || {}), bounds: weekdayBounds });
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
   renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
   renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
@@ -9929,7 +9946,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260801-financeiro15';
+const UBY_APP_VERSION = '20260801-financeiro16';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
