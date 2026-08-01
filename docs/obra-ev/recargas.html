@@ -818,6 +818,8 @@
       <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar financeiro</button>
     </div>
     <div class="controls" id="ctrlClube" style="display:none">
+      <span>Competição:</span>
+      <select class="ctl-select" id="clubMonthSelector" onchange="handleClubMonthChange()" aria-label="Mês da competição Clube UBY"></select>
       <span>Ranking por pontos: R$ 1 gasto = 1 ponto</span>
       <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar clube</button>
       <button class="btn-recalc" onclick="syncClubParticipantsFromSheet()">Sincronizar formulario</button>
@@ -825,6 +827,7 @@
       <button class="btn-recalc" onclick="configureClubFormEndpoint()">Configurar endpoint</button>
       <a class="btn-recalc" href="https://docs.google.com/forms/d/1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM/edit#responses" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Abrir Forms</a>
       <button class="btn-recalc" onclick="window.print()">Imprimir ranking</button>
+      <button class="btn-recalc" onclick="copyClubWinnerNotice()">Copiar aviso aos vencedores</button>
       <input type="file" id="clubParticipantFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" multiple style="display:none" onchange="handleClubParticipantFiles(Array.from(this.files)); this.value=''">
     </div>
     <div class="controls" id="ctrlClientes" style="display:none">
@@ -1076,11 +1079,11 @@
             <div class="brand-tag">Fidelidade, premiações e parcerias</div>
           </div>
         </div>
-        <h1>Ranking do Clube UBY</h1>
+        <h1>Ranking mensal do Clube UBY</h1>
         <p id="clubHeroMeta">Carregando ranking dos clientes...</p>
       </div>
       <div class="hero-formula" id="clubHeroFormula">
-        Cada R$ 1 gasto gera 1 ponto no clube.
+        A competição vale somente para o mês selecionado. O acumulado fica como histórico.
       </div>
     </section>
 
@@ -1090,12 +1093,12 @@
       <div class="club-print-head">
         <div>
           <div class="club-print-title">Podio Clube UBY</div>
-          <div class="club-print-sub">Ranking dos clientes da operacao UBY para compartilhar no grupo</div>
+          <div class="club-print-sub">Ranking mensal dos clientes da operação UBY para compartilhar no grupo</div>
         </div>
         <div class="club-print-meta" id="clubPrintMeta">Atualizando ranking...</div>
       </div>
       <div class="club-podium" id="clubPodium"></div>
-      <div class="club-print-rule">Criterio do ranking: somente recargas pagas em carregadores marcados como UBY. Cada R$ 1 gasto gera 1 ponto no Clube UBY.</div>
+      <div class="club-print-rule">Critério do ranking mensal: somente recargas pagas no mês selecionado em carregadores marcados como UBY. Cada R$ 1 gasto gera 1 ponto no Clube UBY. Para receber prêmio, é obrigatório estar no grupo Clube UBY e ter o cadastro preenchido.</div>
       <div class="club-print-foot">
         <div><strong>Top 3</strong><br>30% de desconto em alinhamento e balanceamento.</div>
         <div><strong>Todos do clube</strong><br>10% de desconto em todos os servicos da rede Muffatao Autocenter.</div>
@@ -1216,7 +1219,7 @@
         <h2>Ranking de clientes</h2>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Posicao</th><th>Cliente</th><th>Cadastro</th><th>Telefone</th><th>E-mail</th><th>Veiculo</th><th>Pontos</th><th>Faturamento</th><th>kWh</th><th>Recargas</th><th>Ultima recarga</th><th>Beneficio</th></tr></thead>
+            <thead><tr><th>Posição</th><th>Cliente</th><th>Cadastro</th><th>Telefone</th><th>E-mail</th><th>Veículo</th><th>Pontos no mês</th><th>Faturamento no mês</th><th>kWh no mês</th><th>Recargas no mês</th><th>Pontos acumulados</th><th>Faturamento acumulado</th><th>Última recarga</th><th>Benefício</th></tr></thead>
             <tbody id="clubRankingTable"></tbody>
           </table>
         </div>

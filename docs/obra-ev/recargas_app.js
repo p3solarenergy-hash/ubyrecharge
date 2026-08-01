@@ -7451,13 +7451,68 @@ function clubBenefitForPosition(position) {
   return '10% em todos os serviços da rede Muffatão Autocenter';
 }
 
-function renderClub() {
-  ensureClubParticipantsAutoSync();
+function clubCompetitionMonths(charges = []) {
+  return [...new Set(charges.map(chargeMonthKey).filter(key => key && key !== 'unknown'))].sort();
+}
+
+function clubCompetitionScope() {
   const unitData = getGeneralUnitData();
   const charges = getUbyOperationCharges(unitData).filter(charge => Number(charge.revenue || 0) > 0);
+  const months = clubCompetitionMonths(charges);
+  const selector = document.getElementById('clubMonthSelector');
+  const selectedMonth = months.includes(selector?.value) ? selector.value : (months.at(-1) || '');
+  if (selector) {
+    selector.innerHTML = months.map(month => `<option value="${month}">${monthLabel(month)}</option>`).join('') || '<option value="">Sem mês com recargas</option>';
+    selector.value = selectedMonth;
+  }
+  return { charges, months, selectedMonth };
+}
+
+function handleClubMonthChange() {
+  renderClub();
+}
+
+function clubWinnerNotice(rows = [], month = '') {
+  const ranking = rows.slice(0, 3).length
+    ? rows.slice(0, 3).map((row, index) => `${index + 1}º lugar: ${row.name} - ${row.points.toLocaleString('pt-BR')} pontos`).join('\n')
+    : 'Ainda não houve pontuação suficiente para definir vencedores.';
+  return `RESULTADO CLUBE UBY - ${monthLabel(month || monthKey(new Date()))}\n\n${ranking}\n\nParabéns aos vencedores do mês! Os três primeiros colocados recebem 30% de desconto em alinhamento e balanceamento. Todos os participantes do Clube UBY têm 10% de desconto nos serviços da rede Muffatão Autocenter.\n\nIMPORTANTE: a premiação é validada somente para quem estiver no grupo Clube UBY e com o cadastro do Clube preenchido. Caso uma dessas condições não seja atendida, não haverá direito ao prêmio.\n\nCada R$ 1 gasto nas recargas UBY gera 1 ponto. O próximo ranking começa no primeiro dia do próximo mês.`;
+}
+
+async function copyClubWinnerNotice() {
+  const scope = clubCompetitionScope();
+  const rows = enrichClubClientRows(
+    clubClientRows(scope.charges.filter(charge => chargeMonthKey(charge) === scope.selectedMonth)),
+    clubParticipantsStore().rows
+  );
+  const notice = clubWinnerNotice(rows, scope.selectedMonth);
+  try {
+    await navigator.clipboard.writeText(notice);
+    alert('Aviso mensal copiado. Valide grupo e cadastro antes de enviar.');
+  } catch (_) {
+    window.prompt('Copie o aviso mensal abaixo:', notice);
+  }
+}
+
+function renderClub() {
+  ensureClubParticipantsAutoSync();
+  const scope = clubCompetitionScope();
+  const charges = scope.charges;
+  const monthCharges = scope.selectedMonth ? charges.filter(charge => chargeMonthKey(charge) === scope.selectedMonth) : [];
   const participantStore = clubParticipantsStore();
   const participants = participantStore.rows;
-  const rows = enrichClubClientRows(clubClientRows(charges), participants);
+  const accumulatedRows = enrichClubClientRows(clubClientRows(charges), participants);
+  const accumulatedByKey = new Map();
+  accumulatedRows.forEach(row => clubParticipantKeys(row).forEach(key => accumulatedByKey.set(key, row)));
+  const rows = enrichClubClientRows(clubClientRows(monthCharges), participants).map(row => {
+    const accumulated = clubParticipantKeys(row).map(key => accumulatedByKey.get(key)).find(Boolean);
+    return {
+      ...row,
+      accumulatedPoints: accumulated?.points || row.points,
+      accumulatedRevenue: accumulated?.revenue || row.revenue
+    };
+  });
+  const competitionLabel = scope.selectedMonth ? monthLabel(scope.selectedMonth) : 'sem mês com recargas';
   const rankByKey = new Map();
   rows.forEach(row => clubParticipantKeys(row).forEach(key => rankByKey.set(key, row)));
   const matchedParticipants = participants.filter(participant => clubParticipantKeys(participant).some(key => rankByKey.has(key)));
@@ -7470,21 +7525,21 @@ function renderClub() {
   const top3 = rows.slice(0, 3);
 
   document.getElementById('clubHeroMeta').innerHTML = rows.length
-    ? `<strong>${rows.length}</strong> participante(s) UBY com consumo pago<br>${fmtBRL(totalRevenue)} em faturamento elegivel<br>${totalPoints.toLocaleString('pt-BR')} ponto(s) gerados`
-    : 'Nenhum cliente UBY com faturamento pago para pontuar ainda.';
+    ? `<strong>${competitionLabel}</strong>: ${rows.length} participante(s) UBY com consumo pago<br>${fmtBRL(totalRevenue)} em faturamento no mês<br>${totalPoints.toLocaleString('pt-BR')} ponto(s) mensais`
+    : `Nenhum cliente UBY com faturamento pago em ${competitionLabel} para pontuar ainda.`;
   document.getElementById('clubHeroFormula').innerHTML =
-    '<strong>Regra atual</strong><br>Somente carregadores marcados como operacao UBY entram no clube.<br>R$ 1 gasto = 1 ponto no Clube UBY.<br>Top 3 ganham 30% de desconto em alinhamento e balanceamento.<br>Todos os participantes ganham 10% em servicos da rede Muffatao Autocenter.';
+    `<strong>Competição mensal: ${competitionLabel}</strong><br>Somente carregadores marcados como operação UBY entram no clube.<br>R$ 1 gasto = 1 ponto no Clube UBY.<br>Top 3 ganham 30% em alinhamento e balanceamento.<br>Prêmio válido somente para quem estiver no grupo e com cadastro preenchido.`;
 
   document.getElementById('clubKpis').innerHTML = `
-    <div class="card"><div class="label">Participantes UBY</div><div class="value">${rows.length}</div><div class="sub">clientes com faturamento pago na operacao UBY</div></div>
-    <div class="card"><div class="label">Pontos emitidos</div><div class="value">${totalPoints.toLocaleString('pt-BR')}</div><div class="sub">1 ponto por real gasto</div></div>
-    <div class="card"><div class="label">Receita elegível</div><div class="value">${fmtBRL(totalRevenue)}</div><div class="sub">base do ranking</div></div>
+    <div class="card"><div class="label">Participantes no mês</div><div class="value">${rows.length}</div><div class="sub">clientes com faturamento pago em ${competitionLabel}</div></div>
+    <div class="card"><div class="label">Pontos do mês</div><div class="value">${totalPoints.toLocaleString('pt-BR')}</div><div class="sub">1 ponto por real gasto</div></div>
+    <div class="card"><div class="label">Receita do mês</div><div class="value">${fmtBRL(totalRevenue)}</div><div class="sub">base mensal do ranking</div></div>
     <div class="card"><div class="label">Com telefone</div><div class="value">${withPhone}</div><div class="sub">${rows.length ? fmtPct(withPhone / rows.length * 100) : '0,00%'} dos participantes</div></div>
     <div class="card"><div class="label">Cadastro Forms</div><div class="value">${registeredRows}</div><div class="sub">${rows.length ? fmtPct(registeredRows / rows.length * 100) : '0,00%'} do ranking cruzado</div></div>
   `;
 
   document.getElementById('clubRewards').innerHTML = `
-    <div class="action-row"><div><strong>Top 3</strong><span>30% de desconto em alinhamento e balanceamento.</span></div><b class="good">Ativo</b></div>
+    <div class="action-row"><div><strong>Top 3 mensal</strong><span>30% de desconto em alinhamento e balanceamento. Validação exige grupo Clube UBY e cadastro preenchido.</span></div><b class="good">Ativo</b></div>
     <div class="action-row"><div><strong>Todos os participantes</strong><span>10% de desconto em todos os serviços da rede Muffatão Autocenter.</span></div><b class="good">Ativo</b></div>
   `;
   renderClubPartners();
@@ -7536,8 +7591,8 @@ function renderClub() {
     { row: top3[2], position: 3 }
   ];
   document.getElementById('clubPrintMeta').innerHTML = rows.length
-    ? `${rows.length} participante(s) UBY<br>${fmtBRL(totalRevenue)} elegiveis<br>${totalPoints.toLocaleString('pt-BR')} ponto(s)`
-    : 'Sem participantes UBY elegiveis ainda';
+    ? `${competitionLabel}<br>${rows.length} participante(s) UBY<br>${fmtBRL(totalRevenue)} no mês<br>${totalPoints.toLocaleString('pt-BR')} ponto(s) mensais`
+    : `Sem participantes UBY em ${competitionLabel} ainda`;
   document.getElementById('clubPodium').innerHTML = podiumOrder.map(slot => {
     if (!slot.row) {
       return `<div class="podium-place rank-${slot.position}">
@@ -7560,7 +7615,7 @@ function renderClub() {
           <div class="podium-name">${escapeHtml(slot.row.name)}</div>
           <div class="podium-points">${slot.row.points.toLocaleString('pt-BR')} pts</div>
           <div class="podium-stats">
-            <div class="podium-stat"><strong>${fmtBRL(slot.row.revenue)}</strong><span>periodo</span></div>
+            <div class="podium-stat"><strong>${fmtBRL(slot.row.revenue)}</strong><span>${competitionLabel}</span></div>
             <div class="podium-stat"><strong>${slot.row.count}</strong><span>recargas</span></div>
             <div class="podium-stat"><strong>${slot.row.energy.toFixed(1).replace('.', ',')} kWh</strong><span>energia</span></div>
           </div>
@@ -7596,10 +7651,12 @@ function renderClub() {
       <td>${fmtBRL(row.revenue)}</td>
       <td>${row.energy.toFixed(2).replace('.', ',')}</td>
       <td>${row.count}</td>
+      <td>${row.accumulatedPoints.toLocaleString('pt-BR')}</td>
+      <td>${fmtBRL(row.accumulatedRevenue)}</td>
       <td>${fmtDT(row.lastDate)}</td>
       <td>${escapeHtml(clubBenefitForPosition(position))}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="12" style="color:var(--p3-muted);text-align:center;padding:20px">Sem clientes elegiveis no clube.</td></tr>';
+  }).join('') : '<tr><td colspan="14" style="color:var(--p3-muted);text-align:center;padding:20px">Sem clientes elegíveis no clube neste mês.</td></tr>';
 }
 async function toggleUbyOperation(workId, key, checked) {
   syncGeneralRecordsFromLocal();
