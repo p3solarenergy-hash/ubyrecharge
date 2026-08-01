@@ -5327,6 +5327,18 @@ function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
     while (cursor <= endDay && guard < MAX_DAILY_RANGE_DAYS) {
       const idx = cursor.getDay();
       groups[idx].dates.add(dateKeyLocal(cursor));
+      // Recorta as horas disponíveis desse dia ao intervalo real [startBound,
+      // endBound] — o dia de hoje (ainda em andamento) conta só as horas já
+      // passadas, igual ao card "Ocupação do período" (occByInterval /
+      // stationAvailableHours). Sem isso, o dia corrente era contado com 24h
+      // fixas aqui mas com horas reais lá, gerando dois % de ocupação
+      // diferentes pro mesmo dia.
+      const dayStart = new Date(cursor);
+      const dayEnd = new Date(cursor);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      const overlapStart = Math.max(dayStart.getTime(), startBound.getTime());
+      const overlapEnd = Math.min(dayEnd.getTime(), endBound.getTime());
+      groups[idx].hours = (groups[idx].hours || 0) + Math.max(overlapEnd - overlapStart, 0) / 3_600_000;
       cursor.setDate(cursor.getDate() + 1);
       guard++;
     }
@@ -5348,7 +5360,7 @@ function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
     const row = groups[idx];
     const days = row.dates.size || 0;
     const validCount = Math.max(0, row.count - row.failed);
-    const maxKWh = Math.max(Number(power) || 0, 0) * 24 * days;
+    const maxKWh = Math.max(Number(power) || 0, 0) * (row.hours || 0);
     const occ = maxKWh > 0 ? row.energy / maxKWh * 100 : 0;
     return {
       ...row,
@@ -9917,7 +9929,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260729-financeiro14';
+const UBY_APP_VERSION = '20260801-financeiro15';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
