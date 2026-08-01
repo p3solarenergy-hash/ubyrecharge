@@ -310,9 +310,9 @@
     .accountability-title strong { color:var(--p3-text); font-size:15px; line-height:1.25; display:block; }
     .accountability-title span { color:var(--p3-muted); font-size:11px; display:block; margin-top:4px; }
     .accountability-pill { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; padding:4px 9px; background:rgba(45,127,249,.16); color:#BFD8FF; border:1px solid rgba(45,127,249,.28); font-size:11px; font-weight:800; white-space:nowrap; }
-    .accountability-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:12px 0; }
+    .accountability-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin:12px 0; }
     .accountability-metric { border:1px solid rgba(84,180,255,.18); border-radius:10px; padding:10px; background:rgba(84,180,255,.05); min-width:0; }
-    .accountability-metric b { display:block; color:#57B7FF; font-size:16px; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .accountability-metric b { display:block; color:#57B7FF; font-size:15px; line-height:1.2; white-space:normal; }
     .accountability-metric span { display:block; color:var(--p3-muted); font-size:10px; margin-top:4px; text-transform:uppercase; letter-spacing:.05em; }
     .accountability-controls { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:12px; }
     .accountability-controls label { display:grid; gap:6px; color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:800; min-width:0; }
@@ -1270,6 +1270,33 @@
       <div class="uby-finance-list" id="ubyFinanceRows"></div>
     </section>
 
+    <section class="section"><div id="ubyDistribution"></div></section>
+
+    <section class="section">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+          <h2 style="margin:0">Custos da matriz UBY</h2>
+          <span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span>
+        </div>
+        <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:70ch">
+          Despesas da matriz UBY que não são de um carregador só (ex.: aluguel da matriz). O total é dividido <strong>igualmente entre os carregadores UBY que tiveram recarga no mês</strong>. Cadastre uma vez — o rateio se ajusta sozinho conforme entram carregadores.
+        </p>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Custo</th><th style="text-align:right">Valor / mês</th><th style="text-align:right">÷ por carregador</th><th style="text-align:right">Ação</th></tr></thead>
+            <tbody id="matrizCostList"></tbody>
+            <tfoot id="matrizCostFoot"></tfoot>
+          </table>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+          <input id="matrizNewName" type="text" placeholder="Nome do custo (ex.: Aluguel matriz)" style="flex:1;min-width:200px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
+          <input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Valor R$/mês" style="width:150px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
+          <button class="btn-open" type="button" onclick="addMatrizCost()">＋ Adicionar custo</button>
+        </div>
+        <div id="matrizRateio" style="margin-top:18px"></div>
+      </div>
+    </section>
+
     <section class="day-compare-grid" id="usageUbyDayCompare"></section>
     <section class="section weekday-report" id="usageUbyWeekdayReport"></section>
 
@@ -1874,6 +1901,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260727-club-identity1"></script>
+<script src="recargas_app.js?v=20260801-financeiro16"></script>
 </body>
 </html>
