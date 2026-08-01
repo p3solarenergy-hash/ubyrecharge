@@ -33,7 +33,7 @@ assert(
   'O historico completo deve existir como carregamento sob demanda.'
 );
 assert(
-  htmlDocument.includes('recargas_app.js?v=20260727-club-identity1') &&
+  /<script src="recargas_app\.js\?v=[^"]+"><\/script>/.test(htmlDocument) &&
   htmlDocument.length < 180000,
   'O motor da pagina deve ficar em arquivo externo cacheavel.'
 );
