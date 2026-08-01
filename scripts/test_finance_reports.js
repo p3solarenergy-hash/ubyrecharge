@@ -17,6 +17,9 @@ assert.ok(areaHtml.includes('Percentual contratado'));
 assert.ok(areaHtml.includes('Acumulado do ponto'));
 assert.ok(areaHtml.includes('Linha do tempo mensal'));
 assert.ok(areaHtml.includes('5.139,53'));
+assert.ok(areaHtml.includes('UBY RECHARGE LTDA'));
+assert.ok(areaHtml.includes('66.737.561/0001-86'));
+assert.ok(areaHtml.includes('02_versao_dark.png'));
 
 const investorEntry = {
   label: 'Jul/2026', occupancyPct: 18.4, targetOccPct: 15, revenue: 5000, extraRevenue: 200, totalRevenue: 5200,
@@ -45,11 +48,14 @@ assert.ok(investorHtml.includes('Periodo do relatorio'));
 assert.ok(investorHtml.includes('01/07/2026 a 13/07/2026'));
 assert.ok(investorHtml.includes('Ocupacao do periodo'));
 assert.ok(investorHtml.includes('Composicao financeira e custo diluido'));
-assert.ok(investorHtml.includes('R$/kWh inicial'));
-assert.ok(investorHtml.includes('R$/kWh atual'));
+assert.ok(!investorHtml.includes('R$/kWh inicial'));
+assert.ok(investorHtml.includes('R$/kWh efetivo'));
 assert.ok(investorHtml.includes('Acumulado da operacao'));
 assert.ok(investorHtml.includes('Linha do tempo mes a mes'));
 assert.ok(investorHtml.includes('Resultado por ponto'));
 assert.ok(investorHtml.includes('Seguro'));
+assert.ok(investorHtml.includes('UBY RECHARGE LTDA'));
+assert.ok(investorHtml.includes('66.737.561/0001-86'));
+assert.ok(investorHtml.includes('Londrina - PR'));
 
 console.log('finance report tests ok');

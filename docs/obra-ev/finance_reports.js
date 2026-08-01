@@ -2,6 +2,17 @@
   'use strict';
 
   var locale = 'pt-BR';
+  var company = {
+    legalName: 'UBY RECHARGE LTDA',
+    cnpj: '66.737.561/0001-86',
+    location: 'Londrina - PR'
+  };
+  var reportAssetBase = (function () {
+    if (typeof document !== 'undefined' && document.currentScript && document.currentScript.src) {
+      return document.currentScript.src.replace(/[^/]+(?:\?.*)?$/, '');
+    }
+    return 'https://p3solarenergy-hash.github.io/ubyrecharge/obra-ev/';
+  })();
 
   function num(value) {
     var parsed = Number(value);
@@ -76,12 +87,18 @@
       .toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:flex-end;padding:10px 0;background:#fff}
       .toolbar button{border:0;border-radius:6px;background:#2d7ff9;color:#fff;padding:9px 14px;font-weight:800;cursor:pointer}
       .report{max-width:1080px;margin:0 auto}
-      .header{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:start;padding:22px 24px;background:#0c2440;color:#fff;border-bottom:5px solid #2d7ff9}
-      .eyebrow{color:#78c8ff;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.12em}
+      .header{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:start;padding:22px 24px;background:#0a1628;color:#fff;border-bottom:5px solid #00ff85}
+      .company-brand{display:flex;align-items:center;gap:14px;margin-bottom:17px}
+      .brand-logo-crop{position:relative;width:176px;height:56px;overflow:hidden;flex:0 0 auto}
+      .brand-logo-crop img{position:absolute;width:252px;max-width:none;height:auto;left:-3px;top:50%;transform:translateY(-50%)}
+      .company-data{display:grid;gap:2px;color:#d9e3ef;font-size:8px;line-height:1.35}
+      .company-data strong{color:#fff;font-size:10px;letter-spacing:.06em}
+      .company-data span:first-of-type{color:#00ff85;font-weight:800}
+      .eyebrow{color:#00e5ff;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.12em}
       h1{margin:6px 0 8px;font-size:25px;line-height:1.12}
       .meta{color:#c9d9e9;line-height:1.55}
-      .badge{border:1px solid #61b8ff;border-radius:999px;padding:6px 10px;color:#d8efff;font-weight:800;white-space:nowrap}
-      .period-banner{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:11px 22px;background:#eaf4ff;border:1px solid #9ccfff;border-top:0;color:#174f82}
+      .badge{border:1px solid #00ff85;border-radius:999px;padding:6px 10px;color:#00ff85;font-weight:800;white-space:nowrap}
+      .period-banner{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:11px 22px;background:#e9fff5;border:1px solid #8ce8bd;border-top:0;color:#12613d}
       .period-banner span{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
       .period-banner strong{font-size:14px;color:#0c2440}
       .section{padding:18px 22px 0}
@@ -112,22 +129,31 @@
       .timeline-bar b{text-align:right;color:#174f82;font-size:9px}
       .note{margin:14px 22px 0;padding:10px 12px;border-left:4px solid #f0a528;background:#fff7e3;color:#664d13}
       .foot{margin:18px 22px 0;padding:12px 0;border-top:1px solid #dce6f0;color:#6a7d90;font-size:8px}
+      .foot-company{display:block;margin-bottom:4px;color:#0a1628;font-weight:900;letter-spacing:.04em}
       .page-break{break-before:page;page-break-before:always}
       .avoid{break-inside:avoid;page-break-inside:avoid}
-      @media(max-width:760px){.header{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}.section{overflow-x:auto}}
-      @media print{.toolbar{display:none}.report{max-width:none}.header,.period-banner,.metric,.panel,.grand-total,.timeline-bar{break-inside:avoid;page-break-inside:avoid}.section{padding-left:0;padding-right:0}.metrics{padding-left:0;padding-right:0}.grand-total,.note,.foot{margin-left:0;margin-right:0}}
+      @media(max-width:760px){.header{grid-template-columns:1fr}.company-brand{align-items:flex-start;flex-direction:column}.metrics{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}.section{overflow-x:auto}}
+      @media print{.toolbar{display:none}.report{max-width:none}.header{grid-template-columns:1fr auto}.company-brand{align-items:center;flex-direction:row}.split{grid-template-columns:1fr 1fr}.header,.period-banner,.metric,.panel,.grand-total,.timeline-bar{break-inside:avoid;page-break-inside:avoid}.section{padding-left:0;padding-right:0}.metrics{padding-left:0;padding-right:0}.grand-total,.note,.foot{margin-left:0;margin-right:0}}
     `;
   }
 
   function shell(title, body, options) {
     var settings = options || {};
-    var printScript = settings.printAfter ? '<script>setTimeout(function(){window.print()},450)<\/script>' : '';
+    var printScript = settings.printAfter ? '<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},250)})<\/script>' : '';
     return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(title) + '</title><style>' + reportCss() + '</style></head><body><div class="toolbar"><button onclick="window.print()">Salvar como PDF / imprimir</button></div>' + body + printScript + '</body></html>';
+  }
+
+  function companyIdentity() {
+    return '<div class="company-brand"><div class="brand-logo-crop"><img src="' + esc(reportAssetBase + 'assets/brand/v2/02_versao_dark.png') + '" alt="UBY Recharge"></div><div class="company-data"><strong>' + esc(company.legalName) + '</strong><span>CNPJ ' + esc(company.cnpj) + '</span><span>' + esc(company.location) + '</span></div></div>';
+  }
+
+  function reportFoot(text) {
+    return '<div class="foot"><span class="foot-company">' + esc(company.legalName) + ' | CNPJ ' + esc(company.cnpj) + ' | ' + esc(company.location) + '</span>' + esc(text) + '</div>';
   }
 
   function header(model, eyebrow, title) {
     var meta = model.report || {};
-    return '<div class="header"><div><div class="eyebrow">' + esc(eyebrow) + '</div><h1>' + esc(title) + '</h1><div class="meta"><strong>' + esc(meta.station || meta.scope || '-') + '</strong><br>' + (meta.work ? 'Obra: ' + esc(meta.work) + '<br>' : '') + 'Gerado em ' + esc(meta.generatedAt || '-') + '</div></div><div class="badge">' + esc(statusLabel(meta.status)) + (meta.version ? ' - versao ' + esc(meta.version) : '') + '</div></div><div class="period-banner"><span>Periodo do relatorio</span><strong>' + esc(reportPeriod(meta)) + '</strong></div>';
+    return '<div class="header"><div>' + companyIdentity() + '<div class="eyebrow">' + esc(eyebrow) + '</div><h1>' + esc(title) + '</h1><div class="meta"><strong>' + esc(meta.station || meta.scope || '-') + '</strong><br>' + (meta.work ? 'Obra: ' + esc(meta.work) + '<br>' : '') + 'Gerado em ' + esc(meta.generatedAt || '-') + '</div></div><div class="badge">' + esc(statusLabel(meta.status)) + (meta.version ? ' - versao ' + esc(meta.version) : '') + '</div></div><div class="period-banner"><span>Periodo do relatorio</span><strong>' + esc(reportPeriod(meta)) + '</strong></div>';
   }
 
   function metrics(items) {
@@ -182,7 +208,7 @@
         { value: brl(accumulated.energyCost), label: 'Energia reembolsada' },
         { value: brl(accumulated.partnerTotal), label: 'Total acumulado para area', className: 'positive' }
       ]) + '</div>' +
-      '<div class="section"><div class="section-title"><h2>Linha do tempo mensal</h2><span>Fechamentos preservados por competencia</span></div>' + timelineBars(timeline, 'partnerTotal', brl) +
+      '<div class="section avoid"><div class="section-title"><h2>Linha do tempo mensal</h2><span>Fechamentos preservados por competencia</span></div>' + timelineBars(timeline, 'partnerTotal', brl) +
       '<table><thead><tr><th>Periodo</th><th>Faturamento</th><th>Energia</th><th>R$/kWh</th><th>% area</th><th>Participacao</th><th>Total area</th></tr></thead><tbody>' + rows(timeline, [
         { value: 'label' }, { value: function (item) { return brl(item.revenue); }, className: 'value' },
         { value: function (item) { return kwh(item.energy); }, className: 'value' },
@@ -192,17 +218,16 @@
         { value: function (item) { return brl(item.partnerTotal); }, className: 'value' }
       ]) + '</tbody></table></div>' +
       (current.notes ? '<div class="note"><strong>Observacao:</strong> ' + esc(current.notes) + '</div>' : '') +
-      '<div class="foot">Relatorio destinado ao parceiro da area. Conferir tarifa de energia, percentual contratual e documentos fiscais antes do envio final.</div></div>';
+      reportFoot('Relatorio destinado ao parceiro da area. Conferir tarifa de energia, percentual contratual e documentos fiscais antes do envio final.') + '</div>';
     return shell('Prestacao de contas - ' + (model.report && model.report.station || 'UBY'), body, options);
   }
 
   function itemTable(title, items, total, totalLabel) {
-    return '<div class="panel"><h3>' + esc(title) + '</h3><table><thead><tr><th>Item</th><th>Regra</th><th>Valor</th><th>R$/kWh inicial</th><th>R$/kWh atual</th></tr></thead><tbody>' + rows(items || [], [
+    return '<div class="panel"><h3>' + esc(title) + '</h3><table><thead><tr><th>Item</th><th>Regra</th><th>Valor</th><th>R$/kWh efetivo</th></tr></thead><tbody>' + rows(items || [], [
       { value: 'label' }, { value: 'rule' },
       { value: function (item) { return brl(item.amount); }, className: 'value' },
-      { value: function (item) { return perKwh(item.plannedPerKWh); }, className: 'value' },
       { value: function (item) { return perKwh(item.actualPerKWh); }, className: 'value' }
-    ]) + '<tr class="total-row"><td colspan="2">' + esc(totalLabel) + '</td><td class="value">' + esc(brl(total)) + '</td><td></td><td></td></tr></tbody></table></div>';
+    ]) + '<tr class="total-row"><td colspan="2">' + esc(totalLabel) + '</td><td class="value">' + esc(brl(total)) + '</td><td></td></tr></tbody></table></div>';
   }
 
   function investorReport(model, options) {
@@ -259,14 +284,14 @@
         { value: function (item) { return brl(item.operationNet); }, className: 'value' },
         { value: function (item) { return pct(item.operationMargin); }, className: 'value' }
       ]) + '</tbody></table></div>' +
-      (units.length ? '<div class="section"><div class="section-title"><h2>Resultado por ponto</h2><span>Composicao da rede UBY</span></div><table><thead><tr><th>Unidade</th><th>Tipo</th><th>Ocupacao</th><th>Receita</th><th>Energia</th><th>Custos</th><th>Resultado</th></tr></thead><tbody>' + rows(units, [
+      (units.length ? '<div class="section avoid"><div class="section-title"><h2>Resultado por ponto</h2><span>Composicao da rede UBY</span></div><table><thead><tr><th>Unidade</th><th>Tipo</th><th>Ocupacao</th><th>Receita</th><th>Energia</th><th>Custos</th><th>Resultado</th></tr></thead><tbody>' + rows(units, [
         { value: 'name' }, { value: 'type' }, { value: function (item) { return pct(item.occupancyPct); }, className: 'value' },
         { value: function (item) { return brl(item.totalRevenue); }, className: 'value' },
         { value: function (item) { return kwh(item.energy); }, className: 'value' },
         { value: function (item) { return brl(item.totalOperatingCost); }, className: 'value' },
         { value: function (item) { return brl(item.operationNet); }, className: 'value' }
       ]) + '</tbody></table></div>' : '') +
-      '<div class="foot">Relatorio gerencial para investidores. Os valores respeitam as premissas salvas em cada unidade e competencia. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.</div></div>';
+      reportFoot('Relatorio gerencial para investidores. Os valores respeitam as premissas salvas em cada unidade e competencia. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.') + '</div>';
     return shell('Relatorio de investidores - ' + (model.report && (model.report.station || model.report.scope) || 'UBY'), body, options);
   }
 
