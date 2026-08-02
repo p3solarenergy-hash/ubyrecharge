@@ -67,6 +67,8 @@ vm.createContext(context);
 vm.runInContext([
   extractFunction(html, 'monthKey'),
   extractFunction(html, 'daysInMonth'),
+  extractFunction(html, 'timeMinutes'),
+  extractFunction(html, 'stationAvailableHours'),
   extractFunction(html, 'monthCanBeClosed'),
   extractFunction(html, 'rechargeRecordHasData'),
   extractFunction(html, 'updatedAtMs'),
@@ -97,6 +99,14 @@ assert.strictEqual(context.monthCanBeClosed('2026-07', new Date(2026, 6, 18)), f
 assert.strictEqual(context.monthCanBeClosed('2026-07', new Date(2026, 6, 31)), true, 'current month may close on its last day');
 assert.strictEqual(context.monthCanBeClosed('2026-06', new Date(2026, 6, 18)), true, 'past months may be closed');
 assert.strictEqual(context.monthCanBeClosed('2026-08', new Date(2026, 6, 18)), false, 'future months must not be closed');
+
+const jardinsSchedule = { open24h: false, openTime: '08:00', closeTime: '21:00', openDays: [0, 1, 2, 3, 4, 5, 6] };
+const jardinsAvailableHours = context.stationAvailableHours(
+  jardinsSchedule,
+  new Date(2026, 7, 1, 0, 0, 0),
+  new Date(2026, 7, 2, 13, 39, 0)
+);
+assert.strictEqual(Number(jardinsAvailableHours.toFixed(2)), 18.65, 'Jardins must use 13h opening hours plus the open portion of the current day');
 
 assert.strictEqual(
   context.canonicalClubPersonName('Douglas Hugo De Oliveira Oliveira'),

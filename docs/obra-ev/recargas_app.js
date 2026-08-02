@@ -4928,6 +4928,16 @@ function occByInterval(charges, powerOverride, boundsOverride) {
   const energy = charges.reduce((s, c) => s + c.energyKWh, 0);
   return { pct: maxKWh > 0 ? energy / maxKWh * 100 : 0, hours, maxKWh, energy, power };
 }
+
+function availabilityForCurrentCharges(charges = []) {
+  const stationName = currentStationReportName || canonicalStationNameForWork(
+    currentWorkId,
+    charges[0]?.station || currentWorkName,
+    currentWorkName
+  );
+  return stationAvailabilityFor(currentWorkId, stationName, currentWorkName);
+}
+
 function occByFullMonth(charges, mk) {
   const [y, m] = mk.split('-');
   const power  = getPower();
@@ -5430,6 +5440,7 @@ function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
     .filter(date => isPlausibleChargeDate(date));
   const startBound = bounds?.start || (validDates.length ? new Date(Math.min(...validDates)) : null);
   const endBound = bounds?.end || (validDates.length ? new Date(Math.max(...validDates)) : null);
+  const availability = availabilityForCurrentCharges(charges);
   if (startBound && endBound) {
     const cursor = new Date(startBound.getFullYear(), startBound.getMonth(), startBound.getDate(), 0, 0, 0);
     const endDay = new Date(endBound.getFullYear(), endBound.getMonth(), endBound.getDate(), 0, 0, 0);
@@ -5448,7 +5459,11 @@ function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
       dayEnd.setDate(dayEnd.getDate() + 1);
       const overlapStart = Math.max(dayStart.getTime(), startBound.getTime());
       const overlapEnd = Math.min(dayEnd.getTime(), endBound.getTime());
-      groups[idx].hours = (groups[idx].hours || 0) + Math.max(overlapEnd - overlapStart, 0) / 3_600_000;
+      groups[idx].hours = (groups[idx].hours || 0) + stationAvailableHours(
+        availability,
+        new Date(overlapStart),
+        new Date(overlapEnd)
+      );
       cursor.setDate(cursor.getDate() + 1);
       guard++;
     }
@@ -5893,20 +5908,21 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
   const periodStart = options.bounds?.start || (dated.length ? new Date(Math.min(...dated.map(charge => charge.startDate))) : firstDay);
   const periodEnd = options.bounds?.end || (dated.length ? new Date(Math.max(...dated.map(charge => charge.startDate))) : lastDay);
   const calendarPower = Math.max(Number(options.power || getPower() || 0), 0);
-  // `date` recorta as horas do dia ao intervalo real de dados (igual ao card
-  // "Ocupação do período" e ao relatório semanal): o dia de hoje/último dia
-  // com recarga (ainda em andamento) conta só as horas já passadas, em vez
-  // de 24h fixas — senão esse dia mostra uma ocupação menor do que deveria
-  // comparado ao resto do painel.
-  const dayOccupation = (energy = 0, dayCount = 1, date = null) => {
-    const days = Math.max(Number(dayCount || 1), 1);
-    let hours = 24 * days;
-    if (date && periodEnd) {
+  const availability = availabilityForCurrentCharges(charges);
+  // Cada dia usa a mesma agenda operacional configurada para a estação. Em
+  // estações com expediente reduzido, 08:00-21:00 significa 13h disponíveis,
+  // nunca 24h. O intervalo é recortado no primeiro e último dia parcial.
+  const dayOccupation = (energy = 0, dates = [], clampToPeriod = true) => {
+    const hours = dates.reduce((total, date) => {
+      if (!date || Number.isNaN(date.getTime())) return total;
       const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
       const dayEnd = new Date(dayStart);
       dayEnd.setDate(dayEnd.getDate() + 1);
-      hours = Math.max((Math.min(dayEnd.getTime(), periodEnd.getTime()) - dayStart.getTime()) / 3_600_000, 0);
-    }
+      const startMs = clampToPeriod ? Math.max(dayStart.getTime(), periodStart.getTime()) : dayStart.getTime();
+      const endMs = clampToPeriod ? Math.min(dayEnd.getTime(), periodEnd.getTime()) : dayEnd.getTime();
+      if (endMs <= startMs) return total;
+      return total + stationAvailableHours(availability, new Date(startMs), new Date(endMs));
+    }, 0);
     const maxKWh = calendarPower * hours;
     const pct = maxKWh > 0 ? Number(energy || 0) / maxKWh * 100 : 0;
     const cls = pct < 15 ? 'low' : (pct < 30 ? 'mid' : 'good');
@@ -5925,7 +5941,14 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
         const item = dayOfMonthMap[day] || { revenue: 0, count: 0, energy: 0, failed: 0, newClientCount: 0, monthCount: 0 };
         const hasMovement = item.count > 0 || item.revenue > 0;
         const avgDayRevenue = item.monthCount ? item.revenue / item.monthCount : 0;
-        const occ = dayOccupation(item.energy, item.monthCount || 1);
+        const dayDates = [...(item.months || [])]
+          .filter(monthKey => monthKey && monthKey !== 'unknown')
+          .map(monthKey => {
+            const [year, month] = String(monthKey).split('-').map(Number);
+            return Number.isFinite(year) && Number.isFinite(month) ? new Date(year, month - 1, day) : null;
+          })
+          .filter(Boolean);
+        const occ = dayOccupation(item.energy, dayDates, false);
         const cls = !hasMovement ? '' : (avgDayRevenue >= 150 ? 'good' : (avgDayRevenue <= 30 ? 'down' : 'warn'));
         const tags = weatherTagsForDayOfMonth(day, external).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
         return `<div class="calendar-day ${cls}">
@@ -5951,7 +5974,7 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
       const prev = historyMap[dateKeyLocal(prevDate)] || { revenue: 0, count: 0, energy: 0, failed: 0 };
       const change = pctChange(item.revenue, prev.revenue);
       const hasMovement = item.count > 0 || item.revenue > 0;
-      const occ = dayOccupation(item.energy, 1, date);
+      const occ = dayOccupation(item.energy, [date]);
       const cls = !hasMovement ? '' : (change >= 10 ? 'good' : (change <= -10 ? 'down' : 'warn'));
       const changeText = prev.revenue > 0 || item.revenue > 0 ? `${change >= 0 ? '+' : ''}${fmtPct(change)} vs ${String(prevDate.getDate()).padStart(2,'0')}/${String(prevDate.getMonth()+1).padStart(2,'0')}` : 'sem base mes anterior';
       const tags = contextTagsForDate(date, external).map(tag => `<span class="calendar-tag ${tag.type || ''}">${escapeHtml(tag.text)}</span>`).join('');
