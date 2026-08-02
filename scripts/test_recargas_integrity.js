@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '..');
 const htmlPath = path.join(root, 'docs', 'obra-ev', 'recargas.html');
 const bridgePath = path.join(root, 'docs', 'obra-ev', 'supabase_bridge.js');
 const backupPath = path.join(root, 'docs', 'obra-ev', 'backup_guard.js');
+const financeReportsPath = path.join(root, 'docs', 'obra-ev', 'finance_reports.js');
 const migrationPath = path.join(root, 'docs', 'obra-ev', 'supabase_recargas_integrity_20260714.sql');
 const html = [
   fs.readFileSync(htmlPath, 'utf8'),
@@ -14,6 +15,7 @@ const html = [
 ].join('\n');
 const bridge = fs.readFileSync(bridgePath, 'utf8');
 const backup = fs.readFileSync(backupPath, 'utf8');
+const financeReports = fs.readFileSync(financeReportsPath, 'utf8');
 const migration = fs.readFileSync(migrationPath, 'utf8');
 
 function extractFunction(source, name) {
@@ -344,6 +346,10 @@ assert(html.includes('closingNeedsRefresh: Boolean(closedSummary && !matchesClos
 assert(!html.includes("if (closedSummary?.source === 'manual') return closedSummary;"), 'manual snapshots must never hide later valid recharges');
 assert(!html.includes('else await window.UBY_SUPABASE.saveRechargeBase(workId, record)'), 'metadata updates must never fall back to a full recharge overwrite');
 assert(!html.includes('else if (window.UBY_SUPABASE?.saveRechargeBase)'), 'financial settings must never fall back to a full recharge overwrite');
+assert(html.includes("const directPartnerDistribution = model === 'p3_society' || model === 'management_only';"), 'management-only operations must treat partner profit as a direct distribution');
+assert(html.includes('Lucro distribuido diretamente ao parceiro'), 'financial panel must identify direct partner profit clearly');
+assert(financeReports.includes("current.operationModel === 'management_only'"), 'investor report must render management-only direct distributions correctly');
+assert(financeReports.includes('Lucro acumulado distribuido ao parceiro'), 'accumulated report must label direct partner profit as a distribution');
 assert(bridge.includes('async function loadRechargeWorks()'), 'works must be loaded from the shared database');
 assert(backup.includes('const MAX_BACKUPS = 5;'), 'browser backups must be bounded');
 assert(backup.includes('"uby-recargas-db-v1"'), 'heavy cloud-backed recharge cache must be excluded from automatic browser backups');

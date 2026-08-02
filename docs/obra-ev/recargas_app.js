@@ -3988,6 +3988,7 @@ function renderFinanceiro(applySaved = true) {
   const isUbyModel = settings.operationModel === 'uby' || settings.operationModel === 'hybrid';
   const hasP3Society = settings.operationModel === 'p3_society' || settings.operationModel === 'hybrid';
   const isExternalSociety = settings.operationModel === 'p3_society';
+  const isDirectPartnerModel = isExternalSociety || settings.operationModel === 'management_only';
   const partnerName = currentWorkPartnerName();
   updateFinanceCommandSummary(result, charges, clients);
 
@@ -4001,7 +4002,7 @@ function renderFinanceiro(applySaved = true) {
     `<div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao${hasP3Society ? ' + sociedades' : ''}</div></div>`,
     isUbyModel ? `<div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos energia, custos e P3</div></div>` : '',
     hasP3Society ? `<div class="card"><div class="label">Resultado P3 na sociedade</div><div class="value">${fmtBRL(p3SocietyProfit)}</div><div class="sub">${isExternalSociety ? `${settings.p3SocietyPct}% do resultado da parceria` : 'participacao configurada em AC/DC'}</div></div>` : '',
-    isExternalSociety ? `<div class="card"><div class="label">Distribuicao ${partnerName}</div><div class="value">${fmtBRL(partnerInvestorDistribution)}</div><div class="sub">${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}% do resultado da parceria</div></div>` : '',
+    isDirectPartnerModel ? `<div class="card"><div class="label">${settings.operationModel === 'management_only' ? `Lucro distribuido ${partnerName}` : `Distribuicao ${partnerName}`}</div><div class="value">${fmtBRL(partnerInvestorDistribution)}</div><div class="sub">${settings.operationModel === 'management_only' ? 'resultado liquido pago diretamente ao parceiro' : `${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}% do resultado da parceria`}</div></div>` : '',
     isUbyModel ? `<div class="card"><div class="label">Retencao S.A.</div><div class="value">${fmtBRL(saRetention)}</div><div class="sub">${settings.saRetentionPct}% do lucro liquido UBY</div></div>` : '',
     isUbyModel ? `<div class="card"><div class="label">Investidores UBY</div><div class="value">${fmtBRL(investorDistribution)}</div><div class="sub">${settings.investorQuotaPct}% de ${fmtBRL(ubyDistributable)}</div></div>` : '',
     `<div class="card"><div class="label">Payback</div><div class="value">${formatPaybackMonths(paybackMonths)}</div><div class="sub">investimento / resultado proprio</div></div>`,
@@ -4020,7 +4021,7 @@ function renderFinanceiro(applySaved = true) {
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em AC (${settings.p3AcEquityPct}%)</td><td>${fmtBRL(p3AcEquity)}</td></tr>` : '',
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em DC (${settings.p3DcEquityPct}%)</td><td>${fmtBRL(p3DcEquity)}</td></tr>` : '',
     settings.operationModel === 'p3_society' ? `<tr><td>Resultado P3 na sociedade (${settings.p3SocietyPct}%)</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
-    isExternalSociety ? `<tr><td>Distribuicao ao socio investidor ${partnerName} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%)</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
+    isDirectPartnerModel ? `<tr><td>${settings.operationModel === 'management_only' ? `Lucro distribuido diretamente ao parceiro ${partnerName}` : `Distribuicao ao socio investidor ${partnerName} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%)`}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
     `<tr><td>Receitas extras</td><td>${fmtBRL(extraRevenue)}</td></tr>`,
     `<tr><td>Resultado operacional apos custos</td><td>${fmtBRL(operationNet)}</td></tr>`,
     `<tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>`,
@@ -4050,7 +4051,7 @@ function renderFinanceiro(applySaved = true) {
     isUbyModel ? `<tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(saRetention)}</td></tr>` : '',
     isUbyModel ? `<tr><td>Base distribuivel UBY</td><td>${fmtBRL(ubyDistributable)}</td></tr>` : '',
     partnerShare ? `<tr><td>Resultado socio/local</td><td>${fmtBRL(partnerShare)}</td></tr>` : '',
-    isExternalSociety ? `<tr><td>Distribuicao ao socio investidor ${partnerName}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
+    isDirectPartnerModel ? `<tr><td>${settings.operationModel === 'management_only' ? `Lucro distribuido diretamente ao parceiro ${partnerName}` : `Distribuicao ao socio investidor ${partnerName}`}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
     `<tr><td>Resultado proprio para payback</td><td>${fmtBRL(paybackBase)}</td></tr>`,
     `<tr><td>Resultado proprio total</td><td>${fmtBRL(ownResult)}</td></tr>`,
     isUbyModel ? `<tr><td>Repasse investidores</td><td>${fmtBRL(investorDistribution)}</td></tr>` : '',
@@ -4061,7 +4062,9 @@ function renderFinanceiro(applySaved = true) {
   document.getElementById('financeNote').innerHTML =
     isUbyModel
       ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}) e o parceiro da area recebe ${fmtBRL(result.areaParticipation)} conforme a regra cadastrada. A UBY fica com ${fmtBRL(ubyNet)} antes da retencao S.A.; ${fmtBRL(saRetention)} ficam retidos por estatuto e ${fmtBRL(investorDistribution)} sao distribuiveis aos investidores. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
-      : `Nesta parceria, o investimento total e ${fmtBRL(settings.investmentValue)}: P3 aportou ${fmtBRL(p3InvestmentValue)} (${settings.p3SocietyPct}%) e ${partnerName} aportou ${fmtBRL(partnerInvestmentValue)} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%). O resultado apos custos e dividido na mesma proporcao: P3 recebe ${fmtBRL(p3SocietyProfit)} e ${partnerName} recebe ${fmtBRL(partnerInvestorDistribution)} como distribuicao do periodo. O payback considera somente o aporte da P3. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`;
+      : settings.operationModel === 'management_only'
+        ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} pela gestao. Depois de energia, plataforma e demais custos, o lucro liquido de ${fmtBRL(partnerInvestorDistribution)} e distribuido diretamente para ${partnerName}. Esse pagamento e registrado como distribuicao do parceiro; o payback da P3 continua baseado somente na sua receita de gestao.`
+        : `Nesta parceria, o investimento total e ${fmtBRL(settings.investmentValue)}: P3 aportou ${fmtBRL(p3InvestmentValue)} (${settings.p3SocietyPct}%) e ${partnerName} aportou ${fmtBRL(partnerInvestmentValue)} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%). O resultado apos custos e dividido na mesma proporcao: P3 recebe ${fmtBRL(p3SocietyProfit)} e ${partnerName} recebe ${fmtBRL(partnerInvestorDistribution)} como distribuicao do periodo. O payback considera somente o aporte da P3. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`;
   updateFinanceRuleOutputs(result);
   renderFinanceOperationalResults(result);
   renderOwnerAreaReportForCurrentMonth();
@@ -4445,8 +4448,12 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const saRetention = Math.max(ubyNet, 0) * cfg.saRetentionPct / 100;
   const ubyDistributable = Math.max(ubyNet - saRetention, 0);
   const investorDistribution = ubyDistributable * cfg.investorQuotaPct / 100;
-  const partnerInvestorDistribution = model === 'p3_society' ? Math.max(partnerShare, 0) : 0;
-  const finalDistribution = model === 'p3_society' ? partnerInvestorDistribution : investorDistribution;
+  // Em sociedade e em operacao somente de gestao, o parceiro recebe o lucro
+  // liquido diretamente. Isso e uma distribuicao real do periodo, ainda que
+  // nao passe pela estrutura de cotas da UBY.
+  const directPartnerDistribution = model === 'p3_society' || model === 'management_only';
+  const partnerInvestorDistribution = directPartnerDistribution ? Math.max(partnerShare, 0) : 0;
+  const finalDistribution = directPartnerDistribution ? partnerInvestorDistribution : investorDistribution;
   const ubyRetained = ubyNet - investorDistribution;
   const p3OperationalResult = management + p3SocietyProfit;
   const ownResult = ubyNet + p3SocietyProfit;
