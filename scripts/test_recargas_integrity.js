@@ -328,6 +328,10 @@ assert(bridge.includes('replace_recharge_sessions'), 'normalized session replace
 assert(html.includes('canonicalClubPersonName'), 'club participants must support conservative normalized-name matching');
 assert(html.includes('person:${canonicalName}'), 'club identity keys must include the canonical participant name');
 assert(html.includes('monthlyInsightsTimer = setTimeout'), 'monthly secondary insights must not block the primary dashboard');
+assert(html.includes('function monthLiveSummary(mk, power = getPower())'), 'monthly rows must derive their values from the consolidated recharge base');
+assert(html.includes('function reconcileMonthlyClosingsWithCharges()'), 'stored monthly closings must reconcile after complementary imports');
+assert(html.includes('closingNeedsRefresh: Boolean(closedSummary && !matchesClosing)'), 'a stale closing must be flagged instead of silently replacing live monthly values');
+assert(!html.includes("if (closedSummary?.source === 'manual') return closedSummary;"), 'manual snapshots must never hide later valid recharges');
 assert(!html.includes('else await window.UBY_SUPABASE.saveRechargeBase(workId, record)'), 'metadata updates must never fall back to a full recharge overwrite');
 assert(!html.includes('else if (window.UBY_SUPABASE?.saveRechargeBase)'), 'financial settings must never fall back to a full recharge overwrite');
 assert(bridge.includes('async function loadRechargeWorks()'), 'works must be loaded from the shared database');

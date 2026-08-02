@@ -715,6 +715,9 @@ function rechargeSummary() {
 }
 
 function buildRechargeRecord() {
+  // Fechamentos registram a auditoria do mês, mas não podem permanecer
+  // divergentes depois que uma importação complementar corrige a base.
+  reconcileMonthlyClosingsWithCharges();
   const updatedAt = new Date().toISOString();
   return {
     workId: currentWorkId,
@@ -969,6 +972,9 @@ function applyRechargeRecord(record, sourceLabel) {
     .filter(charge => !stationBlockedForWork(currentWorkId, charge.station))
     .filter(charge => chargeBelongsToWork(charge, currentWorkId, currentWorkName)));
   monthlyClosings = record?.monthlyClosings || record?.summary?.monthlyClosings || {};
+  // Corrige em memória snapshots antigos antes de qualquer indicador ser
+  // renderizado. A persistência ocorre na próxima alteração salva da obra.
+  reconcileMonthlyClosingsWithCharges();
   financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
   stationAvailability = record?.stationAvailability || record?.summary?.stationAvailability || {};
   ubyOperationOverrides = record?.ubyOperationOverrides || record?.summary?.ubyOperationOverrides || {};
@@ -2277,6 +2283,53 @@ function monthSummaryFromClosing(closing) {
   };
 }
 
+function monthLiveSummary(mk, power = getPower()) {
+  const charges = chargesForMonth(mk);
+  if (!charges.length) return null;
+  const rev = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const occI = occByInterval(charges, power, periodWindow(charges, mk, 'mtd'));
+  const occF = occByFullMonth(charges, mk);
+  const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  return {
+    label: monthLabel(mk), mk, rev, energy,
+    occI: occI.pct, occF: occF.pct,
+    count: charges.length, clients,
+    avgTkt: charges.length ? rev / charges.length : 0
+  };
+}
+
+function closingMatchesLiveSummary(closing, summary) {
+  if (!closing || !summary) return false;
+  const sameRevenue = Math.round(Number(closing.revenue || 0) * 100) === Math.round(Number(summary.rev || 0) * 100);
+  const sameEnergy = Math.round(Number(closing.energyKWh || 0) * 1000) === Math.round(Number(summary.energy || 0) * 1000);
+  return Number(closing.charges || 0) === Number(summary.count || 0)
+    && Number(closing.clients || 0) === Number(summary.clients || 0)
+    && sameRevenue && sameEnergy;
+}
+
+function reconcileMonthlyClosingsWithCharges() {
+  let changed = false;
+  const next = { ...(monthlyClosings || {}) };
+  Object.entries(next).forEach(([mk, closing]) => {
+    if (!monthCanBeClosed(mk) || !closingMatchesMonth(closing, mk)) return;
+    const live = monthLiveSummary(mk);
+    if (!live || closingMatchesLiveSummary(closing, live)) return;
+    const refreshed = buildMonthClosing(mk);
+    if (!refreshed) return;
+    next[mk] = {
+      ...refreshed,
+      source: closing.source === 'manual' || closing.source === 'manual-reconciled' ? 'manual-reconciled' : 'latest_upload',
+      closedAt: closing.closedAt || refreshed.closedAt,
+      originalClosedAt: closing.originalClosedAt || closing.closedAt || '',
+      reconciledAt: new Date().toISOString()
+    };
+    changed = true;
+  });
+  if (changed) monthlyClosings = next;
+  return changed;
+}
+
 function occupancyFromClosing(closing = {}) {
   const energy = Number(closing.energyKWh || 0);
   const power = Number(closing.power || getPower());
@@ -2314,17 +2367,27 @@ function closingMatchesMonth(closing, mk = closing?.month) {
 
 function monthSummaryForMonth(mk, power = getPower()) {
   const closedSummary = monthHasEffectiveClosing(mk) ? monthSummaryFromClosing(monthlyClosings?.[mk]) : null;
-  if (closedSummary?.source === 'manual') return closedSummary;
-  const ch = chargesForMonth(mk);
-  if (ch.length) {
-    const revM = ch.reduce((s,c) => s+c.revenue, 0);
-    const enerM = ch.reduce((s,c) => s+c.energyKWh, 0);
-    const occI = occByInterval(ch, power, periodWindow(ch, mk, 'mtd'));
-    const occF = occByFullMonth(ch, mk);
-    const cln = new Set(ch.map(c => c.userEmail||c.userName)).size;
-    return { label: monthLabel(mk), mk, rev: revM, energy: enerM, occI: occI.pct, occF: occF.pct, count: ch.length, clients: cln, avgTkt: ch.length ? revM/ch.length : 0, fromClosing: false };
+  const liveSummary = monthLiveSummary(mk, power);
+  if (liveSummary) {
+    // A base consolidada é a fonte operacional. O snapshot de fechamento
+    // é preservado para auditoria, mas não pode esconder recargas posteriores.
+    const matchesClosing = Boolean(closedSummary && closingMatchesLiveSummary(monthlyClosings?.[mk], liveSummary));
+    return {
+      ...liveSummary,
+      fromClosing: matchesClosing,
+      closed: monthCanBeClosed(mk),
+      closingNeedsRefresh: Boolean(closedSummary && !matchesClosing)
+    };
   }
   return closedSummary;
+}
+
+function monthClosingBadge(summary) {
+  if (!summary?.closed && !summary?.fromClosing) return '';
+  if (summary.closingNeedsRefresh) {
+    return ' <span style="color:var(--p3-warn);font-size:11px">(fechado; base atualizada)</span>';
+  }
+  return ' <span style="color:var(--p3-muted);font-size:11px">(fechado)</span>';
 }
 
 function renderMonthClosing(mk) {
@@ -2342,7 +2405,11 @@ function renderMonthClosing(mk) {
     table.innerHTML = `<tr><td colspan="9" style="color:var(--p3-muted)">Clique em Fechar mes para salvar o fechamento de ${monthLabel(mk)}.</td></tr>`;
     return;
   }
-  status.textContent = `${closing.source === 'manual' ? 'Fechamento manual' : 'Ultima base do mes'} salva para ${monthLabel(mk)}.`;
+  const live = monthLiveSummary(mk);
+  const needsRefresh = Boolean(live && !closingMatchesLiveSummary(closing, live));
+  status.textContent = needsRefresh
+    ? `A base de ${monthLabel(mk)} foi atualizada depois do fechamento. Os indicadores usam a base consolidada; o snapshot sera reconciliado no proximo salvamento.`
+    : `${closing.source === 'manual' || closing.source === 'manual-reconciled' ? 'Fechamento manual' : 'Ultima base do mes'} salva para ${monthLabel(mk)}.`;
   table.innerHTML = `<tr>
     <td>${monthLabel(closing.month)}</td>
     <td>${closing.charges}</td>
@@ -9495,7 +9562,7 @@ function renderMonthlyTable() {
   document.getElementById('monthlyTable').innerHTML = getMonths().map(mk => {
     const summary = monthSummaryForMonth(mk);
     return `<tr>
-      <td>${mk}${summary?.fromClosing ? ' <span style="color:var(--p3-muted);font-size:11px">(fechado)</span>' : ''}</td><td>${summary?.count || 0}</td><td>${summary?.clients || 0}</td>
+      <td>${mk}${monthClosingBadge(summary)}</td><td>${summary?.count || 0}</td><td>${summary?.clients || 0}</td>
       <td>${(summary?.energy || 0).toFixed(2).replace('.',',')}</td>
       <td>${fmtBRL(summary?.rev || 0)}</td><td>${fmtBRL(summary?.avgTkt || 0)}</td>
       <td>${fmtPct(summary?.occI || 0)}</td><td>${fmtPct(summary?.occF || 0)}</td>
@@ -10018,7 +10085,7 @@ function renderAcumulado() {
   // Tabela histórica
   document.getElementById('accMonthTable').innerHTML = md.map(d =>
     `<tr>
-       <td>${d.label}${d.fromClosing ? ' <span style="color:var(--p3-muted);font-size:11px">(fechado)</span>' : ''}</td><td>${d.count}</td><td>${d.clients}</td>
+       <td>${d.label}${monthClosingBadge(d)}</td><td>${d.count}</td><td>${d.clients}</td>
        <td>${d.energy.toFixed(2).replace('.',',')}</td>
        <td>${fmtBRL(d.rev)}</td><td>${fmtBRL(d.avgTkt)}</td>
        <td>${fmtPct(d.occI)}</td><td>${fmtPct(d.occF)}</td>
