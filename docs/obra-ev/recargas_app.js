@@ -9753,6 +9753,70 @@ function renderTechDiagnostic(charges) {
 // ══════════════════════════════════════════════════════════
 //  TAB ACUMULADO
 // ══════════════════════════════════════════════════════════
+function renderAccumulatedFinanceCharts(rows = [], investmentValue = 0) {
+  const labels = rows.map(row => row.label);
+  const axis = {
+    x: { ticks: { color: '#8FA39A', font: { size: 11 } }, grid: { color: '#24364E' } },
+    y: { beginAtZero: true, ticks: { color: '#8FA39A', font: { size: 11 } }, grid: { color: '#24364E' } }
+  };
+  const lineOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    normalized: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { labels: { color: '#B7C9D9', boxWidth: 12 } },
+      tooltip: { callbacks: { label: context => `${context.dataset.label}: ${fmtBRL(context.raw || 0)}` } }
+    },
+    scales: {
+      x: axis.x,
+      y: { ...axis.y, ticks: { ...axis.y.ticks, callback: value => fmtBRL(value) } }
+    }
+  };
+  const paybackCtx = document.getElementById('chartPaybackAccumulated');
+  destroyChart('chartPaybackAccumulated');
+  if (paybackCtx) {
+    charts.chartPaybackAccumulated = new Chart(paybackCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Resultado recuperado',
+            data: rows.map(row => row.cumulativePayback),
+            borderColor: '#38C96F', backgroundColor: 'rgba(56,201,111,.14)',
+            pointBackgroundColor: '#38C96F', borderWidth: 3, tension: .28, fill: true
+          },
+          {
+            label: 'Investimento cadastrado',
+            data: rows.map(() => investmentValue),
+            borderColor: '#57B7FF', pointRadius: 0, borderWidth: 2, borderDash: [7, 5], tension: 0, fill: false
+          }
+        ]
+      },
+      options: lineOptions
+    });
+  }
+  const resultCtx = document.getElementById('chartAccumulatedResult');
+  destroyChart('chartAccumulatedResult');
+  if (resultCtx) {
+    charts.chartAccumulatedResult = new Chart(resultCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Resultado operacional acumulado',
+          data: rows.map(row => row.cumulativeOperationNet),
+          borderColor: '#57B7FF', backgroundColor: 'rgba(87,183,255,.13)',
+          pointBackgroundColor: '#57B7FF', borderWidth: 3, tension: .28, fill: true
+        }]
+      },
+      options: lineOptions
+    });
+  }
+}
+
 function renderAcumulado() {
   const months = getMonths();
   const power  = getPower();
@@ -9803,6 +9867,48 @@ function renderAcumulado() {
       <div class="sub">${totalCharges} recarga(s) em ${calendarDays} dia(s)</div></div>
   `;
 
+  // Cada linha usa as regras financeiras salvas no proprio mes. Assim, uma
+  // mudanca de tarifa, plataforma ou custo fixo hoje nao reescreve o historico.
+  const financeLastMonth = months.at(-1) || financeMonthKey();
+  const financeTimeline = financeLastMonth ? currentWorkInvestorTimeline(financeLastMonth) : [];
+  const financeTotal = aggregateInvestorEntries(financeTimeline);
+  const investmentValue = Number(financeTotal.investmentValue || 0);
+  let cumulativeOperationNet = 0;
+  let cumulativePayback = 0;
+  const financeRows = financeTimeline.map(entry => {
+    cumulativeOperationNet += Number(entry.operationNet || 0);
+    cumulativePayback += Number(entry.result?.paybackBase || 0);
+    return {
+      ...entry,
+      cumulativeOperationNet,
+      cumulativePayback,
+      remainingInvestment: investmentValue > 0 ? Math.max(investmentValue - cumulativePayback, 0) : 0
+    };
+  });
+  const recoveredPct = investmentValue > 0 ? cumulativePayback / investmentValue * 100 : 0;
+  const monthlyPaybackBase = financeRows.length ? cumulativePayback / financeRows.length : 0;
+  const estimatedPaybackMonths = investmentValue > 0 && monthlyPaybackBase > 0 ? investmentValue / monthlyPaybackBase : 0;
+  const financialKpis = document.getElementById('accFinancialKpis');
+  if (financialKpis) financialKpis.innerHTML = `
+    <div class="finance-result-card"><span>Receita financeira acumulada</span><strong>${fmtBRL(financeTotal.totalRevenue || 0)}</strong><small>recargas e receitas extras</small></div>
+    <div class="finance-result-card warn"><span>Custos operacionais acumulados</span><strong>${fmtBRL(financeTotal.totalOperatingCost || 0)}</strong><small>${fmtBRL(financeTotal.totalCostPerKWh || 0)}/kWh no acumulado</small></div>
+    <div class="finance-result-card ${(financeTotal.operationNet || 0) >= 0 ? 'good' : 'bad'}"><span>Resultado operacional acumulado</span><strong>${fmtBRL(financeTotal.operationNet || 0)}</strong><small>margem ${fmtPct(financeTotal.operationMargin || 0)}</small></div>
+    <div class="finance-result-card ${(cumulativePayback || 0) >= 0 ? 'good' : 'bad'}"><span>Resultado para payback</span><strong>${fmtBRL(cumulativePayback)}</strong><small>resultado proprio recuperavel</small></div>
+    <div class="finance-result-card"><span>Investimento cadastrado</span><strong>${investmentValue > 0 ? fmtBRL(investmentValue) : '-'}</strong><small>${investmentValue > 0 ? `${fmtPct(recoveredPct)} recuperado` : 'informe no financeiro para calcular'}</small></div>
+    <div class="finance-result-card ${investmentValue > 0 && cumulativePayback >= investmentValue ? 'good' : 'warn'}"><span>Saldo a recuperar</span><strong>${investmentValue > 0 ? fmtBRL(Math.max(investmentValue - cumulativePayback, 0)) : '-'}</strong><small>${investmentValue > 0 ? formatPaybackMonths(estimatedPaybackMonths) : 'payback indisponivel'}</small></div>
+  `;
+  const financeTable = document.getElementById('accFinancialTable');
+  if (financeTable) financeTable.innerHTML = financeRows.length ? financeRows.map(row => `
+    <tr>
+      <td>${row.label}</td>
+      <td>${fmtBRL(row.totalRevenue || 0)}</td>
+      <td>${fmtBRL(row.totalOperatingCost || 0)}</td>
+      <td style="color:${row.operationNet >= 0 ? 'var(--p3-accent)' : 'var(--p3-danger)'};font-weight:700">${fmtBRL(row.operationNet || 0)}</td>
+      <td style="color:${row.cumulativeOperationNet >= 0 ? 'var(--p3-primary)' : 'var(--p3-danger)'};font-weight:700">${fmtBRL(row.cumulativeOperationNet)}</td>
+      <td style="color:${row.cumulativePayback >= 0 ? 'var(--p3-accent)' : 'var(--p3-danger)'};font-weight:700">${fmtBRL(row.cumulativePayback)}</td>
+      <td>${investmentValue > 0 ? fmtBRL(row.remainingInvestment) : '-'}</td>
+    </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--p3-muted)">Sem meses financeiros para consolidar.</td></tr>';
+
   renderVisualSummary('accVisualSummary', allCharges, { occ: { pct: totalOcc, energy, power, hours: 0, maxKWh: 0 }, historyCharges: allCharges });
 
   // Gráficos simples
@@ -9812,6 +9918,8 @@ function renderAcumulado() {
     x: { ticks:{color:'#8FA39A',font:{size:11}}, grid:{color:'#24364E'} },
     y: { beginAtZero:true, ticks:{color:'#8FA39A',font:{size:11}}, grid:{color:'#24364E'} }
   };
+
+  renderAccumulatedFinanceCharts(financeRows, investmentValue);
 
   function mkBarChart(id, labels, values, unit, color) {
     destroyChart(id);

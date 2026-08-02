@@ -1609,6 +1609,33 @@
 
     <section class="grid kpis" style="margin-top:0" id="kpiAcc"></section>
 
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Resultado financeiro acumulado</h2>
+        <p class="sub" style="margin:-4px 0 0">Consolida cada mes com os parametros financeiros que estavam vigentes naquele periodo.</p>
+        <div class="finance-results" id="accFinancialKpis"></div>
+      </div>
+    </section>
+
+    <div class="acc-grid">
+      <div class="card"><h2>Payback - resultado acumulado</h2>
+        <canvas id="chartPaybackAccumulated" aria-label="Payback com resultado acumulado"></canvas></div>
+      <div class="card"><h2>Resultado operacional acumulado</h2>
+        <canvas id="chartAccumulatedResult" aria-label="Resultado operacional acumulado"></canvas></div>
+    </div>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Memoria financeira por mes</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Mes</th><th>Receita total</th><th>Custos operacionais</th><th>Resultado do mes</th><th>Resultado acumulado</th><th>Recuperado no payback</th><th>Saldo a recuperar</th></tr></thead>
+            <tbody id="accFinancialTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section class="section weekday-report" id="weekdayOccupancyAcc"></section>
 
     <div class="acc-grid">
