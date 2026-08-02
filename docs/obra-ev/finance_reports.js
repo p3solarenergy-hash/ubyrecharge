@@ -270,16 +270,19 @@
     var revenueItems = model.revenueItems || [];
     var capital = investorCapitalTimeline(timeline, accumulated);
     var externalSociety = current.operationModel === 'p3_society';
-    var directPartnerModel = externalSociety || current.operationModel === 'management_only';
+    var thirdPartyManagement = current.operationModel === 'third_party_management';
+    var directPartnerModel = externalSociety || current.operationModel === 'management_only' || thirdPartyManagement;
     var partnerName = model.report && model.report.partnerName || 'socio investidor';
     var partnerPct = Math.max(100 - num(current.settings && current.settings.p3SocietyPct), 0);
     var distributionLabel = externalSociety
       ? 'Distribuicao ao socio investidor ' + partnerName
       : current.operationModel === 'management_only'
         ? 'Lucro distribuido diretamente ao parceiro ' + partnerName
+        : thirdPartyManagement
+          ? 'Lucro distribuido diretamente ao parceiro ' + partnerName
         : 'Distribuicao final aos investidores';
     var paybackCapitalLabel = externalSociety ? 'Aporte P3 considerado no payback' : 'Investimento considerado';
-    var reportAudience = externalSociety ? 'UBY Recharge - parceria' : (current.operationModel === 'management_only' ? 'UBY Recharge - prestacao de gestao' : 'UBY Recharge - investidores');
+    var reportAudience = externalSociety ? 'UBY Recharge - parceria' : ((current.operationModel === 'management_only' || thirdPartyManagement) ? 'P3 gestao e UBY Recharge' : 'UBY Recharge - investidores');
     var body = '<div class="report">' + header(model, reportAudience, 'Relatorio de desempenho e resultado') +
       metrics([
         { value: pct(current.occupancyPct), label: 'Ocupacao do periodo', className: current.occupancyPct >= num(current.targetOccPct) ? 'positive' : 'negative' },
@@ -295,6 +298,8 @@
       '<tr><td>Faturamento das recargas</td><td class="value">' + esc(brl(current.revenue)) + '</td></tr>' +
       '<tr><td>Receitas adicionais</td><td class="value">' + esc(brl(current.extraRevenue)) + '</td></tr>' +
       '<tr class="total-row"><td>Receitas totais</td><td class="value">' + esc(brl(current.totalRevenue)) + '</td></tr>' +
+      '<tr><td>Gestao P3</td><td class="value">' + esc(brl(current.management)) + '</td></tr>' +
+      (thirdPartyManagement ? '<tr><td>Royalty de marca UBY</td><td class="value">' + esc(brl(current.ubyRoyalty)) + '</td></tr>' : '') +
       '<tr><td>Custos operacionais</td><td class="value">' + esc(brl(current.totalOperatingCost)) + '</td></tr>' +
       '<tr class="total-row"><td>Resultado operacional</td><td class="value">' + esc(brl(current.operationNet)) + '</td></tr>' +
       '</tbody></table></div><div class="panel"><h3>Indicadores de capital</h3><table><tbody>' +
@@ -319,7 +324,7 @@
         { value: pct(accumulated.occupancyPct), label: 'Ocupacao media ponderada' },
         { value: perKwh(accumulated.totalCostPerKWh), label: 'Custo medio acumulado' },
         { value: pct(accumulated.operationMargin), label: 'Margem acumulada' },
-        { value: brl(capital.distribution), label: externalSociety ? 'Distribuicao acumulada ao socio investidor' : (current.operationModel === 'management_only' ? 'Lucro acumulado distribuido ao parceiro' : 'Distribuicao acumulada aos investidores'), className: capital.distribution >= 0 ? 'positive' : 'negative' },
+        { value: brl(capital.distribution), label: externalSociety ? 'Distribuicao acumulada ao socio investidor' : ((current.operationModel === 'management_only' || thirdPartyManagement) ? 'Lucro acumulado distribuido ao parceiro' : 'Distribuicao acumulada aos investidores'), className: capital.distribution >= 0 ? 'positive' : 'negative' },
         { value: brl(capital.recovered), label: 'Resultado recuperado no payback', className: capital.recovered >= 0 ? 'positive' : 'negative' },
         { value: brl(capital.remainingInvestment), label: 'Saldo a recuperar' },
         { value: pct(capital.roiAccumulated), label: 'ROI acumulado' },
@@ -327,7 +332,7 @@
       ]) + '</div>' +
       '<div class="section avoid"><div class="section-title"><h2>Evolucao do payback</h2><span>Resultado acumulado versus investimento considerado</span></div>' +
       timelineBars(capital.rows, 'cumulativePayback', brl) +
-      '<table><thead><tr><th>Mes</th><th>Resultado para payback</th><th>Recuperado acumulado</th><th>' + esc(externalSociety ? 'Distribuicao socio investidor' : (current.operationModel === 'management_only' ? 'Lucro distribuido ao parceiro' : 'Distribuicao investidores')) + '</th><th>Saldo a recuperar</th></tr></thead><tbody>' + rows(capital.rows, [
+      '<table><thead><tr><th>Mes</th><th>Resultado para payback</th><th>Recuperado acumulado</th><th>' + esc(externalSociety ? 'Distribuicao socio investidor' : ((current.operationModel === 'management_only' || thirdPartyManagement) ? 'Lucro distribuido ao parceiro' : 'Distribuicao investidores')) + '</th><th>Saldo a recuperar</th></tr></thead><tbody>' + rows(capital.rows, [
         { value: 'label' },
         { value: function (item) { return brl(item.paybackBase); }, className: 'value' },
         { value: function (item) { return brl(item.cumulativePayback); }, className: 'value' },
@@ -354,7 +359,9 @@
         ? 'Relatorio da parceria. O investimento total e dividido entre P3 e o socio investidor conforme a participacao cadastrada. O payback usa somente o aporte da P3; a distribuicao mostra a parcela do socio investidor apos os custos da operacao. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.'
         : current.operationModel === 'management_only'
           ? 'Relatorio de prestacao de gestao. O lucro distribuido mostra o valor liquido pago diretamente ao parceiro apos energia, plataforma e demais custos. O payback da P3 considera somente a remuneracao de gestao. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.'
-        : 'Relatorio gerencial para investidores. A distribuicao final corresponde ao valor liquido para os cotistas apos a retencao estatutaria e o percentual de cotas configurado. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.') + '</div>';
+          : thirdPartyManagement
+            ? 'Relatorio de gestao com marca UBY. A P3 recebe a remuneracao de gestao e a UBY recebe o royalty de marca configurado. O lucro distribuido mostra o valor liquido pago diretamente ao parceiro apos energia, plataforma e demais custos. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.'
+          : 'Relatorio gerencial para investidores. A distribuicao final corresponde ao valor liquido para os cotistas apos a retencao estatutaria e o percentual de cotas configurado. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.') + '</div>';
     return shell((directPartnerModel ? 'Relatorio da parceria - ' : 'Relatorio de investidores - ') + (model.report && (model.report.station || model.report.scope) || 'UBY'), body, options);
   }
 

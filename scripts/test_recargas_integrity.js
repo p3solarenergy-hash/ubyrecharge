@@ -346,9 +346,11 @@ assert(html.includes('closingNeedsRefresh: Boolean(closedSummary && !matchesClos
 assert(!html.includes("if (closedSummary?.source === 'manual') return closedSummary;"), 'manual snapshots must never hide later valid recharges');
 assert(!html.includes('else await window.UBY_SUPABASE.saveRechargeBase(workId, record)'), 'metadata updates must never fall back to a full recharge overwrite');
 assert(!html.includes('else if (window.UBY_SUPABASE?.saveRechargeBase)'), 'financial settings must never fall back to a full recharge overwrite');
-assert(html.includes("const directPartnerDistribution = model === 'p3_society' || model === 'management_only';"), 'management-only operations must treat partner profit as a direct distribution');
+assert(html.includes("const directPartnerDistribution = model === 'p3_society' || model === 'management_only' || model === 'third_party_management';"), 'direct partner models must treat partner profit as a direct distribution');
 assert(html.includes('Lucro distribuido diretamente ao parceiro'), 'financial panel must identify direct partner profit clearly');
-assert(financeReports.includes("current.operationModel === 'management_only'"), 'investor report must render management-only direct distributions correctly');
+assert(html.includes('Royalty de marca UBY'), 'financial panel must keep the UBY brand royalty separate from P3 management and third-party platform costs');
+assert(html.includes('Faturamento de gestao P3 por mes'), 'general finance must expose monthly P3 management income');
+assert(financeReports.includes("current.operationModel === 'third_party_management'"), 'investor report must render third-party P3 and UBY management correctly');
 assert(financeReports.includes('Lucro acumulado distribuido ao parceiro'), 'accumulated report must label direct partner profit as a distribution');
 assert(bridge.includes('async function loadRechargeWorks()'), 'works must be loaded from the shared database');
 assert(backup.includes('const MAX_BACKUPS = 5;'), 'browser backups must be bounded');

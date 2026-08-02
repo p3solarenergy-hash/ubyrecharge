@@ -2456,6 +2456,7 @@ function defaultFinanceSettings() {
     p3AcEquityPct: 0,
     p3DcEquityPct: 0,
     platformPct: 0,
+    ubyRoyaltyPct: 0,
     energyCostPerKWh: 0,
     investmentValue: 0,
     investorQuotaPct: 100,
@@ -2567,6 +2568,7 @@ function currentFinanceSettingsFromInputs() {
     p3AcEquityPct: numberInputValue('financeP3AcEquityPct', 0),
     p3DcEquityPct: numberInputValue('financeP3DcEquityPct', 0),
     platformPct: numberInputValue('financePlatformPct', 0),
+    ubyRoyaltyPct: numberInputValue('financeUbyRoyaltyPct', 0),
     energyCostPerKWh,
     investmentValue: numberInputValue('financeInvestmentValue', 0),
     investorQuotaPct: numberInputValue('financeInvestorQuotaPct', 100),
@@ -2890,6 +2892,7 @@ function applyFinanceSettingsToInputs(settings = {}) {
     financeP3AcEquityPct: merged.p3AcEquityPct,
     financeP3DcEquityPct: merged.p3DcEquityPct,
     financePlatformPct: merged.platformPct,
+    financeUbyRoyaltyPct: merged.ubyRoyaltyPct,
     financeEnergyCost: merged.energyCostPerKWh,
     financeInvestmentValue: merged.investmentValue,
     financeInvestorQuotaPct: merged.investorQuotaPct,
@@ -3411,6 +3414,14 @@ function financeRuleReportItems(result = {}, settings = {}, type = 'cost') {
     actualPerKWh: energy > 0 ? Number(result.platform || 0) / energy : null,
     plannedPerKWh: planningKWh > 0 ? Number(result.planning?.planningRevenue || 0) * Number(settings.platformPct || 0) / 100 / planningKWh : null
   });
+  if (Number(result.ubyRoyalty || 0) || Number(settings.ubyRoyaltyPct || 0)) {
+    items.push({
+      id: 'ubyRoyalty', label: 'Royalty de marca UBY', rule: `${fmtPct(settings.ubyRoyaltyPct || 0)} do faturamento`, amount: Number(result.ubyRoyalty || 0),
+      plannedAmount: Number(result.planning?.planningRevenue || 0) * Number(settings.ubyRoyaltyPct || 0) / 100,
+      actualPerKWh: energy > 0 ? Number(result.ubyRoyalty || 0) / energy : null,
+      plannedPerKWh: planningKWh > 0 ? Number(result.planning?.planningRevenue || 0) * Number(settings.ubyRoyaltyPct || 0) / 100 / planningKWh : null
+    });
+  }
   if (result.areaEligible && (Number(result.areaParticipation || 0) || Number(result.plannedAreaParticipation || 0))) {
     items.push({
       id: 'area', label: 'Parceiro da area', rule: `${fmtPct(result.areaSharePct || 0)} sobre ${settings.ownerTransferMode === 'net' ? 'lucro liquido' : 'faturamento'}`,
@@ -3440,6 +3451,8 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
     targetOccPct: Number(settings.targetOccPct || 0),
     planningKWh: Number(result.planning?.planningKWh || 0),
     totalOperatingCost: Number(result.totalOperatingCost || 0),
+    management: Number(result.management || 0),
+    ubyRoyalty: Number(result.ubyRoyalty || 0),
     operationNet: Number(result.operationNet || 0),
     operationMargin: Number(result.operationMargin || 0),
     totalCostPerKWh: result.totalCostPerKWh,
@@ -3465,7 +3478,7 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
 }
 
 function aggregateInvestorEntries(entries = [], investmentValue = null) {
-  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','operationNet','paybackBase','saRetention','investorDistribution','partnerInvestorDistribution','finalDistribution','ubyRetained'];
+  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','management','ubyRoyalty','operationNet','paybackBase','saRetention','investorDistribution','partnerInvestorDistribution','finalDistribution','ubyRetained'];
   const total = numeric.reduce((acc, key) => ({ ...acc, [key]: entries.reduce((sum, entry) => sum + Number(entry[key] || 0), 0) }), {});
   total.occupancyPct = total.maxKWh > 0 ? total.energy / total.maxKWh * 100 : 0;
   total.totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
@@ -3981,28 +3994,30 @@ function renderFinanceiro(applySaved = true) {
   updateFinanceModelVisibility(settings.operationModel);
   const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
-  const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, partnerInvestorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin, p3InvestmentValue, partnerInvestmentValue } = result;
+  const { revenue, energy, acRevenue, dcRevenue, management, platform, ubyRoyalty, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, partnerInvestorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin, p3InvestmentValue, partnerInvestmentValue } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
   const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
   const p3TakePct = revenue ? p3Gross / revenue * 100 : 0;
   const isUbyModel = settings.operationModel === 'uby' || settings.operationModel === 'hybrid';
   const hasP3Society = settings.operationModel === 'p3_society' || settings.operationModel === 'hybrid';
   const isExternalSociety = settings.operationModel === 'p3_society';
-  const isDirectPartnerModel = isExternalSociety || settings.operationModel === 'management_only';
+  const hasUbyRoyalty = settings.operationModel === 'third_party_management';
+  const isDirectPartnerModel = isExternalSociety || settings.operationModel === 'management_only' || hasUbyRoyalty;
   const partnerName = currentWorkPartnerName();
   updateFinanceCommandSummary(result, charges, clients);
 
   document.getElementById('financeHeroMeta').innerHTML =
     `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}`;
   document.getElementById('financeFormula').innerHTML =
-    `<strong>${operationModelLabel(settings.operationModel)}</strong><br>P3: gestao ${settings.managementPct}% + sociedade configurada. App/plataforma ${settings.platformPct}% e servico de terceiros.<br>Meta ocupacao: ${fmtPct(target.targetOccPct)} | real ${fmtPct(target.realOccPct)}<br><strong style="color:#57B7FF">Payback: ${formatPaybackMonths(paybackMonths)}</strong>`;
+    `<strong>${operationModelLabel(settings.operationModel)}</strong><br>P3: gestao ${settings.managementPct}%${hasUbyRoyalty ? ` | UBY: royalty de marca ${settings.ubyRoyaltyPct}%` : ''}. App/plataforma de terceiros ${settings.platformPct}%.<br>Meta ocupacao: ${fmtPct(target.targetOccPct)} | real ${fmtPct(target.realOccPct)}<br><strong style="color:#57B7FF">Payback: ${formatPaybackMonths(paybackMonths)}</strong>`;
 
   document.getElementById('financeKpis').innerHTML = [
     `<div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>`,
     `<div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao${hasP3Society ? ' + sociedades' : ''}</div></div>`,
+    hasUbyRoyalty ? `<div class="card"><div class="label">Royalty UBY</div><div class="value">${fmtBRL(ubyRoyalty)}</div><div class="sub">${settings.ubyRoyaltyPct}% pela utilizacao da marca</div></div>` : '',
     isUbyModel ? `<div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos energia, custos e P3</div></div>` : '',
     hasP3Society ? `<div class="card"><div class="label">Resultado P3 na sociedade</div><div class="value">${fmtBRL(p3SocietyProfit)}</div><div class="sub">${isExternalSociety ? `${settings.p3SocietyPct}% do resultado da parceria` : 'participacao configurada em AC/DC'}</div></div>` : '',
-    isDirectPartnerModel ? `<div class="card"><div class="label">${settings.operationModel === 'management_only' ? `Lucro distribuido ${partnerName}` : `Distribuicao ${partnerName}`}</div><div class="value">${fmtBRL(partnerInvestorDistribution)}</div><div class="sub">${settings.operationModel === 'management_only' ? 'resultado liquido pago diretamente ao parceiro' : `${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}% do resultado da parceria`}</div></div>` : '',
+    isDirectPartnerModel ? `<div class="card"><div class="label">${(settings.operationModel === 'management_only' || hasUbyRoyalty) ? `Lucro distribuido ${partnerName}` : `Distribuicao ${partnerName}`}</div><div class="value">${fmtBRL(partnerInvestorDistribution)}</div><div class="sub">${(settings.operationModel === 'management_only' || hasUbyRoyalty) ? 'resultado liquido pago diretamente ao parceiro' : `${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}% do resultado da parceria`}</div></div>` : '',
     isUbyModel ? `<div class="card"><div class="label">Retencao S.A.</div><div class="value">${fmtBRL(saRetention)}</div><div class="sub">${settings.saRetentionPct}% do lucro liquido UBY</div></div>` : '',
     isUbyModel ? `<div class="card"><div class="label">Investidores UBY</div><div class="value">${fmtBRL(investorDistribution)}</div><div class="sub">${settings.investorQuotaPct}% de ${fmtBRL(ubyDistributable)}</div></div>` : '',
     `<div class="card"><div class="label">Payback</div><div class="value">${formatPaybackMonths(paybackMonths)}</div><div class="sub">investimento / resultado proprio</div></div>`,
@@ -4016,12 +4031,13 @@ function renderFinanceiro(applySaved = true) {
     `<tr><td>Receita AC</td><td>${fmtBRL(acRevenue)}</td></tr>`,
     `<tr><td>Receita DC</td><td>${fmtBRL(dcRevenue)}</td></tr>`,
     `<tr><td>Gestao P3 (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>`,
+    hasUbyRoyalty ? `<tr><td>Royalty de marca UBY (${settings.ubyRoyaltyPct}%)</td><td>${fmtBRL(ubyRoyalty)}</td></tr>` : '',
     `<tr><td>App/plataforma terceiros (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>`,
     result.areaEligible ? `<tr><td>Participacao da area (${result.areaSharePct}%)</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em AC (${settings.p3AcEquityPct}%)</td><td>${fmtBRL(p3AcEquity)}</td></tr>` : '',
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em DC (${settings.p3DcEquityPct}%)</td><td>${fmtBRL(p3DcEquity)}</td></tr>` : '',
     settings.operationModel === 'p3_society' ? `<tr><td>Resultado P3 na sociedade (${settings.p3SocietyPct}%)</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
-    isDirectPartnerModel ? `<tr><td>${settings.operationModel === 'management_only' ? `Lucro distribuido diretamente ao parceiro ${partnerName}` : `Distribuicao ao socio investidor ${partnerName} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%)`}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
+    isDirectPartnerModel ? `<tr><td>${(settings.operationModel === 'management_only' || hasUbyRoyalty) ? `Lucro distribuido diretamente ao parceiro ${partnerName}` : `Distribuicao ao socio investidor ${partnerName} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%)`}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
     `<tr><td>Receitas extras</td><td>${fmtBRL(extraRevenue)}</td></tr>`,
     `<tr><td>Resultado operacional apos custos</td><td>${fmtBRL(operationNet)}</td></tr>`,
     `<tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>`,
@@ -4038,6 +4054,7 @@ function renderFinanceiro(applySaved = true) {
     isExternalSociety ? `<tr><td>Aporte P3 (${settings.p3SocietyPct}%)</td><td>${fmtBRL(p3InvestmentValue)}</td></tr>` : '',
     isExternalSociety ? `<tr><td>Aporte ${partnerName} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%)</td><td>${fmtBRL(partnerInvestmentValue)}</td></tr>` : '',
     `<tr><td>Receita P3</td><td>${fmtBRL(p3Gross)}</td></tr>`,
+    hasUbyRoyalty ? `<tr><td>Royalty de marca UBY</td><td>${fmtBRL(ubyRoyalty)}</td></tr>` : '',
     `<tr><td>App/plataforma terceiros</td><td>${fmtBRL(platform)}</td></tr>`,
     `<tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>`,
     result.areaEligible ? `<tr><td>Participacao do parceiro da area</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
@@ -4051,7 +4068,7 @@ function renderFinanceiro(applySaved = true) {
     isUbyModel ? `<tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(saRetention)}</td></tr>` : '',
     isUbyModel ? `<tr><td>Base distribuivel UBY</td><td>${fmtBRL(ubyDistributable)}</td></tr>` : '',
     partnerShare ? `<tr><td>Resultado socio/local</td><td>${fmtBRL(partnerShare)}</td></tr>` : '',
-    isDirectPartnerModel ? `<tr><td>${settings.operationModel === 'management_only' ? `Lucro distribuido diretamente ao parceiro ${partnerName}` : `Distribuicao ao socio investidor ${partnerName}`}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
+    isDirectPartnerModel ? `<tr><td>${(settings.operationModel === 'management_only' || hasUbyRoyalty) ? `Lucro distribuido diretamente ao parceiro ${partnerName}` : `Distribuicao ao socio investidor ${partnerName}`}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
     `<tr><td>Resultado proprio para payback</td><td>${fmtBRL(paybackBase)}</td></tr>`,
     `<tr><td>Resultado proprio total</td><td>${fmtBRL(ownResult)}</td></tr>`,
     isUbyModel ? `<tr><td>Repasse investidores</td><td>${fmtBRL(investorDistribution)}</td></tr>` : '',
@@ -4064,6 +4081,8 @@ function renderFinanceiro(applySaved = true) {
       ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}) e o parceiro da area recebe ${fmtBRL(result.areaParticipation)} conforme a regra cadastrada. A UBY fica com ${fmtBRL(ubyNet)} antes da retencao S.A.; ${fmtBRL(saRetention)} ficam retidos por estatuto e ${fmtBRL(investorDistribution)} sao distribuiveis aos investidores. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
       : settings.operationModel === 'management_only'
         ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} pela gestao. Depois de energia, plataforma e demais custos, o lucro liquido de ${fmtBRL(partnerInvestorDistribution)} e distribuido diretamente para ${partnerName}. Esse pagamento e registrado como distribuicao do parceiro; o payback da P3 continua baseado somente na sua receita de gestao.`
+        : hasUbyRoyalty
+          ? `Neste ativo de terceiro, a P3 recebe ${fmtBRL(management)} pela gestao (${settings.managementPct}%) e a UBY recebe ${fmtBRL(ubyRoyalty)} pelo uso da marca (${settings.ubyRoyaltyPct}%). Depois de energia, plataforma e demais custos, ${fmtBRL(partnerInvestorDistribution)} sao distribuidos diretamente para ${partnerName}. A plataforma de terceiros permanece separada em ${fmtBRL(platform)}.`
         : `Nesta parceria, o investimento total e ${fmtBRL(settings.investmentValue)}: P3 aportou ${fmtBRL(p3InvestmentValue)} (${settings.p3SocietyPct}%) e ${partnerName} aportou ${fmtBRL(partnerInvestmentValue)} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%). O resultado apos custos e dividido na mesma proporcao: P3 recebe ${fmtBRL(p3SocietyProfit)} e ${partnerName} recebe ${fmtBRL(partnerInvestorDistribution)} como distribuicao do periodo. O payback considera somente o aporte da P3. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`;
   updateFinanceRuleOutputs(result);
   renderFinanceOperationalResults(result);
@@ -4368,9 +4387,10 @@ function targetOccupationMetrics(charges, mk, settings = {}) {
 function operationModelLabel(model) {
   return {
     uby: 'UBY - ativo proprio',
-    p3_society: 'P3 sociedade fora da UBY',
+    p3_society: 'Ativo P3 com parceria',
     hybrid: 'Hibrido AC/DC',
-    management_only: 'Somente gestao'
+    management_only: 'Gestao P3 - ativo de terceiro',
+    third_party_management: 'Gestao P3 + marca UBY - terceiro'
   }[model] || 'UBY - ativo proprio';
 }
 
@@ -4390,6 +4410,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const model = cfg.operationModel || 'uby';
   const management = revenue * cfg.managementPct / 100;
   const platform = revenue * cfg.platformPct / 100;
+  const ubyRoyalty = model === 'third_party_management' ? revenue * cfg.ubyRoyaltyPct / 100 : 0;
   const energyCost = energy * cfg.energyCostPerKWh;
   const mk = options.monthKey || chargeMonthKey(charges[0] || {}) || financeMonthKey();
   const planning = financePlanningContext(charges, mk === 'unknown' ? financeMonthKey() : mk, cfg, options.historyCharges || charges, options.power);
@@ -4398,7 +4419,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const extraCosts = costEvaluation.actual;
   const extraRevenue = revenueEvaluation.actual;
   const costs = energyCost + extraCosts;
-  const preAreaNet = revenue + extraRevenue - management - platform - costs;
+  const preAreaNet = revenue + extraRevenue - management - platform - ubyRoyalty - costs;
   const areaEligible = model === 'uby' || model === 'hybrid';
   const areaSharePct = cfg.ownerTransferMode === 'net' ? Number(cfg.ownerNetProfitSharePct || 0) : Number(cfg.ownerRevenueSharePct || 0);
   const areaShareBase = cfg.ownerTransferMode === 'net' ? Math.max(preAreaNet, 0) : revenue;
@@ -4423,6 +4444,11 @@ function financeForCharges(charges, settings = {}, options = {}) {
     partnerShare = operationNet - p3SocietyProfit;
   } else if (model === 'management_only') {
     partnerShare = operationNet;
+  } else if (model === 'third_party_management') {
+    // O ponto continua sendo do parceiro. P3 recebe a gestao e UBY recebe
+    // apenas o royalty de marca, ambos separados do custo de plataforma.
+    partnerShare = operationNet;
+    ubyNet = ubyRoyalty;
   } else if (model === 'hybrid') {
     const acP3 = ac.net * cfg.p3AcEquityPct / 100;
     const dcP3 = dc.net * cfg.p3DcEquityPct / 100;
@@ -4451,50 +4477,53 @@ function financeForCharges(charges, settings = {}, options = {}) {
   // Em sociedade e em operacao somente de gestao, o parceiro recebe o lucro
   // liquido diretamente. Isso e uma distribuicao real do periodo, ainda que
   // nao passe pela estrutura de cotas da UBY.
-  const directPartnerDistribution = model === 'p3_society' || model === 'management_only';
+  const directPartnerDistribution = model === 'p3_society' || model === 'management_only' || model === 'third_party_management';
   const partnerInvestorDistribution = directPartnerDistribution ? Math.max(partnerShare, 0) : 0;
   const finalDistribution = directPartnerDistribution ? partnerInvestorDistribution : investorDistribution;
   const ubyRetained = ubyNet - investorDistribution;
   const p3OperationalResult = management + p3SocietyProfit;
   const ownResult = ubyNet + p3SocietyProfit;
-  const paybackBase = model === 'p3_society' ? p3SocietyProfit : (model === 'management_only' ? p3OperationalResult : ownResult);
+  const paybackBase = model === 'p3_society' ? p3SocietyProfit : ((model === 'management_only' || model === 'third_party_management') ? p3OperationalResult : ownResult);
   const paybackInvestmentValue = model === 'p3_society' ? p3InvestmentValue : cfg.investmentValue;
   const paybackMonths = paybackInvestmentValue > 0 && paybackBase > 0 ? paybackInvestmentValue / paybackBase : 0;
   const roiMonthly = paybackInvestmentValue > 0 ? paybackBase / paybackInvestmentValue * 100 : 0;
   const margin = revenue ? ownResult / revenue * 100 : 0;
   const totalRevenue = revenue + extraRevenue;
-  const totalOperatingCost = energyCost + extraCosts + management + platform + areaParticipation;
+  const totalOperatingCost = energyCost + extraCosts + management + platform + ubyRoyalty + areaParticipation;
   const directCostPerKWh = energy > 0 ? (energyCost + extraCosts + areaParticipation) / energy : null;
   const totalCostPerKWh = energy > 0 ? totalOperatingCost / energy : null;
   const extraRevenuePerKWh = energy > 0 ? extraRevenue / energy : null;
   const plannedEnergyCost = planning.planningKWh * cfg.energyCostPerKWh;
   const plannedManagement = planning.planningRevenue * cfg.managementPct / 100;
   const plannedPlatform = planning.planningRevenue * cfg.platformPct / 100;
-  const plannedPreAreaNet = planning.planningRevenue + revenueEvaluation.planned - plannedManagement - plannedPlatform - plannedEnergyCost - costEvaluation.planned;
+  const plannedUbyRoyalty = model === 'third_party_management' ? planning.planningRevenue * cfg.ubyRoyaltyPct / 100 : 0;
+  const plannedPreAreaNet = planning.planningRevenue + revenueEvaluation.planned - plannedManagement - plannedPlatform - plannedUbyRoyalty - plannedEnergyCost - costEvaluation.planned;
   const plannedAreaShareBase = cfg.ownerTransferMode === 'net' ? Math.max(plannedPreAreaNet, 0) : planning.planningRevenue;
   const plannedAreaParticipation = areaEligible ? plannedAreaShareBase * areaSharePct / 100 : 0;
   const plannedDirectCost = plannedEnergyCost + costEvaluation.planned + plannedAreaParticipation;
-  const plannedTotalCost = plannedDirectCost + plannedManagement + plannedPlatform;
+  const plannedTotalCost = plannedDirectCost + plannedManagement + plannedPlatform + plannedUbyRoyalty;
   const plannedDirectCostPerKWh = planning.planningKWh > 0 ? plannedDirectCost / planning.planningKWh : null;
   const plannedExtraRevenuePerKWh = planning.planningKWh > 0 ? revenueEvaluation.planned / planning.planningKWh : null;
   const managementVariable = planning.salePricePerKWh * cfg.managementPct / 100;
   const platformVariable = planning.salePricePerKWh * cfg.platformPct / 100;
   const areaVariable = areaEligible && cfg.ownerTransferMode !== 'net' ? planning.salePricePerKWh * areaSharePct / 100 : 0;
-  const variableCostPerKWh = cfg.energyCostPerKWh + managementVariable + platformVariable + areaVariable + financeVariableCostPerKWh(cfg.costRules, planning);
+  const royaltyVariable = model === 'third_party_management' ? planning.salePricePerKWh * cfg.ubyRoyaltyPct / 100 : 0;
+  const variableCostPerKWh = cfg.energyCostPerKWh + managementVariable + platformVariable + royaltyVariable + areaVariable + financeVariableCostPerKWh(cfg.costRules, planning);
   const variableRevenuePerKWh = planning.salePricePerKWh + financeVariableCostPerKWh(cfg.revenueRules, planning);
   const economics = window.UBY_FINANCE_ENGINE.unitEconomics({
     energy,
     revenue,
     extraRevenue,
     energyCost,
-    extraCosts: extraCosts + areaParticipation,
+    extraCosts: extraCosts + areaParticipation + ubyRoyalty,
     management,
     platform,
     planningKWh: planning.planningKWh,
     plannedEnergyCost,
-    plannedExtraCosts: costEvaluation.planned + plannedAreaParticipation,
+    plannedExtraCosts: costEvaluation.planned + plannedAreaParticipation + plannedUbyRoyalty,
     plannedManagement,
     plannedPlatform,
+    plannedUbyRoyalty,
     variableRevenuePerKWh,
     variableCostPerKWh,
     fixedCosts: financeFixedRuleTotal(cfg.costRules),
@@ -4547,6 +4576,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     breakEvenKWh,
     planning,
     p3Gross,
+    ubyRoyalty,
     operationNet,
     ubyNet,
     saRetention,
@@ -4689,8 +4719,11 @@ function generalFinanceByUnit(unitData) {
       (byMonth[mk] ||= []).push(charge);
     });
     const settings = allRechargeRecords[unit.workId]?.financialSettings || {};
-    const total = Object.entries(byMonth).reduce((acc, [mk, charges]) => {
+    const monthly = Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b)).map(([mk, charges]) => {
       const result = financeForCharges(charges, settings[mk] || settings.default || defaultFinanceSettings(), { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId) });
+      return { monthKey: mk, result };
+    });
+    const total = monthly.reduce((acc, { result }) => {
       Object.entries(result).forEach(([key, value]) => {
         if (['operationModel', 'margin', 'paybackMonths', 'roiMonthly', 'investmentValue', 'paybackInvestmentValue', 'p3InvestmentValue', 'partnerInvestmentValue'].includes(key) || !Number.isFinite(value)) return;
         acc[key] = (acc[key] || 0) + value;
@@ -4704,7 +4737,8 @@ function generalFinanceByUnit(unitData) {
     total.margin = total.revenue ? total.ownResult / total.revenue * 100 : 0;
     total.paybackMonths = total.paybackInvestmentValue > 0 && total.paybackBase > 0 ? total.paybackInvestmentValue / total.paybackBase : 0;
     total.roiMonthly = total.paybackInvestmentValue > 0 ? total.paybackBase / total.paybackInvestmentValue * 100 : 0;
-    return { ...unit, finance: total };
+    total.operationModel = monthly.at(-1)?.result?.operationModel || settings.default?.operationModel || 'uby';
+    return { ...unit, finance: total, financeMonths: monthly };
   });
 }
 
@@ -4773,15 +4807,27 @@ function renderGeneralFinance(unitData) {
   total.paybackMonths = total.paybackInvestmentValue > 0 && total.paybackBase > 0 ? total.paybackInvestmentValue / total.paybackBase : 0;
   total.roiMonthly = total.paybackInvestmentValue > 0 ? total.paybackBase / total.paybackInvestmentValue * 100 : 0;
   const best = [...rows].sort((a, b) => (b.finance?.ownResult || 0) - (a.finance?.ownResult || 0))[0];
+  const managementByMonth = new Map();
+  rows.forEach(row => (row.financeMonths || []).forEach(({ monthKey, result }) => {
+    if (!monthKey) return;
+    const item = managementByMonth.get(monthKey) || { monthKey, management: 0, ubyRoyalty: 0, p3SocietyProfit: 0, units: new Set() };
+    item.management += Number(result.management || 0);
+    item.ubyRoyalty += Number(result.ubyRoyalty || 0);
+    item.p3SocietyProfit += Number(result.p3SocietyProfit || 0);
+    item.units.add(row.workId || row.workName || row.station || monthKey);
+    managementByMonth.set(monthKey, item);
+  }));
+  const managementRows = [...managementByMonth.values()].sort((a, b) => b.monthKey.localeCompare(a.monthKey));
   document.getElementById('generalFinanceHeroMeta').innerHTML =
-    `Unidades com base: <strong>${rows.length}</strong><br>Investimento cadastrado: <strong>${fmtBRL(total.investmentValue || 0)}</strong><br>Resultado UBY consolidado: <strong>${fmtBRL(total.ubyNet || 0)}</strong>`;
+    `Unidades com base: <strong>${rows.length}</strong><br>Investimento cadastrado: <strong>${fmtBRL(total.investmentValue || 0)}</strong><br>Resultado UBY e royalties: <strong>${fmtBRL(total.ubyNet || 0)}</strong>`;
   document.getElementById('generalFinanceHeroFormula').innerHTML =
-    `<strong>Modelo financeiro</strong><br>P3 recebe gestao e sociedades configuradas. App/plataforma e servico de terceiros.<br>UBY recebe apenas ativos UBY e distribui aos investidores por cotas. Sociedades fora da UBY ficam separadas.`;
+    `<strong>Modelo financeiro</strong><br>P3 recebe gestao e sociedades configuradas. Plataforma de terceiros e royalty de marca UBY ficam em linhas separadas.<br>Ativos UBY distribuem por cotas; ativos de terceiros preservam o lucro do parceiro apos os percentuais contratados.`;
   document.getElementById('kpiGeneralFinance').innerHTML = `
     <div class="card"><div class="label">Receita financeira</div><div class="value">${fmtBRL(total.revenue || 0)}</div><div class="sub">base das recargas</div></div>
     <div class="card"><div class="label">Receita P3 total</div><div class="value">${fmtBRL(total.p3Gross || 0)}</div><div class="sub">gestao + sociedades</div></div>
     <div class="card"><div class="label">Sociedades P3</div><div class="value">${fmtBRL(total.p3SocietyProfit || 0)}</div><div class="sub">fora da UBY quando configurado</div></div>
-    <div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(total.ubyNet || 0)}</div><div class="sub">apos custos e P3</div></div>
+    <div class="card"><div class="label">Royalties UBY</div><div class="value">${fmtBRL(total.ubyRoyalty || 0)}</div><div class="sub">marca em ativos de terceiros</div></div>
+    <div class="card"><div class="label">Resultado UBY e royalties</div><div class="value">${fmtBRL(total.ubyNet || 0)}</div><div class="sub">ativos UBY + uso de marca</div></div>
     <div class="card"><div class="label">Retencao S.A.</div><div class="value">${fmtBRL(total.saRetention || 0)}</div><div class="sub">retencao estatutaria</div></div>
     <div class="card"><div class="label">Investidores</div><div class="value">${fmtBRL(total.investorDistribution || 0)}</div><div class="sub">repasses por cotas</div></div>
     <div class="card"><div class="label">Payback geral</div><div class="value">${formatPaybackMonths(total.paybackMonths || 0)}</div><div class="sub">investimento / resultado proprio</div></div>
@@ -4791,17 +4837,19 @@ function renderGeneralFinance(unitData) {
     <tr><td>Faturamento bruto das recargas</td><td>${fmtBRL(total.revenue || 0)}</td></tr>
     <tr><td>Receitas extras</td><td>${fmtBRL(total.extraRevenue || 0)}</td></tr>
     <tr><td>App e plataforma de terceiros</td><td>${fmtBRL(total.platform || 0)}</td></tr>
+    <tr><td>Royalty de marca UBY</td><td>${fmtBRL(total.ubyRoyalty || 0)}</td></tr>
     <tr><td>Demais custos configurados</td><td>${fmtBRL(total.costs || 0)}</td></tr>
     <tr><td>Participacao dos parceiros de area</td><td>${fmtBRL(total.areaParticipation || 0)}</td></tr>
     <tr class="finance-total-row"><td>Custo operacional total</td><td>${fmtBRL(total.totalOperatingCost || 0)}</td></tr>
     <tr class="finance-group-row"><th colspan="2">Distribuicao do resultado</th></tr>
     <tr><td>Gestao P3</td><td>${fmtBRL(total.management || 0)}</td></tr>
     <tr><td>Sociedade P3</td><td>${fmtBRL(total.p3SocietyProfit || 0)}</td></tr>
-    <tr><td>Resultado UBY antes da retencao</td><td>${fmtBRL(total.ubyNet || 0)}</td></tr>
+    <tr><td>Resultado UBY e royalties antes da retencao</td><td>${fmtBRL(total.ubyNet || 0)}</td></tr>
     <tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(total.saRetention || 0)}</td></tr>
     <tr><td>Repasse aos investidores</td><td>${fmtBRL(total.investorDistribution || 0)}</td></tr>
     <tr><td>Valor retido pela UBY</td><td>${fmtBRL(total.ubyRetained || 0)}</td></tr>
     <tr><td>Resultado do socio ou local</td><td>${fmtBRL(total.partnerShare || 0)}</td></tr>
+    <tr><td>Lucro distribuido diretamente ao parceiro</td><td>${fmtBRL(total.partnerInvestorDistribution || 0)}</td></tr>
     <tr class="finance-group-row"><th colspan="2">Retorno</th></tr>
     <tr><td>Investimento cadastrado</td><td>${fmtBRL(total.investmentValue || 0)}</td></tr>
     <tr><td>Payback estimado</td><td>${formatPaybackMonths(total.paybackMonths || 0)}</td></tr>
@@ -4812,17 +4860,22 @@ function renderGeneralFinance(unitData) {
   document.getElementById('generalFinanceUnitTable').innerHTML = rows.length ? rows.map(row => `
     <tr>
       <td>${row.workName}</td>
+      <td>${operationModelLabel(row.finance.operationModel || 'uby')}</td>
       <td>${fmtBRL(row.finance.revenue || 0)}</td>
       <td>${fmtBRL(row.finance.totalOperatingCost || 0)}</td>
       <td>${fmtBRL(row.finance.management || 0)}</td>
+      <td>${fmtBRL(row.finance.ubyRoyalty || 0)}</td>
       <td>${fmtBRL(row.finance.p3SocietyProfit || 0)}</td>
       <td>${fmtBRL(row.finance.ubyNet || 0)}</td>
-      <td>${fmtBRL(row.finance.investorDistribution || 0)}</td>
       <td>${fmtBRL(row.finance.partnerShare || 0)}</td>
       <td>${formatPaybackMonths(row.finance.paybackMonths || 0)}</td>
-      <td>${fmtPct(row.finance.margin || 0)}</td>
     </tr>
   `).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem bases financeiras para consolidar</td></tr>';
+  const managementTable = document.getElementById('generalP3ManagementTable');
+  if (managementTable) managementTable.innerHTML = managementRows.length ? managementRows.map(item => {
+    const p3Total = item.management + item.p3SocietyProfit;
+    return `<tr><td>${monthLabel(item.monthKey)}</td><td>${fmtBRL(item.management)}</td><td>${fmtBRL(item.ubyRoyalty)}</td><td>${fmtBRL(item.p3SocietyProfit)}</td><td>${fmtBRL(p3Total)}</td><td>${item.units.size}</td></tr>`;
+  }).join('') : '<tr><td colspan="6" style="color:var(--p3-muted);text-align:center;padding:20px">Sem competencias financeiras registradas</td></tr>';
   markOverviewRendered('financeiroGeral');
 }
 
