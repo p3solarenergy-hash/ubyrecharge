@@ -231,12 +231,12 @@
   }
 
   function investorCapitalTimeline(timeline, accumulated) {
-    var investment = num(accumulated && accumulated.investmentValue);
+    var investment = num(accumulated && (accumulated.paybackInvestmentValue != null ? accumulated.paybackInvestmentValue : accumulated.investmentValue));
     var recovered = 0;
     var distribution = 0;
     var rows = (timeline || []).map(function (item) {
       var paybackBase = num(item && (item.paybackBase != null ? item.paybackBase : item.result && item.result.paybackBase));
-      var investorDistribution = num(item && item.investorDistribution);
+      var investorDistribution = num(item && (item.finalDistribution != null ? item.finalDistribution : item.investorDistribution));
       recovered += paybackBase;
       distribution += investorDistribution;
       return {
@@ -269,7 +269,15 @@
     var costItems = model.costItems || [];
     var revenueItems = model.revenueItems || [];
     var capital = investorCapitalTimeline(timeline, accumulated);
-    var body = '<div class="report">' + header(model, 'UBY Recharge - investidores', 'Relatorio de desempenho e resultado') +
+    var externalSociety = current.operationModel === 'p3_society';
+    var partnerName = model.report && model.report.partnerName || 'socio investidor';
+    var partnerPct = Math.max(100 - num(current.settings && current.settings.p3SocietyPct), 0);
+    var distributionLabel = externalSociety
+      ? 'Distribuicao ao socio investidor ' + partnerName
+      : 'Distribuicao final aos investidores';
+    var paybackCapitalLabel = externalSociety ? 'Aporte P3 considerado no payback' : 'Investimento considerado';
+    var reportAudience = externalSociety ? 'UBY Recharge - parceria' : 'UBY Recharge - investidores';
+    var body = '<div class="report">' + header(model, reportAudience, 'Relatorio de desempenho e resultado') +
       metrics([
         { value: pct(current.occupancyPct), label: 'Ocupacao do periodo', className: current.occupancyPct >= num(current.targetOccPct) ? 'positive' : 'negative' },
         { value: brl(current.totalRevenue), label: 'Receitas totais', className: 'highlight' },
@@ -287,11 +295,14 @@
       '<tr><td>Custos operacionais</td><td class="value">' + esc(brl(current.totalOperatingCost)) + '</td></tr>' +
       '<tr class="total-row"><td>Resultado operacional</td><td class="value">' + esc(brl(current.operationNet)) + '</td></tr>' +
       '</tbody></table></div><div class="panel"><h3>Indicadores de capital</h3><table><tbody>' +
-      '<tr><td>Investimento considerado</td><td class="value">' + esc(brl(current.investmentValue)) + '</td></tr>' +
+      (externalSociety ? '<tr><td>Investimento total da parceria</td><td class="value">' + esc(brl(current.investmentValue)) + '</td></tr>' +
+        '<tr><td>Aporte P3 (' + esc(pct(num(current.settings && current.settings.p3SocietyPct))) + ')</td><td class="value">' + esc(brl(current.p3InvestmentValue)) + '</td></tr>' +
+        '<tr><td>Aporte ' + esc(partnerName) + ' (' + esc(pct(partnerPct)) + ')</td><td class="value">' + esc(brl(current.partnerInvestmentValue)) + '</td></tr>' : '') +
+      '<tr><td>' + esc(paybackCapitalLabel) + '</td><td class="value">' + esc(brl(current.paybackInvestmentValue != null ? current.paybackInvestmentValue : current.investmentValue)) + '</td></tr>' +
       '<tr><td>ROI do periodo</td><td class="value">' + esc(pct(current.roiMonthly)) + '</td></tr>' +
       '<tr><td>Payback estimado</td><td class="value">' + esc(payback(current.paybackMonths)) + '</td></tr>' +
-      '<tr><td>Retencao S.A.</td><td class="value">' + esc(brl(current.saRetention)) + '</td></tr>' +
-      '<tr class="total-row"><td>Distribuicao final aos investidores</td><td class="value">' + esc(brl(current.investorDistribution)) + '</td></tr>' +
+      (externalSociety ? '<tr><td>Resultado P3 no periodo</td><td class="value">' + esc(brl(current.paybackBase)) + '</td></tr>' : '<tr><td>Retencao S.A.</td><td class="value">' + esc(brl(current.saRetention)) + '</td></tr>') +
+      '<tr class="total-row"><td>' + esc(distributionLabel) + '</td><td class="value">' + esc(brl(current.finalDistribution != null ? current.finalDistribution : current.investorDistribution)) + '</td></tr>' +
       '</tbody></table></div></div></div>' +
       '<div class="section page-break"><div class="section-title"><h2>Composicao financeira e custo diluido</h2><span>Quanto cada item representa por kWh</span></div><div class="split">' +
       itemTable('Receitas', revenueItems, current.totalRevenue, 'Total de receitas') +
@@ -305,7 +316,7 @@
         { value: pct(accumulated.occupancyPct), label: 'Ocupacao media ponderada' },
         { value: perKwh(accumulated.totalCostPerKWh), label: 'Custo medio acumulado' },
         { value: pct(accumulated.operationMargin), label: 'Margem acumulada' },
-        { value: brl(capital.distribution), label: 'Distribuicao acumulada aos investidores', className: capital.distribution >= 0 ? 'positive' : 'negative' },
+        { value: brl(capital.distribution), label: externalSociety ? 'Distribuicao acumulada ao socio investidor' : 'Distribuicao acumulada aos investidores', className: capital.distribution >= 0 ? 'positive' : 'negative' },
         { value: brl(capital.recovered), label: 'Resultado recuperado no payback', className: capital.recovered >= 0 ? 'positive' : 'negative' },
         { value: brl(capital.remainingInvestment), label: 'Saldo a recuperar' },
         { value: pct(capital.roiAccumulated), label: 'ROI acumulado' },
@@ -313,7 +324,7 @@
       ]) + '</div>' +
       '<div class="section avoid"><div class="section-title"><h2>Evolucao do payback</h2><span>Resultado acumulado versus investimento considerado</span></div>' +
       timelineBars(capital.rows, 'cumulativePayback', brl) +
-      '<table><thead><tr><th>Mes</th><th>Resultado para payback</th><th>Recuperado acumulado</th><th>Distribuicao investidores</th><th>Saldo a recuperar</th></tr></thead><tbody>' + rows(capital.rows, [
+      '<table><thead><tr><th>Mes</th><th>Resultado para payback</th><th>Recuperado acumulado</th><th>' + esc(externalSociety ? 'Distribuicao socio investidor' : 'Distribuicao investidores') + '</th><th>Saldo a recuperar</th></tr></thead><tbody>' + rows(capital.rows, [
         { value: 'label' },
         { value: function (item) { return brl(item.paybackBase); }, className: 'value' },
         { value: function (item) { return brl(item.cumulativePayback); }, className: 'value' },
@@ -336,8 +347,10 @@
         { value: function (item) { return brl(item.totalOperatingCost); }, className: 'value' },
         { value: function (item) { return brl(item.operationNet); }, className: 'value' }
       ]) + '</tbody></table></div>' : '') +
-      reportFoot('Relatorio gerencial para investidores. A distribuicao final corresponde ao valor liquido para os cotistas apos a retencao estatutaria e o percentual de cotas configurado. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.') + '</div>';
-    return shell('Relatorio de investidores - ' + (model.report && (model.report.station || model.report.scope) || 'UBY'), body, options);
+      reportFoot(externalSociety
+        ? 'Relatorio da parceria. O investimento total e dividido entre P3 e o socio investidor conforme a participacao cadastrada. O payback usa somente o aporte da P3; a distribuicao mostra a parcela do socio investidor apos os custos da operacao. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.'
+        : 'Relatorio gerencial para investidores. A distribuicao final corresponde ao valor liquido para os cotistas apos a retencao estatutaria e o percentual de cotas configurado. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.') + '</div>';
+    return shell((externalSociety ? 'Relatorio da parceria - ' : 'Relatorio de investidores - ') + (model.report && (model.report.station || model.report.scope) || 'UBY'), body, options);
   }
 
   var api = {

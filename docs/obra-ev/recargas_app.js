@@ -478,6 +478,11 @@ function workPowerById(workId) {
   return power > 0 ? power : 7;
 }
 
+function currentWorkPartnerName() {
+  const work = currentWork();
+  return String(work?.cliente || work?.nome || 'Parceiro').trim() || 'Parceiro';
+}
+
 function setStorageState(message, isError = false) {
   const el = document.getElementById('storageState');
   if (!el) return;
@@ -3373,11 +3378,17 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
     totalCostPerKWh: result.totalCostPerKWh,
     plannedTotalCostPerKWh: result.plannedTotalCostPerKWh,
     investmentValue: Number(result.investmentValue || 0),
+    paybackInvestmentValue: Number(result.paybackInvestmentValue || result.investmentValue || 0),
     paybackBase: Number(result.paybackBase || 0),
     roiMonthly: Number(result.roiMonthly || 0),
     paybackMonths: Number(result.paybackMonths || 0),
     saRetention: Number(result.saRetention || 0),
     investorDistribution: Number(result.investorDistribution || 0),
+    partnerInvestorDistribution: Number(result.partnerInvestorDistribution || 0),
+    finalDistribution: Number(result.finalDistribution || result.investorDistribution || 0),
+    p3InvestmentValue: Number(result.p3InvestmentValue || 0),
+    partnerInvestmentValue: Number(result.partnerInvestmentValue || 0),
+    operationModel: result.operationModel || settings.operationModel || 'uby',
     ubyRetained: Number(result.ubyRetained || 0),
     revenueItems: financeRuleReportItems(result, settings, 'revenue'),
     costItems: financeRuleReportItems(result, settings, 'cost'),
@@ -3387,15 +3398,19 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
 }
 
 function aggregateInvestorEntries(entries = [], investmentValue = null) {
-  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','operationNet','paybackBase','saRetention','investorDistribution','ubyRetained'];
+  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','operationNet','paybackBase','saRetention','investorDistribution','partnerInvestorDistribution','finalDistribution','ubyRetained'];
   const total = numeric.reduce((acc, key) => ({ ...acc, [key]: entries.reduce((sum, entry) => sum + Number(entry[key] || 0), 0) }), {});
   total.occupancyPct = total.maxKWh > 0 ? total.energy / total.maxKWh * 100 : 0;
   total.totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
   total.operationMargin = total.totalRevenue > 0 ? total.operationNet / total.totalRevenue * 100 : 0;
   total.investmentValue = investmentValue == null ? Number(entries.at(-1)?.investmentValue || 0) : Number(investmentValue || 0);
-  total.roiMonthly = total.investmentValue > 0 ? total.operationNet / total.investmentValue * 100 : 0;
-  const averageMonthlyResult = entries.length ? total.operationNet / entries.length : 0;
-  total.paybackMonths = total.investmentValue > 0 && averageMonthlyResult > 0 ? total.investmentValue / averageMonthlyResult : 0;
+  total.paybackInvestmentValue = Number(entries.at(-1)?.paybackInvestmentValue || total.investmentValue || 0);
+  total.p3InvestmentValue = Number(entries.at(-1)?.p3InvestmentValue || 0);
+  total.partnerInvestmentValue = Number(entries.at(-1)?.partnerInvestmentValue || 0);
+  total.operationModel = entries.at(-1)?.operationModel || 'uby';
+  total.roiMonthly = total.paybackInvestmentValue > 0 ? total.paybackBase / total.paybackInvestmentValue * 100 : 0;
+  const averageMonthlyResult = entries.length ? total.paybackBase / entries.length : 0;
+  total.paybackMonths = total.paybackInvestmentValue > 0 && averageMonthlyResult > 0 ? total.paybackInvestmentValue / averageMonthlyResult : 0;
   return total;
 }
 
@@ -3420,6 +3435,7 @@ function currentWorkInvestorReportModel(mk = financeMonthKey(), settingsOverride
     report: {
       station: currentStationReportName || currentWorkName,
       work: currentWorkName,
+      partnerName: currentWorkPartnerName(),
       period: period.label,
       periodStart: period.start,
       periodEnd: period.end,
@@ -3898,12 +3914,14 @@ function renderFinanceiro(applySaved = true) {
   updateFinanceModelVisibility(settings.operationModel);
   const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk });
-  const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin } = result;
+  const { revenue, energy, acRevenue, dcRevenue, management, platform, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, partnerInvestorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin, p3InvestmentValue, partnerInvestmentValue } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
   const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
   const p3TakePct = revenue ? p3Gross / revenue * 100 : 0;
   const isUbyModel = settings.operationModel === 'uby' || settings.operationModel === 'hybrid';
   const hasP3Society = settings.operationModel === 'p3_society' || settings.operationModel === 'hybrid';
+  const isExternalSociety = settings.operationModel === 'p3_society';
+  const partnerName = currentWorkPartnerName();
   updateFinanceCommandSummary(result, charges, clients);
 
   document.getElementById('financeHeroMeta').innerHTML =
@@ -3915,7 +3933,8 @@ function renderFinanceiro(applySaved = true) {
     `<div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>`,
     `<div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao${hasP3Society ? ' + sociedades' : ''}</div></div>`,
     isUbyModel ? `<div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos energia, custos e P3</div></div>` : '',
-    hasP3Society ? `<div class="card"><div class="label">Sociedade P3</div><div class="value">${fmtBRL(p3SocietyProfit)}</div><div class="sub">fora da UBY quando aplicavel</div></div>` : '',
+    hasP3Society ? `<div class="card"><div class="label">Resultado P3 na sociedade</div><div class="value">${fmtBRL(p3SocietyProfit)}</div><div class="sub">${isExternalSociety ? `${settings.p3SocietyPct}% do resultado da parceria` : 'participacao configurada em AC/DC'}</div></div>` : '',
+    isExternalSociety ? `<div class="card"><div class="label">Distribuicao ${partnerName}</div><div class="value">${fmtBRL(partnerInvestorDistribution)}</div><div class="sub">${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}% do resultado da parceria</div></div>` : '',
     isUbyModel ? `<div class="card"><div class="label">Retencao S.A.</div><div class="value">${fmtBRL(saRetention)}</div><div class="sub">${settings.saRetentionPct}% do lucro liquido UBY</div></div>` : '',
     isUbyModel ? `<div class="card"><div class="label">Investidores UBY</div><div class="value">${fmtBRL(investorDistribution)}</div><div class="sub">${settings.investorQuotaPct}% de ${fmtBRL(ubyDistributable)}</div></div>` : '',
     `<div class="card"><div class="label">Payback</div><div class="value">${formatPaybackMonths(paybackMonths)}</div><div class="sub">investimento / resultado proprio</div></div>`,
@@ -3933,7 +3952,8 @@ function renderFinanceiro(applySaved = true) {
     result.areaEligible ? `<tr><td>Participacao da area (${result.areaSharePct}%)</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em AC (${settings.p3AcEquityPct}%)</td><td>${fmtBRL(p3AcEquity)}</td></tr>` : '',
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em DC (${settings.p3DcEquityPct}%)</td><td>${fmtBRL(p3DcEquity)}</td></tr>` : '',
-    settings.operationModel === 'p3_society' ? `<tr><td>Sociedade P3 geral (${settings.p3SocietyPct}%)</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
+    settings.operationModel === 'p3_society' ? `<tr><td>Resultado P3 na sociedade (${settings.p3SocietyPct}%)</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
+    isExternalSociety ? `<tr><td>Distribuicao ao socio investidor ${partnerName} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%)</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
     `<tr><td>Receitas extras</td><td>${fmtBRL(extraRevenue)}</td></tr>`,
     `<tr><td>Resultado operacional apos custos</td><td>${fmtBRL(operationNet)}</td></tr>`,
     `<tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>`,
@@ -3946,7 +3966,9 @@ function renderFinanceiro(applySaved = true) {
     `<tr><td>Recargas pretendidas mes completo</td><td>${target.fullMonthTargetCharges.toFixed(1).replace('.', ',')}</td></tr>`
   ].filter(Boolean).join('');
   document.getElementById('financeResultTable').innerHTML = [
-    `<tr><td>Investimento no ponto</td><td>${fmtBRL(settings.investmentValue)}</td></tr>`,
+    `<tr><td>Investimento total no ponto</td><td>${fmtBRL(settings.investmentValue)}</td></tr>`,
+    isExternalSociety ? `<tr><td>Aporte P3 (${settings.p3SocietyPct}%)</td><td>${fmtBRL(p3InvestmentValue)}</td></tr>` : '',
+    isExternalSociety ? `<tr><td>Aporte ${partnerName} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%)</td><td>${fmtBRL(partnerInvestmentValue)}</td></tr>` : '',
     `<tr><td>Receita P3</td><td>${fmtBRL(p3Gross)}</td></tr>`,
     `<tr><td>App/plataforma terceiros</td><td>${fmtBRL(platform)}</td></tr>`,
     `<tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>`,
@@ -3956,11 +3978,12 @@ function renderFinanceiro(applySaved = true) {
     `<tr><td>Custo efetivo por kWh</td><td>${fmtPerKWh(result.totalCostPerKWh)}</td></tr>`,
     `<tr><td>Custo inicial por kWh</td><td>${fmtPerKWh(result.plannedTotalCostPerKWh)}</td></tr>`,
     `<tr><td>Ponto de equilibrio</td><td>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</td></tr>`,
-    hasP3Society ? `<tr><td>Lucro sociedade P3</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
+    hasP3Society ? `<tr><td>Resultado P3 na sociedade</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
     isUbyModel ? `<tr><td>Resultado liquido UBY</td><td>${fmtBRL(ubyNet)}</td></tr>` : '',
     isUbyModel ? `<tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(saRetention)}</td></tr>` : '',
     isUbyModel ? `<tr><td>Base distribuivel UBY</td><td>${fmtBRL(ubyDistributable)}</td></tr>` : '',
     partnerShare ? `<tr><td>Resultado socio/local</td><td>${fmtBRL(partnerShare)}</td></tr>` : '',
+    isExternalSociety ? `<tr><td>Distribuicao ao socio investidor ${partnerName}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
     `<tr><td>Resultado proprio para payback</td><td>${fmtBRL(paybackBase)}</td></tr>`,
     `<tr><td>Resultado proprio total</td><td>${fmtBRL(ownResult)}</td></tr>`,
     isUbyModel ? `<tr><td>Repasse investidores</td><td>${fmtBRL(investorDistribution)}</td></tr>` : '',
@@ -3971,7 +3994,7 @@ function renderFinanceiro(applySaved = true) {
   document.getElementById('financeNote').innerHTML =
     isUbyModel
       ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}) e o parceiro da area recebe ${fmtBRL(result.areaParticipation)} conforme a regra cadastrada. A UBY fica com ${fmtBRL(ubyNet)} antes da retencao S.A.; ${fmtBRL(saRetention)} ficam retidos por estatuto e ${fmtBRL(investorDistribution)} sao distribuiveis aos investidores. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
-      : `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}). O socio/local fica com ${fmtBRL(partnerShare)} conforme o modelo escolhido. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`;
+      : `Nesta parceria, o investimento total e ${fmtBRL(settings.investmentValue)}: P3 aportou ${fmtBRL(p3InvestmentValue)} (${settings.p3SocietyPct}%) e ${partnerName} aportou ${fmtBRL(partnerInvestmentValue)} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%). O resultado apos custos e dividido na mesma proporcao: P3 recebe ${fmtBRL(p3SocietyProfit)} e ${partnerName} recebe ${fmtBRL(partnerInvestorDistribution)} como distribuicao do periodo. O payback considera somente o aporte da P3. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`;
   updateFinanceRuleOutputs(result);
   renderFinanceOperationalResults(result);
   renderOwnerAreaReportForCurrentMonth();
@@ -4344,15 +4367,26 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const p3AcEquity = model === 'hybrid' ? ac.net * cfg.p3AcEquityPct / 100 : 0;
   const p3DcEquity = model === 'hybrid' ? dc.net * cfg.p3DcEquityPct / 100 : 0;
   const p3Gross = management + p3SocietyProfit;
+  // Em sociedade externa, o investimento informado e o capital total do ponto.
+  // O payback da P3 deve considerar apenas o capital que ela efetivamente aportou.
+  const p3InvestmentValue = model === 'p3_society'
+    ? Math.max(cfg.investmentValue * cfg.p3SocietyPct / 100, 0)
+    : cfg.investmentValue;
+  const partnerInvestmentValue = model === 'p3_society'
+    ? Math.max(cfg.investmentValue - p3InvestmentValue, 0)
+    : 0;
   const saRetention = Math.max(ubyNet, 0) * cfg.saRetentionPct / 100;
   const ubyDistributable = Math.max(ubyNet - saRetention, 0);
   const investorDistribution = ubyDistributable * cfg.investorQuotaPct / 100;
+  const partnerInvestorDistribution = model === 'p3_society' ? Math.max(partnerShare, 0) : 0;
+  const finalDistribution = model === 'p3_society' ? partnerInvestorDistribution : investorDistribution;
   const ubyRetained = ubyNet - investorDistribution;
   const p3OperationalResult = management + p3SocietyProfit;
   const ownResult = ubyNet + p3SocietyProfit;
   const paybackBase = model === 'p3_society' ? p3SocietyProfit : (model === 'management_only' ? p3OperationalResult : ownResult);
-  const paybackMonths = cfg.investmentValue > 0 && paybackBase > 0 ? cfg.investmentValue / paybackBase : 0;
-  const roiMonthly = cfg.investmentValue > 0 ? paybackBase / cfg.investmentValue * 100 : 0;
+  const paybackInvestmentValue = model === 'p3_society' ? p3InvestmentValue : cfg.investmentValue;
+  const paybackMonths = paybackInvestmentValue > 0 && paybackBase > 0 ? paybackInvestmentValue / paybackBase : 0;
+  const roiMonthly = paybackInvestmentValue > 0 ? paybackBase / paybackInvestmentValue * 100 : 0;
   const margin = revenue ? ownResult / revenue * 100 : 0;
   const totalRevenue = revenue + extraRevenue;
   const totalOperatingCost = energyCost + extraCosts + management + platform + areaParticipation;
@@ -4444,12 +4478,17 @@ function financeForCharges(charges, settings = {}, options = {}) {
     saRetention,
     ubyDistributable,
     investorDistribution,
+    partnerInvestorDistribution,
+    finalDistribution,
     ubyRetained,
     paybackBase,
     paybackMonths,
     roiMonthly,
     margin,
-    investmentValue: cfg.investmentValue
+    investmentValue: cfg.investmentValue,
+    paybackInvestmentValue,
+    p3InvestmentValue,
+    partnerInvestmentValue
   };
 }
 
@@ -4579,15 +4618,18 @@ function generalFinanceByUnit(unitData) {
     const total = Object.entries(byMonth).reduce((acc, [mk, charges]) => {
       const result = financeForCharges(charges, settings[mk] || settings.default || defaultFinanceSettings(), { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId) });
       Object.entries(result).forEach(([key, value]) => {
-        if (['operationModel', 'margin', 'paybackMonths', 'roiMonthly', 'investmentValue'].includes(key) || !Number.isFinite(value)) return;
+        if (['operationModel', 'margin', 'paybackMonths', 'roiMonthly', 'investmentValue', 'paybackInvestmentValue', 'p3InvestmentValue', 'partnerInvestmentValue'].includes(key) || !Number.isFinite(value)) return;
         acc[key] = (acc[key] || 0) + value;
       });
       acc.investmentValue = Math.max(acc.investmentValue || 0, result.investmentValue || 0);
+      acc.paybackInvestmentValue = Math.max(acc.paybackInvestmentValue || 0, result.paybackInvestmentValue || result.investmentValue || 0);
+      acc.p3InvestmentValue = Math.max(acc.p3InvestmentValue || 0, result.p3InvestmentValue || 0);
+      acc.partnerInvestmentValue = Math.max(acc.partnerInvestmentValue || 0, result.partnerInvestmentValue || 0);
       return acc;
     }, {});
     total.margin = total.revenue ? total.ownResult / total.revenue * 100 : 0;
-    total.paybackMonths = total.investmentValue > 0 && total.paybackBase > 0 ? total.investmentValue / total.paybackBase : 0;
-    total.roiMonthly = total.investmentValue > 0 ? total.paybackBase / total.investmentValue * 100 : 0;
+    total.paybackMonths = total.paybackInvestmentValue > 0 && total.paybackBase > 0 ? total.paybackInvestmentValue / total.paybackBase : 0;
+    total.roiMonthly = total.paybackInvestmentValue > 0 ? total.paybackBase / total.paybackInvestmentValue * 100 : 0;
     return { ...unit, finance: total };
   });
 }
@@ -4654,8 +4696,8 @@ function renderGeneralFinance(unitData) {
     return acc;
   }, {});
   total.margin = total.revenue ? total.ownResult / total.revenue * 100 : 0;
-  total.paybackMonths = total.investmentValue > 0 && total.paybackBase > 0 ? total.investmentValue / total.paybackBase : 0;
-  total.roiMonthly = total.investmentValue > 0 ? total.paybackBase / total.investmentValue * 100 : 0;
+  total.paybackMonths = total.paybackInvestmentValue > 0 && total.paybackBase > 0 ? total.paybackInvestmentValue / total.paybackBase : 0;
+  total.roiMonthly = total.paybackInvestmentValue > 0 ? total.paybackBase / total.paybackInvestmentValue * 100 : 0;
   const best = [...rows].sort((a, b) => (b.finance?.ownResult || 0) - (a.finance?.ownResult || 0))[0];
   document.getElementById('generalFinanceHeroMeta').innerHTML =
     `Unidades com base: <strong>${rows.length}</strong><br>Investimento cadastrado: <strong>${fmtBRL(total.investmentValue || 0)}</strong><br>Resultado UBY consolidado: <strong>${fmtBRL(total.ubyNet || 0)}</strong>`;
@@ -8154,6 +8196,9 @@ function ubyInvestorMonthEntry(rows = [], mk = '') {
   });
   const investmentValue = unitEntries.reduce((sum, entry) => sum + Number(entry.investmentValue || 0), 0);
   const total = aggregateInvestorEntries(unitEntries, investmentValue);
+  total.paybackInvestmentValue = unitEntries.reduce((sum, entry) => sum + Number(entry.paybackInvestmentValue || 0), 0);
+  total.p3InvestmentValue = unitEntries.reduce((sum, entry) => sum + Number(entry.p3InvestmentValue || 0), 0);
+  total.partnerInvestmentValue = unitEntries.reduce((sum, entry) => sum + Number(entry.partnerInvestmentValue || 0), 0);
   const monthCharges = rows.flatMap(row => (row.charges || []).filter(charge => chargeMonthKey(charge) === mk));
   total.clients = new Set(monthCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
   total.charges = monthCharges.length;
