@@ -230,6 +230,37 @@
     ]) + '<tr class="total-row"><td colspan="2">' + esc(totalLabel) + '</td><td class="value">' + esc(brl(total)) + '</td><td></td></tr></tbody></table></div>';
   }
 
+  function investorCapitalTimeline(timeline, accumulated) {
+    var investment = num(accumulated && accumulated.investmentValue);
+    var recovered = 0;
+    var distribution = 0;
+    var rows = (timeline || []).map(function (item) {
+      var paybackBase = num(item && (item.paybackBase != null ? item.paybackBase : item.result && item.result.paybackBase));
+      var investorDistribution = num(item && item.investorDistribution);
+      recovered += paybackBase;
+      distribution += investorDistribution;
+      return {
+        label: item && item.label || '-',
+        paybackBase: paybackBase,
+        investorDistribution: investorDistribution,
+        cumulativePayback: recovered,
+        cumulativeDistribution: distribution,
+        remainingInvestment: investment > 0 ? Math.max(investment - recovered, 0) : 0
+      };
+    });
+    var averagePayback = rows.length ? recovered / rows.length : 0;
+    return {
+      investment: investment,
+      recovered: recovered,
+      distribution: distribution,
+      remainingInvestment: investment > 0 ? Math.max(investment - recovered, 0) : 0,
+      recoveredPct: investment > 0 ? recovered / investment * 100 : 0,
+      roiAccumulated: investment > 0 ? recovered / investment * 100 : 0,
+      paybackMonths: investment > 0 && averagePayback > 0 ? investment / averagePayback : 0,
+      rows: rows
+    };
+  }
+
   function investorReport(model, options) {
     var current = model.current || {};
     var accumulated = model.accumulated || {};
@@ -237,6 +268,7 @@
     var units = model.units || [];
     var costItems = model.costItems || [];
     var revenueItems = model.revenueItems || [];
+    var capital = investorCapitalTimeline(timeline, accumulated);
     var body = '<div class="report">' + header(model, 'UBY Recharge - investidores', 'Relatorio de desempenho e resultado') +
       metrics([
         { value: pct(current.occupancyPct), label: 'Ocupacao do periodo', className: current.occupancyPct >= num(current.targetOccPct) ? 'positive' : 'negative' },
@@ -259,7 +291,7 @@
       '<tr><td>ROI do periodo</td><td class="value">' + esc(pct(current.roiMonthly)) + '</td></tr>' +
       '<tr><td>Payback estimado</td><td class="value">' + esc(payback(current.paybackMonths)) + '</td></tr>' +
       '<tr><td>Retencao S.A.</td><td class="value">' + esc(brl(current.saRetention)) + '</td></tr>' +
-      '<tr><td>Distribuivel a investidores</td><td class="value">' + esc(brl(current.investorDistribution)) + '</td></tr>' +
+      '<tr class="total-row"><td>Distribuicao final aos investidores</td><td class="value">' + esc(brl(current.investorDistribution)) + '</td></tr>' +
       '</tbody></table></div></div></div>' +
       '<div class="section page-break"><div class="section-title"><h2>Composicao financeira e custo diluido</h2><span>Quanto cada item representa por kWh</span></div><div class="split">' +
       itemTable('Receitas', revenueItems, current.totalRevenue, 'Total de receitas') +
@@ -273,8 +305,21 @@
         { value: pct(accumulated.occupancyPct), label: 'Ocupacao media ponderada' },
         { value: perKwh(accumulated.totalCostPerKWh), label: 'Custo medio acumulado' },
         { value: pct(accumulated.operationMargin), label: 'Margem acumulada' },
-        { value: brl(accumulated.investorDistribution), label: 'Distribuicao acumulada' }
+        { value: brl(capital.distribution), label: 'Distribuicao acumulada aos investidores', className: capital.distribution >= 0 ? 'positive' : 'negative' },
+        { value: brl(capital.recovered), label: 'Resultado recuperado no payback', className: capital.recovered >= 0 ? 'positive' : 'negative' },
+        { value: brl(capital.remainingInvestment), label: 'Saldo a recuperar' },
+        { value: pct(capital.roiAccumulated), label: 'ROI acumulado' },
+        { value: payback(capital.paybackMonths), label: 'Payback estimado acumulado' }
       ]) + '</div>' +
+      '<div class="section avoid"><div class="section-title"><h2>Evolucao do payback</h2><span>Resultado acumulado versus investimento considerado</span></div>' +
+      timelineBars(capital.rows, 'cumulativePayback', brl) +
+      '<table><thead><tr><th>Mes</th><th>Resultado para payback</th><th>Recuperado acumulado</th><th>Distribuicao investidores</th><th>Saldo a recuperar</th></tr></thead><tbody>' + rows(capital.rows, [
+        { value: 'label' },
+        { value: function (item) { return brl(item.paybackBase); }, className: 'value' },
+        { value: function (item) { return brl(item.cumulativePayback); }, className: 'value' },
+        { value: function (item) { return brl(item.investorDistribution); }, className: 'value' },
+        { value: function (item) { return capital.investment > 0 ? brl(item.remainingInvestment) : '-'; }, className: 'value' }
+      ]) + '</tbody></table></div>' +
       '<div class="section avoid"><div class="section-title"><h2>Linha do tempo mes a mes</h2><span>Evolucao do faturamento e resultado</span></div>' + timelineBars(timeline, 'totalRevenue', brl) +
       '<table><thead><tr><th>Mes</th><th>Ocupacao</th><th>Receita</th><th>kWh</th><th>Custos</th><th>Resultado</th><th>Margem</th></tr></thead><tbody>' + rows(timeline, [
         { value: 'label' }, { value: function (item) { return pct(item.occupancyPct); }, className: 'value' },
@@ -291,7 +336,7 @@
         { value: function (item) { return brl(item.totalOperatingCost); }, className: 'value' },
         { value: function (item) { return brl(item.operationNet); }, className: 'value' }
       ]) + '</tbody></table></div>' : '') +
-      reportFoot('Relatorio gerencial para investidores. Os valores respeitam as premissas salvas em cada unidade e competencia. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.') + '</div>';
+      reportFoot('Relatorio gerencial para investidores. A distribuicao final corresponde ao valor liquido para os cotistas apos a retencao estatutaria e o percentual de cotas configurado. Conferir documentos fiscais e ajustes extraordinarios antes da aprovacao do fechamento.') + '</div>';
     return shell('Relatorio de investidores - ' + (model.report && (model.report.station || model.report.scope) || 'UBY'), body, options);
   }
 

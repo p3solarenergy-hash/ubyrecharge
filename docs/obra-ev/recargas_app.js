@@ -3373,6 +3373,7 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
     totalCostPerKWh: result.totalCostPerKWh,
     plannedTotalCostPerKWh: result.plannedTotalCostPerKWh,
     investmentValue: Number(result.investmentValue || 0),
+    paybackBase: Number(result.paybackBase || 0),
     roiMonthly: Number(result.roiMonthly || 0),
     paybackMonths: Number(result.paybackMonths || 0),
     saRetention: Number(result.saRetention || 0),
@@ -3386,7 +3387,7 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
 }
 
 function aggregateInvestorEntries(entries = [], investmentValue = null) {
-  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','operationNet','saRetention','investorDistribution','ubyRetained'];
+  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','operationNet','paybackBase','saRetention','investorDistribution','ubyRetained'];
   const total = numeric.reduce((acc, key) => ({ ...acc, [key]: entries.reduce((sum, entry) => sum + Number(entry[key] || 0), 0) }), {});
   total.occupancyPct = total.maxKWh > 0 ? total.energy / total.maxKWh * 100 : 0;
   total.totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
