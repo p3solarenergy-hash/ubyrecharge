@@ -18,6 +18,23 @@ const backup = fs.readFileSync(backupPath, 'utf8');
 const financeReports = fs.readFileSync(financeReportsPath, 'utf8');
 const migration = fs.readFileSync(migrationPath, 'utf8');
 
+assert(
+  html.includes('function rechargeMetadataSeed(workId)'),
+  'completed works must support metadata before their first spreadsheet import'
+);
+assert(
+  html.includes('function stationUbyOperationKey(workId, stationName, workName = \'\')'),
+  'manual UBY classification must keep a stable station-level key'
+);
+assert(
+  !html.includes('const occupied = rows.filter(row => row.count > 0)'),
+  'schedule configuration must remain visible for zero-charge completed works'
+);
+assert(
+  bridge.includes('Uma obra concluida pode receber configuracoes'),
+  'Supabase metadata saving must create a safe empty base for a completed work'
+);
+
 function extractFunction(source, name) {
   const marker = `function ${name}(`;
   const start = source.indexOf(marker);
@@ -327,7 +344,7 @@ assert(html.includes('derivedFiles = new Map()'), 'legacy bases must rebuild vis
 assert(bridge.includes('existingCharges > 0 && !explicitEmptyIntents.has(mutationIntent)'), 'cloud must reject accidental empty overwrite');
 assert(bridge.includes('"remove_file"'), 'cloud must allow an explicit last-file removal');
 assert(!bridge.includes('...(existing.resumo || {}),\n      ...incomingSummary'), 'metadata saves must not replace operational summary fields');
-assert(bridge.includes('const existingSummary = existing.resumo || {};'), 'metadata saves must start from the authoritative cloud summary');
+assert(bridge.includes('const existingSummary = existing?.resumo || {};'), 'metadata saves must start from the authoritative cloud summary when it exists');
 assert(bridge.includes('stationAvailability: payload?.stationAvailability'), 'station schedules must persist in cloud metadata');
 assert(!html.includes('duplicateGeneralLabels'), 'the general dashboard must not create duplicated KPI cards');
 assert(html.includes('stationAvailableHours(config, window.start, window.end)'), 'general occupancy must use station availability windows');

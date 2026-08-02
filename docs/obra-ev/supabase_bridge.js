@@ -479,8 +479,7 @@
       .eq("obra_id", id)
       .maybeSingle();
     if (readError) throw readError;
-    if (!existing) throw new Error("Base de recargas ainda nao criada para esta obra.");
-    const existingSummary = existing.resumo || {};
+    const existingSummary = existing?.resumo || {};
     const incomingSummary = payload?.summary || {};
     const summary = {
       ...existingSummary,
@@ -493,11 +492,23 @@
       ubyAreaAccounting: payload?.ubyAreaAccounting || incomingSummary.ubyAreaAccounting || existingSummary.ubyAreaAccounting || {},
       updatedAt: new Date().toISOString()
     };
-    const { error: updateError } = await sb
-      .from("obra_recargas_base")
-      .update({ resumo: summary, updated_at: new Date().toISOString() })
-      .eq("obra_id", id);
-    if (updateError) throw updateError;
+    const updatedAt = new Date().toISOString();
+    if (existing) {
+      const { error: updateError } = await sb
+        .from("obra_recargas_base")
+        .update({ resumo: summary, updated_at: updatedAt })
+        .eq("obra_id", id);
+      if (updateError) throw updateError;
+    } else {
+      // Uma obra concluida pode receber configuracoes (horario, classificacao
+      // UBY) antes da primeira importacao. Cria somente a casca vazia, sem
+      // sessoes nem arquivos, para que a proxima planilha continue sendo a
+      // fonte operacional da base.
+      const { error: insertError } = await sb
+        .from("obra_recargas_base")
+        .upsert({ obra_id: id, arquivos: [], recargas: [], resumo: summary, updated_at: updatedAt }, { onConflict: "obra_id" });
+      if (insertError) throw insertError;
+    }
     await insertAuditLog(sb, user, {
       entidadeId: id,
       acao: "save_recharge_metadata",

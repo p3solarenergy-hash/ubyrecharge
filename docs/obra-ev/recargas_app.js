@@ -217,11 +217,7 @@ async function saveStationLayoutConfiguration() {
     closeTime: document.getElementById('stationLayoutCloseTime').value || '22:00',
     openDays
   };
-  const source = allRechargeRecords[workId] || localRecord(workId);
-  if (!source) {
-    alert('A base desta obra ainda nao foi carregada.');
-    return;
-  }
+  const source = allRechargeRecords[workId] || localRecord(workId) || rechargeMetadataSeed(workId);
   const availability = { ...(source.stationAvailability || source.summary?.stationAvailability || {}) };
   availability[stationAvailabilityKey(sourceName)] = config;
   const updatedAt = new Date().toISOString();
@@ -688,6 +684,33 @@ function mergeCloudRechargeRecords(records) {
 
 function localRecord(workId = currentWorkId) {
   return localRechargeDb()[workId] || null;
+}
+
+// Configuracoes operacionais tambem precisam existir antes da primeira
+// planilha. Este registro vazio preserva horario e classificacao UBY sem
+// inventar recargas ou alterar o historico da obra.
+function rechargeMetadataSeed(workId) {
+  const id = String(workId || '').trim();
+  const workName = workNameById(id, id);
+  const updatedAt = new Date().toISOString();
+  return hydratedRechargeRecord({
+    workId: id,
+    workName,
+    files: [],
+    charges: [],
+    summary: {
+      workId: id,
+      workName,
+      charges: 0,
+      files: 0,
+      clients: 0,
+      energyKWh: 0,
+      revenue: 0,
+      updatedAt
+    },
+    updatedAt,
+    metadataOnly: true
+  }, id);
 }
 
 function rechargeSummary() {
@@ -6604,6 +6627,13 @@ function ubyOperationKey(charge = {}) {
   return chargerKey(charge);
 }
 
+// Chave estavel da unidade. Ela permite marcar uma estacao como UBY antes da
+// primeira exportacao e manter essa decisao quando o conector chegar na base.
+function stationUbyOperationKey(workId, stationName, workName = '') {
+  const station = canonicalStationNameForWork(workId, stationName, workName);
+  return `${String(workId || '').trim()}|${normalizeStationForCompare(station)}|station`;
+}
+
 function isUbyOperationCharge(charge = {}, overrides = ubyOperationOverrides) {
   const key = ubyOperationKey(charge);
   if (Object.prototype.hasOwnProperty.call(overrides || {}, key)) return !!overrides[key];
@@ -6611,7 +6641,10 @@ function isUbyOperationCharge(charge = {}, overrides = ubyOperationOverrides) {
 }
 
 function isUbyOperationGroup(group = {}, overrides = ubyOperationOverrides) {
-  if (Object.prototype.hasOwnProperty.call(overrides || {}, group.key)) return !!overrides[group.key];
+  const keys = [group.key, group.stationOverrideKey].filter(Boolean);
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(overrides || {}, key)) return !!overrides[key];
+  }
   if (group.kind === 'dc') return true;
   return (group.charges || []).some(charge => isUbyOperationCharge(charge, overrides));
 }
@@ -6838,7 +6871,6 @@ function stationOccupancyForMonths(row, monthKeys, mode = 'mtd') {
   let hours = 0;
   (monthKeys || []).forEach(monthKeyValue => {
     const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === monthKeyValue);
-    if (!monthCharges.length) return;
     const window = periodWindow(monthCharges, monthKeyValue, mode);
     energy += monthCharges.reduce((sum, charge) => sum + charge.energyKWh, 0);
     hours += stationAvailableHours(config, window.start, window.end);
@@ -6850,7 +6882,7 @@ function stationOccupancyForMonths(row, monthKeys, mode = 'mtd') {
 function renderGeneralStationOccupancy(rows, monthKeys) {
   const target = document.getElementById('generalStationOccupancy');
   if (!target) return;
-  const occupied = rows.filter(row => row.count > 0)
+  const occupied = rows
     .map(row => ({ row, occupancy: stationOccupancyForMonths(row, monthKeys, 'mtd') }))
     .sort((a, b) => b.occupancy.pct - a.occupancy.pct);
   target.innerHTML = occupied.length ? occupied.map(({ row, occupancy }) => `
@@ -6860,7 +6892,7 @@ function renderGeneralStationOccupancy(rows, monthKeys) {
       <div class="station-occupancy-meta">${occupancy.hours.toFixed(1).replace('.', ',')} h disponiveis<br>${stationScheduleLabel(occupancy.config)}</div>
       <button class="btn-open" type="button" onclick="openStationLayoutConfiguration('${escapeAttr(row.workId)}','${escapeAttr(row.stationName)}')">Configurar horario</button>
     </div>
-  `).join('') : '<div class="note">Nenhum eletroposto com recargas no periodo.</div>';
+  `).join('') : '<div class="note">Nenhum eletroposto concluido disponivel para configurar.</div>';
 }
 
 function getUbyChargerRows(unitData = getGeneralUnitData()) {
@@ -6881,6 +6913,7 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
           workId: unit.workId,
           workName: unit.workName,
           key,
+          stationOverrideKey: stationUbyOperationKey(unit.workId, stationName, unit.workName),
           station: stationName,
           connType: charge.connType || '',
           connTypes: new Set(),
@@ -6903,7 +6936,8 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
     });
 
     groups.forEach(group => {
-      const hasOverride = Object.prototype.hasOwnProperty.call(unit.ubyOperationOverrides || {}, group.key);
+      const hasOverride = [group.key, group.stationOverrideKey]
+        .some(key => Object.prototype.hasOwnProperty.call(unit.ubyOperationOverrides || {}, key));
       const included = isUbyOperationGroup(group, unit.ubyOperationOverrides);
       rows.push({
         ...group,
@@ -6914,6 +6948,39 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
         ruleSource: hasOverride ? 'manual' : included ? 'DC automatico' : 'fora por padrao'
       });
     });
+  });
+
+  // A classificacao e um cadastro operacional: toda obra concluida deve
+  // aparecer mesmo antes de importar a primeira planilha. Assim a decisao de
+  // entrar ou nao na UBY nao depende de haver recargas no mes.
+  const existingStations = new Set(rows.map(row => `${row.workId}|${normalizeStationForCompare(row.station)}`));
+  getGeneralStationRows(unitData).forEach(unit => {
+    const stationName = canonicalStationNameForWork(unit.workId, unit.stationName || unit.workName, unit.workName);
+    const identity = `${unit.workId}|${normalizeStationForCompare(stationName)}`;
+    if (existingStations.has(identity)) return;
+    const stationOverrideKey = stationUbyOperationKey(unit.workId, stationName, unit.workName);
+    const overrides = unit.ubyOperationOverrides || allRechargeRecords[unit.workId]?.ubyOperationOverrides || allRechargeRecords[unit.workId]?.summary?.ubyOperationOverrides || {};
+    const kind = chargerKind({ workId: unit.workId, workName: unit.workName, station: stationName });
+    const group = {
+      workId: unit.workId,
+      workName: unit.workName,
+      key: stationOverrideKey,
+      stationOverrideKey,
+      station: stationName,
+      kind,
+      charges: []
+    };
+    const hasOverride = Object.prototype.hasOwnProperty.call(overrides, stationOverrideKey);
+    rows.push({
+      ...group,
+      connType: 'Sem planilha importada',
+      clients: 0,
+      energy: 0,
+      revenue: 0,
+      included: isUbyOperationGroup(group, overrides),
+      ruleSource: hasOverride ? 'manual' : group.included ? 'DC automatico' : 'fora por padrao'
+    });
+    existingStations.add(identity);
   });
   return rows.sort((a, b) => Number(b.included) - Number(a.included) || b.revenue - a.revenue);
 }
@@ -7854,8 +7921,7 @@ function renderClub() {
 async function toggleUbyOperation(workId, key, checked) {
   syncGeneralRecordsFromLocal();
   const db = localRechargeDb();
-  const record = allRechargeRecords[workId] || db[workId];
-  if (!record) return;
+  const record = allRechargeRecords[workId] || db[workId] || rechargeMetadataSeed(workId);
   const overrides = { ...(record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {}) };
   overrides[key] = !!checked;
   record.ubyOperationOverrides = overrides;
