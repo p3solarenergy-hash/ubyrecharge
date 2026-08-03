@@ -4513,9 +4513,12 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const partnerInvestmentValue = model === 'p3_society'
     ? Math.max(cfg.investmentValue - p3InvestmentValue, 0)
     : 0;
+  const isUbyInvestorAsset = model === 'uby' || model === 'hybrid';
   const saRetention = Math.max(ubyNet, 0) * cfg.saRetentionPct / 100;
   const ubyDistributable = Math.max(ubyNet - saRetention, 0);
-  const investorDistribution = ubyDistributable * cfg.investorQuotaPct / 100;
+  // Cotistas UBY participam apenas dos ativos da UBY. Em gestao de terceiros,
+  // o royalty continua receita da marca, mas nao vira distribuicao de cotas.
+  const investorDistribution = isUbyInvestorAsset ? ubyDistributable * cfg.investorQuotaPct / 100 : 0;
   // Em sociedade e em operacao somente de gestao, o parceiro recebe o lucro
   // liquido diretamente. Isso e uma distribuicao real do periodo, ainda que
   // nao passe pela estrutura de cotas da UBY.
@@ -4764,9 +4767,12 @@ function generalFinanceByUnit(unitData) {
       if (mk === 'unknown') return;
       (byMonth[mk] ||= []).push(charge);
     });
-    const settings = allRechargeRecords[unit.workId]?.financialSettings || {};
     const monthly = Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b)).map(([mk, charges]) => {
-      const result = financeForCharges(charges, settings[mk] || settings.default || defaultFinanceSettings(), { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId) });
+      // A configuracao pode ser diferente por carregador. Usar somente a raiz
+      // da obra fazia o geral voltar para o modelo padrao e ignorar a escolha
+      // salva para Sabara, Central JK e qualquer outra estacao individual.
+      const settings = financeSettingsForUbyRow(unit, mk);
+      const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId) });
       return { monthKey: mk, result };
     });
     const total = monthly.reduce((acc, { result }) => {
@@ -4783,7 +4789,7 @@ function generalFinanceByUnit(unitData) {
     total.margin = total.revenue ? total.ownResult / total.revenue * 100 : 0;
     total.paybackMonths = total.paybackInvestmentValue > 0 && total.paybackBase > 0 ? total.paybackInvestmentValue / total.paybackBase : 0;
     total.roiMonthly = total.paybackInvestmentValue > 0 ? total.paybackBase / total.paybackInvestmentValue * 100 : 0;
-    total.operationModel = monthly.at(-1)?.result?.operationModel || settings.default?.operationModel || 'uby';
+    total.operationModel = monthly.at(-1)?.result?.operationModel || 'uby';
     return { ...unit, finance: total, financeMonths: monthly };
   });
 }
@@ -4871,7 +4877,6 @@ function renderGeneralFinanceOverview(rows = []) {
   const p3Total = sum(p3Rows, row => row.finance?.p3OperationalResult);
   const ubyInvestorTotal = sum(ubyInvestorRows, row => row.finance?.investorDistribution);
   const partnerTotal = sum(partnerRows, row => row.finance?.partnerInvestorDistribution);
-  const ranked = [...rows].sort((a, b) => financeUnitOutcome(b.finance).value - financeUnitOutcome(a.finance).value);
   const list = (items, metric, emptyText = 'Nenhuma unidade neste modelo.') => items.length
     ? items.slice(0, 3).map(row => `
       <div class="finance-overview-row">
@@ -4903,12 +4908,6 @@ function renderGeneralFinanceOverview(rows = []) {
       <strong class="finance-overview-total">${fmtBRL(partnerTotal)}</strong>
       <span class="finance-overview-caption">Lucro liquido distribuido diretamente em sociedades e ativos de parceiros.</span>
       <div class="finance-overview-list">${list(partnerRows, row => row.finance?.partnerInvestorDistribution, 'Nenhum repasse direto a parceiro registrado.')}</div>
-    </article>
-    <article class="finance-overview-panel points">
-      <h2>Pontos</h2>
-      <strong class="finance-overview-total">${rows.length} unidade(s)</strong>
-      <span class="finance-overview-caption">Ranking pelo resultado que pertence ao modelo selecionado em cada ponto.</span>
-      <div class="finance-overview-list">${list(ranked, row => financeUnitOutcome(row.finance).value)}</div>
     </article>
   `;
 }
