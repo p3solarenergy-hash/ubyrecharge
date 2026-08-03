@@ -2306,6 +2306,12 @@ function monthSummaryFromClosing(closing) {
   };
 }
 
+// Atalho usado pelo financeiro geral. Mantem a mesma abertura segura do painel
+// individual e evita duplicar navegacao ou estado da obra no HTML do resumo.
+async function openFinanceUnit(workId, stationName = '') {
+  await openWorkReport(workId, 'financeiro', stationName);
+}
+
 function monthLiveSummary(mk, power = getPower()) {
   const charges = chargesForMonth(mk);
   if (!charges.length) return null;
@@ -2585,7 +2591,7 @@ function currentFinanceSettingsFromInputs() {
   const costRules = financeRulesFromInputs('cost');
   const revenueRules = financeRulesFromInputs('revenue');
   return {
-    operationModel: document.getElementById('financeOperationModel')?.value || 'uby',
+    operationModel: normalizeOperationModel(document.getElementById('financeOperationModel')?.value || 'uby'),
     managementPct: numberInputValue('financeMgmtPct', 5),
     p3SocietyPct: numberInputValue('financeP3SocietyPct', 0),
     p3AcEquityPct: numberInputValue('financeP3AcEquityPct', 0),
@@ -2899,6 +2905,7 @@ async function restoreFinancePreviousMonth() {
 
 function applyFinanceSettingsToInputs(settings = {}) {
   const merged = { ...defaultFinanceSettings(), ...settings };
+  merged.operationModel = normalizeOperationModel(merged.operationModel);
   if (!settings.operationModel && (Number(settings.p3AcEquityPct || 0) > 0 || Number(settings.p3DcEquityPct || 0) > 0)) merged.operationModel = 'hybrid';
   if (!settings.ownerTransferMode && Number(settings.ownerNetProfitSharePct || 0) > 0) merged.ownerTransferMode = 'net';
   if (!Number(merged.ownerEnergyRate || 0) && Number(merged.energyCostPerKWh || 0) > 0) merged.ownerEnergyRate = merged.energyCostPerKWh;
@@ -4407,14 +4414,25 @@ function targetOccupationMetrics(charges, mk, settings = {}) {
   };
 }
 
+function normalizeOperationModel(model) {
+  const raw = String(model || 'uby').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+  if (['management_only', 'management', 'gestao', 'gestao_p3', 'p3_management', 'p3_gestao'].includes(raw)) return 'management_only';
+  if (['third_party_management', 'gestao_royalty', 'gestao_com_royalty', 'gestao_p3_uby', 'terceiro_com_marca_uby'].includes(raw)) return 'third_party_management';
+  if (['p3_society', 'p3society', 'p3_parceria', 'parceria', 'sociedade', 'ativo_p3'].includes(raw)) return 'p3_society';
+  if (['hybrid', 'hibrido', 'hibrido_ac_dc'].includes(raw)) return 'hybrid';
+  return 'uby';
+}
+
 function operationModelLabel(model) {
   return {
-    uby: 'UBY - ativo proprio',
-    p3_society: 'Ativo P3 com parceria',
-    hybrid: 'Hibrido AC/DC',
-    management_only: 'Gestao P3 - ativo de terceiro',
-    third_party_management: 'Gestao P3 + marca UBY - terceiro'
-  }[model] || 'UBY - ativo proprio';
+    uby: 'Ativo UBY',
+    p3_society: 'Parceria P3',
+    hybrid: 'Ativo UBY hibrido',
+    management_only: 'Gestao P3 (sem UBY)',
+    third_party_management: 'Gestao P3 + royalty UBY'
+  }[normalizeOperationModel(model)] || 'Ativo UBY';
 }
 
 function financeForCharges(charges, settings = {}, options = {}) {
@@ -4430,7 +4448,8 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const acRevenue = charges.filter(c => chargerKind(c) === 'ac').reduce((sum, c) => sum + c.revenue, 0);
   const dcRevenue = charges.filter(c => chargerKind(c) === 'dc').reduce((sum, c) => sum + c.revenue, 0);
   const unknownRevenue = Math.max(revenue - acRevenue - dcRevenue, 0);
-  const model = cfg.operationModel || 'uby';
+  const model = normalizeOperationModel(cfg.operationModel);
+  cfg.operationModel = model;
   const management = revenue * cfg.managementPct / 100;
   const platform = revenue * cfg.platformPct / 100;
   const ubyRoyalty = model === 'third_party_management' ? revenue * cfg.ubyRoyaltyPct / 100 : 0;
@@ -4507,7 +4526,11 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const p3OperationalResult = management + p3SocietyProfit;
   const ownResult = ubyNet + p3SocietyProfit;
   const paybackBase = model === 'p3_society' ? p3SocietyProfit : ((model === 'management_only' || model === 'third_party_management') ? p3OperationalResult : ownResult);
-  const paybackInvestmentValue = model === 'p3_society' ? p3InvestmentValue : cfg.investmentValue;
+  // Em gestao de ativo de terceiro nao ha capital UBY a recuperar. O retorno
+  // acompanha a receita P3, mas nao deve fingir um payback da UBY.
+  const paybackInvestmentValue = model === 'p3_society'
+    ? p3InvestmentValue
+    : ((model === 'management_only' || model === 'third_party_management') ? 0 : cfg.investmentValue);
   const paybackMonths = paybackInvestmentValue > 0 && paybackBase > 0 ? paybackInvestmentValue / paybackBase : 0;
   const roiMonthly = paybackInvestmentValue > 0 ? paybackBase / paybackInvestmentValue * 100 : 0;
   const margin = revenue ? ownResult / revenue * 100 : 0;
@@ -4810,13 +4833,84 @@ async function renderFinanceOnly() {
   try { renderUbyFinancialOverview(ubyRows, sourceMonths, isMonthView, currentMonth, viewLabel); } catch (e) { console.error('[fin-uby]', e); }
 }
 
+function financeUnitOutcome(finance = {}) {
+  const model = normalizeOperationModel(finance.operationModel);
+  if (model === 'management_only') {
+    return { label: 'Receita P3 de gestao', value: Number(finance.p3OperationalResult || 0), destination: 'P3' };
+  }
+  if (model === 'third_party_management') {
+    return { label: 'P3 + royalty UBY', value: Number(finance.p3OperationalResult || 0) + Number(finance.ubyRoyalty || 0), destination: 'P3 e UBY' };
+  }
+  if (model === 'p3_society') {
+    return { label: 'Resultado P3 na parceria', value: Number(finance.p3OperationalResult || 0), destination: 'P3' };
+  }
+  return { label: 'Resultado UBY', value: Number(finance.ubyNet || 0), destination: 'UBY' };
+}
+
+function financeUnitOpenButton(row) {
+  const station = row.stationName || row.station || '';
+  return `<button class="btn-open" type="button" onclick="openFinanceUnit('${escapeAttr(row.workId)}','${escapeAttr(station)}')">Abrir</button>`;
+}
+
+function renderGeneralFinanceOverview(rows = []) {
+  const target = document.getElementById('generalFinanceOverview');
+  if (!target) return;
+  const ubyRows = rows.filter(row => ['uby', 'hybrid', 'third_party_management'].includes(normalizeOperationModel(row.finance?.operationModel)));
+  const p3Rows = rows.filter(row => ['p3_society', 'management_only', 'third_party_management', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
+  const investorRows = rows.filter(row => Number(row.finance?.investorDistribution || 0) > 0 || Number(row.finance?.partnerInvestorDistribution || 0) > 0);
+  const sum = (items, selector) => items.reduce((total, item) => total + Number(selector(item) || 0), 0);
+  const ubyTotal = sum(ubyRows, row => row.finance?.ubyNet);
+  const p3Total = sum(p3Rows, row => row.finance?.p3OperationalResult);
+  const investorTotal = sum(investorRows, row => {
+    const model = normalizeOperationModel(row.finance?.operationModel);
+    return model === 'uby' || model === 'hybrid' ? row.finance?.investorDistribution : row.finance?.partnerInvestorDistribution;
+  });
+  const ranked = [...rows].sort((a, b) => financeUnitOutcome(b.finance).value - financeUnitOutcome(a.finance).value);
+  const list = (items, metric, emptyText = 'Nenhuma unidade neste modelo.') => items.length
+    ? items.slice(0, 3).map(row => `
+      <div class="finance-overview-row">
+        <div><strong>${escapeHtml(row.workName)}</strong><span>${escapeHtml(operationModelLabel(row.finance?.operationModel))}</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><b>${fmtBRL(metric(row))}</b>${financeUnitOpenButton(row)}</div>
+      </div>`).join('')
+    : `<div class="finance-overview-row"><span>${emptyText}</span></div>`;
+  target.innerHTML = `
+    <article class="finance-overview-panel uby">
+      <h2>UBY</h2>
+      <strong class="finance-overview-total">${fmtBRL(ubyTotal)}</strong>
+      <span class="finance-overview-caption">Resultado de ativos UBY e royalties de marca, antes da distribuicao.</span>
+      <div class="finance-overview-list">${list(ubyRows, row => row.finance?.ubyNet)}</div>
+    </article>
+    <article class="finance-overview-panel p3">
+      <h2>P3</h2>
+      <strong class="finance-overview-total">${fmtBRL(p3Total)}</strong>
+      <span class="finance-overview-caption">Gestao contratada e resultados de sociedade P3.</span>
+      <div class="finance-overview-list">${list(p3Rows, row => row.finance?.p3OperationalResult)}</div>
+    </article>
+    <article class="finance-overview-panel investors">
+      <h2>Investidores e parceiros</h2>
+      <strong class="finance-overview-total">${fmtBRL(investorTotal)}</strong>
+      <span class="finance-overview-caption">Distribuicoes por cotas UBY ou lucro pago diretamente ao parceiro.</span>
+      <div class="finance-overview-list">${list(investorRows, row => {
+        const model = normalizeOperationModel(row.finance?.operationModel);
+        return model === 'uby' || model === 'hybrid' ? row.finance?.investorDistribution : row.finance?.partnerInvestorDistribution;
+      })}</div>
+    </article>
+    <article class="finance-overview-panel points">
+      <h2>Pontos</h2>
+      <strong class="finance-overview-total">${rows.length} unidade(s)</strong>
+      <span class="finance-overview-caption">Ranking pelo resultado que pertence ao modelo selecionado em cada ponto.</span>
+      <div class="finance-overview-list">${list(ranked, row => financeUnitOutcome(row.finance).value)}</div>
+    </article>
+  `;
+}
+
 function renderGeneralFinance(unitData) {
   const activeUnits = (unitData || []).filter(unit =>
     Array.isArray(unit.charges) && unit.charges.length > 0 &&
     (Number(unit.count) > 0 || Number(unit.energy) > 0 || Number(unit.revenue) > 0)
   );
   const rows = generalFinanceByUnit(activeUnits).sort((a, b) => {
-    const ownDiff = (Number(b.finance?.ownResult) || 0) - (Number(a.finance?.ownResult) || 0);
+    const ownDiff = financeUnitOutcome(b.finance).value - financeUnitOutcome(a.finance).value;
     if (Math.abs(ownDiff) > 0.009) return ownDiff;
     return (Number(b.finance?.revenue) || 0) - (Number(a.finance?.revenue) || 0);
   });
@@ -4829,7 +4923,8 @@ function renderGeneralFinance(unitData) {
   total.margin = total.revenue ? total.ownResult / total.revenue * 100 : 0;
   total.paybackMonths = total.paybackInvestmentValue > 0 && total.paybackBase > 0 ? total.paybackInvestmentValue / total.paybackBase : 0;
   total.roiMonthly = total.paybackInvestmentValue > 0 ? total.paybackBase / total.paybackInvestmentValue * 100 : 0;
-  const best = [...rows].sort((a, b) => (b.finance?.ownResult || 0) - (a.finance?.ownResult || 0))[0];
+  const best = [...rows].sort((a, b) => financeUnitOutcome(b.finance).value - financeUnitOutcome(a.finance).value)[0];
+  renderGeneralFinanceOverview(rows);
   const managementByMonth = new Map();
   rows.forEach(row => (row.financeMonths || []).forEach(({ monthKey, result }) => {
     if (!monthKey) return;
@@ -4878,22 +4973,23 @@ function renderGeneralFinance(unitData) {
     <tr><td>Payback estimado</td><td>${formatPaybackMonths(total.paybackMonths || 0)}</td></tr>
     <tr><td>ROI mensal</td><td>${fmtPct(total.roiMonthly || 0)}</td></tr>
     <tr><td>Margem sobre o faturamento</td><td>${fmtPct(total.margin || 0)}</td></tr>
-    <tr><td>Melhor unidade financeira</td><td>${best ? `${best.workName} - ${fmtBRL(best.finance.ownResult || 0)}` : '-'}</td></tr>
+    <tr><td>Melhor unidade financeira</td><td>${best ? `${best.workName} - ${fmtBRL(financeUnitOutcome(best.finance).value)}` : '-'}</td></tr>
   `;
   document.getElementById('generalFinanceUnitTable').innerHTML = rows.length ? rows.map(row => `
-    <tr>
+    <tr data-operation-model="${normalizeOperationModel(row.finance.operationModel)}">
       <td>${row.workName}</td>
       <td>${operationModelLabel(row.finance.operationModel || 'uby')}</td>
       <td>${fmtBRL(row.finance.revenue || 0)}</td>
       <td>${fmtBRL(row.finance.totalOperatingCost || 0)}</td>
       <td>${fmtBRL(row.finance.management || 0)}</td>
       <td>${fmtBRL(row.finance.ubyRoyalty || 0)}</td>
-      <td>${fmtBRL(row.finance.p3SocietyProfit || 0)}</td>
-      <td>${fmtBRL(row.finance.ubyNet || 0)}</td>
+      <td>${fmtBRL(row.finance.p3OperationalResult || 0)}</td>
+      <td>${normalizeOperationModel(row.finance.operationModel) === 'management_only' ? '—' : fmtBRL(row.finance.ubyNet || 0)}</td>
       <td>${fmtBRL(row.finance.partnerShare || 0)}</td>
       <td>${formatPaybackMonths(row.finance.paybackMonths || 0)}</td>
+      <td>${financeUnitOpenButton(row)}</td>
     </tr>
-  `).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:20px">Sem bases financeiras para consolidar</td></tr>';
+  `).join('') : '<tr><td colspan="11" style="color:var(--p3-muted);text-align:center;padding:20px">Sem bases financeiras para consolidar</td></tr>';
   const managementTable = document.getElementById('generalP3ManagementTable');
   if (managementTable) managementTable.innerHTML = managementRows.length ? managementRows.map(item => {
     const p3Total = item.management + item.p3SocietyProfit;
