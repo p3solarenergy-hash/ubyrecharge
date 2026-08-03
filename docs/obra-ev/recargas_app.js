@@ -4856,15 +4856,21 @@ function renderGeneralFinanceOverview(rows = []) {
   const target = document.getElementById('generalFinanceOverview');
   if (!target) return;
   const ubyRows = rows.filter(row => ['uby', 'hybrid', 'third_party_management'].includes(normalizeOperationModel(row.finance?.operationModel)));
-  const p3Rows = rows.filter(row => ['p3_society', 'management_only', 'third_party_management', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
-  const investorRows = rows.filter(row => Number(row.finance?.investorDistribution || 0) > 0 || Number(row.finance?.partnerInvestorDistribution || 0) > 0);
+  // P3 must include its management fee from UBY assets as well as P3-only partnerships.
+  const p3Rows = rows.filter(row => Number(row.finance?.p3OperationalResult || 0) > 0);
+  const ubyInvestorRows = rows.filter(row =>
+    ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)) &&
+    Number(row.finance?.investorDistribution || 0) > 0
+  );
+  const partnerRows = rows.filter(row =>
+    ['p3_society', 'management_only', 'third_party_management'].includes(normalizeOperationModel(row.finance?.operationModel)) &&
+    Number(row.finance?.partnerInvestorDistribution || 0) > 0
+  );
   const sum = (items, selector) => items.reduce((total, item) => total + Number(selector(item) || 0), 0);
   const ubyTotal = sum(ubyRows, row => row.finance?.ubyNet);
   const p3Total = sum(p3Rows, row => row.finance?.p3OperationalResult);
-  const investorTotal = sum(investorRows, row => {
-    const model = normalizeOperationModel(row.finance?.operationModel);
-    return model === 'uby' || model === 'hybrid' ? row.finance?.investorDistribution : row.finance?.partnerInvestorDistribution;
-  });
+  const ubyInvestorTotal = sum(ubyInvestorRows, row => row.finance?.investorDistribution);
+  const partnerTotal = sum(partnerRows, row => row.finance?.partnerInvestorDistribution);
   const ranked = [...rows].sort((a, b) => financeUnitOutcome(b.finance).value - financeUnitOutcome(a.finance).value);
   const list = (items, metric, emptyText = 'Nenhuma unidade neste modelo.') => items.length
     ? items.slice(0, 3).map(row => `
@@ -4883,17 +4889,20 @@ function renderGeneralFinanceOverview(rows = []) {
     <article class="finance-overview-panel p3">
       <h2>P3</h2>
       <strong class="finance-overview-total">${fmtBRL(p3Total)}</strong>
-      <span class="finance-overview-caption">Gestao contratada e resultados de sociedade P3.</span>
+      <span class="finance-overview-caption">Gestao de todos os ativos, mais resultados de sociedades P3.</span>
       <div class="finance-overview-list">${list(p3Rows, row => row.finance?.p3OperationalResult)}</div>
     </article>
     <article class="finance-overview-panel investors">
-      <h2>Investidores e parceiros</h2>
-      <strong class="finance-overview-total">${fmtBRL(investorTotal)}</strong>
-      <span class="finance-overview-caption">Distribuicoes por cotas UBY ou lucro pago diretamente ao parceiro.</span>
-      <div class="finance-overview-list">${list(investorRows, row => {
-        const model = normalizeOperationModel(row.finance?.operationModel);
-        return model === 'uby' || model === 'hybrid' ? row.finance?.investorDistribution : row.finance?.partnerInvestorDistribution;
-      })}</div>
+      <h2>Investidores UBY</h2>
+      <strong class="finance-overview-total">${fmtBRL(ubyInvestorTotal)}</strong>
+      <span class="finance-overview-caption">Distribuicao por cotas dos ativos UBY, apos a retencao estatutaria.</span>
+      <div class="finance-overview-list">${list(ubyInvestorRows, row => row.finance?.investorDistribution, 'Nenhuma distribuicao UBY registrada.')}</div>
+    </article>
+    <article class="finance-overview-panel investors">
+      <h2>Parceiros</h2>
+      <strong class="finance-overview-total">${fmtBRL(partnerTotal)}</strong>
+      <span class="finance-overview-caption">Lucro liquido distribuido diretamente em sociedades e ativos de parceiros.</span>
+      <div class="finance-overview-list">${list(partnerRows, row => row.finance?.partnerInvestorDistribution, 'Nenhum repasse direto a parceiro registrado.')}</div>
     </article>
     <article class="finance-overview-panel points">
       <h2>Pontos</h2>
