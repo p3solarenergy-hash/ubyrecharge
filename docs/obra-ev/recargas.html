@@ -456,22 +456,23 @@
     .uby-finance-cell.result-positive b { color:#57D990; }
     .uby-finance-cell.result-negative b { color:#FF7A7A; }
     .finance-empty-guidance { border-left:3px solid #FFD66B; border-radius:8px; background:rgba(242,169,61,.10); color:#FFE4A0; padding:10px 12px; font-size:12px; line-height:1.45; margin-top:12px; }
-    /* Visao executiva do financeiro geral: separa quem recebe cada resultado. */
-    .finance-overview-grid { display:grid; grid-template-columns:repeat(4,minmax(190px,1fr)); gap:14px; margin-top:18px; }
-    .finance-overview-panel { min-width:0; min-height:236px; border:1px solid rgba(84,180,255,.22); border-radius:12px; background:linear-gradient(145deg,rgba(16,36,61,.98),rgba(8,21,37,.98)); padding:16px; box-shadow:var(--p3-shadow); }
-    .finance-overview-panel h2 { margin:0; padding:0 0 10px; border-bottom:1px solid rgba(84,180,255,.16); font-size:15px; }
-    .finance-overview-panel .finance-overview-total { display:block; margin-top:14px; color:#57B7FF; font-size:28px; line-height:1.1; font-weight:900; overflow-wrap:anywhere; }
-    .finance-overview-panel .finance-overview-caption { display:block; margin-top:5px; color:var(--p3-muted); font-size:11px; line-height:1.4; }
-    .finance-overview-panel.p3 .finance-overview-total { color:#FFD66B; }
-    .finance-overview-panel.investors .finance-overview-total { color:#57D990; }
-    .finance-overview-panel.points .finance-overview-total { color:#BFD8FF; }
-    .finance-overview-list { display:grid; gap:8px; margin-top:14px; }
-    .finance-overview-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; padding-top:8px; border-top:1px solid rgba(84,180,255,.11); }
-    .finance-overview-row:first-child { padding-top:0; border-top:0; }
+    /* Visao executiva do financeiro geral: cada destino de resultado em uma faixa clara e completa. */
+    .finance-overview-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; align-items:stretch; }
+    .finance-overview-panel { --finance-accent:#57B7FF; min-width:0; display:grid; grid-template-rows:auto auto auto 1fr; border:1px solid color-mix(in srgb,var(--finance-accent) 34%,transparent); border-radius:12px; background:linear-gradient(145deg,rgba(16,36,61,.99),rgba(8,21,37,.99)); padding:17px; box-shadow:var(--p3-shadow); overflow:hidden; }
+    .finance-overview-panel.uby { --finance-accent:#57B7FF; }
+    .finance-overview-panel.p3 { --finance-accent:#FFD66B; }
+    .finance-overview-panel.investors { --finance-accent:#57D990; }
+    .finance-overview-panel.partners { --finance-accent:#38D9B1; }
+    .finance-overview-panel h2 { margin:0; padding:0 0 11px; border-bottom:1px solid rgba(84,180,255,.16); color:var(--p3-text); font-size:15px; }
+    .finance-overview-panel .finance-overview-total { display:block; margin-top:15px; color:var(--finance-accent); font-size:30px; line-height:1.05; font-weight:900; letter-spacing:0; overflow-wrap:anywhere; }
+    .finance-overview-panel .finance-overview-caption { display:block; min-height:34px; margin-top:6px; color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .finance-overview-list { display:grid; align-content:start; gap:0; margin-top:14px; }
+    .finance-overview-row { display:grid; grid-template-columns:minmax(0,1fr) max-content auto; gap:9px; align-items:center; min-height:48px; padding:8px 0; border-top:1px solid rgba(84,180,255,.13); }
     .finance-overview-row strong { display:block; color:var(--p3-text); font-size:11px; line-height:1.3; overflow-wrap:anywhere; }
     .finance-overview-row span { display:block; margin-top:2px; color:var(--p3-muted); font-size:10px; line-height:1.25; }
-    .finance-overview-row b { color:#BFD8FF; font-size:12px; white-space:nowrap; }
-    .finance-overview-row .btn-open { min-height:30px; padding:5px 9px; font-size:10px; }
+    .finance-overview-row b { color:var(--finance-accent); font-size:12px; white-space:nowrap; text-align:right; }
+    .finance-overview-row .btn-open { min-height:30px; padding:5px 9px; font-size:10px; white-space:nowrap; }
+    .finance-overview-empty { grid-column:1/-1; color:var(--p3-muted); font-size:11px; line-height:1.4; padding:5px 0; }
     .station-layout-dialog { width:min(620px,calc(100vw - 24px)); border:1px solid rgba(84,180,255,.28); border-radius:12px; padding:0; background:#0D1B2E; color:var(--p3-text); box-shadow:0 30px 80px rgba(0,0,0,.55); }
     .station-layout-dialog::backdrop { background:rgba(2,8,18,.76); backdrop-filter:blur(3px); }
     .station-layout-head { padding:18px 20px 14px; border-bottom:1px solid var(--surface-border); }

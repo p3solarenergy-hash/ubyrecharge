@@ -4878,12 +4878,13 @@ function renderGeneralFinanceOverview(rows = []) {
   const ubyInvestorTotal = sum(ubyInvestorRows, row => row.finance?.investorDistribution);
   const partnerTotal = sum(partnerRows, row => row.finance?.partnerInvestorDistribution);
   const list = (items, metric, emptyText = 'Nenhuma unidade neste modelo.') => items.length
-    ? items.slice(0, 3).map(row => `
+    ? items.slice().sort((a, b) => Number(metric(b) || 0) - Number(metric(a) || 0)).map(row => `
       <div class="finance-overview-row">
         <div><strong>${escapeHtml(row.workName)}</strong><span>${escapeHtml(operationModelLabel(row.finance?.operationModel))}</span></div>
-        <div style="display:flex;align-items:center;gap:8px"><b>${fmtBRL(metric(row))}</b>${financeUnitOpenButton(row)}</div>
+        <b>${fmtBRL(metric(row))}</b>
+        ${financeUnitOpenButton(row)}
       </div>`).join('')
-    : `<div class="finance-overview-row"><span>${emptyText}</span></div>`;
+    : `<div class="finance-overview-empty">${emptyText}</div>`;
   target.innerHTML = `
     <article class="finance-overview-panel uby">
       <h2>UBY</h2>
@@ -4897,7 +4898,7 @@ function renderGeneralFinanceOverview(rows = []) {
       <span class="finance-overview-caption">Gestao de todos os ativos, mais resultados de sociedades P3.</span>
       <div class="finance-overview-list">${list(p3Rows, row => row.finance?.p3OperationalResult)}</div>
     </article>
-    <article class="finance-overview-panel investors">
+    <article class="finance-overview-panel partners">
       <h2>Investidores UBY</h2>
       <strong class="finance-overview-total">${fmtBRL(ubyInvestorTotal)}</strong>
       <span class="finance-overview-caption">Distribuicao por cotas dos ativos UBY, apos a retencao estatutaria.</span>
