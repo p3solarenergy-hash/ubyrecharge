@@ -5444,6 +5444,15 @@ function trendInfo(value, formatter = signedNumber) {
   return { cls, arrow, text: formatter(n) };
 }
 
+// Faixa visual unica para todos os indicadores de ocupacao.
+function occupationBand(value = 0) {
+  const pct = Math.max(0, Number(value) || 0);
+  if (pct <= 5) return { className: 'occ-red', label: 'critica', range: 'ate 5%' };
+  if (pct <= 10) return { className: 'occ-yellow', label: 'atencao', range: 'de 5% a 10%' };
+  if (pct <= 20) return { className: 'occ-blue', label: 'em evolucao', range: 'de 10% a 20%' };
+  return { className: 'occ-green', label: 'forte', range: 'acima de 20%' };
+}
+
 function kpiDayTrend(charges = [], metric = 'revenue', historyCharges = charges) {
   const rows = dailyOperationalRows(charges, historyCharges);
   if (rows.length < 2) return '';
@@ -5472,12 +5481,12 @@ function renderVisualSummary(elId, charges = [], options = {}) {
   const revenueDiff = Number(last.revenue || 0) - Number(prev.revenue || 0);
   const countDiff = Number(last.count || 0) - Number(prev.count || 0);
   const energyDiff = Number(last.energy || 0) - Number(prev.energy || 0);
-  const occState = occ.pct < 15 ? 'bad' : (occ.pct < 30 ? 'warn' : '');
+  const occBand = occupationBand(occ.pct);
   const trendGlyph = value => value > 0 ? '&#8599;' : (value < 0 ? '&#8600;' : '&#8594;');
   const imgBolt = "url('assets/brand/v2/09_sobre_midnight.png')";
   const imgBadge = "url('assets/brand/v2/09_sobre_midnight.png')";
   const cards = [
-    { title: 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: 'base do periodo selecionado', trend: trendGlyph(occ.pct - 15), cls: occState, img: imgBolt },
+    { title: 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: `faixa ${occBand.label}: ${occBand.range}`, trend: trendGlyph(occ.pct - 10), cls: occBand.className, img: imgBolt },
     { title: 'Faturamento', value: fmtBRL(revenue), sub: `${signedMoney(revenueDiff)} vs dia anterior`, trend: trendGlyph(revenueDiff), cls: revenueDiff < 0 ? 'bad' : '', img: imgBadge },
     { title: 'Consumo de energia', value: fmtKWh(energy), sub: `${signedNumber(energyDiff, ' kWh')} vs dia anterior`, trend: trendGlyph(energyDiff), cls: energyDiff < 0 ? 'warn' : '', img: imgBolt },
     { title: 'Clientes atendidos', value: String(clients), sub: `${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, trend: trendGlyph(clients), cls: '', img: imgBadge },
@@ -5688,7 +5697,7 @@ function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
 }
 
 function occClassForPct(pct = 0) {
-  return pct < 15 ? 'occ-red' : (pct < 30 ? 'occ-yellow' : 'occ-green');
+  return occupationBand(pct).className;
 }
 
 function renderWeekdayOccupancyReport(elId, charges = [], power = getPower(), title = 'Dinamica semanal de ocupacao', bounds = null) {
@@ -6112,7 +6121,7 @@ function renderOperationalCalendar(prefix = 'usage', charges = [], historyCharge
     }, 0);
     const maxKWh = calendarPower * hours;
     const pct = maxKWh > 0 ? Number(energy || 0) / maxKWh * 100 : 0;
-    const cls = pct < 15 ? 'low' : (pct < 30 ? 'mid' : 'good');
+    const cls = occupationBand(pct).className;
     return { pct, cls };
   };
   const build = (external = {}) => {
@@ -6990,7 +6999,7 @@ function renderGeneralStationOccupancy(rows, monthKeys) {
     .map(row => ({ row, occupancy: stationOccupancyForMonths(row, monthKeys, 'mtd') }))
     .sort((a, b) => b.occupancy.pct - a.occupancy.pct);
   target.innerHTML = occupied.length ? occupied.map(({ row, occupancy }) => `
-    <div class="station-occupancy-row">
+    <div class="station-occupancy-row ${occupationBand(occupancy.pct).className}">
       <div class="station-occupancy-name"><strong>${row.stationName}</strong><span>${row.workName}</span></div>
       <div><div class="station-occupancy-value">${fmtPct(occupancy.pct)}</div><div class="station-occupancy-bar"><span style="width:${Math.min(occupancy.pct,100).toFixed(1)}%"></span></div></div>
       <div class="station-occupancy-meta">${occupancy.hours.toFixed(1).replace('.', ',')} h disponiveis<br>${stationScheduleLabel(occupancy.config)}</div>
@@ -9110,8 +9119,9 @@ async function renderUbyOperation() {
   const viewLabel = monthFallbackToAccumulated
     ? `Acumulado UBY (sem recargas em ${monthLabel(currentGeneralMonth)})`
     : (isMonthView ? `Mes atual (${monthLabel(currentGeneralMonth)})` : 'Acumulado UBY');
-  const occClass = totalOcc < 15 ? 'occ-red' : (totalOcc < 30 ? 'occ-yellow' : 'occ-green');
-  const occStatus = totalOcc < 15 ? 'abaixo do objetivo minimo de 15%' : (totalOcc < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
+  const occBand = occupationBand(totalOcc);
+  const occClass = occBand.className;
+  const occStatus = `${occBand.label}: ${occBand.range}`;
 
   document.getElementById('generalSourceLabel').textContent = totalCharges
     ? `${viewLabel}: ${included.length} carregador(es) UBY ativo(s)`
@@ -9463,8 +9473,9 @@ async function renderGeral() {
   document.getElementById('generalSourceLabel').textContent = totalCharges
     ? `${viewLabel}: ${units} estação(ões) com base salva - escolha uma para abrir`
     : 'Sem bases salvas para consolidar';
-  const occClass = totalOcc < 15 ? 'occ-red' : (totalOcc < 30 ? 'occ-yellow' : 'occ-green');
-  const occStatus = totalOcc < 15 ? 'abaixo do objetivo minimo de 15%' : (totalOcc < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
+  const occBand = occupationBand(totalOcc);
+  const occClass = occBand.className;
+  const occStatus = `${occBand.label}: ${occBand.range}`;
   document.getElementById('kpiGeneral').innerHTML = `
     <div class="card"><div class="label">Ticket medio geral</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas</div></div>
     <div class="card"><div class="label">Melhor unidade</div><div class="value" style="font-size:18px;white-space:normal">${stationRows[0]?.stationName || '-'}</div><div class="sub">${stationRows[0] ? fmtBRL(stationRows[0].revenue) : 'sem dados'}</div></div>
@@ -9678,8 +9689,9 @@ function renderKPIs(charges, mk, window) {
   const days    = Math.max(window.hours / 24, 1);
   const dMonth  = daysInMonth(mk.split('-')[0], mk.split('-')[1]);
   const proj    = dMonth / Math.max(days, 1);
-  const occClass = occ.pct < 15 ? 'occ-red' : (occ.pct < 30 ? 'occ-yellow' : 'occ-green');
-  const occStatus = occ.pct < 15 ? 'abaixo do objetivo minimo de 15%' : (occ.pct < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
+  const occBand = occupationBand(occ.pct);
+  const occClass = occBand.className;
+  const occStatus = `${occBand.label}: ${occBand.range}`;
   const idleValue = charges.reduce((sum, charge) => sum + Number(charge.idleValue || 0), 0);
   const failedCount = charges.filter(charge => isFailedCharge(charge)).length;
   const calendarDays = Math.max(calendarDayCount(window.start, window.end), 1);
@@ -9728,11 +9740,12 @@ function enhanceIndividualKpis() {
   const energyCard = byLabel('energia entregue');
   if (occCard) {
     const occValue = parseNumber(occCard.querySelector('.value')?.textContent || 0);
-    const occClass = occValue < 15 ? 'occ-red' : (occValue < 30 ? 'occ-yellow' : 'occ-green');
-    const occStatus = occValue < 15 ? 'abaixo do objetivo minimo de 15%' : (occValue < 30 ? 'entre 15% e 30%, em evolucao' : 'acima de 30%, saudavel');
+    const occBand = occupationBand(occValue);
+    const occClass = occBand.className;
+    const occStatus = `${occBand.label}: ${occBand.range}`;
     occCard.className = `card kpi-feature ${occClass}`;
     const sub = occCard.querySelector('.sub');
-    if (sub) sub.textContent = `${occStatus} · meta: 15% minimo / 30% ideal`;
+    if (sub) sub.textContent = `Faixa de ocupacao ${occStatus}`;
   }
   if (revenueCard) revenueCard.className = 'card kpi-feature revenue-card';
   [occCard, ticketCard, revKwhCard, countCard, energyCard, revenueCard]
