@@ -2031,6 +2031,7 @@ async function readFile(file) {
       }
       }
       if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
+      const importControlIssues = importedCharges.filter(rechargeControlIssue);
 
       const dateMonths = [...new Set(importedCharges.map(charge => monthKey(charge.startDate)).filter(k => k && k !== 'unknown'))];
       const wrongMonths = dateMonths.filter(k => k !== selectedMonth);
@@ -2093,11 +2094,16 @@ async function readFile(file) {
       document.getElementById('tabsBar').style.display    = 'flex';
       document.getElementById('emptyState').style.display = 'none';
       updateCorrectionButtons();
-      setStorageState(`Planilha importada para <strong>${currentWorkName}</strong>: ${importedCharges.length} recarga(s), ${fmtKWh(importedCharges.reduce((s,c)=>s+c.energyKWh,0))}, ${fmtBRL(importedCharges.reduce((s,c)=>s+c.revenue,0))}. Salvando no banco...`);
+      const controlNote = importControlIssues.length
+        ? ` <strong>${importControlIssues.length} sessão(ões) próxima(s) de zero foi(ram) sinalizada(s) para conferência.</strong>`
+        : '';
+      setStorageState(`Planilha importada para <strong>${currentWorkName}</strong>: ${importedCharges.length} recarga(s), ${fmtKWh(importedCharges.reduce((s,c)=>s+c.energyKWh,0))}, ${fmtBRL(importedCharges.reduce((s,c)=>s+c.revenue,0))}. Salvando no banco...${controlNote}`);
       await yieldToBrowser();
       await saveRechargeBase();
       await renderAll();
-      if (replacedCount > 0) {
+      if (importControlIssues.length) {
+        setFeedback(`${importControlIssues.length} sessão(ões) com até 0,25 kWh e R$ 1,00 foram sinalizadas como possível falha. Confira Análise operacional.`, 'up-error');
+      } else if (replacedCount > 0) {
         setFeedback(`${replacedCount} recarga(s) do mês foram substituidas.`, 'up-loading');
       } else if (duplicateCount > 0) {
         setFeedback(`${duplicateCount} recarga(s) duplicada(s) foram atualizadas. As demais foram consolidadas no mês.`, 'up-loading');
@@ -6210,16 +6216,28 @@ function isKwidCharge(charge = {}) {
   return /kwid/.test(normalizeTextForInsight(vehicleLabel(charge)));
 }
 
-function isFailedCharge(charge = {}) {
+// Spott may omit an explicit failure status. Preserve every imported row, but
+// flag near-zero sessions so they do not look like completed recharges.
+function rechargeControlIssue(charge = {}) {
   const text = normalizeTextForInsight([
     charge.rawStatus,
     charge.paymentStatus,
     charge.paymentType,
     charge.failureReason
   ].filter(Boolean).join(' '));
-  if (/(falha|erro|cancel|recus|negad|expir|timeout|interromp|incomplet|nao conclu|sem sucesso|failed|declin|invalid|invalido)/.test(text)) return true;
-  if (/(aprov|pago|paid|approved|success|conclu|finaliz|complet)/.test(text)) return false;
-  return Number(charge.energyKWh || 0) <= 0 && Number(charge.revenue || 0) <= 0;
+  if (/(falha|erro|cancel|recus|negad|expir|timeout|interromp|incomplet|nao conclu|sem sucesso|failed|declin|invalid|invalido)/.test(text)) {
+    return { type: 'reported', label: safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || 'falha informada pela plataforma').trim() };
+  }
+  const energy = Number(charge.energyKWh || 0);
+  const revenue = Number(charge.revenue || 0);
+  if (energy <= 0.25 && revenue <= 1) {
+    return { type: 'near_zero', label: 'energia e faturamento proximos de zero (sinalizado pela importacao)' };
+  }
+  return null;
+}
+
+function isFailedCharge(charge = {}) {
+  return Boolean(rechargeControlIssue(charge));
 }
 
 function isExecutedCharge(charge = {}) {
@@ -6312,19 +6330,20 @@ function renderOperationQuality(prefix = 'usage', charges = []) {
   const removedShare = stats.total ? stats.removed.length / stats.total * 100 : 0;
   const qualityClass = removedShare > 15 ? 'warn' : 'good';
   const removedLines = stats.removed.slice(0, 6).map(charge => {
-    const reason = isFailedCharge(charge)
-      ? safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || charge.paymentType || 'falha/erro').trim()
+    const issue = rechargeControlIssue(charge);
+    const reason = issue
+      ? issue.label
       : 'baixo tempo, energia zerada ou sessão não executada';
     return `<div class="metric-line"><strong>${chargeDisplayDay(charge)}</strong><span>${escapeHtml(clientDisplayName(charge))} · ${escapeHtml(reason)}</span><b class="warn">${fmtKWh(charge.energyKWh || 0)}</b></div>`;
   }).join('');
   el.innerHTML = `
     <div class="metric-strip">
       <div class="metric-mini good"><span>kWh médio válido</span><strong>${stats.avgKwh.toFixed(1).replace('.', ',')} kWh</strong><span>${stats.executed.length} sessão(ões) executada(s)</span></div>
-      <div class="metric-mini ${qualityClass}"><span>Tentativas fora da média</span><strong>${stats.removed.length}</strong><span>${fmtPct(removedShare)} da base removida do cálculo</span></div>
+      <div class="metric-mini ${qualityClass}"><span>Falhas e sessões suspeitas</span><strong>${stats.removed.length}</strong><span>${fmtPct(removedShare)} da base removida do cálculo</span></div>
       <div class="metric-mini"><span>Ticket válido</span><strong>${fmtBRL(stats.avgTicket)}</strong><span>somente recargas executadas</span></div>
       <div class="metric-mini"><span>Potência média válida</span><strong>${stats.avgPower.toFixed(1).replace('.', ',')} kW</strong><span>kWh / horas conectadas válidas</span></div>
     </div>
-    <div class="note">A média de kWh ignora falhas, sessões com energia zerada e tentativas muito curtas que distorcem a leitura operacional.</div>
+    <div class="note">A média de kWh ignora falhas declaradas e sessões com até 0,25 kWh e R$ 1,00. Essas sessões seguem salvas para auditoria, mas entram como alerta operacional.</div>
     <div class="metric-lines">${removedLines || '<div class="metric-line"><strong>OK</strong><span>Nenhuma tentativa removida da média limpa.</span><b class="good">100%</b></div>'}</div>
   `;
 }
@@ -6443,24 +6462,26 @@ function renderRecentFailureDiagnostics(prefix = 'usage', charges = []) {
   if (!el) return;
   const recent = recentCharges(charges, 7).charges.sort((a, b) => (b.startDate || 0) - (a.startDate || 0));
   const failed = recent.filter(isFailedCharge);
+  const inferredIssues = failed.filter(charge => rechargeControlIssue(charge)?.type === 'near_zero');
   const reasonMap = {};
   failed.forEach(charge => {
-    const reason = safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || charge.paymentType || 'Sem motivo na planilha').trim();
+    const reason = rechargeControlIssue(charge)?.label || 'Sem motivo na planilha';
     reasonMap[reason] = (reasonMap[reason] || 0) + 1;
   });
   const topReason = topEntries(reasonMap, 1)[0];
   const failedLines = failed.slice(0, 7).map(charge => {
-    const reason = safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || charge.paymentType || 'Sem motivo').trim();
+    const reason = rechargeControlIssue(charge)?.label || 'Sem motivo';
     const station = safeText(charge.station || charge.workName || 'Unidade').trim();
     return `<div class="metric-line"><strong>${chargeDayLabel(charge)}</strong><span>${escapeHtml(station)} · ${escapeHtml(reason)}</span><b>${fmtKWh(charge.energyKWh || 0)}</b></div>`;
   }).join('');
   el.innerHTML = `
     <div class="metric-strip">
       <div class="metric-mini ${failed.length ? 'warn' : 'good'}"><span>Falhas 7 dias</span><strong>${failed.length}</strong><span>${recent.length} tentativa(s) recentes</span></div>
+      <div class="metric-mini ${inferredIssues.length ? 'warn' : 'good'}"><span>Alertas por dados</span><strong>${inferredIssues.length}</strong><span>até 0,25 kWh e R$ 1,00</span></div>
       <div class="metric-mini ${failed.length ? 'warn' : 'good'}"><span>Taxa de erro</span><strong>${recent.length ? fmtPct(failed.length / recent.length * 100) : '0,00%'}</strong><span>falhas / tentativas recentes</span></div>
       <div class="metric-mini"><span>Principal motivo</span><strong style="font-size:14px;white-space:normal">${escapeHtml(topReason?.[0] || '-')}</strong><span>${topReason ? `${topReason[1]} ocorrencia(s)` : 'sem falhas'}</span></div>
     </div>
-    <div class="note">${failed.length ? 'Priorize os motivos mais repetidos antes de analisar campanha ou crescimento.' : 'Nenhuma falha detectada nos últimos 7 dias.'}</div>
+    <div class="note">${failed.length ? `${inferredIssues.length ? `${inferredIssues.length} alerta(s) foram inferidos por energia e faturamento próximos de zero. ` : ''}Priorize os motivos mais repetidos antes de analisar campanha ou crescimento.` : 'Nenhuma falha detectada nos últimos 7 dias.'}</div>
     <div class="metric-lines">${failedLines || '<div class="metric-line"><strong>OK</strong><span>Nenhuma falha recente para listar.</span><b class="good">0</b></div>'}</div>
   `;
 }
