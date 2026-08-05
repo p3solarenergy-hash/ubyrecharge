@@ -6752,8 +6752,22 @@ function chargerKind(charge = {}) {
   return 'unknown';
 }
 
+// Alguns equipamentos fisicos exportam uma linha por plug/conector. Nestes
+// pontos conhecidos, o painel deve contar o carregador uma vez e somar os plugs.
+function isSinglePhysicalChargerStation(workId, stationName, workName = '') {
+  const station = normalizeStationForCompare(canonicalStationNameForWork(workId, stationName, workName));
+  const context = normalizeStationForCompare(`${stationName || ''} ${workName || ''}`);
+  return station.includes('robert koch') ||
+    station.includes('rio beach') ||
+    context.includes('central jk') ||
+    context.includes('posto central jk');
+}
+
 function chargerKey(charge = {}) {
   const station = canonicalStationNameForWork(charge.workId, charge.station, charge.workName);
+  if (isSinglePhysicalChargerStation(charge.workId, station, charge.workName)) {
+    return `${station || charge.station || ''}|carregador`.trim().toLowerCase();
+  }
   const key = `${station || charge.station || ''}|${charge.connType || ''}`.trim().toLowerCase();
   return key || `${charge.workId || ''}|sem-identificacao`;
 }
@@ -7037,11 +7051,9 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
     unit.charges.forEach(charge => {
       const stationName = canonicalStationNameForWork(unit.workId, charge.station || unit.stationName || unit.workName, unit.workName);
       const stationKey = normalizeStationForCompare(stationName);
-      const groupAsSingleCharger = stationKey.includes('robert koch') || stationKey.includes('rio beach');
+      const groupAsSingleCharger = isSinglePhysicalChargerStation(unit.workId, stationName, unit.workName);
       const key = groupAsSingleCharger
         ? stationKey
-        : String(unit.workId) === 'rio'
-        ? `${normalizeStationForCompare(stationName)}|${safeText(charge.connType || '').trim().toLowerCase()}`
         : ubyOperationKey(charge);
       if (!groups.has(key)) {
         groups.set(key, {
