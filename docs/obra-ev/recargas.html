@@ -495,7 +495,8 @@
     .station-layout-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
     .station-layout-field { display:grid; gap:6px; min-width:0; color:var(--p3-muted); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
     .station-layout-field.wide { grid-column:1/-1; }
-    .station-layout-field input { width:100%; min-height:40px; border:1px solid var(--p3-border); border-radius:8px; background:#091526; color:var(--p3-text); padding:9px 10px; font:inherit; }
+    .station-layout-field input,.station-layout-field textarea { width:100%; min-height:40px; border:1px solid var(--p3-border); border-radius:8px; background:#091526; color:var(--p3-text); padding:9px 10px; font:inherit; }
+    .station-layout-field textarea { min-height:76px; resize:vertical; line-height:1.4; }
     .station-layout-divider { grid-column:1/-1; margin-top:6px; padding-top:14px; border-top:1px solid var(--surface-border); color:var(--p3-primary); font-size:12px; font-weight:800; }
     .station-layout-toggle { display:flex; align-items:center; gap:9px; min-height:40px; color:var(--p3-text); font-size:12px; font-weight:700; }
     .station-layout-toggle input { width:18px; height:18px; accent-color:var(--p3-primary); }
@@ -1527,6 +1528,8 @@
 
     <section class="visual-summary" id="monthlyVisualSummary"></section>
 
+    <section class="section" id="commercialOccupancyPanel" style="margin-top:18px"></section>
+
     <!-- KPIs -->
     <section class="grid kpis" id="kpiGrid"></section>
 
@@ -1991,6 +1994,9 @@
           <label><input class="station-open-day" type="checkbox" value="6" checked>Sab</label>
           <label><input class="station-open-day" type="checkbox" value="0" checked>Dom</label>
         </div>
+        <div class="station-layout-divider">Regra comercial de cortesia (opcional)</div>
+        <label class="station-layout-field">Tarifa comercial de referencia (R$/kWh)<input id="stationLayoutReferenceTariff" type="number" min="0" step="0.01" placeholder="Ex.: 1,79"></label>
+        <label class="station-layout-field wide">Pessoas com recarga cortesia<textarea id="stationLayoutCourtesyUsers" placeholder="Um nome, e-mail ou telefone por linha. Ex.: Dono do posto"></textarea></label>
       </div>
     </div>
     <div class="station-layout-actions">
@@ -2013,6 +2019,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260805-ranking-occupancy"></script>
+<script src="recargas_app.js?v=20260805-commercial-identity1"></script>
 </body>
 </html>

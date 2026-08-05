@@ -28,6 +28,8 @@ let financeEditorCurrentSettings = null;
 let ubyOperationOverrides = {};
 let rechargeRecordsVersion = 0;
 let generalUnitDataCache = null;
+let networkHistoryCache = null;
+let networkHistoryCacheVersion = -1;
 let localRechargeDbSignature = '';
 let financeReportArchive = [];
 let financeReportArchiveLoaded = false;
@@ -192,6 +194,8 @@ function openStationLayoutConfiguration(workId, stationName) {
   document.getElementById('stationLayoutOpen24h').checked = config.open24h !== false;
   document.getElementById('stationLayoutOpenTime').value = config.openTime || '08:00';
   document.getElementById('stationLayoutCloseTime').value = config.closeTime || '22:00';
+  document.getElementById('stationLayoutReferenceTariff').value = Number(config.referenceTariffPerKwh || 0) || '';
+  document.getElementById('stationLayoutCourtesyUsers').value = (config.courtesyUsers || []).join('\n');
   const openDays = new Set((config.openDays || [0,1,2,3,4,5,6]).map(Number));
   document.querySelectorAll('.station-open-day').forEach(input => { input.checked = openDays.has(Number(input.value)); });
   toggleStationScheduleInputs();
@@ -215,7 +219,12 @@ async function saveStationLayoutConfiguration() {
     open24h: document.getElementById('stationLayoutOpen24h').checked,
     openTime: document.getElementById('stationLayoutOpenTime').value || '08:00',
     closeTime: document.getElementById('stationLayoutCloseTime').value || '22:00',
-    openDays
+    openDays,
+    referenceTariffPerKwh: Math.max(0, Number(document.getElementById('stationLayoutReferenceTariff').value) || 0),
+    courtesyUsers: safeText(document.getElementById('stationLayoutCourtesyUsers').value)
+      .split(/[\n,;]/)
+      .map(value => value.trim())
+      .filter(Boolean)
   };
   const source = allRechargeRecords[workId] || localRecord(workId) || rechargeMetadataSeed(workId);
   const availability = { ...(source.stationAvailability || source.summary?.stationAvailability || {}) };
@@ -509,12 +518,31 @@ function escapeAttr(value) {
     .replace(/'/g, "\\'");
 }
 
-function clientIdentityKey(name = '', email = '') {
-  return safeText(email || name).trim().toLowerCase();
+function canonicalClientName(value = '') {
+  const tokens = normalizeTextForInsight(value)
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  // Alguns exportadores repetem o ultimo sobrenome (ex.: "Oliveira Oliveira").
+  // A chave preserva a ordem e elimina apenas a duplicacao literal.
+  return [...new Set(tokens)].join(' ');
+}
+
+function clientIdentityKey(name = '', email = '', phone = '') {
+  const canonicalName = canonicalClientName(name);
+  // O nome normalizado vem primeiro porque planilhas diferentes frequentemente
+  // trazem e-mail vazio ou abreviado para o mesmo motorista. Telefone/e-mail
+  // continuam sendo o desempate para registros sem nome aproveitavel.
+  if (canonicalName.split(' ').length >= 2) return `name:${canonicalName}`;
+  const normalizedPhone = normalizePhone(phone);
+  if (normalizedPhone) return `phone:${normalizedPhone}`;
+  const normalizedEmail = safeText(email).trim().toLowerCase();
+  return normalizedEmail ? `email:${normalizedEmail}` : '';
 }
 
 function clientKeyFromCharge(charge = {}) {
-  return clientIdentityKey(charge.userName, charge.userEmail);
+  return clientIdentityKey(charge.userName, charge.userEmail, charge.userPhone);
 }
 
 function serializeCharge(charge) {
@@ -5132,6 +5160,90 @@ function availabilityForCurrentCharges(charges = []) {
   return stationAvailabilityFor(currentWorkId, stationName, currentWorkName);
 }
 
+function courtesyIdentityCandidates(value = '') {
+  const text = safeText(value).trim();
+  if (!text) return [];
+  const phone = normalizePhone(text);
+  const email = text.includes('@') ? text.toLowerCase() : '';
+  const name = canonicalClientName(text);
+  return [
+    phone ? `phone:${phone}` : '',
+    email ? `email:${email}` : '',
+    name.split(' ').length >= 2 ? `name:${name}` : ''
+  ].filter(Boolean);
+}
+
+function isCourtesyCharge(charge = {}, config = {}) {
+  const candidates = new Set([
+    clientKeyFromCharge(charge),
+    ...courtesyIdentityCandidates(charge.userName),
+    ...courtesyIdentityCandidates(charge.userEmail),
+    ...courtesyIdentityCandidates(charge.userPhone)
+  ].filter(Boolean));
+  return (config.courtesyUsers || []).some(person =>
+    courtesyIdentityCandidates(person).some(key => candidates.has(key))
+  );
+}
+
+function commercialOccupancyStats(charges = [], bounds = null) {
+  const config = availabilityForCurrentCharges(charges);
+  const operational = occByInterval(charges, undefined, bounds);
+  const valid = charges.filter(isExecutedCharge);
+  const referenceTariff = Math.max(0, Number(config.referenceTariffPerKwh || 0));
+  const courtesy = valid.filter(charge => isCourtesyCharge(charge, config));
+  const courtesyEnergy = courtesy.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const courtesyRevenue = courtesy.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const revenue = valid.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const potentialRevenue = referenceTariff > 0 ? operational.energy * referenceTariff : 0;
+  const commercialEquivalentEnergy = referenceTariff > 0 ? revenue / referenceTariff : 0;
+  const commercialPct = operational.maxKWh > 0 && referenceTariff > 0
+    ? commercialEquivalentEnergy / operational.maxKWh * 100
+    : 0;
+  const courtesyPotential = referenceTariff > 0 ? courtesyEnergy * referenceTariff : 0;
+  const captureRate = potentialRevenue > 0 ? revenue / potentialRevenue * 100 : 0;
+  return {
+    config,
+    configured: (config.courtesyUsers || []).length > 0 || referenceTariff > 0,
+    referenceTariff,
+    operational,
+    commercialPct,
+    commercialEquivalentEnergy,
+    courtesy,
+    courtesyEnergy,
+    courtesyRevenue,
+    courtesyPotential,
+    captureRate,
+    revenue
+  };
+}
+
+function renderCommercialOccupancyPanel(charges = [], bounds = null) {
+  const el = document.getElementById('commercialOccupancyPanel');
+  if (!el) return;
+  const stats = commercialOccupancyStats(charges, bounds);
+  if (!stats.configured) {
+    el.innerHTML = '';
+    return;
+  }
+  if (!stats.referenceTariff) {
+    el.innerHTML = `<div class="card"><h2>Uso cortesia e ocupacao comercial</h2><div class="note">Cadastre uma tarifa comercial de referencia na configuracao da estacao para separar a ocupacao operacional da comercial.</div></div>`;
+    return;
+  }
+  const band = occupationBand(stats.commercialPct);
+  el.innerHTML = `
+    <div class="card ${band.className}">
+      <h2>Ocupacao comercial e uso cortesia</h2>
+      <div class="metric-strip">
+        <div class="metric-mini"><span>Ocupacao operacional</span><strong>${fmtPct(stats.operational.pct)}</strong><span>${fmtKWh(stats.operational.energy)} entregues</span></div>
+        <div class="metric-mini ${band.className}"><span>Ocupacao comercial</span><strong>${fmtPct(stats.commercialPct)}</strong><span>receita convertida pela tarifa de referencia</span></div>
+        <div class="metric-mini ${stats.courtesy.length ? 'warn' : 'good'}"><span>Uso cortesia</span><strong>${stats.courtesy.length} recarga(s)</strong><span>${fmtKWh(stats.courtesyEnergy)} sem receita comercial</span></div>
+        <div class="metric-mini ${stats.courtesyPotential ? 'warn' : ''}"><span>Receita potencial nao faturada</span><strong>${fmtBRL(Math.max(0, stats.courtesyPotential - stats.courtesyRevenue))}</strong><span>${fmtBRL(stats.referenceTariff)}/kWh de referencia</span></div>
+        <div class="metric-mini"><span>Captura de receita</span><strong>${fmtPct(stats.captureRate)}</strong><span>${fmtBRL(stats.revenue)} de ${fmtBRL(stats.operational.energy * stats.referenceTariff)} potencial</span></div>
+      </div>
+    <div class="note">A ocupacao operacional mede energia entregue. A comercial converte somente a receita efetiva em kWh pela tarifa de referencia, evitando que recargas gratuitas mascarem o resultado financeiro.</div>
+    </div>`;
+}
+
 function occByFullMonth(charges, mk) {
   const [y, m] = mk.split('-');
   const power  = getPower();
@@ -6371,7 +6483,7 @@ function renderAbsentClientAlerts(prefix = 'usage', charges = []) {
   `;
 }
 
-function newClientRows(charges = [], historyCharges = charges) {
+function legacyNewClientRows(charges = [], historyCharges = charges) {
   const firstByClient = {};
   (historyCharges?.length ? historyCharges : charges)
     .filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()))
@@ -6396,10 +6508,10 @@ function newClientRows(charges = [], historyCharges = charges) {
     .sort((a, b) => b.firstDate - a.firstDate);
 }
 
-function renderNewClients(prefix = 'usage', charges = [], historyCharges = charges) {
+function legacyRenderNewClients(prefix = 'usage', charges = [], historyCharges = charges) {
   const el = document.getElementById(`${prefix}NewClients`);
   if (!el) return;
-  const rows = newClientRows(charges, historyCharges);
+  const rows = legacyNewClientRows(charges, historyCharges);
   const withPhone = rows.filter(row => row.phone).length;
   const topLines = rows.slice(0, 12).map(row => `
     <div class="metric-line">
@@ -6415,6 +6527,110 @@ function renderNewClients(prefix = 'usage', charges = [], historyCharges = charg
       <div class="metric-mini"><span>Receita inicial</span><strong>${fmtBRL(rows.reduce((sum, row) => sum + row.revenue, 0))}</strong><span>${fmtKWh(rows.reduce((sum, row) => sum + row.energy, 0))}</span></div>
     </div>
     <div class="metric-lines">${topLines || '<div class="metric-line"><strong>Sem novos clientes</strong><span>Nenhum primeiro uso identificado neste período.</span><b>0</b></div>'}</div>
+  `;
+}
+
+function networkHistoryCharges(fallback = []) {
+  if (networkHistoryCache && networkHistoryCacheVersion === rechargeRecordsVersion) {
+    return networkHistoryCache;
+  }
+  try {
+    const rows = getAllGeneralCharges(getGeneralUnitData());
+    networkHistoryCache = rows.length ? rows : fallback;
+    networkHistoryCacheVersion = rechargeRecordsVersion;
+    return networkHistoryCache;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function clientStationKey(charge = {}) {
+  const workId = safeText(charge.workId || '').trim().toLowerCase();
+  const station = canonicalStationNameForWork(workId, charge.station, charge.workName);
+  return `${workId || normalizeStationForCompare(station)}|${normalizeStationForCompare(station)}`;
+}
+
+function firstChargeByClient(charges = [], byStation = false) {
+  const first = {};
+  charges
+    .filter(isExecutedCharge)
+    .filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()))
+    .slice()
+    .sort((a, b) => a.startDate - b.startDate)
+    .forEach(charge => {
+      const client = clientKeyFromCharge(charge);
+      if (!client) return;
+      const key = byStation ? `${client}|${clientStationKey(charge)}` : client;
+      if (!first[key]) first[key] = charge;
+    });
+  return first;
+}
+
+function newClientInsights(charges = [], stationHistory = charges, networkHistory = stationHistory) {
+  const validPeriod = charges.filter(isExecutedCharge);
+  const periodKeys = new Set(validPeriod.map(clientKeyFromCharge).filter(Boolean));
+  const globalHistory = networkHistory?.length ? networkHistory : stationHistory;
+  const globalFirst = firstChargeByClient(globalHistory);
+  const stationFirst = firstChargeByClient(stationHistory?.length ? stationHistory : charges, true);
+  const stationsByClient = {};
+  globalHistory.filter(isExecutedCharge).forEach(charge => {
+    const client = clientKeyFromCharge(charge);
+    if (client) (stationsByClient[client] ||= new Set()).add(clientStationKey(charge));
+  });
+  const firstInPeriod = (firstCharge, client) => firstCharge && periodKeys.has(client) && validPeriod.some(charge =>
+    clientKeyFromCharge(charge) === client && rechargeUniqueKey(charge) === rechargeUniqueKey(firstCharge)
+  );
+  const newNetwork = [];
+  const newStationExisting = [];
+  const multiStation = new Set();
+  periodKeys.forEach(client => {
+    const representative = validPeriod.find(charge => clientKeyFromCharge(charge) === client);
+    const firstNetworkCharge = globalFirst[client];
+    const firstStationCharge = stationFirst[`${client}|${clientStationKey(representative || firstNetworkCharge || {})}`];
+    if (firstInPeriod(firstNetworkCharge, client)) newNetwork.push(firstNetworkCharge);
+    else if (firstInPeriod(firstStationCharge, client)) newStationExisting.push(firstStationCharge);
+    if ((stationsByClient[client]?.size || 0) > 1) multiStation.add(client);
+  });
+  const toRow = charge => ({
+    name: charge.userName || charge.userEmail || 'Cliente sem nome',
+    phone: charge.userPhone || '',
+    email: charge.userEmail || '',
+    firstDate: charge.startDate,
+    revenue: Number(charge.revenue || 0),
+    energy: Number(charge.energyKWh || 0)
+  });
+  return {
+    newNetwork: newNetwork.map(toRow).sort((a, b) => b.firstDate - a.firstDate),
+    newStationExisting: newStationExisting.map(toRow).sort((a, b) => b.firstDate - a.firstDate),
+    multiStation: multiStation.size
+  };
+}
+
+function renderNewClients(prefix = 'usage', charges = [], historyCharges = charges, networkHistory = historyCharges) {
+  const el = document.getElementById(`${prefix}NewClients`);
+  if (!el) return;
+  const insight = newClientInsights(charges, historyCharges, networkHistory);
+  const rows = [
+    ...insight.newNetwork.map(row => ({ ...row, type: 'Novo na rede UBY' })),
+    ...insight.newStationExisting.map(row => ({ ...row, type: 'Novo nesta estacao' }))
+  ];
+  const withPhone = rows.filter(row => row.phone).length;
+  const topLines = rows.slice(0, 12).map(row => `
+    <div class="metric-line">
+      <strong>${escapeHtml(row.name)}</strong>
+      <span>${escapeHtml(row.type)}${row.type === 'Novo nesta estacao' ? ' · ja usava a rede' : ''}${row.phone ? ` · Tel: ${escapeHtml(row.phone)}` : ''}</span>
+      <b>${fmtDT(row.firstDate)}</b>
+    </div>
+  `).join('');
+  el.innerHTML = `
+    <div class="metric-strip">
+      <div class="metric-mini ${insight.newNetwork.length ? 'good' : ''}"><span>Novos na rede UBY</span><strong>${insight.newNetwork.length}</strong><span>primeiro uso em toda a rede</span></div>
+      <div class="metric-mini"><span>Novos nesta estacao</span><strong>${insight.newStationExisting.length}</strong><span>ja eram clientes da rede</span></div>
+      <div class="metric-mini"><span>Usam mais de uma estacao</span><strong>${insight.multiStation}</strong><span>ativos do periodo</span></div>
+      <div class="metric-mini"><span>Com telefone</span><strong>${withPhone}</strong><span>${rows.length ? fmtPct(withPhone / rows.length * 100) : '0,00%'} das entradas</span></div>
+    </div>
+    <div class="note">Falhas e sessoes proximas de zero nao entram em aquisicao. “Novo nesta estacao” indica expansao ou migracao de uso, nao aquisicao nova da rede.</div>
+    <div class="metric-lines">${topLines || '<div class="metric-line"><strong>Sem novas entradas</strong><span>Nenhum primeiro uso de rede ou de estacao identificado neste periodo.</span><b>0</b></div>'}</div>
   `;
 }
 
@@ -6723,7 +6939,7 @@ async function renderUsageInsights(charges = [], prefix = 'usage', historyCharge
   await yieldToBrowser();
   renderRecentFailureDiagnostics(prefix, charges);
   renderOperationQuality(prefix, charges);
-  renderNewClients(prefix, charges, historyCharges);
+  renderNewClients(prefix, charges, historyCharges, options.networkHistory || networkHistoryCharges(historyCharges));
   renderAbsentClientAlerts(prefix, historyCharges);
   await yieldToBrowser();
   renderOperationalCalendar(prefix, charges, historyCharges, { ...(options.calendar || {}), bounds: weekdayBounds });
@@ -9668,6 +9884,7 @@ async function renderMensal() {
   const charges = filterChargesByWindow(monthCharges, window);
   if (!charges.length) {
     renderVisualSummary('monthlyVisualSummary', [], { historyCharges: allCharges });
+    renderCommercialOccupancyPanel([], window);
     renderWeekdayOccupancyReport('weekdayOccupancyMensal', [], getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
     setStorageState(`Sem recargas em ${periodModeLabel(window.mode)} para <strong>${currentWorkName}</strong>.`);
     renderMonthClosing(mk);
@@ -9676,6 +9893,7 @@ async function renderMensal() {
 
   renderHero(charges, mk, window);
   renderVisualSummary('monthlyVisualSummary', charges, { bounds: window, historyCharges: allCharges });
+  renderCommercialOccupancyPanel(charges, window);
   renderKPIs(charges, mk, window);
   enhanceIndividualKpis();
   renderWeekdayOccupancyReport('weekdayOccupancyMensal', charges, getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
