@@ -7028,20 +7028,26 @@ function stationOccupancyForMonths(row, monthKeys, mode = 'mtd') {
   return { config, power, energy, hours, maxKWh, pct: maxKWh > 0 ? energy / maxKWh * 100 : 0 };
 }
 
-function renderGeneralStationOccupancy(rows, monthKeys) {
+function renderGeneralStationOccupancy(rows) {
   const target = document.getElementById('generalStationOccupancy');
   if (!target) return;
-  const occupied = rows
-    .map(row => ({ row, occupancy: stationOccupancyForMonths(row, monthKeys, 'mtd') }))
-    .sort((a, b) => b.occupancy.pct - a.occupancy.pct);
-  target.innerHTML = occupied.length ? occupied.map(({ row, occupancy }) => `
-    <div class="station-occupancy-row ${occupationBand(occupancy.pct).className}">
+  const configured = [...rows].sort((a, b) => String(a.stationName).localeCompare(String(b.stationName), 'pt-BR'));
+  target.innerHTML = configured.length ? configured.map(row => {
+    const config = stationAvailabilityFor(row.workId, row.stationName, row.workName);
+    return `
+    <div class="station-schedule-row">
       <div class="station-occupancy-name"><strong>${row.stationName}</strong><span>${row.workName}</span></div>
-      <div><div class="station-occupancy-value">${fmtPct(occupancy.pct)}</div><div class="station-occupancy-bar"><span style="width:${Math.min(occupancy.pct,100).toFixed(1)}%"></span></div></div>
-      <div class="station-occupancy-meta">${occupancy.hours.toFixed(1).replace('.', ',')} h disponiveis<br>${stationScheduleLabel(occupancy.config)}</div>
+      <div class="station-occupancy-meta">${stationScheduleLabel(config)}</div>
       <button class="btn-open" type="button" onclick="openStationLayoutConfiguration('${escapeAttr(row.workId)}','${escapeAttr(row.stationName)}')">Configurar horario</button>
     </div>
-  `).join('') : '<div class="note">Nenhum eletroposto concluido disponivel para configurar.</div>';
+  `;
+  }).join('') : '<div class="note">Nenhum eletroposto concluido disponivel para configurar.</div>';
+}
+
+function unitOccupancyMarkup(unit, monthKeys) {
+  const occupancy = stationOccupancyForMonths(unit, monthKeys, 'mtd');
+  const band = occupationBand(occupancy.pct);
+  return `<div class="unit-occupancy ${band.className}"><div class="unit-value">${fmtPct(occupancy.pct)}</div><div class="unit-sub">ocupacao · ${occupancy.hours.toFixed(1).replace('.', ',')} h</div><div class="unit-occupancy-bar"><span style="width:${Math.min(occupancy.pct, 100).toFixed(1)}%"></span></div></div>`;
 }
 
 function getUbyChargerRows(unitData = getGeneralUnitData()) {
@@ -9197,11 +9203,13 @@ async function renderUbyOperation() {
   renderBarChart('chartUbyRevenueUnit', chartLabels, chartRows.map(row => row.revenue), '#57B7FF', ' R$');
   renderBarChart('chartUbyEnergyUnit', chartLabels, chartRows.map(row => row.energy), '#2DBBD3', ' kWh');
 
+  const accessMonthKeys = isMonthView && currentGeneralMonth ? [currentGeneralMonth] : sourceMonths;
   document.getElementById('ubyUnitRank').innerHTML = accessRows.length ? accessRows.slice(0, 12).map(unit => `
     <div class="unit-card">
       <div><strong>${escapeHtml(unit.stationName || unit.workName)}</strong><span>Obra: ${escapeHtml(unit.workName)} - ${unit.clients} cliente(s)</span></div>
       <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
       <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">${unit.kind.toUpperCase()} - ${unit.connType || 'sem conector'}</div></div>
+      ${unitOccupancyMarkup(unit, accessMonthKeys)}
       <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir estacao</button></div>
     </div>
   `).join('') : '<div class="note">Nenhuma unidade marcada como UBY.</div>';
@@ -9519,15 +9527,17 @@ async function renderGeral() {
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${acdc.dcChargers}</div><div class="sub">conectores/estacoes unicas</div></div>
   `;
   renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
-  renderGeneralStationOccupancy(stationRows, months);
+  renderGeneralStationOccupancy(accumulatedStationRows);
   renderGeneralDecisionCockpit(unitData, charges, stationRows);
   scheduleOverviewInsights('geral', () => renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } }));
 
+  const rankingMonthKeys = currentGeneralMonth ? [currentGeneralMonth] : months;
   document.getElementById('generalUnitRank').innerHTML = rankingStationRows.length ? rankingStationRows.slice(0, 12).map(unit => `
     <div class="unit-card">
       <div><strong>${unit.stationName}</strong><span>Obra: ${unit.workName} - ${monthLabel(currentGeneralMonth) || 'mês atual'} - ${unit.clients} cliente(s)</span></div>
       <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
       <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">AC ${unit.acdc.acCharges} / DC ${unit.acdc.dcCharges}</div></div>
+      ${unitOccupancyMarkup(unit, rankingMonthKeys)}
       <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir estação</button></div>
     </div>
   `).join('') : '<div class="note">Nenhuma obra cadastrada para abrir.</div>';

@@ -94,13 +94,26 @@
     .general-hero .value { color:#fff; font-size:clamp(30px,4vw,48px); }
     .general-split { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
     .unit-rank { display:grid; gap:12px; }
-    .unit-card { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(180px,1fr) minmax(120px,.45fr) minmax(120px,.45fr) auto; gap:12px; align-items:center; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:12px 14px; box-shadow:var(--p3-shadow); }
+    .unit-card { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(180px,1fr) minmax(104px,.42fr) minmax(112px,.45fr) minmax(150px,.56fr) auto; gap:12px; align-items:center; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:12px 14px; box-shadow:var(--p3-shadow); }
     .unit-card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
     .unit-card > * { position:relative; z-index:1; }
     .unit-card strong { display:block; color:var(--p3-text); font-size:13px; }
     .unit-card span { color:var(--p3-muted); font-size:11px; }
     .unit-card .unit-value { color:var(--p3-primary); font-weight:700; text-align:right; white-space:nowrap; }
     .unit-card .unit-sub { color:var(--p3-muted); font-size:11px; text-align:right; }
+    .unit-card .unit-occupancy { min-width:0; }
+    .unit-card .unit-occupancy .unit-value { text-align:left; font-size:18px; font-variant-numeric:tabular-nums; }
+    .unit-card .unit-occupancy .unit-sub { text-align:left; }
+    .unit-occupancy-bar { height:6px; margin-top:6px; overflow:hidden; border-radius:99px; background:#1B334F; }
+    .unit-occupancy-bar span { display:block; height:100%; border-radius:inherit; background:var(--metric-info); }
+    .unit-occupancy.occ-red .unit-value { color:var(--metric-danger); }
+    .unit-occupancy.occ-red .unit-occupancy-bar span { background:var(--metric-danger); }
+    .unit-occupancy.occ-yellow .unit-value { color:var(--metric-warning); }
+    .unit-occupancy.occ-yellow .unit-occupancy-bar span { background:var(--metric-warning); }
+    .unit-occupancy.occ-blue .unit-value { color:var(--metric-info); }
+    .unit-occupancy.occ-blue .unit-occupancy-bar span { background:var(--metric-info); }
+    .unit-occupancy.occ-green .unit-value { color:var(--metric-success); }
+    .unit-occupancy.occ-green .unit-occupancy-bar span { background:var(--metric-success); }
     .unit-actions { display:flex; gap:8px; justify-content:flex-end; align-items:center; }
     .btn-open {
       background:var(--p3-primary);
@@ -492,6 +505,8 @@
     .station-occupancy-list { display:grid; gap:8px; }
     .station-occupancy-row { display:grid; grid-template-columns:minmax(210px,1.35fr) minmax(140px,.7fr) minmax(110px,.55fr) auto; gap:16px; align-items:center; padding:13px 0; border-bottom:1px solid var(--surface-border); }
     .station-occupancy-row:last-child { border-bottom:0; }
+    .station-schedule-row { display:grid; grid-template-columns:minmax(210px,1fr) minmax(220px,.9fr) auto; gap:16px; align-items:center; padding:13px 0; border-bottom:1px solid var(--surface-border); }
+    .station-schedule-row:last-child { border-bottom:0; }
     .station-occupancy-name strong { display:block; color:var(--p3-text); font-size:13px; }
     .station-occupancy-name span,.station-occupancy-meta { color:var(--p3-muted); font-size:11px; }
     .station-occupancy-value { color:var(--p3-primary); font-size:21px; font-weight:900; font-variant-numeric:tabular-nums; }
@@ -818,7 +833,7 @@
       .station-layout-dialog { width:calc(100vw - 18px); }
       .station-layout-body,.station-layout-head { padding-left:14px; padding-right:14px; }
       .station-weekdays { grid-template-columns:repeat(4,minmax(0,1fr)); }
-      .station-occupancy-row { grid-template-columns:1fr auto; gap:8px; }
+      .station-occupancy-row,.station-schedule-row { grid-template-columns:1fr auto; gap:8px; }
       .station-occupancy-meta { grid-column:1/-1; }
       .finance-result-card { min-height:112px; padding:12px; }
       .finance-result-card strong { font-size:20px; }
@@ -1077,8 +1092,8 @@
 
     <section class="section" style="margin-top:18px;grid-template-columns:1fr">
       <div class="card">
-        <h2>Ocupacao media e horarios dos eletropostos</h2>
-        <div class="sub" style="margin:-8px 0 12px">Configuracao individual sobre a potencia e os horarios realmente disponiveis de cada unidade.</div>
+        <h2>Horarios de funcionamento</h2>
+        <div class="sub" style="margin:-8px 0 12px">Defina os horarios realmente disponiveis de cada unidade. A ocupacao fica visivel no ranking acima.</div>
         <div class="station-occupancy-list" id="generalStationOccupancy"></div>
       </div>
     </section>
@@ -1998,6 +2013,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260805-central-jk-physical"></script>
+<script src="recargas_app.js?v=20260805-ranking-occupancy"></script>
 </body>
 </html>
