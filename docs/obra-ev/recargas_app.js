@@ -5106,16 +5106,27 @@ function monthEndDate(mk) {
   return new Date(y, m, 0, 23, 59, 59);
 }
 
-function periodWindow(monthCharges, mk, mode = selectedPeriodMode()) {
+function effectiveMonthStart(mk, operationStart = null) {
+  const monthStart = monthStartDate(mk);
+  const firstOperation = operationStart && typeof operationStart.getTime === 'function'
+    ? new Date(operationStart)
+    : parseDate(operationStart);
+  if (!firstOperation || Number.isNaN(firstOperation.getTime())) return monthStart;
+  if (firstOperation.getFullYear() !== monthStart.getFullYear() || firstOperation.getMonth() !== monthStart.getMonth()) return monthStart;
+  return new Date(firstOperation.getFullYear(), firstOperation.getMonth(), firstOperation.getDate(), 0, 0, 0);
+}
+
+function periodWindow(monthCharges, mk, mode = selectedPeriodMode(), operationStart = null) {
   const monthStart = monthStartDate(mk);
   const monthEnd = monthEndDate(mk);
   let end = mode === 'closed' ? monthEnd : (reportEndForCharges(monthCharges) || monthEnd);
   if (end > monthEnd) end = monthEnd;
-  let start = monthStart;
+  const activeStart = effectiveMonthStart(mk, operationStart || (currentWorkId ? currentWorkOperationStart() : null));
+  let start = activeStart;
   const days = Number(mode);
   if (Number.isFinite(days) && days > 0) {
     start = new Date(end.getTime() - days * 86_400_000);
-    if (start < monthStart) start = monthStart;
+    if (start < activeStart) start = activeStart;
   }
   const hours = Math.max((end - start) / 3_600_000, 0);
   return { start, end, hours, mode, monthKey: mk };
@@ -7232,11 +7243,12 @@ function getGeneralStationRows(unitData) {
 function stationOccupancyForMonths(row, monthKeys, mode = 'mtd') {
   const config = stationAvailabilityFor(row.workId, row.stationName, row.workName);
   const power = Number(workPowerById(row.workId) || 0);
+  const operationStart = operationStartForCharges(row.charges, row);
   let energy = 0;
   let hours = 0;
   (monthKeys || []).forEach(monthKeyValue => {
     const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === monthKeyValue);
-    const window = periodWindow(monthCharges, monthKeyValue, mode);
+    const window = periodWindow(monthCharges, monthKeyValue, mode, operationStart);
     energy += monthCharges.reduce((sum, charge) => sum + charge.energyKWh, 0);
     hours += stationAvailableHours(config, window.start, window.end);
   });
@@ -9361,10 +9373,11 @@ async function renderUbyOperation() {
   let totalMaxKWh = 0;
   const windows = [];
   included.forEach(row => {
+    const operationStart = operationStartForCharges(row.charges, row);
     months.forEach(mk => {
       const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === mk);
       if (!monthCharges.length) return;
-      const window = periodWindow(monthCharges, mk, 'mtd');
+      const window = periodWindow(monthCharges, mk, 'mtd', operationStart);
       windows.push(window);
       totalMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window).maxKWh;
     });
