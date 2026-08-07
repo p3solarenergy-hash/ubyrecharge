@@ -26,6 +26,7 @@ let stationAvailability = {};
 let financeSaveTimer = null;
 let financePendingSave = null;
 let financeSaveInFlight = Promise.resolve();
+let liveOccupationRefreshTimer = null;
 let financeEditorCurrentSettings = null;
 let ubyOperationOverrides = {};
 let rechargeRecordsVersion = 0;
@@ -5269,6 +5270,17 @@ function reportEndForCharges(charges) {
   return reportEnd || lastChargeEnd;
 }
 
+function isCurrentMonthKey(mk = '', now = new Date()) {
+  return String(mk || '') === monthKey(now);
+}
+
+function livePeriodEndForMonth(mk = '', mode = selectedPeriodMode(), importedEnd = null, now = new Date()) {
+  if (mode === 'closed' || !isCurrentMonthKey(mk, now)) return importedEnd;
+  const monthEnd = monthEndDate(mk);
+  // The live reading uses the current clock instead of freezing at import time.
+  return now > monthEnd ? monthEnd : now;
+}
+
 function periodBounds(charges) {
   const dates = charges.map(c => c.startDate).filter(Boolean);
   if (!dates.length) return { start: null, end: null, hours: 0 };
@@ -5306,7 +5318,8 @@ function effectiveMonthStart(mk, operationStart = null) {
 function periodWindow(monthCharges, mk, mode = selectedPeriodMode(), operationStart = null) {
   const monthStart = monthStartDate(mk);
   const monthEnd = monthEndDate(mk);
-  let end = mode === 'closed' ? monthEnd : (reportEndForCharges(monthCharges) || monthEnd);
+  const importedEnd = reportEndForCharges(monthCharges);
+  let end = mode === 'closed' ? monthEnd : (livePeriodEndForMonth(mk, mode, importedEnd) || importedEnd || monthEnd);
   if (end > monthEnd) end = monthEnd;
   const activeStart = effectiveMonthStart(mk, operationStart || (currentWorkId ? currentWorkOperationStart() : null));
   let start = activeStart;
@@ -5327,9 +5340,9 @@ function filterChargesByWindow(charges, window) {
   });
 }
 
-function periodModeLabel(mode = selectedPeriodMode()) {
+function periodModeLabel(mode = selectedPeriodMode(), mk = '') {
   if (mode === 'closed') return 'mes fechado';
-  if (mode === 'mtd') return 'mes ate a planilha';
+  if (mode === 'mtd') return isCurrentMonthKey(mk) ? 'mes ate agora' : 'mes ate a planilha';
   return `ultimos ${mode} dia${String(mode) === '1' ? '' : 's'}`;
 }
 
@@ -10060,6 +10073,26 @@ async function renderAll() {
   else if (visibleTab === 'financeiroGeral') renderGeneralFinance(getGeneralUnitData());
 }
 
+function scheduleLiveOccupationRefresh() {
+  clearTimeout(liveOccupationRefreshTimer);
+  const now = new Date();
+  const nextHour = new Date(now);
+  nextHour.setMinutes(0, 2, 0);
+  nextHour.setHours(nextHour.getHours() + 1);
+  const wait = Math.max(nextHour.getTime() - now.getTime(), 60_000);
+  liveOccupationRefreshTimer = setTimeout(async () => {
+    try {
+      const monthlyVisible = document.getElementById('tabMensal')?.style.display === 'block';
+      const mk = document.getElementById('monthSelector')?.value || '';
+      if (monthlyVisible && document.visibilityState === 'visible' && isCurrentMonthKey(mk) && selectedPeriodMode() === 'mtd') {
+        await renderMensal();
+      }
+    } finally {
+      scheduleLiveOccupationRefresh();
+    }
+  }, wait);
+}
+
 // ══════════════════════════════════════════════════════════
 //  TAB MENSAL
 // ══════════════════════════════════════════════════════════
@@ -10086,7 +10119,7 @@ async function renderMensal() {
     renderVisualSummary('monthlyVisualSummary', [], { historyCharges: allCharges });
     renderCommercialOccupancyPanel([], window);
     renderWeekdayOccupancyReport('weekdayOccupancyMensal', [], getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
-    setStorageState(`Sem recargas em ${periodModeLabel(window.mode)} para <strong>${currentWorkName}</strong>.`);
+    setStorageState(`Sem recargas em ${periodModeLabel(window.mode, mk)} para <strong>${currentWorkName}</strong>.`);
     renderMonthClosing(mk);
     return;
   }
@@ -10125,11 +10158,14 @@ function renderHero(charges, mk, window) {
   const minDate  = window.start;
   const lastEnd  = window.end;
   const occ      = occByInterval(charges, undefined, window);
+  const liveReading = window.mode === 'mtd' && isCurrentMonthKey(mk);
 
   document.getElementById('heroMeta').innerHTML =
     `Estação: <strong>${stations.join(' · ') || '—'}</strong><br>
      Período: <strong>${fmtDT(minDate)}</strong> até <strong>${fmtDT(lastEnd)}</strong><br>
      Mês: <strong>${monthLabel(mk)}</strong>`;
+
+  if (liveReading) document.getElementById('heroMeta').insertAdjacentHTML('beforeend', '<br><span style="color:#57B7FF">Leitura atualizada ate agora</span>');
 
   document.getElementById('heroFormula').innerHTML =
     `<strong>Ocupação real</strong><br>
@@ -10954,7 +10990,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260806-finance-persistence2';
+const UBY_APP_VERSION = '20260807-live-occupation1';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
@@ -11021,3 +11057,4 @@ document.getElementById('undoLastImportBtn')?.addEventListener('click', undoLast
 document.getElementById('clearSelectedMonthBtn')?.addEventListener('click', clearSelectedMonth);
 document.getElementById('clearRechargeBaseBtn')?.addEventListener('click', clearRechargeBase);
 initializeRechargePage();
+scheduleLiveOccupationRefresh();
