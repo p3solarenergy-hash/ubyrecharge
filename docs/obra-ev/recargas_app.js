@@ -52,6 +52,7 @@ let overviewSessionsFullyHydrated = false;
 let overviewSessionsHydrationPromise = null;
 let fullRechargeWorkIds = new Set();
 let rechargeFullLoadPromises = new Map();
+let operationalPowerSaveInFlight = false;
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -479,8 +480,72 @@ function workNameById(workId, fallback = '') {
 
 function workPowerById(workId) {
   const work = workOptions().find(item => item.id === workId);
+  const record = allRechargeRecords[workId] || localRecord(workId) || {};
+  const operationalPower = Number(record.operationalPowerKw || record.summary?.operationalPowerKw || 0);
+  if (operationalPower >= 1 && operationalPower <= 360) return operationalPower;
   const power = Number(work?.kw || 0);
   return power > 0 ? power : 7;
+}
+
+function syncOperationalPowerInputs(workId = currentWorkId) {
+  const power = workPowerById(workId);
+  ['chargerPower', 'chargerPowerAcc'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.value = power;
+  });
+  return power;
+}
+
+async function saveOperationalPowerFromInputs(value = null) {
+  if (operationalPowerSaveInFlight) return;
+  const primary = document.getElementById('chargerPower');
+  const accumulated = document.getElementById('chargerPowerAcc');
+  const candidate = Number(value ?? primary?.value ?? accumulated?.value ?? 0);
+  if (!Number.isFinite(candidate) || candidate < 1 || candidate > 360) {
+    setStorageState('Informe uma potência operacional entre 1 e 360 kW.', true);
+    syncOperationalPowerInputs();
+    return;
+  }
+
+  const power = Math.round(candidate * 10) / 10;
+  const workId = currentWorkId;
+  const source = allRechargeRecords[workId] || localRecord(workId) || rechargeMetadataSeed(workId);
+  const updatedAt = new Date().toISOString();
+  const record = {
+    ...source,
+    operationalPowerKw: power,
+    summary: {
+      ...(source.summary || {}),
+      operationalPowerKw: power,
+      updatedAt
+    },
+    updatedAt
+  };
+
+  operationalPowerSaveInFlight = true;
+  allRechargeRecords[workId] = hydratedRechargeRecord(record, workId);
+  const db = localRechargeDb();
+  db[workId] = compactRechargeRecord(record);
+  writeJson(RECARGAS_LOCAL_KEY, db);
+  window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`work:${workId}`, record).catch(() => {});
+  markRechargeRecordsDirty();
+  syncOperationalPowerInputs(workId);
+
+  try {
+    if (window.UBY_SUPABASE?.saveRechargeMetadata) {
+      await window.UBY_SUPABASE.saveRechargeMetadata(workId, {
+        ...record,
+        metadataType: 'operational_power'
+      });
+    }
+    setStorageState(`Potência operacional de <strong>${currentWorkName}</strong> salva em <strong>${power.toLocaleString('pt-BR')} kW</strong>. Indicadores recalculados.`);
+  } catch (err) {
+    setStorageState(`Potência operacional salva neste navegador. Banco pendente: ${err.message}`, true);
+  } finally {
+    operationalPowerSaveInFlight = false;
+  }
+
+  await renderAll();
 }
 
 function currentWorkPartnerName() {
@@ -755,6 +820,7 @@ function rechargeSummary() {
     monthlyClosings,
     financialSettings,
     stationAvailability,
+    operationalPowerKw: workPowerById(currentWorkId),
     ubyOperationOverrides,
     ubyAreaAccounting: readUbyAreaAccounting(),
     energyKWh: energy,
@@ -788,6 +854,7 @@ function buildRechargeRecord() {
     monthlyClosings,
     financialSettings,
     stationAvailability,
+    operationalPowerKw: workPowerById(currentWorkId),
     ubyOperationOverrides,
     ubyAreaAccounting: readUbyAreaAccounting(),
     summary: rechargeSummary(),
@@ -1028,6 +1095,7 @@ function applyRechargeRecord(record, sourceLabel) {
   reconcileMonthlyClosingsWithCharges();
   financialSettings = record?.financialSettings || record?.summary?.financialSettings || {};
   stationAvailability = record?.stationAvailability || record?.summary?.stationAvailability || {};
+  syncOperationalPowerInputs(currentWorkId);
   ubyOperationOverrides = record?.ubyOperationOverrides || record?.summary?.ubyOperationOverrides || {};
   loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
     fileKey: file.fileKey || fileSourceKey(file.month, file.name, file.station || ''),
@@ -1149,21 +1217,13 @@ function initWorkSelector() {
   selector.innerHTML = works.map(work => `<option value="${work.id}">${work.nome || work.id}${work.cliente ? ' - ' + work.cliente : ''}</option>`).join('');
   selector.value = currentWorkId;
   currentWorkName = currentWork().nome || currentWorkId;
-  const power = Number(currentWork().kw || 0);
-  if (power > 0) {
-    document.getElementById('chargerPower').value = power;
-    document.getElementById('chargerPowerAcc').value = power;
-  }
+  syncOperationalPowerInputs(currentWorkId);
   selector.onchange = async () => {
     currentStationReportName = '';
     currentWorkId = selector.value;
     localStorage.setItem('uby-recargas-current-work', currentWorkId);
     currentWorkName = currentWork().nome || currentWorkId;
-    const nextPower = Number(currentWork().kw || 0);
-    if (nextPower > 0) {
-      document.getElementById('chargerPower').value = nextPower;
-      document.getElementById('chargerPowerAcc').value = nextPower;
-    }
+    syncOperationalPowerInputs(currentWorkId);
     await loadRechargeBase(currentWorkId);
   };
 }
@@ -1188,11 +1248,7 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
     localStorage.setItem('uby-recargas-current-work', currentWorkId);
     if (selector) selector.value = currentWorkId;
     currentWorkName = currentWork().nome || currentWorkId;
-    const nextPower = Number(currentWork().kw || 0);
-    if (nextPower > 0) {
-      document.getElementById('chargerPower').value = nextPower;
-      document.getElementById('chargerPowerAcc').value = nextPower;
-    }
+    syncOperationalPowerInputs(currentWorkId);
 
     document.getElementById('tabsBar').style.display = 'flex';
     document.getElementById('emptyState').style.display = 'none';
@@ -5048,13 +5104,13 @@ function getPower() {
   // cai no padrão de 7 kW em vez de travar lendo `.value` de null.
   const chargerPowerEl = document.getElementById('chargerPower');
   const chargerPowerAccEl = document.getElementById('chargerPowerAcc');
-  if (!chargerPowerEl && !chargerPowerAccEl) return 7;
+  if (!chargerPowerEl && !chargerPowerAccEl) return workPowerById(currentWorkId);
   const v = parseFloat(chargerPowerEl?.value);
   const v2 = parseFloat(chargerPowerAccEl?.value);
   // Sincroniza ambos os inputs
   if (!isNaN(v) && chargerPowerAccEl) chargerPowerAccEl.value = v;
   if (!isNaN(v2) && isNaN(v) && chargerPowerEl) chargerPowerEl.value = v2;
-  return isNaN(v) ? (isNaN(v2) ? 7 : v2) : v;
+  return isNaN(v) ? (isNaN(v2) ? workPowerById(currentWorkId) : v2) : v;
 }
 
 // ── Cálculo de ocupação ───────────────────────────────────
@@ -10765,7 +10821,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260801-financeiro16';
+const UBY_APP_VERSION = '20260806-operational-power1';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }

@@ -488,6 +488,7 @@
       monthlyClosings: payload?.monthlyClosings || incomingSummary.monthlyClosings || existingSummary.monthlyClosings || {},
       financialSettings: payload?.financialSettings || incomingSummary.financialSettings || existingSummary.financialSettings || {},
       stationAvailability: payload?.stationAvailability || incomingSummary.stationAvailability || existingSummary.stationAvailability || {},
+      operationalPowerKw: Number(payload?.operationalPowerKw || incomingSummary.operationalPowerKw || existingSummary.operationalPowerKw || 0),
       ubyOperationOverrides: payload?.ubyOperationOverrides || incomingSummary.ubyOperationOverrides || existingSummary.ubyOperationOverrides || {},
       ubyAreaAccounting: payload?.ubyAreaAccounting || incomingSummary.ubyAreaAccounting || existingSummary.ubyAreaAccounting || {},
       updatedAt: new Date().toISOString()

@@ -925,16 +925,16 @@
         <option value="30">Ultimos 30 dias</option>
         <option value="closed">Mes fechado</option>
       </select>
-      <span style="margin-left:8px">Potência:</span>
-      <input  class="ctl-input"  id="chargerPower" type="number" value="7" min="1" max="360" step="0.1">
+      <span style="margin-left:8px">Potência operacional:</span>
+      <input  class="ctl-input"  id="chargerPower" type="number" value="7" min="1" max="360" step="0.1" onchange="saveOperationalPowerFromInputs(this.value)">
       <span>kW</span>
-      <button class="btn-recalc" onclick="renderAll()">↺ Recalcular</button>
+      <button class="btn-recalc" onclick="saveOperationalPowerFromInputs()">↺ Salvar e recalcular</button>
     </div>
     <div class="controls" id="ctrlAcc" style="display:none">
-      <span>Potência:</span>
-      <input  class="ctl-input"  id="chargerPowerAcc" type="number" value="7" min="1" max="360" step="0.1">
+      <span>Potência operacional:</span>
+      <input  class="ctl-input"  id="chargerPowerAcc" type="number" value="7" min="1" max="360" step="0.1" onchange="saveOperationalPowerFromInputs(this.value)">
       <span>kW</span>
-      <button class="btn-recalc" onclick="renderAll()">↺ Recalcular</button>
+      <button class="btn-recalc" onclick="saveOperationalPowerFromInputs()">↺ Salvar e recalcular</button>
     </div>
     <div class="controls" id="ctrlFinanceiro" style="display:none">
       <span>Financeiro mensal com salvamento automatico e historico de fechamentos.</span>
@@ -2014,11 +2014,11 @@
 <script src="supabase_config.js"></script>
 <script src="clube_uby_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_bridge.js?v=20260802-station-config1"></script>
+<script src="supabase_bridge.js?v=20260806-operational-power1"></script>
 <script src="recharge_runtime.js?v=20260716-architecture1"></script>
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260805-commercial-identity1"></script>
+<script src="recargas_app.js?v=20260806-operational-power1"></script>
 </body>
 </html>
