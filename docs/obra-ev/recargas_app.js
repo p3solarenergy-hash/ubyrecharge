@@ -24,6 +24,8 @@ let monthlyClosings = {};
 let financialSettings = {};
 let stationAvailability = {};
 let financeSaveTimer = null;
+let financePendingSave = null;
+let financeSaveInFlight = Promise.resolve();
 let financeEditorCurrentSettings = null;
 let ubyOperationOverrides = {};
 let rechargeRecordsVersion = 0;
@@ -487,6 +489,53 @@ function workPowerById(workId) {
   return power > 0 ? power : 7;
 }
 
+function selectorChargesForWork(workId = '') {
+  const record = allRechargeRecords[String(workId || '')] || localRecord(workId) || {};
+  return Array.isArray(record?.charges) ? record.charges.map(hydrateCharge) : [];
+}
+
+function workSelectorStationName(work = {}) {
+  const charges = selectorChargesForWork(work.id);
+  const stations = [...new Set(charges
+    .map(charge => canonicalStationNameForWork(work.id, charge.station, work.nome || charge.workName))
+    .filter(Boolean))];
+  if (stations.length === 1) return stations[0];
+  const record = allRechargeRecords[String(work.id || '')] || localRecord(work.id) || {};
+  const summaryStation = safeText(record?.summary?.stationName || record?.summary?.station || record?.stationName).trim();
+  return canonicalStationNameForWork(work.id, summaryStation || work.nome || work.id, work.nome || work.id);
+}
+
+function workSelectorKinds(work = {}) {
+  const charges = selectorChargesForWork(work.id);
+  const kinds = new Set(charges.map(chargerKind).filter(kind => kind === 'dc' || kind === 'ac'));
+  if (!kinds.size) {
+    const record = allRechargeRecords[String(work.id || '')] || localRecord(work.id) || {};
+    const nominalPower = Number(record?.operationalPowerKw || record?.summary?.operationalPowerKw || record?.summary?.powerKw || work.kw || 0);
+    const label = `${workSelectorStationName(work)} ${work.nome || ''}`.toUpperCase();
+    if (/\bDC\b|\bCCS\b|\b60\s*KW\b|\b80\s*KW\b/.test(label)) kinds.add('dc');
+    else if (/\bAC\b|TYPE\s*2|\b7\s*KW\b|\b22\s*KW\b/.test(label)) kinds.add('ac');
+    else if (nominalPower >= 40) kinds.add('dc');
+    else if (nominalPower > 0) kinds.add('ac');
+  }
+  return ['dc', 'ac'].filter(kind => kinds.has(kind));
+}
+
+function workSelectorLabel(work = {}) {
+  const types = workSelectorKinds(work).map(kind => kind.toUpperCase()).join(' / ');
+  const station = workSelectorStationName(work);
+  return `${types ? `${types} - ` : ''}${station || work.id || 'ESTACAO'}`.toLocaleUpperCase('pt-BR');
+}
+
+function workSelectorOrder(a = {}, b = {}) {
+  const rank = work => {
+    const kinds = workSelectorKinds(work);
+    if (kinds.includes('dc')) return 0;
+    if (kinds.includes('ac')) return 1;
+    return 2;
+  };
+  return rank(a) - rank(b) || workSelectorLabel(a).localeCompare(workSelectorLabel(b), 'pt-BR');
+}
+
 function syncOperationalPowerInputs(workId = currentWorkId) {
   const power = workPowerById(workId);
   ['chargerPower', 'chargerPowerAcc'].forEach(id => {
@@ -906,6 +955,22 @@ function saveLocalRechargeBase(record = null, options = {}) {
   return { mode: 'indexeddb', size: fullSave.size };
 }
 
+// Financial edits must survive immediately, even when the user changes an
+// obra or tab before the cloud synchronization finishes.
+function saveLocalRechargeRecordFor(workId, record) {
+  const targetWorkId = String(workId || record?.workId || currentWorkId || '');
+  if (!targetWorkId || !record) return { mode: 'skipped-empty' };
+  const fullRecord = { ...record, workId: targetWorkId };
+  const db = localRechargeDb();
+  window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`work:${targetWorkId}`, fullRecord).catch(() => {});
+  db[targetWorkId] = compactRechargeRecord(fullRecord);
+  const fullSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactRechargeDb(db, targetWorkId));
+  if (!fullSave.ok) return { mode: 'none', error: fullSave.error };
+  allRechargeRecords[targetWorkId] = hydratedRechargeRecord(fullRecord, targetWorkId);
+  markRechargeRecordsDirty();
+  return { mode: 'indexeddb', size: fullSave.size };
+}
+
 async function clearCloudRechargeBase() {
   if (!window.UBY_SUPABASE?.clearRechargeBase) return false;
   await window.UBY_SUPABASE.clearRechargeBase(currentWorkId);
@@ -1212,13 +1277,14 @@ async function loadRechargeBase(workId = currentWorkId, options = {}) {
 function initWorkSelector() {
   const selector = document.getElementById('workSelector');
   if (!selector) return;
-  const works = workOptions();
+  const works = [...workOptions()].sort(workSelectorOrder);
   if (!works.some(work => work.id === currentWorkId)) currentWorkId = works[0]?.id || 'rio';
-  selector.innerHTML = works.map(work => `<option value="${work.id}">${work.nome || work.id}${work.cliente ? ' - ' + work.cliente : ''}</option>`).join('');
+  selector.innerHTML = works.map(work => `<option value="${escapeAttr(work.id)}">${escapeHtml(workSelectorLabel(work))}</option>`).join('');
   selector.value = currentWorkId;
   currentWorkName = currentWork().nome || currentWorkId;
   syncOperationalPowerInputs(currentWorkId);
   selector.onchange = async () => {
+    await flushPendingFinancialSettingsSave();
     currentStationReportName = '';
     currentWorkId = selector.value;
     localStorage.setItem('uby-recargas-current-work', currentWorkId);
@@ -1243,6 +1309,7 @@ async function openWorkReport(workId, target = 'mensal', stationName = '') {
   clearTimeout(overviewInsightsTimers.geral);
   const selector = document.getElementById('workSelector');
   try {
+    await flushPendingFinancialSettingsSave();
     currentWorkId = String(workId || currentWorkId);
     currentStationReportName = shouldOpenFullRechargeWork(currentWorkId, stationName) ? '' : safeText(stationName).trim();
     localStorage.setItem('uby-recargas-current-work', currentWorkId);
@@ -2948,7 +3015,7 @@ function renderFinanceMonthVersionState(settings = currentFinanceSettingsFromInp
 }
 
 async function handleFinanceMonthChange() {
-  clearTimeout(financeSaveTimer);
+  await flushPendingFinancialSettingsSave();
   const mk = financeMonthKey();
   if (!mk) return;
   const resolution = financeMonthResolution(mk);
@@ -2967,6 +3034,7 @@ async function handleFinanceMonthChange() {
 }
 
 async function confirmFinanceMonthValues() {
+  await flushPendingFinancialSettingsSave();
   const mk = financeMonthKey();
   if (!mk) return;
   persistFinancialSettingsFromInputs(mk);
@@ -2977,6 +3045,7 @@ async function confirmFinanceMonthValues() {
 }
 
 async function restoreFinancePreviousMonth() {
+  await flushPendingFinancialSettingsSave();
   const mk = financeMonthKey();
   const resolution = financeMonthResolution(mk);
   const previousMonth = resolution.previousMonth;
@@ -4221,6 +4290,7 @@ function updateFinanceModelVisibility(model = 'uby') {
 }
 
 async function saveFinancialSettings() {
+  await flushPendingFinancialSettingsSave();
   const mk = financeMonthKey();
   if (!mk) return;
   persistFinancialSettingsFromInputs(mk);
@@ -4290,36 +4360,97 @@ function financeRecordWithCurrentSettings() {
   };
 }
 
-async function saveFinancialSettingsRecord() {
-  const record = financeRecordWithCurrentSettings();
+async function saveFinancialSettingsRecord(workId = currentWorkId, recordOverride = null) {
+  const targetWorkId = String(workId || currentWorkId || '');
+  const record = recordOverride || financeRecordWithCurrentSettings();
+  if (!targetWorkId || !record) return { mode: 'skipped-empty' };
+  record.workId = targetWorkId;
   record.metadataType = 'financial_settings';
-  const localSave = saveLocalRechargeBase(record);
-  allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
-  markRechargeRecordsDirty();
+  record.summary = {
+    ...(record.summary || {}),
+    workId: targetWorkId,
+    financialSettings: record.financialSettings || financialSettings,
+    updatedAt: record.updatedAt || new Date().toISOString()
+  };
+  const localSave = saveLocalRechargeRecordFor(targetWorkId, record);
   if (window.UBY_SUPABASE?.saveRechargeMetadata) {
-    await window.UBY_SUPABASE.saveRechargeMetadata(currentWorkId, record);
+    await window.UBY_SUPABASE.saveRechargeMetadata(targetWorkId, record);
   }
   return localSave;
+}
+
+function financeSaveSnapshot(monthKey = financeMonthKey()) {
+  const targetWorkId = String(currentWorkId || '');
+  if (!targetWorkId || !monthKey) return null;
+  persistFinancialSettingsFromInputs(monthKey);
+  const record = financeRecordWithCurrentSettings();
+  record.metadataType = 'financial_settings';
+  return {
+    workId: targetWorkId,
+    monthKey,
+    workName: currentWorkName,
+    record: JSON.parse(JSON.stringify(record))
+  };
+}
+
+function queueFinancialSettingsSave(snapshot) {
+  if (!snapshot?.workId || !snapshot?.record) return financeSaveInFlight;
+  financeSaveInFlight = financeSaveInFlight
+    .catch(() => null)
+    .then(() => saveFinancialSettingsRecord(snapshot.workId, snapshot.record));
+  return financeSaveInFlight;
+}
+
+async function commitPendingFinancialSettingsSave() {
+  if (financeSaveTimer) {
+    clearTimeout(financeSaveTimer);
+    financeSaveTimer = null;
+  }
+  const snapshot = financePendingSave;
+  financePendingSave = null;
+  if (!snapshot) return financeSaveInFlight;
+  try {
+    await queueFinancialSettingsSave(snapshot);
+    if (String(currentWorkId) === String(snapshot.workId)) {
+      setStorageState(`Financeiro de ${monthLabel(snapshot.monthKey)} salvo automaticamente para <strong>${snapshot.workName}</strong>.`);
+      renderFinanceMonthVersionState(financeEditorCurrentSettings);
+      renderGeneralFinance(getGeneralUnitData());
+    }
+  } catch (err) {
+    setStorageState(`Financeiro local salvo. Falha ao sincronizar: ${err.message}`, true);
+    throw err;
+  }
+}
+
+async function flushPendingFinancialSettingsSave() {
+  try {
+    await commitPendingFinancialSettingsSave();
+  } catch (_) {
+    // The immediate local snapshot remains available; navigation must not lock.
+  }
 }
 
 function scheduleFinancialSettingsSave() {
   const mk = financeMonthKey();
   if (!mk || !currentWorkId) return;
-  const settings = persistFinancialSettingsFromInputs(mk);
+  let snapshot;
+  try {
+    snapshot = financeSaveSnapshot(mk);
+  } catch (err) {
+    setStorageState(`Nao foi possivel salvar agora: ${err.message}`, true);
+    return;
+  }
+  if (!snapshot) return;
+  const settings = financeEditorCurrentSettings;
+  // Local persistence is synchronous from the user's perspective. Cloud sync
+  // is queued after the short debounce and cannot be redirected to another obra.
+  saveLocalRechargeRecordFor(snapshot.workId, snapshot.record);
+  financePendingSave = snapshot;
   renderFinanceMonthVersionState(settings);
   const savedLabel = document.getElementById('financeVersionSaved');
   if (savedLabel) savedLabel.textContent = 'Salvando...';
   clearTimeout(financeSaveTimer);
-  financeSaveTimer = setTimeout(async () => {
-    try {
-      await saveFinancialSettingsRecord();
-      setStorageState(`Financeiro de ${monthLabel(mk)} salvo automaticamente para <strong>${currentWorkName}</strong>.`);
-      renderFinanceMonthVersionState(financeEditorCurrentSettings);
-      renderGeneralFinance(getGeneralUnitData());
-    } catch (err) {
-      setStorageState(`Financeiro local salvo. Falha ao sincronizar: ${err.message}`, true);
-    }
-  }, 900);
+  financeSaveTimer = setTimeout(() => { commitPendingFinancialSettingsSave(); }, 500);
 }
 
 function formatPaybackMonths(months) {
@@ -10776,6 +10907,8 @@ function showTab(name) {
 function hideAllTabs() { showTab('none'); }
 
 async function switchTab(name, btn) {
+  const financeVisible = document.getElementById('tabFinanceiro')?.style.display === 'block';
+  if (financeVisible && name !== 'financeiro') await flushPendingFinancialSettingsSave();
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   showTab(name);
@@ -10821,7 +10954,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260806-operational-power1';
+const UBY_APP_VERSION = '20260806-finance-persistence2';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
