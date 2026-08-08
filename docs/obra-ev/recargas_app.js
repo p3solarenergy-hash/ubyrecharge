@@ -5025,18 +5025,47 @@ let matrizEditingId = '';
 
 function matrizScopeKey(row = {}) { return `${String(row.workId || '')}::${String(row.key || normalizeStationForCompare(row.station || row.workName || ''))}`; }
 function matrizStationScope(row = {}) { return `${String(row.workId || '')}::${normalizeStationForCompare(row.station || row.stationName || row.workName || '')}`; }
+function matrizTargetIdentity(row = {}) {
+  return {
+    scope: matrizScopeKey(row),
+    workId: String(row.workId || ''),
+    station: safeText(row.station || row.stationName || row.workName || ''),
+    stationKey: normalizeStationForCompare(row.station || row.stationName || row.workName || ''),
+    workName: safeText(row.workName || '')
+  };
+}
+function matrizTargetCandidates(target = {}) {
+  const raw = typeof target === 'string' ? { scope: target } : (target || {});
+  const workId = String(raw.workId || String(raw.scope || '').split('::')[0] || '');
+  const stationKey = normalizeStationForCompare(raw.station || raw.stationName || raw.stationKey || '');
+  return [...new Set([
+    String(raw.scope || ''),
+    workId && stationKey ? `${workId}::${stationKey}` : '',
+    stationKey
+  ].filter(Boolean))];
+}
 function matrizScopeCandidates(row = {}) {
   return [...new Set([matrizScopeKey(row), matrizStationScope(row)].filter(scope => scope && scope !== '::'))];
 }
 function matrizRowsMatch(left = {}, right = {}) {
   if (left === right) return true;
   if (String(left.workId || '') !== String(right.workId || '')) return false;
-  return matrizScopeCandidates(left).some(scope => matrizScopeCandidates(right).includes(scope));
+  if (matrizScopeCandidates(left).some(scope => matrizScopeCandidates(right).includes(scope))) return true;
+  // A chave do plug pode mudar entre plataformas/importacoes. A estacao
+  // canonica da mesma obra continua sendo o identificador do rateio.
+  const leftStation = normalizeStationForCompare(left.station || left.stationName || '');
+  const rightStation = normalizeStationForCompare(right.station || right.stationName || '');
+  return !!leftStation && leftStation === rightStation;
 }
-function matrizResolveTargetRow(scope, rows = []) {
-  const exact = rows.find(row => matrizScopeCandidates(row).includes(scope));
+function matrizResolveTargetRow(target, rows = []) {
+  const targetData = typeof target === 'string' ? { scope: target } : (target || {});
+  const candidates = matrizTargetCandidates(targetData);
+  const exact = rows.find(row => matrizScopeCandidates(row).some(scope => candidates.includes(scope)));
   if (exact) return exact;
-  const workId = String(scope || '').split('::')[0];
+  const workId = String(targetData.workId || String(targetData.scope || '').split('::')[0] || '');
+  const stationKey = normalizeStationForCompare(targetData.station || targetData.stationName || targetData.stationKey || '');
+  const sameStation = rows.find(row => String(row.workId || '') === workId && stationKey && normalizeStationForCompare(row.station || row.stationName || '') === stationKey);
+  if (sameStation) return sameStation;
   const sameWork = rows.filter(row => String(row.workId || '') === workId);
   // Old records could identify a connector instead of the station. If there is
   // only one current UBY station in the work, it remains the correct target.
@@ -5058,7 +5087,7 @@ function matrizNormalizeCost(raw = {}) {
     amount: Math.max(0, Number(raw.amount ?? raw.valor ?? 0)), installments: Math.max(1, Number(raw.installments || 1)),
     startMonth: String(raw.startMonth || raw.effectiveMonth || ''), endMonth: String(raw.endMonth || ''), dueDay: Math.min(31, Math.max(1, Number(raw.dueDay || 1))),
     allocation: ['equal', 'power', 'energy', 'revenue', 'custom'].includes(raw.allocation) ? raw.allocation : 'equal',
-    targets: targets.map(target => ({ scope: String(target.scope || ''), startMonth: String(target.startMonth || raw.startMonth || ''), share: Math.max(0, Number(target.share || 0)) })).filter(target => target.scope),
+    targets: targets.map(target => ({ scope: String(target.scope || ''), workId: String(target.workId || String(target.scope || '').split('::')[0] || ''), station: safeText(target.station || target.stationName || ''), stationKey: normalizeStationForCompare(target.stationKey || target.station || target.stationName || ''), workName: safeText(target.workName || ''), startMonth: String(target.startMonth || raw.startMonth || ''), share: Math.max(0, Number(target.share || 0)) })).filter(target => target.scope || (target.workId && target.stationKey)),
     documentRef: safeText(raw.documentRef || ''), notes: safeText(raw.notes || ''), enabled: raw.enabled !== false && raw.ativo !== false,
     createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || new Date().toISOString()
   };
@@ -5127,7 +5156,7 @@ function matrizWeight(row, target, item, mk) {
 function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
   const rows = getUbyChargerRows(unitData).filter(candidate => candidate.included);
   return loadMatrizCosts().filter(item => matrizApplies(item, mk)).flatMap(item => {
-    const targets = (item.targets || []).filter(target => !target.startMonth || target.startMonth <= mk).map(target => ({ target, row: matrizResolveTargetRow(target.scope, rows) })).filter(entry => entry.row);
+    const targets = (item.targets || []).filter(target => !target.startMonth || target.startMonth <= mk).map(target => ({ target, row: matrizResolveTargetRow(target, rows) })).filter(entry => entry.row);
     const own = targets.find(entry => matrizRowsMatch(entry.row, row));
     if (!own || !targets.length) return [];
     const weighted = targets.map(entry => ({ ...entry, weight: matrizWeight(entry.row, entry.target, item, mk) }));
@@ -5166,7 +5195,7 @@ function addMatrizCost() {
     if (existingTargets.has(scope)) return existingTargets.get(scope);
     const currentRow = matrizResolveTargetRow(scope, targetRows);
     return (previous?.targets || []).find(target => {
-      const priorRow = matrizResolveTargetRow(target.scope, targetRows);
+      const priorRow = matrizResolveTargetRow(target, targetRows);
       return priorRow && currentRow && matrizRowsMatch(priorRow, currentRow);
     });
   };
@@ -5176,7 +5205,8 @@ function addMatrizCost() {
     category: matrizInput('matrizCostCategory')?.value || 'Outros custos', supplier: matrizInput('matrizCostSupplier')?.value || '', costKind: matrizInput('matrizCostKind')?.value || 'recurring', installments: matrizInput('matrizCostInstallments')?.value || 1, startMonth, endMonth: matrizInput('matrizCostEndMonth')?.value || '', dueDay: matrizInput('matrizCostDueDay')?.value || 1, allocation: matrizInput('matrizCostMethod')?.value || 'equal', documentRef: matrizInput('matrizCostDocument')?.value || '', notes: matrizInput('matrizCostNotes')?.value || '', enabled: true,
     targets: targetIds.map((scope, index) => {
       const existing = existingTargetForScope(scope);
-      return { scope, startMonth: existing?.startMonth || startMonth, share: shares[index] || existing?.share || 0 };
+      const row = matrizResolveTargetRow(scope, targetRows);
+      return { ...matrizTargetIdentity(row || { workId: String(scope).split('::')[0], key: String(scope).split('::')[1] || '' }), scope, startMonth: existing?.startMonth || startMonth, share: shares[index] || existing?.share || 0 };
     }), updatedAt: new Date().toISOString() });
   if (previous) Object.assign(previous, cost); else list.push(cost);
   saveMatrizCosts(list); resetMatrizCostForm(); renderMatrizCosts(getGeneralUnitData());
@@ -5191,7 +5221,7 @@ function editMatrizCost(id) {
     const rows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
     [...targets.options].forEach(option => {
       const row = matrizResolveTargetRow(option.value, rows);
-      option.selected = item.targets.some(target => matrizRowsMatch(matrizResolveTargetRow(target.scope, rows), row));
+      option.selected = item.targets.some(target => matrizRowsMatch(matrizResolveTargetRow(target, rows), row));
     });
   }
   const button = matrizInput('matrizSaveButton'); if (button) button.textContent = 'Salvar alteracao';
@@ -5201,6 +5231,14 @@ function removeMatrizCost(id) {
   const item = loadMatrizCosts().find(cost => cost.id === id); if (!item) return;
   item.enabled = false; item.updatedAt = new Date().toISOString(); saveMatrizCosts(loadMatrizCosts()); renderMatrizCosts(getGeneralUnitData());
   setMatrizFeedback('Custo desativado. O historico anterior permanece preservado.', false);
+}
+function deleteMatrizCost(id) {
+  const item = loadMatrizCosts().find(cost => cost.id === id); if (!item) return;
+  if (!window.confirm(`Excluir definitivamente o custo "${item.name}"? Esta acao remove o cadastro e o rateio dele de todas as competencias.`)) return;
+  const next = loadMatrizCosts().filter(cost => cost.id !== id);
+  if (matrizEditingId === id) resetMatrizCostForm();
+  saveMatrizCosts(next); renderMatrizCosts(getGeneralUnitData());
+  setMatrizFeedback(`Custo ${item.name} excluido definitivamente.`, false);
 }
 function ensureMatrizCostEditor() {
   if (matrizInput('matrizCostCategory')) return;
@@ -5245,13 +5283,75 @@ function renderMatrizCosts(unitData) {
     const parcel = matrizMonthOffset(item.startMonth, mk) + 1;
     const period = item.costKind === 'installment' ? `parcela ${Math.max(1, parcel)} de ${item.installments}` : item.costKind === 'one_off' ? 'lancamento unico' : 'recorrente mensal';
     const activeTargets = item.targets.filter(target => !target.startMonth || target.startMonth <= mk);
-    const targetNames = activeTargets.map(target => matrizResolveTargetRow(target.scope, rows)?.station || '').filter(Boolean);
-    return `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="sub">${escapeHtml(item.category)}${item.supplier ? ` | ${escapeHtml(item.supplier)}` : ''}${item.documentRef ? ` | ${escapeHtml(item.documentRef)}` : ''}</div></td><td>${escapeHtml(period)}<div class="sub">inicio ${item.startMonth ? monthLabel(item.startMonth) : '-'} | venc. dia ${item.dueDay}</div></td><td>${matrizMethodLabel(item.allocation)}<div class="sub">${targetNames.length ? escapeHtml(targetNames.join(' | ')) : `${activeTargets.length} destino(s) sem base ativa`}</div></td><td class="num" style="text-align:right">${matrizApplies(item, mk) ? fmtBRL(item.amount) : 'fora da competencia'}</td><td style="text-align:right"><button class="btn-open" type="button" onclick="editMatrizCost('${escapeAttr(item.id)}')">Editar</button> <button class="btn-open" type="button" onclick="removeMatrizCost('${escapeAttr(item.id)}')">Desativar</button></td></tr>`;
+    const targetNames = activeTargets.map(target => matrizResolveTargetRow(target, rows)?.station || target.station || '').filter(Boolean);
+    const allocated = rows.reduce((sum, row) => sum + matrizCostItemsForRow(row, mk, unitData).filter(cost => cost.id === item.id).reduce((subtotal, cost) => subtotal + Number(cost.amount || 0), 0), 0);
+    return `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="sub">${escapeHtml(item.category)}${item.supplier ? ` | ${escapeHtml(item.supplier)}` : ''}${item.documentRef ? ` | ${escapeHtml(item.documentRef)}` : ''}</div></td><td>${escapeHtml(period)}<div class="sub">inicio ${item.startMonth ? monthLabel(item.startMonth) : '-'} | venc. dia ${item.dueDay}</div></td><td>${matrizMethodLabel(item.allocation)}<div class="sub">${targetNames.length ? escapeHtml(targetNames.join(' | ')) : `${activeTargets.length} destino(s) sem base ativa`}</div></td><td class="num" style="text-align:right">${matrizApplies(item, mk) ? `${fmtBRL(item.amount)}<div class="sub">rateado: ${fmtBRL(allocated)}</div>` : 'fora da competencia'}</td><td style="text-align:right"><button class="btn-open" type="button" onclick="editMatrizCost('${escapeAttr(item.id)}')">Editar</button> <button class="btn-open" type="button" onclick="removeMatrizCost('${escapeAttr(item.id)}')">Desativar</button> <button class="btn-danger" type="button" onclick="deleteMatrizCost('${escapeAttr(item.id)}')">Excluir</button></td></tr>`;
   }).join('') : '<tr><td colspan="5" style="color:var(--p3-muted);text-align:center;padding:16px">Nenhum custo compartilhado cadastrado.</td></tr>';
   const foot = matrizInput('matrizCostFoot'); if (foot) foot.innerHTML = `<tr style="font-weight:700"><td colspan="3">Programado em ${mk ? monthLabel(mk) : '-'}</td><td class="num" style="text-align:right">${fmtBRL(planned)}</td><td></td></tr>`;
   const targets = matrizInput('matrizCostTargets');
   if (targets && !matrizEditingId) targets.innerHTML = rows.map(row => `<option value="${escapeAttr(matrizScopeKey(row))}" selected>${escapeHtml(row.station || row.workName)} | ${escapeHtml(row.workName)}</option>`).join('');
   const rateio = matrizInput('matrizRateio'); if (rateio) rateio.textContent = rows.length ? `Destinos ativos: ${rows.map(row => row.station || row.workName).join(' | ')}.` : '';
+  renderMatrizMonthlyDre(rows, mk);
+}
+
+function matrizMonthSequence(from, to) {
+  if (!/^\d{4}-\d{2}$/.test(from || '') || !/^\d{4}-\d{2}$/.test(to || '') || from > to) return [];
+  const values = [];
+  let cursor = from;
+  while (cursor <= to && values.length < 48) {
+    values.push(cursor);
+    const year = Number(cursor.slice(0, 4));
+    const month = Number(cursor.slice(5, 7));
+    cursor = `${year + (month === 12 ? 1 : 0)}-${String(month === 12 ? 1 : month + 1).padStart(2, '0')}`;
+  }
+  return values;
+}
+
+function renderMatrizMonthlyDre(rows = [], activeMonth = '') {
+  // O DRE da matriz pertence a pagina financeira dedicada. A pagina de
+  // recargas continua leve e mostra somente o custo rateado de cada estacao.
+  if (!window.UBY_FINANCE_ONLY) return;
+  const anchor = matrizInput('matrizCostList')?.closest('.card');
+  if (!anchor) return;
+  let host = document.getElementById('matrizMonthlyDre');
+  if (!host) {
+    host = document.createElement('section');
+    host.id = 'matrizMonthlyDre';
+    host.className = 'card';
+    host.style.marginTop = '18px';
+    anchor.insertAdjacentElement('afterend', host);
+  }
+  const costs = loadMatrizCosts();
+  const chargeMonths = rows.flatMap(row => (row.charges || []).map(chargeMonthKey)).filter(mk => mk !== 'unknown');
+  const starts = costs.map(item => item.startMonth).filter(mk => /^\d{4}-\d{2}$/.test(mk));
+  const candidates = [...new Set([...chargeMonths, ...starts, activeMonth].filter(mk => /^\d{4}-\d{2}$/.test(mk)))].sort();
+  if (!candidates.length) {
+    host.innerHTML = '<h2 style="margin:0 0 6px">DRE mensal da matriz</h2><p class="sub">Cadastre um custo da matriz ou selecione uma competencia para visualizar o rateio mensal.</p>';
+    return;
+  }
+  const months = matrizMonthSequence(candidates[0], candidates[candidates.length - 1]);
+  const series = months.map(mk => {
+    const programmed = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const allocated = rows.reduce((sum, row) => sum + matrizCostItemsForRow(row, mk).reduce((partial, item) => partial + Number(item.amount || 0), 0), 0);
+    return { mk, programmed, allocated, pending: Math.max(programmed - allocated, 0) };
+  });
+  const totals = series.reduce((sum, row) => ({ programmed: sum.programmed + row.programmed, allocated: sum.allocated + row.allocated, pending: sum.pending + row.pending }), { programmed: 0, allocated: 0, pending: 0 });
+  const max = Math.max(1, ...series.map(row => row.programmed));
+  host.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><h2 style="margin:0">DRE mensal da matriz</h2><span class="sub">custos programados, rateados e pendentes</span></div>
+    <p class="sub" style="margin:6px 0 16px;max-width:78ch">Este demonstrativo registra o custo compartilhado por competencia. O valor rateado e enviado para o resultado financeiro de cada carregador de destino.</p>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px;margin-bottom:16px">
+      <div class="finance-result-card"><span>Programado</span><strong>${fmtBRL(totals.programmed)}</strong><small>soma das competencias exibidas</small></div>
+      <div class="finance-result-card"><span>Rateado aos carregadores</span><strong style="color:var(--p3-ok)">${fmtBRL(totals.allocated)}</strong><small>incluido nos custos individuais</small></div>
+      <div class="finance-result-card"><span>Pendente de rateio</span><strong style="color:${totals.pending > 0 ? 'var(--p3-warn)' : 'var(--p3-ok)'}">${fmtBRL(totals.pending)}</strong><small>${totals.pending > 0 ? 'revise os destinos do custo' : 'todos os custos possuem destino'}</small></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
+      ${series.map(row => {
+        const width = Math.max(3, row.programmed / max * 100);
+        const allocatedWidth = row.programmed ? row.allocated / row.programmed * 100 : 0;
+        return `<article style="background:var(--p3-card-soft);border:1px solid var(--p3-border);border-radius:8px;padding:14px"><strong>${escapeHtml(monthLabel(row.mk))}</strong><div style="display:flex;justify-content:space-between;gap:8px;margin-top:10px"><span class="sub">Programado</span><b>${fmtBRL(row.programmed)}</b></div><div style="height:7px;background:var(--p3-track);border-radius:999px;margin:7px 0 11px"><span style="display:block;height:100%;width:${width.toFixed(1)}%;background:var(--p3-primary);border-radius:inherit"></span></div><div style="display:flex;justify-content:space-between;gap:8px"><span class="sub">Rateado</span><b style="color:var(--p3-ok)">${fmtBRL(row.allocated)}</b></div><div class="sub" style="margin-top:6px;color:${row.pending > 0 ? 'var(--p3-warn)' : 'var(--p3-muted)'}">${row.pending > 0 ? `Pendente: ${fmtBRL(row.pending)} (${fmtPct(100 - allocatedWidth)})` : 'Rateio completo'}</div></article>`;
+      }).join('')}
+    </div>`;
 }
 
 function generalFinanceByUnit(unitData) {

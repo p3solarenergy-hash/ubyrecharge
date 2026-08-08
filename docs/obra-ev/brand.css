@@ -155,6 +155,19 @@ a.main:hover{
   color:var(--uby-midnight)!important;
 }
 
+.btn-danger{
+  background:transparent!important;
+  border:1px solid #ff6872!important;
+  color:#ff858c!important;
+  box-shadow:none!important;
+}
+
+.btn-danger:hover{
+  background:#ff6872!important;
+  border-color:#ff6872!important;
+  color:var(--uby-midnight)!important;
+}
+
 .value,
 .stat .value,
 .kpi-value,
