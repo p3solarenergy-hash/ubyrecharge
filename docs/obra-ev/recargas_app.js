@@ -5157,7 +5157,12 @@ function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
   const rows = getUbyChargerRows(unitData).filter(candidate => candidate.included);
   return loadMatrizCosts().filter(item => matrizApplies(item, mk)).flatMap(item => {
     const targets = (item.targets || []).filter(target => !target.startMonth || target.startMonth <= mk).map(target => ({ target, row: matrizResolveTargetRow(target, rows) })).filter(entry => entry.row);
-    const own = targets.find(entry => matrizRowsMatch(entry.row, row));
+    const direct = targets.find(entry => matrizRowsMatch(entry.row, row));
+    // Algumas plataformas trocam o identificador do conector entre exportacoes.
+    // Quando ha somente um destino UBY na mesma obra, o rateio continua sendo
+    // inequivoco mesmo se a chave antiga do conector nao existir mais.
+    const sameWorkTargets = targets.filter(entry => String(entry.row.workId || '') === String(row.workId || ''));
+    const own = direct || (sameWorkTargets.length === 1 ? sameWorkTargets[0] : null);
     if (!own || !targets.length) return [];
     const weighted = targets.map(entry => ({ ...entry, weight: matrizWeight(entry.row, entry.target, item, mk) }));
     const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
