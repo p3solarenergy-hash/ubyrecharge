@@ -2791,6 +2791,7 @@ function financeRuleValueHint(basis = 'fixed') {
 
 function financeRuleDisplayValue(rule) {
   if (!rule) return 'Sem base anterior';
+  if (rule.displayRule) return safeText(rule.displayRule);
   if (rule.enabled === false) return 'Nao utilizado';
   const value = Number(rule.value || 0);
   if (rule.basis === 'revenue_pct') return `${value.toFixed(2).replace('.', ',')}% do faturamento`;
@@ -3624,7 +3625,7 @@ function financeRuleReportItems(result = {}, settings = {}, type = 'cost') {
 }
 
 function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}) {
-  const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: options.historyCharges || charges, power: options.power });
+  const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: options.historyCharges || charges, power: options.power, matrizCostItems: options.matrizCostItems || currentMatrizItems(mk) });
   const occupancy = financeMonthOccupancy(charges, mk, options.power, options.operationStart);
   const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
   return {
@@ -3783,7 +3784,7 @@ function openFinanceReportDocument(html) {
 function buildFinanceMonthReportSnapshot(mk = financeMonthKey(), settingsOverride = null) {
   const settings = settingsOverride || currentFinanceSettingsFromInputs();
   const charges = chargesForMonth(mk);
-  const result = financeForCharges(charges, settings, { monthKey: mk });
+  const result = financeForCharges(charges, settings, { monthKey: mk, matrizCostItems: currentMatrizItems(mk) });
   const occupancy = financeMonthOccupancy(charges, mk, workPowerById(currentWorkId), currentWorkOperationStart());
   const summary = monthSummaryForMonth(mk);
   const owner = ownerAreaReportForSummary(summary, settings, charges);
@@ -4115,7 +4116,7 @@ function generateCurrentFinanceReportLegacy() {
   }
   const settings = currentFinanceSettingsFromInputs();
   const charges = chargesForMonth(mk);
-  const result = financeForCharges(charges, settings, { monthKey: mk });
+  const result = financeForCharges(charges, settings, { monthKey: mk, matrizCostItems: currentMatrizItems(mk) });
   const summary = monthSummaryForMonth(mk);
   const owner = ownerAreaReportForSummary(summary, settings, charges);
   const clients = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
@@ -4168,6 +4169,7 @@ function updateOwnerTransferModeVisibility(mode = 'gross') {
 }
 
 function renderFinanceiro(applySaved = true) {
+  if (!matrizCostsLoaded) ensureMatrizCostsLoaded().then(() => renderFinanceiro(false)).catch(() => {});
   populateFinanceWorkSelector();
   const months = getMonths();
   const selector = document.getElementById('financeMonthSelector');
@@ -4183,7 +4185,7 @@ function renderFinanceiro(applySaved = true) {
   financeEditorCurrentSettings = settings;
   updateFinanceModelVisibility(settings.operationModel);
   const charges = chargesForMonth(mk);
-  const result = financeForCharges(charges, settings, { monthKey: mk });
+  const result = financeForCharges(charges, settings, { monthKey: mk, matrizCostItems: currentMatrizItems(mk) });
   const { revenue, energy, acRevenue, dcRevenue, management, platform, ubyRoyalty, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, partnerInvestorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin, p3InvestmentValue, partnerInvestmentValue } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
   const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
@@ -4680,7 +4682,30 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const planning = financePlanningContext(charges, mk === 'unknown' ? financeMonthKey() : mk, cfg, options.historyCharges || charges, options.power);
   const costEvaluation = evaluateFinanceRules(cfg.costRules, planning);
   const revenueEvaluation = evaluateFinanceRules(cfg.revenueRules, planning);
-  const extraCosts = costEvaluation.actual;
+  // Custos compartilhados da matriz chegam jÃ¡ rateados para este carregador.
+  // Eles nÃ£o entram em costRules porque a matriz tem vigÃªncia e rateio prÃ³prios.
+  const matrizCostItems = (Array.isArray(options.matrizCostItems) ? options.matrizCostItems : [])
+    .map(item => ({
+      id: String(item?.id || `matriz-${Math.random().toString(36).slice(2)}`),
+      label: safeText(item?.label || item?.name || 'Custo da matriz'),
+      amount: Math.max(0, Number(item?.amount || 0)),
+      rule: safeText(item?.rule || 'Rateio da matriz')
+    }))
+    .filter(item => item.amount > 0);
+  const matrizCost = matrizCostItems.reduce((sum, item) => sum + item.amount, 0);
+  const matrizCostDetails = matrizCostItems.map(item => ({
+    id: `matriz-${item.id}`,
+    label: item.label,
+    enabled: true,
+    basis: 'fixed',
+    value: item.amount,
+    actual: item.amount,
+    planned: item.amount,
+    actualPerKWh: planning.energy > 0 ? item.amount / planning.energy : null,
+    plannedPerKWh: planning.planningKWh > 0 ? item.amount / planning.planningKWh : null,
+    displayRule: item.rule
+  }));
+  const extraCosts = costEvaluation.actual + matrizCost;
   const extraRevenue = revenueEvaluation.actual;
   const costs = energyCost + extraCosts;
   const preAreaNet = revenue + extraRevenue - management - platform - ubyRoyalty - costs;
@@ -4768,10 +4793,10 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const plannedManagement = planning.planningRevenue * cfg.managementPct / 100;
   const plannedPlatform = planning.planningRevenue * cfg.platformPct / 100;
   const plannedUbyRoyalty = model === 'third_party_management' ? planning.planningRevenue * cfg.ubyRoyaltyPct / 100 : 0;
-  const plannedPreAreaNet = planning.planningRevenue + revenueEvaluation.planned - plannedManagement - plannedPlatform - plannedUbyRoyalty - plannedEnergyCost - costEvaluation.planned;
+  const plannedPreAreaNet = planning.planningRevenue + revenueEvaluation.planned - plannedManagement - plannedPlatform - plannedUbyRoyalty - plannedEnergyCost - costEvaluation.planned - matrizCost;
   const plannedAreaShareBase = cfg.ownerTransferMode === 'net' ? Math.max(plannedPreAreaNet, 0) : planning.planningRevenue;
   const plannedAreaParticipation = areaEligible ? plannedAreaShareBase * areaSharePct / 100 : 0;
-  const plannedDirectCost = plannedEnergyCost + costEvaluation.planned + plannedAreaParticipation;
+  const plannedDirectCost = plannedEnergyCost + costEvaluation.planned + matrizCost + plannedAreaParticipation;
   const plannedTotalCost = plannedDirectCost + plannedManagement + plannedPlatform + plannedUbyRoyalty;
   const plannedDirectCostPerKWh = planning.planningKWh > 0 ? plannedDirectCost / planning.planningKWh : null;
   const plannedExtraRevenuePerKWh = planning.planningKWh > 0 ? revenueEvaluation.planned / planning.planningKWh : null;
@@ -4791,13 +4816,13 @@ function financeForCharges(charges, settings = {}, options = {}) {
     platform,
     planningKWh: planning.planningKWh,
     plannedEnergyCost,
-    plannedExtraCosts: costEvaluation.planned + plannedAreaParticipation + plannedUbyRoyalty,
+    plannedExtraCosts: costEvaluation.planned + matrizCost + plannedAreaParticipation + plannedUbyRoyalty,
     plannedManagement,
     plannedPlatform,
     plannedUbyRoyalty,
     variableRevenuePerKWh,
     variableCostPerKWh,
-    fixedCosts: financeFixedRuleTotal(cfg.costRules),
+    fixedCosts: financeFixedRuleTotal(cfg.costRules) + matrizCost,
     fixedRevenue: financeFixedRuleTotal(cfg.revenueRules)
   });
   const { plannedTotalCostPerKWh, resultPerKWh, operationMargin, contributionPerKWh, breakEvenKWh } = economics;
@@ -4818,6 +4843,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     energyCost,
     energyRate: Number(cfg.energyCostPerKWh || 0),
     extraCosts,
+    matrizCost,
     extraRevenue,
     preAreaNet,
     areaEligible,
@@ -4827,7 +4853,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     plannedAreaParticipation,
     costRules: cfg.costRules,
     revenueRules: cfg.revenueRules,
-    costRuleDetails: costEvaluation.details,
+    costRuleDetails: [...costEvaluation.details, ...matrizCostDetails],
     revenueRuleDetails: revenueEvaluation.details,
     costs,
     totalRevenue,
@@ -4870,16 +4896,16 @@ function financeForCharges(charges, settings = {}, options = {}) {
 // ── Custos da matriz UBY (compartilhados, rateio igual) ───────────────────────
 // Camada nova, separada do engine financeiro: cadastra custos da matriz e os
 // divide igualmente entre os carregadores UBY que tiveram recarga no mês.
-const MATRIZ_COSTS_KEY = 'uby-matriz-costs-v1';
+const MATRIZ_LEGACY_COSTS_KEY = 'uby-matriz-costs-v1';
 
-function loadMatrizCosts() {
+function loadMatrizCostsLegacy() {
   try {
-    const arr = JSON.parse(localStorage.getItem(MATRIZ_COSTS_KEY) || '[]');
+    const arr = JSON.parse(localStorage.getItem(MATRIZ_LEGACY_COSTS_KEY) || '[]');
     return Array.isArray(arr) ? arr : [];
   } catch (_) { return []; }
 }
-function saveMatrizCosts(list) {
-  try { localStorage.setItem(MATRIZ_COSTS_KEY, JSON.stringify(Array.isArray(list) ? list : [])); } catch (_) {}
+function saveMatrizCostsLegacy(list) {
+  try { localStorage.setItem(MATRIZ_LEGACY_COSTS_KEY, JSON.stringify(Array.isArray(list) ? list : [])); } catch (_) {}
 }
 function setMatrizFeedback(msg, isError) {
   const el = document.getElementById('matrizFeedback');
@@ -4890,7 +4916,7 @@ function setMatrizFeedback(msg, isError) {
   // Mantém também o storageState como fallback (páginas antigas sem o elemento).
   if (msg) setStorageState(msg, !!isError);
 }
-function addMatrizCost() {
+function addMatrizCostLegacy() {
   try {
     const nameEl = document.getElementById('matrizNewName');
     const valEl = document.getElementById('matrizNewValue');
@@ -4900,22 +4926,22 @@ function addMatrizCost() {
       setMatrizFeedback('Informe o nome e um valor maior que zero para o custo da matriz.', true);
       return;
     }
-    const list = loadMatrizCosts();
+    const list = loadMatrizCostsLegacy();
     list.push({ id: 'm' + Date.now().toString(36), nome, valor, ativo: true });
-    saveMatrizCosts(list);
+    saveMatrizCostsLegacy(list);
     if (nameEl) nameEl.value = '';
     if (valEl) valEl.value = '';
-    renderMatrizCosts(getGeneralUnitData());
+    renderMatrizCostsLegacy(getGeneralUnitData());
     setMatrizFeedback(`Custo "${nome}" adicionado (${fmtBRL(valor)}).`, false);
   } catch (e) {
     console.error('[fin-matriz-add]', e);
     setMatrizFeedback('Não foi possível adicionar o custo agora. Recarregue a página e tente novamente.', true);
   }
 }
-function removeMatrizCost(id) {
+function removeMatrizCostLegacy(id) {
   try {
-    saveMatrizCosts(loadMatrizCosts().filter(c => c.id !== id));
-    renderMatrizCosts(getGeneralUnitData());
+    saveMatrizCostsLegacy(loadMatrizCostsLegacy().filter(c => c.id !== id));
+    renderMatrizCostsLegacy(getGeneralUnitData());
     setMatrizFeedback('Custo removido.', false);
   } catch (e) {
     console.error('[fin-matriz-remove]', e);
@@ -4930,10 +4956,10 @@ function ubyChargersWithRechargeInMonth(unitData, mk) {
     .filter(row => (row.charges || []).some(charge => chargeMonthKey(charge) === mk));
 }
 
-function renderMatrizCosts(unitData) {
+function renderMatrizCostsLegacy(unitData) {
   const listEl = document.getElementById('matrizCostList');
   if (!listEl) return;
-  const costs = loadMatrizCosts();
+  const costs = loadMatrizCostsLegacy();
 
   // Mês de referência: o mais recente com recargas UBY.
   const ubyRows = getUbyChargerRows(unitData).filter(row => row.included);
@@ -4981,6 +5007,176 @@ function renderMatrizCosts(unitData) {
     </div>`;
 }
 
+// Shared-cost matrix v2. It preserves historical allocations by keeping each
+// selected target and its effective month on the cost record itself.
+const MATRIZ_COSTS_KEY = 'uby-matriz-costs-v2';
+const MATRIZ_STORE_WORK_ID = '__uby_matriz_financeira__';
+let matrizCostsState = [];
+let matrizCostsLoaded = false;
+let matrizCostsLoadPromise = null;
+let matrizCostsSaveChain = Promise.resolve();
+let matrizEditingId = '';
+
+function matrizScopeKey(row = {}) { return `${String(row.workId || '')}::${String(row.key || normalizeStationForCompare(row.station || row.workName || ''))}`; }
+function matrizMonthOffset(start, target) {
+  if (!/^\d{4}-\d{2}$/.test(String(start || '')) || !/^\d{4}-\d{2}$/.test(String(target || ''))) return -1;
+  return (Number(target.slice(0, 4)) - Number(start.slice(0, 4))) * 12 + Number(target.slice(5, 7)) - Number(start.slice(5, 7));
+}
+function matrizMethodLabel(method) { return ({ equal: 'Rateio igual', power: 'Por potencia', energy: 'Por kWh', revenue: 'Por faturamento', custom: 'Participacao definida' })[method] || 'Rateio igual'; }
+function matrizKindLabel(kind) { return ({ recurring: 'Recorrente', installment: 'Parcelado', one_off: 'Pontual' })[kind] || 'Recorrente'; }
+function matrizNormalizeCost(raw = {}) {
+  const oldTargets = Array.isArray(raw.targetIds) ? raw.targetIds : [];
+  const targets = Array.isArray(raw.targets) && raw.targets.length ? raw.targets : oldTargets.map(scope => ({ scope, startMonth: raw.startMonth || '', share: raw.customShares?.[scope] || 0 }));
+  return {
+    id: String(raw.id || `m${Date.now().toString(36)}`), name: safeText(raw.name || raw.nome || 'Custo sem nome'),
+    category: safeText(raw.category || 'Outros custos'), supplier: safeText(raw.supplier || ''),
+    costKind: ['recurring', 'installment', 'one_off'].includes(raw.costKind) ? raw.costKind : 'recurring',
+    amount: Math.max(0, Number(raw.amount ?? raw.valor ?? 0)), installments: Math.max(1, Number(raw.installments || 1)),
+    startMonth: String(raw.startMonth || raw.effectiveMonth || ''), endMonth: String(raw.endMonth || ''), dueDay: Math.min(31, Math.max(1, Number(raw.dueDay || 1))),
+    allocation: ['equal', 'power', 'energy', 'revenue', 'custom'].includes(raw.allocation) ? raw.allocation : 'equal',
+    targets: targets.map(target => ({ scope: String(target.scope || ''), startMonth: String(target.startMonth || raw.startMonth || ''), share: Math.max(0, Number(target.share || 0)) })).filter(target => target.scope),
+    documentRef: safeText(raw.documentRef || ''), notes: safeText(raw.notes || ''), enabled: raw.enabled !== false && raw.ativo !== false,
+    createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || new Date().toISOString()
+  };
+}
+function loadMatrizCosts() {
+  if (matrizCostsState.length) return matrizCostsState;
+  try { matrizCostsState = (JSON.parse(localStorage.getItem(MATRIZ_COSTS_KEY) || '[]') || []).map(matrizNormalizeCost); } catch (_) { matrizCostsState = []; }
+  if (!matrizCostsState.length) matrizCostsState = loadMatrizCostsLegacy().map(matrizNormalizeCost);
+  return matrizCostsState;
+}
+function saveMatrizCosts(list, options = {}) {
+  matrizCostsState = (Array.isArray(list) ? list : []).map(matrizNormalizeCost);
+  try { localStorage.setItem(MATRIZ_COSTS_KEY, JSON.stringify(matrizCostsState)); } catch (_) {}
+  if (options.remote !== false) persistMatrizCosts().catch(err => {
+    console.warn('[matriz-save]', err);
+    setMatrizFeedback('Salvo neste navegador; a sincronizacao com a nuvem esta pendente.', true);
+  });
+  return matrizCostsState;
+}
+async function ensureMatrizCostsLoaded() {
+  if (matrizCostsLoaded) return loadMatrizCosts();
+  if (matrizCostsLoadPromise) return matrizCostsLoadPromise;
+  matrizCostsLoadPromise = (async () => {
+    loadMatrizCosts();
+    try {
+      if (window.UBY_SUPABASE?.loadRechargeBase) {
+        const remote = await window.UBY_SUPABASE.loadRechargeBase(MATRIZ_STORE_WORK_ID);
+        const cloud = remote?.matrizCosts || remote?.summary?.matrizCosts;
+        if (Array.isArray(cloud)) saveMatrizCosts(cloud, { remote: false });
+      }
+    } catch (err) { console.warn('[matriz-load]', err); }
+    matrizCostsLoaded = true;
+    return matrizCostsState;
+  })().finally(() => { matrizCostsLoadPromise = null; });
+  return matrizCostsLoadPromise;
+}
+function persistMatrizCosts() {
+  if (!window.UBY_SUPABASE?.saveRechargeMetadata) return Promise.resolve();
+  const snapshot = matrizCostsState.map(matrizNormalizeCost);
+  matrizCostsSaveChain = matrizCostsSaveChain.catch(() => {}).then(() => window.UBY_SUPABASE.saveRechargeMetadata(MATRIZ_STORE_WORK_ID, {
+    workId: MATRIZ_STORE_WORK_ID, workName: 'Matriz financeira UBY', matrizCosts: snapshot, summary: { matrizCosts: snapshot }
+  }));
+  return matrizCostsSaveChain;
+}
+function matrizInput(id) { return document.getElementById(id); }
+function matrizSelectedTargets() { return [...(matrizInput('matrizCostTargets')?.selectedOptions || [])].map(option => option.value).filter(Boolean); }
+function matrizApplies(item, mk) {
+  if (!item?.enabled || !mk) return false;
+  const offset = matrizMonthOffset(item.startMonth || mk, mk);
+  if (offset < 0 || (item.endMonth && mk > item.endMonth)) return false;
+  if (item.costKind === 'one_off') return offset === 0;
+  return item.costKind !== 'installment' || offset < Number(item.installments || 1);
+}
+function matrizWeight(row, target, item, mk) {
+  if (item.allocation === 'custom') return Number(target.share || 0);
+  if (item.allocation === 'power') return Math.max(0, Number(workPowerById(row.workId) || 0));
+  const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
+  if (item.allocation === 'energy') return charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  if (item.allocation === 'revenue') return charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  return 1;
+}
+function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
+  const rows = new Map(getUbyChargerRows(unitData).filter(candidate => candidate.included).map(candidate => [matrizScopeKey(candidate), candidate]));
+  const ownScope = matrizScopeKey(row);
+  return loadMatrizCosts().filter(item => matrizApplies(item, mk)).flatMap(item => {
+    const targets = (item.targets || []).filter(target => !target.startMonth || target.startMonth <= mk).map(target => ({ target, row: rows.get(target.scope) })).filter(entry => entry.row);
+    const own = targets.find(entry => entry.target.scope === ownScope);
+    if (!own || !targets.length) return [];
+    const weighted = targets.map(entry => ({ ...entry, weight: matrizWeight(entry.row, entry.target, item, mk) }));
+    const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+    const amount = totalWeight > 0 ? Number(item.amount || 0) * own.weight / totalWeight : Number(item.amount || 0) / targets.length;
+    return amount > 0 ? [{ id: item.id, label: item.name, amount, rule: `${matrizKindLabel(item.costKind)} | ${matrizMethodLabel(item.allocation)} | ${targets.length} destino(s)` }] : [];
+  });
+}
+function currentMatrizItems(mk = financeMonthKey()) {
+  const rows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.workId === currentWorkId && row.included);
+  const current = currentStationReportName ? rows.find(row => normalizeStationForCompare(row.station) === normalizeStationForCompare(currentStationReportName)) : rows[0];
+  return current ? matrizCostItemsForRow(current, mk) : [];
+}
+function resetMatrizCostForm() {
+  matrizEditingId = '';
+  ['matrizNewName','matrizCostSupplier','matrizNewValue','matrizCostEndMonth','matrizCostDocument','matrizCostNotes','matrizCostCustomShares'].forEach(id => { const el = matrizInput(id); if (el) el.value = ''; });
+  const start = matrizInput('matrizCostStartMonth'); if (start) start.value = financeMonthKey() || getMonths().at(-1) || '';
+  const kind = matrizInput('matrizCostKind'); if (kind) kind.value = 'recurring';
+  const method = matrizInput('matrizCostMethod'); if (method) method.value = 'equal';
+  const installments = matrizInput('matrizCostInstallments'); if (installments) installments.value = 1;
+  const due = matrizInput('matrizCostDueDay'); if (due) due.value = 1;
+  const button = matrizInput('matrizSaveButton'); if (button) button.textContent = 'Adicionar custo';
+}
+function addMatrizCost() {
+  const name = safeText(matrizInput('matrizNewName')?.value || '').trim();
+  const amount = Math.max(0, Number(matrizInput('matrizNewValue')?.value || 0));
+  if (!name || !amount) { setMatrizFeedback('Informe o nome e o valor de cada parcela ou competencia.', true); return; }
+  const allTargets = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included).map(matrizScopeKey);
+  const targetIds = matrizSelectedTargets().length ? matrizSelectedTargets() : allTargets;
+  if (!targetIds.length) { setMatrizFeedback('Selecione pelo menos um carregador de destino.', true); return; }
+  const list = loadMatrizCosts();
+  const previous = list.find(item => item.id === matrizEditingId);
+  const existingTargets = new Map((previous?.targets || []).map(target => [target.scope, target]));
+  const shares = safeText(matrizInput('matrizCostCustomShares')?.value || '').split(/[;,]/).map(value => Math.max(0, Number(value.trim().replace(',', '.')) || 0));
+  const startMonth = matrizInput('matrizCostStartMonth')?.value || financeMonthKey();
+  const cost = matrizNormalizeCost({ ...previous, id: previous?.id || `m${Date.now().toString(36)}`, name, amount,
+    category: matrizInput('matrizCostCategory')?.value || 'Outros custos', supplier: matrizInput('matrizCostSupplier')?.value || '', costKind: matrizInput('matrizCostKind')?.value || 'recurring', installments: matrizInput('matrizCostInstallments')?.value || 1, startMonth, endMonth: matrizInput('matrizCostEndMonth')?.value || '', dueDay: matrizInput('matrizCostDueDay')?.value || 1, allocation: matrizInput('matrizCostMethod')?.value || 'equal', documentRef: matrizInput('matrizCostDocument')?.value || '', notes: matrizInput('matrizCostNotes')?.value || '', enabled: true,
+    targets: targetIds.map((scope, index) => ({ scope, startMonth: existingTargets.get(scope)?.startMonth || startMonth, share: shares[index] || existingTargets.get(scope)?.share || 0 })), updatedAt: new Date().toISOString() });
+  if (previous) Object.assign(previous, cost); else list.push(cost);
+  saveMatrizCosts(list); resetMatrizCostForm(); renderMatrizCosts(getGeneralUnitData());
+  setMatrizFeedback(`Custo ${name} salvo. O rateio fica gravado por competencia e destino.`, false);
+}
+function editMatrizCost(id) {
+  const item = loadMatrizCosts().find(cost => cost.id === id); if (!item) return;
+  matrizEditingId = id;
+  const values = { matrizNewName:item.name, matrizCostCategory:item.category, matrizCostSupplier:item.supplier, matrizCostKind:item.costKind, matrizNewValue:item.amount, matrizCostInstallments:item.installments, matrizCostStartMonth:item.startMonth, matrizCostEndMonth:item.endMonth, matrizCostDueDay:item.dueDay, matrizCostMethod:item.allocation, matrizCostDocument:item.documentRef, matrizCostNotes:item.notes, matrizCostCustomShares:item.targets.map(target => target.share || 0).join(', ') };
+  Object.entries(values).forEach(([idValue, value]) => { const el = matrizInput(idValue); if (el) el.value = value ?? ''; });
+  const targets = matrizInput('matrizCostTargets'); if (targets) [...targets.options].forEach(option => { option.selected = item.targets.some(target => target.scope === option.value); });
+  const button = matrizInput('matrizSaveButton'); if (button) button.textContent = 'Salvar alteracao';
+  setMatrizFeedback(`Editando ${item.name}. Destinos novos passam a valer da competencia atual para frente.`, false);
+}
+function removeMatrizCost(id) {
+  const item = loadMatrizCosts().find(cost => cost.id === id); if (!item) return;
+  item.enabled = false; item.updatedAt = new Date().toISOString(); saveMatrizCosts(loadMatrizCosts()); renderMatrizCosts(getGeneralUnitData());
+  setMatrizFeedback('Custo desativado. O historico anterior permanece preservado.', false);
+}
+function renderMatrizCosts(unitData) {
+  const listEl = matrizInput('matrizCostList'); if (!listEl) return;
+  const mk = financeMonthKey() || getMonths().at(-1) || '';
+  const rows = getUbyChargerRows(unitData).filter(row => row.included);
+  const costs = loadMatrizCosts();
+  const planned = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const monthEl = matrizInput('matrizMonthLabel'); if (monthEl) monthEl.textContent = mk ? `competencia ${monthLabel(mk)} | cadastro salvo separadamente das recargas` : 'selecione a competencia';
+  listEl.innerHTML = costs.length ? costs.map(item => {
+    const parcel = matrizMonthOffset(item.startMonth, mk) + 1;
+    const period = item.costKind === 'installment' ? `parcela ${Math.max(1, parcel)} de ${item.installments}` : item.costKind === 'one_off' ? 'lancamento unico' : 'recorrente mensal';
+    const activeTargets = item.targets.filter(target => !target.startMonth || target.startMonth <= mk);
+    const targetNames = activeTargets.map(target => rows.find(row => matrizScopeKey(row) === target.scope)?.station || '').filter(Boolean);
+    return `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="sub">${escapeHtml(item.category)}${item.supplier ? ` | ${escapeHtml(item.supplier)}` : ''}${item.documentRef ? ` | ${escapeHtml(item.documentRef)}` : ''}</div></td><td>${escapeHtml(period)}<div class="sub">inicio ${item.startMonth ? monthLabel(item.startMonth) : '-'} | venc. dia ${item.dueDay}</div></td><td>${matrizMethodLabel(item.allocation)}<div class="sub">${targetNames.length ? escapeHtml(targetNames.join(' | ')) : `${activeTargets.length} destino(s) sem base ativa`}</div></td><td class="num" style="text-align:right">${matrizApplies(item, mk) ? fmtBRL(item.amount) : 'fora da competencia'}</td><td style="text-align:right"><button class="btn-open" type="button" onclick="editMatrizCost('${escapeAttr(item.id)}')">Editar</button> <button class="btn-open" type="button" onclick="removeMatrizCost('${escapeAttr(item.id)}')">Desativar</button></td></tr>`;
+  }).join('') : '<tr><td colspan="5" style="color:var(--p3-muted);text-align:center;padding:16px">Nenhum custo compartilhado cadastrado.</td></tr>';
+  const foot = matrizInput('matrizCostFoot'); if (foot) foot.innerHTML = `<tr style="font-weight:700"><td colspan="3">Programado em ${mk ? monthLabel(mk) : '-'}</td><td class="num" style="text-align:right">${fmtBRL(planned)}</td><td></td></tr>`;
+  const targets = matrizInput('matrizCostTargets');
+  if (targets && !matrizEditingId) targets.innerHTML = rows.map(row => `<option value="${escapeAttr(matrizScopeKey(row))}" selected>${escapeHtml(row.station || row.workName)} | ${escapeHtml(row.workName)}</option>`).join('');
+  const rateio = matrizInput('matrizRateio'); if (rateio) rateio.textContent = rows.length ? `Destinos ativos: ${rows.map(row => row.station || row.workName).join(' | ')}.` : '';
+}
+
 function generalFinanceByUnit(unitData) {
   return unitData.map(unit => {
     const byMonth = {};
@@ -4994,7 +5190,9 @@ function generalFinanceByUnit(unitData) {
       // da obra fazia o geral voltar para o modelo padrao e ignorar a escolha
       // salva para Sabara, Central JK e qualquer outra estacao individual.
       const settings = financeSettingsForUbyRow(unit, mk);
-      const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId) });
+      const matrixRow = getUbyChargerRows(unitData).find(row => row.workId === unit.workId && normalizeStationForCompare(row.station) === normalizeStationForCompare(unit.stationName || unit.workName));
+      const matrizCostItems = matrixRow?.included ? matrizCostItemsForRow(matrixRow, mk, unitData) : [];
+      const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId), matrizCostItems });
       return { monthKey: mk, result };
     });
     const total = monthly.reduce((acc, { result }) => {
@@ -5023,6 +5221,7 @@ function countDetailedCharges() {
 }
 
 async function renderFinanceOnly() {
+  await ensureMatrizCostsLoaded();
   const unitData = getGeneralUnitData();
   const ubyRows = getUbyChargerRows(unitData);
   const includedRows = ubyRows.filter(r => r.included);
@@ -9248,21 +9447,15 @@ function ubyFinanceMonthsForRow(row = {}, sourceMonths = [], isMonthView = true,
   return (sourceMonths || []).filter(mk => !firstMonth || mk >= firstMonth);
 }
 
-let _matrizShareByMonth = {};
 function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true, currentMonth = '') {
   const months = ubyFinanceMonthsForRow(row, sourceMonths, isMonthView, currentMonth);
   let matrizCostTotal = 0;
   const results = months.map(mk => {
     const monthCharges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
-    let settings = financeSettingsForUbyRow(row, mk);
-    // Injeta a fatia da matriz do mês como custo fixo, para o engine já levar
-    // ao resultado, ubyNet, retenção e distribuição a investidores.
-    const matrizShare = Number(_matrizShareByMonth[mk] || 0);
-    if (matrizShare > 0 && monthCharges.length) {
-      matrizCostTotal += matrizShare;
-      settings = { ...settings, costRules: [...(settings.costRules || []), { id: '__matriz', label: 'Custos da matriz UBY', basis: 'fixed', value: matrizShare, enabled: true }] };
-    }
-    return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId) });
+    const settings = financeSettingsForUbyRow(row, mk);
+    const matrizCostItems = matrizCostItemsForRow(row, mk);
+    matrizCostTotal += matrizCostItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems });
   });
   const totals = results.reduce((acc, result) => {
     ['revenue','extraRevenue','totalRevenue','energy','energyCost','extraCosts','management','platform','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
@@ -9283,7 +9476,7 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
 // mês), pro gráfico de evolução e pra tendência dos KPIs. Sempre pega o
 // histórico completo de cada carregador (ignora o toggle "Visão" da página),
 // já que uma evolução mensal não faz sentido presa a 1 mês só.
-function buildUbyMonthlySeries(includedRows = [], sourceMonths = [], matrizShareByMonth = {}) {
+function buildUbyMonthlySeries(includedRows = [], sourceMonths = []) {
   const byMonth = new Map(sourceMonths.map(mk => [mk, {
     mk, label: monthLabel(mk), revenue: 0, totalOperatingCost: 0, operationNet: 0, matrizCost: 0, energy: 0
   }]));
@@ -9293,13 +9486,10 @@ function buildUbyMonthlySeries(includedRows = [], sourceMonths = [], matrizShare
       const bucket = byMonth.get(mk);
       if (!bucket) return;
       const monthCharges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
-      let settings = financeSettingsForUbyRow(row, mk);
-      const matrizShare = Number(matrizShareByMonth[mk] || 0);
-      if (matrizShare > 0 && monthCharges.length) {
-        settings = { ...settings, costRules: [...(settings.costRules || []), { id: '__matriz', label: 'Custos da matriz UBY', basis: 'fixed', value: matrizShare, enabled: true }] };
-        bucket.matrizCost += matrizShare;
-      }
-      const result = financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId) });
+      const settings = financeSettingsForUbyRow(row, mk);
+      const matrizCostItems = matrizCostItemsForRow(row, mk);
+      bucket.matrizCost += matrizCostItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const result = financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems });
       bucket.revenue += Number(result.revenue || 0);
       bucket.totalOperatingCost += Number(result.totalOperatingCost || 0);
       bucket.operationNet += Number(result.operationNet || 0);
@@ -9315,7 +9505,6 @@ function renderCostTree(rows, matrizTotal) {
   if (!el) return;
   if (!rows || !rows.length) { el.innerHTML = ''; return; }
   const n = rows.length;
-  const perCharger = n > 0 ? matrizTotal / n : 0;
   const line = (label, value, cls) =>
     `<div class="tree-line ${cls || ''}"><span>${label}</span><b>${value}</b></div>`;
   el.innerHTML = `
@@ -9324,14 +9513,14 @@ function renderCostTree(rows, matrizTotal) {
         <div class="tree-node root">
           <div class="tn-tag">◆ Matriz UBY</div>
           <div class="tn-title">Custos da matriz</div>
-          <div class="tn-big">${fmtBRL(matrizTotal)}<small>/mês</small></div>
-          <div class="tn-sub">dividido igualmente entre ${n} carregador(es) UBY = <b>${fmtBRL(perCharger)}</b> cada</div>
+          <div class="tn-big">${fmtBRL(matrizTotal)}<small> no período</small></div>
+          <div class="tn-sub">rateado conforme regra e destinos cadastrados em ${n} carregador(es) UBY</div>
         </div>
       </div>
       <div class="tree-branches">
         ${rows.map(r => {
           const f = r.finance || {};
-          const ops = Number(f.management || 0) + Number(f.extraCosts || 0);
+          const ops = Number(f.management || 0) + Math.max(0, Number(f.extraCosts || 0) - Number(f.matrizCost || 0));
           const res = Number(f.operationNet || 0);
           return `
           <div class="tree-branch">
@@ -9433,16 +9622,6 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   const periodLabel = document.getElementById('ubyFinancePeriodLabel');
   if (!summary || !rowsEl) return;
   const includedRows = sourceRows.filter(row => row.included);
-  // Fatia da matriz por mês = total ativo ÷ carregadores UBY com recarga no mês.
-  const matrizTotal = loadMatrizCosts().filter(c => c.ativo !== false).reduce((s, c) => s + Number(c.valor || 0), 0);
-  _matrizShareByMonth = {};
-  if (matrizTotal > 0) {
-    const monthCount = {};
-    includedRows.forEach(row => {
-      new Set((row.charges || []).map(chargeMonthKey).filter(m => m !== 'unknown')).forEach(mk => { monthCount[mk] = (monthCount[mk] || 0) + 1; });
-    });
-    Object.entries(monthCount).forEach(([mk, n]) => { _matrizShareByMonth[mk] = n > 0 ? matrizTotal / n : 0; });
-  }
   const rows = includedRows
     .map(row => aggregateUbyFinanceRow(row, sourceMonths, isMonthView, currentMonth))
     .sort((a, b) => Number(b.finance.operationNet || 0) - Number(a.finance.operationNet || 0));
@@ -9456,7 +9635,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   if (periodLabel) periodLabel.textContent = viewLabel || (isMonthView ? monthLabel(currentMonth) : 'Acumulado');
   // Série mensal só é calculada na página financeira dedicada (evita custo
   // extra de recalcular por mês na aba operacional, que não usa isso).
-  const monthlySeries = window.UBY_FINANCE_ONLY ? buildUbyMonthlySeries(includedRows, sourceMonths, _matrizShareByMonth) : null;
+  const monthlySeries = window.UBY_FINANCE_ONLY ? buildUbyMonthlySeries(includedRows, sourceMonths) : null;
   if (window.UBY_FINANCE_ONLY) {
     const revenueTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.revenue));
     const costTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.totalOperatingCost, { invert: true }));
@@ -10953,6 +11132,7 @@ async function switchTab(name, btn) {
   else if (name === 'geral' && overviewNeedsRender('geral')) await renderGeral();
   else if (name === 'uby') {
     ubyReportsRequested = false;
+    await ensureMatrizCostsLoaded();
     if (overviewNeedsRender('uby')) await renderUbyOperation();
   }
   else if (name === 'clientes') {
@@ -10965,6 +11145,7 @@ async function switchTab(name, btn) {
   }
   else if (name === 'financeiroGeral') {
     await ensureAllOverviewSessionsLoaded();
+    await ensureMatrizCostsLoaded();
     renderGeneralFinance(getGeneralUnitData());
   }
   else if (name === 'detalhes') renderDetalhes();
@@ -10990,7 +11171,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260807-live-occupation1';
+const UBY_APP_VERSION = '20260808-financial-matrix-v2';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }

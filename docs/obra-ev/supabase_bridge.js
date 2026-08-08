@@ -487,6 +487,7 @@
       workName: existingSummary.workName || payload?.workName || incomingSummary.workName || "",
       monthlyClosings: payload?.monthlyClosings || incomingSummary.monthlyClosings || existingSummary.monthlyClosings || {},
       financialSettings: payload?.financialSettings || incomingSummary.financialSettings || existingSummary.financialSettings || {},
+      matrizCosts: payload?.matrizCosts || incomingSummary.matrizCosts || existingSummary.matrizCosts || [],
       stationAvailability: payload?.stationAvailability || incomingSummary.stationAvailability || existingSummary.stationAvailability || {},
       operationalPowerKw: Number(payload?.operationalPowerKw || incomingSummary.operationalPowerKw || existingSummary.operationalPowerKw || 0),
       ubyOperationOverrides: payload?.ubyOperationOverrides || incomingSummary.ubyOperationOverrides || existingSummary.ubyOperationOverrides || {},
@@ -581,6 +582,7 @@
     const { data, error } = await sb
       .from("obra_recargas_base")
       .select("obra_id,arquivos,recargas,resumo,updated_at")
+      .neq("obra_id", "__uby_matriz_financeira__")
       .order("updated_at", { ascending: false });
     if (error) throw error;
     return (data || []).map(row => ({
@@ -602,6 +604,7 @@
     const { data, error } = await sb
       .from("obra_recargas_base")
       .select("obra_id,arquivos,resumo,updated_at")
+      .neq("obra_id", "__uby_matriz_financeira__")
       .order("updated_at", { ascending: false });
     if (error) throw error;
     return (data || []).map(row => ({
