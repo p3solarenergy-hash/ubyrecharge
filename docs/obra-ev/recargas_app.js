@@ -3440,6 +3440,48 @@ function overviewRenderSignature(name) {
   return `${name}:${rechargeRecordsVersion}:${view}`;
 }
 
+function overviewMonthKeys() {
+  return [...new Set(getAllGeneralCharges(getGeneralUnitData())
+    .map(chargeMonthKey)
+    .filter(key => key !== 'unknown'))].sort();
+}
+
+function syncOverviewMonthOptions(sourceMonths = overviewMonthKeys()) {
+  const select = document.getElementById('generalViewMode');
+  if (!select) return;
+  const months = [...new Set(sourceMonths || [])].filter(isPlausibleMonthKey).sort();
+  const previous = select.value || 'month';
+  const latestMonth = months[months.length - 1] || '';
+  const options = [
+    { value: 'month', label: latestMonth ? `Mês atual (${monthLabel(latestMonth)})` : 'Mês atual' },
+    ...months.slice(0, -1).reverse().map(monthKey => ({ value: `month:${monthKey}`, label: monthLabel(monthKey) })),
+    { value: 'accumulated', label: 'Acumulado' }
+  ];
+  const signature = options.map(option => `${option.value}:${option.label}`).join('|');
+  if (select.dataset.optionsSignature !== signature) {
+    select.innerHTML = options.map(option => `<option value="${option.value}">${option.label}</option>`).join('');
+    select.dataset.optionsSignature = signature;
+  }
+  select.value = options.some(option => option.value === previous) ? previous : 'month';
+}
+
+function selectedOverviewPeriod(sourceMonths = overviewMonthKeys()) {
+  const months = [...new Set(sourceMonths || [])].filter(isPlausibleMonthKey).sort();
+  const latestMonth = months[months.length - 1] || '';
+  const view = document.getElementById('generalViewMode')?.value || 'month';
+  const requestedMonth = view.startsWith('month:') ? view.slice('month:'.length) : latestMonth;
+  const monthKey = months.includes(requestedMonth) ? requestedMonth : latestMonth;
+  const isAccumulated = view === 'accumulated';
+  const isMonthView = !isAccumulated && !!monthKey;
+  return {
+    monthKey,
+    latestMonth,
+    isMonthView,
+    isCurrentMonth: isMonthView && monthKey === latestMonth,
+    label: isMonthView ? (monthKey === latestMonth ? `Mês atual (${monthLabel(monthKey)})` : monthLabel(monthKey)) : 'Acumulado'
+  };
+}
+
 function overviewNeedsRender(name) {
   return overviewRenderState[name] !== overviewRenderSignature(name);
 }
@@ -5656,10 +5698,9 @@ function renderUbyFinanceWorkspace(unitData) {
   const sourceRows = getUbyChargerRows(unitData || []);
   const includedRows = sourceRows.filter(row => row.included);
   const sourceMonths = [...new Set(includedRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
-  const selectedMonth = sourceMonths[sourceMonths.length - 1] || '';
-  const monthlyMode = (document.getElementById('generalViewMode')?.value || 'month') !== 'accumulated';
-  const label = monthlyMode && selectedMonth ? `Mes atual (${monthLabel(selectedMonth)})` : 'Acumulado UBY';
-  renderUbyFinancialOverview(sourceRows, sourceMonths, monthlyMode, selectedMonth, label);
+  const period = selectedOverviewPeriod(sourceMonths);
+  const label = period.isMonthView ? period.label : 'Acumulado UBY';
+  renderUbyFinancialOverview(sourceRows, sourceMonths, period.isMonthView, period.monthKey, label);
   renderMatrizCosts(unitData || []);
 }
 
@@ -9951,9 +9992,10 @@ async function renderUbyOperation() {
   const sourceIncluded = sourceRows.filter(row => row.included);
   const sourceUbyCharges = sourceIncluded.flatMap(row => row.charges);
   const sourceMonths = [...new Set(sourceUbyCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
-  const currentGeneralMonth = sourceMonths[sourceMonths.length - 1] || '';
-  const generalViewMode = document.getElementById('generalViewMode')?.value || 'month';
-  let isMonthView = generalViewMode !== 'accumulated' && !!currentGeneralMonth;
+  syncOverviewMonthOptions(overviewMonthKeys());
+  const selectedPeriod = selectedOverviewPeriod(sourceMonths);
+  const currentGeneralMonth = selectedPeriod.monthKey;
+  let isMonthView = selectedPeriod.isMonthView;
   let visibleRows = sourceRows.map(row => summarizeUbyChargerRow(
     row,
     isMonthView ? row.charges.filter(charge => chargeMonthKey(charge) === currentGeneralMonth) : row.charges
@@ -10001,7 +10043,7 @@ async function renderUbyOperation() {
   const lastPeriod = windows.length ? new Date(Math.max(...windows.map(window => window.end).filter(Boolean))) : lastDate;
   const viewLabel = monthFallbackToAccumulated
     ? `Acumulado UBY (sem recargas em ${monthLabel(currentGeneralMonth)})`
-    : (isMonthView ? `Mes atual (${monthLabel(currentGeneralMonth)})` : 'Acumulado UBY');
+    : (isMonthView ? selectedPeriod.label : 'Acumulado UBY');
   const occBand = occupationBand(totalOcc);
   const occClass = occBand.className;
   const occStatus = `${occBand.label}: ${occBand.range}`;
@@ -10284,9 +10326,11 @@ async function ensureAllOverviewSessionsLoaded() {
 }
 
 async function handleGeneralViewModeChange() {
-  if (document.getElementById('generalViewMode')?.value === 'accumulated') {
+  const view = document.getElementById('generalViewMode')?.value || 'month';
+  if (view === 'accumulated' || view.startsWith('month:')) {
     await ensureAllOverviewSessionsLoaded();
   }
+  syncOverviewMonthOptions();
   await renderVisibleOverviewViews();
 }
 
@@ -10295,9 +10339,10 @@ async function renderGeral() {
   const sourceUnitData = getGeneralUnitData();
   const sourceCharges = getAllGeneralCharges(sourceUnitData);
   const sourceMonths = [...new Set(sourceCharges.map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
-  const currentGeneralMonth = sourceMonths[sourceMonths.length - 1] || '';
-  const generalViewMode = document.getElementById('generalViewMode')?.value || 'month';
-  let isGeneralMonthView = generalViewMode !== 'accumulated' && !!currentGeneralMonth;
+  syncOverviewMonthOptions(sourceMonths);
+  const selectedPeriod = selectedOverviewPeriod(sourceMonths);
+  const currentGeneralMonth = selectedPeriod.monthKey;
+  let isGeneralMonthView = selectedPeriod.isMonthView;
   let unitData = isGeneralMonthView ? filterGeneralUnitDataByMonth(sourceUnitData, currentGeneralMonth) : sourceUnitData;
   const generalMonthFallbackToAccumulated = isGeneralMonthView && !getAllGeneralCharges(unitData).length && sourceCharges.length;
   if (generalMonthFallbackToAccumulated) {
@@ -10344,8 +10389,10 @@ async function renderGeral() {
   const lastPeriod = generalWindows.length ? new Date(Math.max(...generalWindows.map(window => window.end).filter(Boolean))) : lastDate;
   const viewLabel = generalMonthFallbackToAccumulated
     ? `Acumulado (sem recargas em ${monthLabel(currentGeneralMonth)})`
-    : (isGeneralMonthView ? `Mês atual (${monthLabel(currentGeneralMonth)})` : 'Acumulado');
-  const viewDetail = isGeneralMonthView ? 'ocupação calculada somente sobre o mês atual' : 'histórico completo das bases salvas';
+    : (isGeneralMonthView ? selectedPeriod.label : 'Acumulado');
+  const viewDetail = isGeneralMonthView
+    ? `ocupação calculada somente sobre ${selectedPeriod.isCurrentMonth ? 'o mês atual' : monthLabel(currentGeneralMonth)}`
+    : 'histórico completo das bases salvas';
 
   document.getElementById('generalHeroMeta').innerHTML = totalCharges
     ? `Visão: <strong>${viewLabel}</strong><br>Unidades com base: <strong>${units}</strong><br>Periodo: <strong>${fmtDT(firstPeriod)}</strong> ate <strong>${fmtDT(lastPeriod)}</strong><br>Meses consolidados: <strong>${isGeneralMonthView ? 1 : months.length}</strong>`
