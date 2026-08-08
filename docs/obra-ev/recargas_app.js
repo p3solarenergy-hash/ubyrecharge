@@ -3614,7 +3614,7 @@ function financeRuleReportItems(result = {}, settings = {}, type = 'cost') {
   const details = type === 'cost' ? (result.costRuleDetails || []) : (result.revenueRuleDetails || []);
   const items = details.filter(item => item.enabled !== false).map(item => ({
     id: item.id,
-    label: item.label || item.id || 'Item',
+    label: item.isMatrix ? `Matriz UBY - ${item.label || item.id || 'Custo compartilhado'}` : (item.label || item.id || 'Item'),
     rule: financeRuleDisplayValue(item),
     amount: Number(item.actual || 0),
     plannedAmount: Number(item.planned || 0),
@@ -3684,6 +3684,9 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
     targetOccPct: Number(settings.targetOccPct || 0),
     planningKWh: Number(result.planning?.planningKWh || 0),
     totalOperatingCost: Number(result.totalOperatingCost || 0),
+    localExtraCosts: Number(result.localExtraCosts || 0),
+    matrizCost: Number(result.matrizCost || 0),
+    matrizCostPerKWh: result.matrizCostPerKWh,
     management: Number(result.management || 0),
     ubyRoyalty: Number(result.ubyRoyalty || 0),
     operationNet: Number(result.operationNet || 0),
@@ -3711,10 +3714,11 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
 }
 
 function aggregateInvestorEntries(entries = [], investmentValue = null) {
-  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','management','ubyRoyalty','operationNet','paybackBase','saRetention','investorDistribution','partnerInvestorDistribution','finalDistribution','ubyRetained'];
+  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','management','ubyRoyalty','operationNet','paybackBase','saRetention','investorDistribution','partnerInvestorDistribution','finalDistribution','ubyRetained','localExtraCosts','matrizCost'];
   const total = numeric.reduce((acc, key) => ({ ...acc, [key]: entries.reduce((sum, entry) => sum + Number(entry[key] || 0), 0) }), {});
   total.occupancyPct = total.maxKWh > 0 ? total.energy / total.maxKWh * 100 : 0;
   total.totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
+  total.matrizCostPerKWh = total.energy > 0 ? total.matrizCost / total.energy : null;
   total.operationMargin = total.totalRevenue > 0 ? total.operationNet / total.totalRevenue * 100 : 0;
   total.investmentValue = investmentValue == null ? Number(entries.at(-1)?.investmentValue || 0) : Number(investmentValue || 0);
   total.paybackInvestmentValue = Number(entries.at(-1)?.paybackInvestmentValue || total.investmentValue || 0);
@@ -4614,7 +4618,14 @@ function updateFinanceRuleOutputs(result = {}) {
   renderDetails('revenue', result.revenueRuleDetails);
 
   const costTotal = document.getElementById('financeCostRuleTotals');
-  if (costTotal) costTotal.innerHTML = `<tr><td colspan="4">Custos diretos</td><td>${fmtBRL((result.energyCost || 0) + (result.extraCosts || 0))}</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td><td>${fmtPerKWh(result.directCostPerKWh)}</td><td></td><td></td><td></td></tr>`;
+  if (costTotal) {
+    const localCost = Number(result.energyCost || 0) + Number(result.localExtraCosts || 0);
+    const localPerKWh = Number(result.energy || 0) > 0 ? localCost / Number(result.energy || 0) : null;
+    costTotal.innerHTML = `
+      <tr><td colspan="4">Custos diretos locais (energia + itens)</td><td>${fmtBRL(localCost)}</td><td>-</td><td>${fmtPerKWh(localPerKWh)}</td><td></td><td></td><td></td></tr>
+      <tr class="finance-matrix-total"><td colspan="4">Rateio de custos da matriz UBY</td><td>${fmtBRL(result.matrizCost || 0)}</td><td>${fmtPerKWh(result.plannedMatrizCostPerKWh)}</td><td>${fmtPerKWh(result.matrizCostPerKWh)}</td><td></td><td></td><td></td></tr>
+      <tr><td colspan="4">Custos diretos totais</td><td>${fmtBRL(localCost + Number(result.matrizCost || 0))}</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td><td>${fmtPerKWh(result.directCostPerKWh)}</td><td></td><td></td><td></td></tr>`;
+  }
   const revenueTotal = document.getElementById('financeRevenueRuleTotals');
   if (revenueTotal) revenueTotal.innerHTML = `<tr><td colspan="4">Receitas adicionais</td><td>${fmtBRL(result.extraRevenue || 0)}</td><td>${fmtPerKWh(result.plannedExtraRevenuePerKWh)}</td><td>${fmtPerKWh(result.extraRevenuePerKWh)}</td><td></td><td></td><td></td></tr>`;
 
@@ -4631,14 +4642,14 @@ function renderFinanceOperationalResults(result = {}) {
   const resultClass = result.operationNet > 0 ? 'good' : (result.operationNet < 0 ? 'bad' : 'warn');
   const marginClass = result.margin >= 20 ? 'good' : (result.margin >= 0 ? 'warn' : 'bad');
   const matrizDetails = (result.costRuleDetails || [])
-    .filter(item => String(item?.id || '').startsWith('matriz-') && Number(item?.actual || 0) > 0)
+    .filter(item => (item?.isMatrix || String(item?.id || '').startsWith('matriz-')) && Number(item?.actual || 0) > 0)
     .map(item => `${item.label}: ${fmtBRL(item.actual)} (${fmtPerKWh(item.actualPerKWh)})`);
   const matrizSub = matrizDetails.length
     ? matrizDetails.join(' | ')
     : 'nenhum custo compartilhado rateado nesta competencia';
   container.innerHTML = `
     <div class="finance-result-card"><span>Custo operacional total</span><strong>${fmtBRL(result.totalOperatingCost || 0)}</strong><small>energia + itens + gestao P3 + plataforma</small></div>
-    <div class="finance-result-card"><span>Custos da matriz UBY</span><strong>${fmtBRL(result.matrizCost || 0)}</strong><small>${escapeHtml(matrizSub)}</small></div>
+    <div class="finance-result-card"><span>Custos da matriz UBY</span><strong>${fmtBRL(result.matrizCost || 0)}</strong><small>${fmtPerKWh(result.matrizCostPerKWh)} do custo por kWh | ${fmtPct(result.matrizCostRevenuePct || 0)} da receita</small><small>${escapeHtml(matrizSub)}</small></div>
     <div class="finance-result-card"><span>Custo efetivo por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>diluido pelos ${fmtKWh(result.energy || 0)} vendidos</small></div>
     <div class="finance-result-card"><span>Custo inicial por kWh</span><strong>${fmtPerKWh(result.plannedTotalCostPerKWh)}</strong><small>base: ${fmtKWh(result.planning?.planningKWh || 0)}</small></div>
     <div class="finance-result-card warn"><span>Ponto de equilibrio</span><strong>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</strong><small>${result.contributionPerKWh > 0 ? `${fmtPerKWh(result.contributionPerKWh)} de contribuicao` : 'preco de venda nao cobre os custos variaveis'}</small></div>
@@ -4752,9 +4763,11 @@ function financeForCharges(charges, settings = {}, options = {}) {
     planned: item.amount,
     actualPerKWh: planning.energy > 0 ? item.amount / planning.energy : null,
     plannedPerKWh: planning.planningKWh > 0 ? item.amount / planning.planningKWh : null,
-    displayRule: item.rule
+    displayRule: item.rule,
+    isMatrix: true
   }));
-  const extraCosts = costEvaluation.actual + matrizCost;
+  const localExtraCosts = costEvaluation.actual;
+  const extraCosts = localExtraCosts + matrizCost;
   const extraRevenue = revenueEvaluation.actual;
   const costs = energyCost + extraCosts;
   const preAreaNet = revenue + extraRevenue - management - platform - ubyRoyalty - costs;
@@ -4835,6 +4848,9 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const margin = revenue ? ownResult / revenue * 100 : 0;
   const totalRevenue = revenue + extraRevenue;
   const totalOperatingCost = energyCost + extraCosts + management + platform + ubyRoyalty + areaParticipation;
+  const matrizCostPerKWh = energy > 0 ? matrizCost / energy : null;
+  const plannedMatrizCostPerKWh = planning.planningKWh > 0 ? matrizCost / planning.planningKWh : null;
+  const matrizCostRevenuePct = revenue > 0 ? matrizCost / revenue * 100 : 0;
   const directCostPerKWh = energy > 0 ? (energyCost + extraCosts + areaParticipation) / energy : null;
   const totalCostPerKWh = energy > 0 ? totalOperatingCost / energy : null;
   const extraRevenuePerKWh = energy > 0 ? extraRevenue / energy : null;
@@ -4892,7 +4908,11 @@ function financeForCharges(charges, settings = {}, options = {}) {
     energyCost,
     energyRate: Number(cfg.energyCostPerKWh || 0),
     extraCosts,
+    localExtraCosts,
     matrizCost,
+    matrizCostPerKWh,
+    plannedMatrizCostPerKWh,
+    matrizCostRevenuePct,
     extraRevenue,
     preAreaNet,
     areaEligible,
@@ -5216,19 +5236,25 @@ function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
   return loadMatrizCosts().filter(item => matrizApplies(item, mk)).flatMap(item => {
     const targets = (item.targets || [])
       .filter(target => !target.startMonth || target.startMonth <= mk)
-      .map(target => ({ target, row: matrizResolveTargetRow(target, rows) }));
-    const activeTargets = targets.filter(entry => entry.row);
-    const direct = activeTargets.find(entry => matrizRowsMatch(entry.row, row))
-      || targets.find(entry => matrizTargetMatchesRow(entry.target, row));
+      .map(target => ({
+        target,
+        row: matrizResolveTargetRow(target, rows) || rows.find(candidate => matrizTargetMatchesRow(target, candidate)) || null
+      }));
+    // Evita que aliases antigos de conector contem duas vezes no denominador.
+    // A identidade economica do custo e a estacao na obra, nao o plug exportado.
+    const activeByScope = new Map();
+    targets.filter(entry => entry.row).forEach(entry => {
+      const scope = matrizStationScope(entry.row) || matrizScopeKey(entry.row);
+      if (!activeByScope.has(scope)) activeByScope.set(scope, entry);
+    });
+    const activeTargets = [...activeByScope.values()];
+    const direct = activeTargets.find(entry => matrizRowsMatch(entry.row, row));
     // Algumas plataformas trocam o identificador do conector entre exportacoes.
     // Quando ha somente um destino UBY na mesma obra, o rateio continua sendo
     // inequivoco mesmo se a chave antiga do conector nao existir mais.
     const sameWorkTargets = activeTargets.filter(entry => String(entry.row.workId || '') === String(row.workId || ''));
     const own = direct || (sameWorkTargets.length === 1 ? sameWorkTargets[0] : null);
-    if (!own || !targets.length) return [];
-    // Quando um destino antigo nao resolve pelo conector, ele ainda conta no
-    // denominador apenas se for identificavel por obra/estacao. Isso evita
-    // ratear valores para destinos inexistentes.
+    if (!own || !activeTargets.length) return [];
     const weighted = activeTargets.map(entry => ({ ...entry, weight: matrizWeight(entry.row, entry.target, item, mk) }));
     if (!weighted.length) return [];
     const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
@@ -5237,9 +5263,18 @@ function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
     return amount > 0 ? [{ id: item.id, label: item.name, amount, rule: `${matrizKindLabel(item.costKind)} | ${matrizMethodLabel(item.allocation)} | ${weighted.length} destino(s)` }] : [];
   });
 }
+function matrizRowForUnit(unit = {}, unitData = getGeneralUnitData()) {
+  const candidates = getUbyChargerRows(unitData)
+    .filter(row => row.included && String(row.workId || '') === String(unit.workId || ''));
+  if (!candidates.length) return null;
+  const station = safeText(unit.stationName || unit.station || unit.workName || '');
+  const direct = candidates.find(row => normalizeStationForCompare(row.station || row.stationName || '') === normalizeStationForCompare(station));
+  if (direct) return direct;
+  const matched = candidates.find(row => matrizTargetMatchesRow({ workId: unit.workId, station }, row));
+  return matched || (candidates.length === 1 ? candidates[0] : null);
+}
 function currentMatrizItems(mk = financeMonthKey()) {
-  const rows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.workId === currentWorkId && row.included);
-  const current = currentStationReportName ? rows.find(row => normalizeStationForCompare(row.station) === normalizeStationForCompare(currentStationReportName)) : rows[0];
+  const current = matrizRowForUnit({ workId: currentWorkId, stationName: currentStationReportName || '' });
   return current ? matrizCostItemsForRow(current, mk) : [];
 }
 function resetMatrizCostForm() {
@@ -5439,8 +5474,8 @@ function generalFinanceByUnit(unitData) {
       // da obra fazia o geral voltar para o modelo padrao e ignorar a escolha
       // salva para Sabara, Central JK e qualquer outra estacao individual.
       const settings = financeSettingsForUbyRow(unit, mk);
-      const matrixRow = getUbyChargerRows(unitData).find(row => row.workId === unit.workId && normalizeStationForCompare(row.station) === normalizeStationForCompare(unit.stationName || unit.workName));
-      const matrizCostItems = matrixRow?.included ? matrizCostItemsForRow(matrixRow, mk, unitData) : [];
+      const matrixRow = matrizRowForUnit(unit, unitData);
+      const matrizCostItems = matrixRow ? matrizCostItemsForRow(matrixRow, mk, unitData) : [];
       const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId), matrizCostItems });
       return { monthKey: mk, result };
     });
@@ -9797,6 +9832,10 @@ function renderCostTree(rows, matrizTotal) {
         ${rows.map(r => {
           const f = r.finance || {};
           const ops = Number(f.management || 0) + Math.max(0, Number(f.extraCosts || 0) - Number(f.matrizCost || 0));
+          const matrizShare = Number(f.matrizCost || 0);
+          const matrizImpact = matrizShare > 0
+            ? `${fmtBRL(matrizShare)} | ${fmtPerKWh(f.matrizCostPerKWh)}`
+            : fmtBRL(0);
           const res = Number(f.operationNet || 0);
           return `
           <div class="tree-branch">
@@ -9806,7 +9845,7 @@ function renderCostTree(rows, matrizTotal) {
               ${line('Faturamento', fmtBRL(Number(f.revenue || 0)), 'in')}
               ${line('− Energia', fmtBRL(Number(f.energyCost || 0)), 'out')}
               ${line('− Gestão / operação', fmtBRL(ops), 'out')}
-              ${line('− Fatia da matriz', fmtBRL(Number(f.matrizCost || 0)), 'out matriz')}
+              ${line('− Fatia da matriz', matrizImpact, 'out matriz')}
               ${line('= Resultado', fmtBRL(res), 'total ' + (res >= 0 ? 'pos' : 'neg'))}
             </div>
           </div>`;
