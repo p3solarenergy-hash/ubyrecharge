@@ -5024,6 +5024,24 @@ let matrizCostsSaveChain = Promise.resolve();
 let matrizEditingId = '';
 
 function matrizScopeKey(row = {}) { return `${String(row.workId || '')}::${String(row.key || normalizeStationForCompare(row.station || row.workName || ''))}`; }
+function matrizStationScope(row = {}) { return `${String(row.workId || '')}::${normalizeStationForCompare(row.station || row.stationName || row.workName || '')}`; }
+function matrizScopeCandidates(row = {}) {
+  return [...new Set([matrizScopeKey(row), matrizStationScope(row)].filter(scope => scope && scope !== '::'))];
+}
+function matrizRowsMatch(left = {}, right = {}) {
+  if (left === right) return true;
+  if (String(left.workId || '') !== String(right.workId || '')) return false;
+  return matrizScopeCandidates(left).some(scope => matrizScopeCandidates(right).includes(scope));
+}
+function matrizResolveTargetRow(scope, rows = []) {
+  const exact = rows.find(row => matrizScopeCandidates(row).includes(scope));
+  if (exact) return exact;
+  const workId = String(scope || '').split('::')[0];
+  const sameWork = rows.filter(row => String(row.workId || '') === workId);
+  // Old records could identify a connector instead of the station. If there is
+  // only one current UBY station in the work, it remains the correct target.
+  return sameWork.length === 1 ? sameWork[0] : null;
+}
 function matrizMonthOffset(start, target) {
   if (!/^\d{4}-\d{2}$/.test(String(start || '')) || !/^\d{4}-\d{2}$/.test(String(target || ''))) return -1;
   return (Number(target.slice(0, 4)) - Number(start.slice(0, 4))) * 12 + Number(target.slice(5, 7)) - Number(start.slice(5, 7));
@@ -5107,11 +5125,10 @@ function matrizWeight(row, target, item, mk) {
   return 1;
 }
 function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
-  const rows = new Map(getUbyChargerRows(unitData).filter(candidate => candidate.included).map(candidate => [matrizScopeKey(candidate), candidate]));
-  const ownScope = matrizScopeKey(row);
+  const rows = getUbyChargerRows(unitData).filter(candidate => candidate.included);
   return loadMatrizCosts().filter(item => matrizApplies(item, mk)).flatMap(item => {
-    const targets = (item.targets || []).filter(target => !target.startMonth || target.startMonth <= mk).map(target => ({ target, row: rows.get(target.scope) })).filter(entry => entry.row);
-    const own = targets.find(entry => entry.target.scope === ownScope);
+    const targets = (item.targets || []).filter(target => !target.startMonth || target.startMonth <= mk).map(target => ({ target, row: matrizResolveTargetRow(target.scope, rows) })).filter(entry => entry.row);
+    const own = targets.find(entry => matrizRowsMatch(entry.row, row));
     if (!own || !targets.length) return [];
     const weighted = targets.map(entry => ({ ...entry, weight: matrizWeight(entry.row, entry.target, item, mk) }));
     const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
@@ -5138,17 +5155,29 @@ function addMatrizCost() {
   const name = safeText(matrizInput('matrizNewName')?.value || '').trim();
   const amount = Math.max(0, Number(matrizInput('matrizNewValue')?.value || 0));
   if (!name || !amount) { setMatrizFeedback('Informe o nome e o valor de cada parcela ou competencia.', true); return; }
-  const allTargets = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included).map(matrizScopeKey);
+  const targetRows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
+  const allTargets = targetRows.map(matrizScopeKey);
   const targetIds = matrizSelectedTargets().length ? matrizSelectedTargets() : allTargets;
   if (!targetIds.length) { setMatrizFeedback('Selecione pelo menos um carregador de destino.', true); return; }
   const list = loadMatrizCosts();
   const previous = list.find(item => item.id === matrizEditingId);
   const existingTargets = new Map((previous?.targets || []).map(target => [target.scope, target]));
+  const existingTargetForScope = scope => {
+    if (existingTargets.has(scope)) return existingTargets.get(scope);
+    const currentRow = matrizResolveTargetRow(scope, targetRows);
+    return (previous?.targets || []).find(target => {
+      const priorRow = matrizResolveTargetRow(target.scope, targetRows);
+      return priorRow && currentRow && matrizRowsMatch(priorRow, currentRow);
+    });
+  };
   const shares = safeText(matrizInput('matrizCostCustomShares')?.value || '').split(/[;,]/).map(value => Math.max(0, Number(value.trim().replace(',', '.')) || 0));
   const startMonth = matrizInput('matrizCostStartMonth')?.value || financeMonthKey();
   const cost = matrizNormalizeCost({ ...previous, id: previous?.id || `m${Date.now().toString(36)}`, name, amount,
     category: matrizInput('matrizCostCategory')?.value || 'Outros custos', supplier: matrizInput('matrizCostSupplier')?.value || '', costKind: matrizInput('matrizCostKind')?.value || 'recurring', installments: matrizInput('matrizCostInstallments')?.value || 1, startMonth, endMonth: matrizInput('matrizCostEndMonth')?.value || '', dueDay: matrizInput('matrizCostDueDay')?.value || 1, allocation: matrizInput('matrizCostMethod')?.value || 'equal', documentRef: matrizInput('matrizCostDocument')?.value || '', notes: matrizInput('matrizCostNotes')?.value || '', enabled: true,
-    targets: targetIds.map((scope, index) => ({ scope, startMonth: existingTargets.get(scope)?.startMonth || startMonth, share: shares[index] || existingTargets.get(scope)?.share || 0 })), updatedAt: new Date().toISOString() });
+    targets: targetIds.map((scope, index) => {
+      const existing = existingTargetForScope(scope);
+      return { scope, startMonth: existing?.startMonth || startMonth, share: shares[index] || existing?.share || 0 };
+    }), updatedAt: new Date().toISOString() });
   if (previous) Object.assign(previous, cost); else list.push(cost);
   saveMatrizCosts(list); resetMatrizCostForm(); renderMatrizCosts(getGeneralUnitData());
   setMatrizFeedback(`Custo ${name} salvo. O rateio fica gravado por competencia e destino.`, false);
@@ -5158,7 +5187,13 @@ function editMatrizCost(id) {
   matrizEditingId = id;
   const values = { matrizNewName:item.name, matrizCostCategory:item.category, matrizCostSupplier:item.supplier, matrizCostKind:item.costKind, matrizNewValue:item.amount, matrizCostInstallments:item.installments, matrizCostStartMonth:item.startMonth, matrizCostEndMonth:item.endMonth, matrizCostDueDay:item.dueDay, matrizCostMethod:item.allocation, matrizCostDocument:item.documentRef, matrizCostNotes:item.notes, matrizCostCustomShares:item.targets.map(target => target.share || 0).join(', ') };
   Object.entries(values).forEach(([idValue, value]) => { const el = matrizInput(idValue); if (el) el.value = value ?? ''; });
-  const targets = matrizInput('matrizCostTargets'); if (targets) [...targets.options].forEach(option => { option.selected = item.targets.some(target => target.scope === option.value); });
+  const targets = matrizInput('matrizCostTargets'); if (targets) {
+    const rows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
+    [...targets.options].forEach(option => {
+      const row = matrizResolveTargetRow(option.value, rows);
+      option.selected = item.targets.some(target => matrizRowsMatch(matrizResolveTargetRow(target.scope, rows), row));
+    });
+  }
   const button = matrizInput('matrizSaveButton'); if (button) button.textContent = 'Salvar alteracao';
   setMatrizFeedback(`Editando ${item.name}. Destinos novos passam a valer da competencia atual para frente.`, false);
 }
@@ -5167,7 +5202,39 @@ function removeMatrizCost(id) {
   item.enabled = false; item.updatedAt = new Date().toISOString(); saveMatrizCosts(loadMatrizCosts()); renderMatrizCosts(getGeneralUnitData());
   setMatrizFeedback('Custo desativado. O historico anterior permanece preservado.', false);
 }
+function ensureMatrizCostEditor() {
+  if (matrizInput('matrizCostCategory')) return;
+  const list = matrizInput('matrizCostList');
+  const card = list?.closest('.card');
+  if (!card) return;
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <h2 style="margin:0">Custos da matriz UBY</h2>
+      <span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span>
+    </div>
+    <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:78ch">Cadastre despesas compartilhadas uma vez, defina parcelas, carregadores atendidos e a regra de rateio. Os destinos e a vigencia ficam guardados por competencia; adicionar um carregador novo nao reescreve meses anteriores.</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Despesa</th><th>Competencia</th><th>Rateio e destinos</th><th style="text-align:right">Valor desta competencia</th><th style="text-align:right">Acao</th></tr></thead><tbody id="matrizCostList"></tbody><tfoot id="matrizCostFoot"></tfoot></table></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:16px">
+      <label class="sub">NOME DO CUSTO<input id="matrizNewName" type="text" placeholder="Ex.: Seguro carregadores" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+      <label class="sub">CATEGORIA<select id="matrizCostCategory" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Seguro</option><option>Locacao / aluguel</option><option>Internet / dados</option><option>Manutencao preventiva</option><option>Manutencao corretiva</option><option>Licenca / plataforma</option><option>Marketing</option><option>Administrativo</option><option>Outros custos</option></select></label>
+      <label class="sub">FORNECEDOR OU DOCUMENTO<input id="matrizCostSupplier" type="text" placeholder="Ex.: Seguradora / boleto" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+      <label class="sub">TIPO DE COBRANCA<select id="matrizCostKind" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="recurring">Recorrente mensal</option><option value="installment">Parcelado</option><option value="one_off">Pontual</option></select></label>
+      <label class="sub">VALOR DE CADA PARCELA (R$)<input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Ex.: 526,24" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+      <label class="sub">NUMERO DE PARCELAS<input id="matrizCostInstallments" type="number" min="1" step="1" value="1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+      <label class="sub">MES INICIAL<input id="matrizCostStartMonth" type="month" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+      <label class="sub">MES FINAL (OPCIONAL)<input id="matrizCostEndMonth" type="month" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+      <label class="sub">DIA DE VENCIMENTO<input id="matrizCostDueDay" type="number" min="1" max="31" value="1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+      <label class="sub">CRITERIO DE RATEIO<select id="matrizCostMethod" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="equal">Rateio igual</option><option value="power">Por potencia instalada</option><option value="energy">Por kWh vendido</option><option value="revenue">Por faturamento</option><option value="custom">Participacao definida</option></select></label>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(260px,1fr) minmax(220px,1fr);gap:10px;margin-top:10px">
+      <label class="sub">CARREGADORES DE DESTINO (PODE SELECIONAR MAIS DE UM)<select id="matrizCostTargets" multiple size="5" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:8px;font:inherit"></select></label>
+      <div><input id="matrizCostCustomShares" type="text" placeholder="Participacoes: 50, 30, 20" style="width:100%;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><div class="sub" style="margin-top:6px">Use participacao definida somente se quiser percentuais personalizados na mesma ordem dos destinos. Nos outros metodos este campo e ignorado.</div><input id="matrizCostDocument" type="text" placeholder="Referencia do boleto ou documento" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><input id="matrizCostNotes" type="text" placeholder="Observacao" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px"><button id="matrizSaveButton" class="btn-open" type="button" onclick="addMatrizCost()">Adicionar custo</button><button class="btn-open" type="button" onclick="resetMatrizCostForm();renderMatrizCosts(getGeneralUnitData())">Limpar</button><span id="matrizFeedback" class="sub"></span></div>
+    <div id="matrizRateio" style="margin-top:18px"></div>`;
+}
 function renderMatrizCosts(unitData) {
+  ensureMatrizCostEditor();
   const listEl = matrizInput('matrizCostList'); if (!listEl) return;
   const mk = financeMonthKey() || getMonths().at(-1) || '';
   const rows = getUbyChargerRows(unitData).filter(row => row.included);
@@ -5178,7 +5245,7 @@ function renderMatrizCosts(unitData) {
     const parcel = matrizMonthOffset(item.startMonth, mk) + 1;
     const period = item.costKind === 'installment' ? `parcela ${Math.max(1, parcel)} de ${item.installments}` : item.costKind === 'one_off' ? 'lancamento unico' : 'recorrente mensal';
     const activeTargets = item.targets.filter(target => !target.startMonth || target.startMonth <= mk);
-    const targetNames = activeTargets.map(target => rows.find(row => matrizScopeKey(row) === target.scope)?.station || '').filter(Boolean);
+    const targetNames = activeTargets.map(target => matrizResolveTargetRow(target.scope, rows)?.station || '').filter(Boolean);
     return `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="sub">${escapeHtml(item.category)}${item.supplier ? ` | ${escapeHtml(item.supplier)}` : ''}${item.documentRef ? ` | ${escapeHtml(item.documentRef)}` : ''}</div></td><td>${escapeHtml(period)}<div class="sub">inicio ${item.startMonth ? monthLabel(item.startMonth) : '-'} | venc. dia ${item.dueDay}</div></td><td>${matrizMethodLabel(item.allocation)}<div class="sub">${targetNames.length ? escapeHtml(targetNames.join(' | ')) : `${activeTargets.length} destino(s) sem base ativa`}</div></td><td class="num" style="text-align:right">${matrizApplies(item, mk) ? fmtBRL(item.amount) : 'fora da competencia'}</td><td style="text-align:right"><button class="btn-open" type="button" onclick="editMatrizCost('${escapeAttr(item.id)}')">Editar</button> <button class="btn-open" type="button" onclick="removeMatrizCost('${escapeAttr(item.id)}')">Desativar</button></td></tr>`;
   }).join('') : '<tr><td colspan="5" style="color:var(--p3-muted);text-align:center;padding:16px">Nenhum custo compartilhado cadastrado.</td></tr>';
   const foot = matrizInput('matrizCostFoot'); if (foot) foot.innerHTML = `<tr style="font-weight:700"><td colspan="3">Programado em ${mk ? monthLabel(mk) : '-'}</td><td class="num" style="text-align:right">${fmtBRL(planned)}</td><td></td></tr>`;
