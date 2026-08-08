@@ -868,7 +868,7 @@
       <button class="tab" onclick="switchTab('geral',this)">Geral</button>
       <button class="tab" onclick="switchTab('clientes',this)">Clientes</button>
       <button class="tab" onclick="switchTab('clube',this)">Clube UBY</button>
-      <button class="tab" onclick="switchTab('financeiroGeral',this)">Financeiro geral</button>
+      <button class="tab" type="button" onclick="location.href='financeiro.html'">Financeiro UBY</button>
       <button class="tab" onclick="openUbyReports(this)">Relatorios</button>
     </div>
     <div class="controls" id="ctrlGeral">
@@ -1332,12 +1332,13 @@
       <div class="finance-section-head">
         <div>
           <h2>Resultado financeiro por carregador UBY</h2>
-          <p>Custos, receitas e resultado operacional calculados com as regras salvas em cada carregador. Abra o financeiro da unidade para editar os itens.</p>
+          <p>Custos, receitas e resultado operacional por carregador. Os custos compartilhados da matriz sao rateados aos destinos e entram no custo final por kWh.</p>
         </div>
         <span class="accountability-pill" id="ubyFinancePeriodLabel">Periodo atual</span>
       </div>
       <div class="uby-finance-summary" id="ubyFinanceSummary"></div>
       <div class="uby-finance-list" id="ubyFinanceRows"></div>
+      <div id="costTree" style="margin-top:16px"></div>
     </section>
 
     <section class="section"><div id="ubyDistribution"></div></section>
@@ -1359,16 +1360,16 @@
           </table>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:16px">
-          <input id="matrizNewName" type="text" placeholder="Nome do custo (ex.: Seguro frota)" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
-          <select id="matrizCostCategory" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Seguro</option><option>Locacao / aluguel</option><option>Internet / dados</option><option>Manutencao preventiva</option><option>Manutencao corretiva</option><option>Licenca / plataforma</option><option>Marketing</option><option>Administrativo</option><option>Outros custos</option></select>
-          <input id="matrizCostSupplier" type="text" placeholder="Fornecedor ou documento" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
-          <select id="matrizCostKind" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="recurring">Recorrente mensal</option><option value="installment">Parcelado</option><option value="one_off">Pontual</option></select>
-          <input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Valor de cada parcela R$" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
-          <input id="matrizCostInstallments" type="number" min="1" step="1" value="1" placeholder="Numero de parcelas" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
-          <input id="matrizCostStartMonth" type="month" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
-          <input id="matrizCostEndMonth" type="month" placeholder="Fim opcional" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
-          <input id="matrizCostDueDay" type="number" min="1" max="31" value="1" placeholder="Dia de vencimento" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
-          <select id="matrizCostMethod" style="background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="equal">Rateio igual</option><option value="power">Por potencia instalada</option><option value="energy">Por kWh vendido</option><option value="revenue">Por faturamento</option><option value="custom">Participacao definida</option></select>
+          <label class="sub">NOME DO CUSTO<input id="matrizNewName" type="text" placeholder="Ex.: Seguro carregadores" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">CATEGORIA<select id="matrizCostCategory" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Seguro</option><option>Locacao / aluguel</option><option>Internet / dados</option><option>Manutencao preventiva</option><option>Manutencao corretiva</option><option>Licenca / plataforma</option><option>Marketing</option><option>Administrativo</option><option>Outros custos</option></select></label>
+          <label class="sub">FORNECEDOR OU DOCUMENTO<input id="matrizCostSupplier" type="text" placeholder="Ex.: Seguradora / boleto" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">TIPO DE COBRANCA<select id="matrizCostKind" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="recurring">Recorrente mensal</option><option value="installment">Parcelado</option><option value="one_off">Pontual</option></select></label>
+          <label class="sub">VALOR DE CADA PARCELA (R$)<input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Ex.: 526,24" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">NUMERO DE PARCELAS<input id="matrizCostInstallments" type="number" min="1" step="1" value="1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">MES INICIAL<input id="matrizCostStartMonth" type="month" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">MES FINAL (OPCIONAL)<input id="matrizCostEndMonth" type="month" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">DIA DE VENCIMENTO<input id="matrizCostDueDay" type="number" min="1" max="31" value="1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">CRITERIO DE RATEIO<select id="matrizCostMethod" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="equal">Rateio igual</option><option value="power">Por potencia instalada</option><option value="energy">Por kWh vendido</option><option value="revenue">Por faturamento</option><option value="custom">Participacao definida</option></select></label>
         </div>
         <div style="display:grid;grid-template-columns:minmax(260px,1fr) minmax(220px,1fr);gap:10px;margin-top:10px">
           <label class="sub">Carregadores de destino (pode selecionar mais de um)<select id="matrizCostTargets" multiple size="5" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:8px;font:inherit"></select></label>
@@ -1497,8 +1498,8 @@
             <div class="brand-tag">P3 gestao, UBY ativos e investidores</div>
           </div>
         </div>
-        <h1>Financeiro Geral de Recargas</h1>
-        <div class="meta" id="generalFinanceHeroMeta">Consolidado financeiro das unidades com base salva.</div>
+        <h1>Financeiro UBY</h1>
+        <div class="meta" id="generalFinanceHeroMeta">Central financeira das unidades, ativos UBY, gestao P3 e investidores.</div>
       </div>
       <div class="formula" id="generalFinanceHeroFormula">A P3 cobra gestao sobre o faturamento; a UBY recebe o resultado operacional dos carregadores e repassa aos investidores conforme cotas.</div>
     </section>
@@ -1506,6 +1507,8 @@
     <section class="finance-overview-grid" id="generalFinanceOverview"></section>
 
     <section class="grid kpis" id="kpiGeneralFinance"></section>
+
+    <div id="ubyFinanceWorkspaceMount" aria-live="polite"></div>
 
     <section class="section" id="generalFinanceSection" style="margin-top:18px">
       <div class="card">
@@ -2030,11 +2033,11 @@
 <script src="supabase_config.js"></script>
 <script src="clube_uby_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_bridge.js?v=20260807-live-occupation1"></script>
+<script src="supabase_bridge.js?v=20260808-financial-matrix1"></script>
 <script src="recharge_runtime.js?v=20260716-architecture1"></script>
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260807-live-occupation1"></script>
+<script src="recargas_app.js?v=20260808-financial-matrix1"></script>
 </body>
 </html>

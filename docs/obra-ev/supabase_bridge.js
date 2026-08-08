@@ -523,6 +523,51 @@
     return { cloud: true, charges: Number(summary.charges || 0), metadataOnly: true };
   }
 
+  // Custos compartilhados nao pertencem a uma obra especifica. Manter essa
+  // matriz fora de obra_recargas_base evita violar a chave estrangeira de obras.
+  async function loadFinancialMatrix() {
+    const sb = client();
+    if (!sb) return null;
+    if (!(await currentUser())) return null;
+    const { data, error } = await sb
+      .from("uby_financial_matrix")
+      .select("id,payload,updated_at")
+      .eq("id", "shared-costs")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return {
+      matrizCosts: Array.isArray(data.payload?.matrizCosts) ? data.payload.matrizCosts : [],
+      updatedAt: data.updated_at
+    };
+  }
+
+  async function saveFinancialMatrix(matrizCosts = []) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre no Supabase antes de salvar a matriz financeira.");
+    const payload = { matrizCosts: Array.isArray(matrizCosts) ? matrizCosts : [] };
+    const { data, error } = await sb
+      .from("uby_financial_matrix")
+      .upsert({
+        id: "shared-costs",
+        payload,
+        updated_by: user.id,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "id" })
+      .select("id,updated_at")
+      .single();
+    if (error) throw error;
+    await insertAuditLog(sb, user, {
+      entidadeTipo: "uby_financial_matrix",
+      entidadeId: "shared-costs",
+      acao: "save_financial_matrix",
+      resumo: { costs: payload.matrizCosts.length }
+    });
+    return { cloud: true, updatedAt: data?.updated_at || null };
+  }
+
   async function clearRechargeBase(workId) {
     const sb = client();
     if (!sb) throw new Error("Supabase ainda nao configurado.");
@@ -875,6 +920,8 @@
     uploadDocumentFile,
     saveRechargeBase,
     saveRechargeMetadata,
+    loadFinancialMatrix,
+    saveFinancialMatrix,
     clearRechargeBase,
     loadRechargeBase,
     loadAllRechargeBases,

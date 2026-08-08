@@ -4588,8 +4588,15 @@ function renderFinanceOperationalResults(result = {}) {
   if (!container) return;
   const resultClass = result.operationNet > 0 ? 'good' : (result.operationNet < 0 ? 'bad' : 'warn');
   const marginClass = result.margin >= 20 ? 'good' : (result.margin >= 0 ? 'warn' : 'bad');
+  const matrizDetails = (result.costRuleDetails || [])
+    .filter(item => String(item?.id || '').startsWith('matriz-') && Number(item?.actual || 0) > 0)
+    .map(item => `${item.label}: ${fmtBRL(item.actual)} (${fmtPerKWh(item.actualPerKWh)})`);
+  const matrizSub = matrizDetails.length
+    ? matrizDetails.join(' | ')
+    : 'nenhum custo compartilhado rateado nesta competencia';
   container.innerHTML = `
     <div class="finance-result-card"><span>Custo operacional total</span><strong>${fmtBRL(result.totalOperatingCost || 0)}</strong><small>energia + itens + gestao P3 + plataforma</small></div>
+    <div class="finance-result-card"><span>Custos da matriz UBY</span><strong>${fmtBRL(result.matrizCost || 0)}</strong><small>${escapeHtml(matrizSub)}</small></div>
     <div class="finance-result-card"><span>Custo efetivo por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>diluido pelos ${fmtKWh(result.energy || 0)} vendidos</small></div>
     <div class="finance-result-card"><span>Custo inicial por kWh</span><strong>${fmtPerKWh(result.plannedTotalCostPerKWh)}</strong><small>base: ${fmtKWh(result.planning?.planningKWh || 0)}</small></div>
     <div class="finance-result-card warn"><span>Ponto de equilibrio</span><strong>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</strong><small>${result.contributionPerKWh > 0 ? `${fmtPerKWh(result.contributionPerKWh)} de contribuicao` : 'preco de venda nao cobre os custos variaveis'}</small></div>
@@ -5010,7 +5017,6 @@ function renderMatrizCostsLegacy(unitData) {
 // Shared-cost matrix v2. It preserves historical allocations by keeping each
 // selected target and its effective month on the cost record itself.
 const MATRIZ_COSTS_KEY = 'uby-matriz-costs-v2';
-const MATRIZ_STORE_WORK_ID = '__uby_matriz_financeira__';
 let matrizCostsState = [];
 let matrizCostsLoaded = false;
 let matrizCostsLoadPromise = null;
@@ -5050,7 +5056,9 @@ function saveMatrizCosts(list, options = {}) {
   try { localStorage.setItem(MATRIZ_COSTS_KEY, JSON.stringify(matrizCostsState)); } catch (_) {}
   if (options.remote !== false) persistMatrizCosts().catch(err => {
     console.warn('[matriz-save]', err);
-    setMatrizFeedback('Salvo neste navegador; a sincronizacao com a nuvem esta pendente.', true);
+    setMatrizFeedback(`Salvo neste navegador. Nuvem pendente: ${err?.message || 'erro de sincronizacao'}`, true);
+  }).then(result => {
+    if (result?.cloud) setMatrizFeedback('Matriz salva na nuvem e neste navegador.', false);
   });
   return matrizCostsState;
 }
@@ -5060,10 +5068,14 @@ async function ensureMatrizCostsLoaded() {
   matrizCostsLoadPromise = (async () => {
     loadMatrizCosts();
     try {
-      if (window.UBY_SUPABASE?.loadRechargeBase) {
-        const remote = await window.UBY_SUPABASE.loadRechargeBase(MATRIZ_STORE_WORK_ID);
-        const cloud = remote?.matrizCosts || remote?.summary?.matrizCosts;
-        if (Array.isArray(cloud)) saveMatrizCosts(cloud, { remote: false });
+      if (window.UBY_SUPABASE?.loadFinancialMatrix) {
+        const remote = await window.UBY_SUPABASE.loadFinancialMatrix();
+        if (remote && Array.isArray(remote.matrizCosts)) {
+          saveMatrizCosts(remote.matrizCosts, { remote: false });
+        } else if (matrizCostsState.length) {
+          // A primeira abertura apos a migracao promove a copia local para a nuvem.
+          await persistMatrizCosts();
+        }
       }
     } catch (err) { console.warn('[matriz-load]', err); }
     matrizCostsLoaded = true;
@@ -5072,11 +5084,9 @@ async function ensureMatrizCostsLoaded() {
   return matrizCostsLoadPromise;
 }
 function persistMatrizCosts() {
-  if (!window.UBY_SUPABASE?.saveRechargeMetadata) return Promise.resolve();
+  if (!window.UBY_SUPABASE?.saveFinancialMatrix) return Promise.reject(new Error('Sincronizacao da matriz financeira indisponivel.'));
   const snapshot = matrizCostsState.map(matrizNormalizeCost);
-  matrizCostsSaveChain = matrizCostsSaveChain.catch(() => {}).then(() => window.UBY_SUPABASE.saveRechargeMetadata(MATRIZ_STORE_WORK_ID, {
-    workId: MATRIZ_STORE_WORK_ID, workName: 'Matriz financeira UBY', matrizCosts: snapshot, summary: { matrizCosts: snapshot }
-  }));
+  matrizCostsSaveChain = matrizCostsSaveChain.catch(() => {}).then(() => window.UBY_SUPABASE.saveFinancialMatrix(snapshot));
   return matrizCostsSaveChain;
 }
 function matrizInput(id) { return document.getElementById(id); }
@@ -5355,6 +5365,7 @@ function renderGeneralFinance(unitData) {
   total.roiMonthly = total.paybackInvestmentValue > 0 ? total.paybackBase / total.paybackInvestmentValue * 100 : 0;
   const best = [...rows].sort((a, b) => financeUnitOutcome(b.finance).value - financeUnitOutcome(a.finance).value)[0];
   renderGeneralFinanceOverview(rows);
+  renderUbyFinanceWorkspace(unitData);
   const managementByMonth = new Map();
   rows.forEach(row => (row.financeMonths || []).forEach(({ monthKey, result }) => {
     if (!monthKey) return;
@@ -5426,6 +5437,33 @@ function renderGeneralFinance(unitData) {
     return `<tr><td>${monthLabel(item.monthKey)}</td><td>${fmtBRL(item.management)}</td><td>${fmtBRL(item.ubyRoyalty)}</td><td>${fmtBRL(item.p3SocietyProfit)}</td><td>${fmtBRL(p3Total)}</td><td>${item.units.size}</td></tr>`;
   }).join('') : '<tr><td colspan="6" style="color:var(--p3-muted);text-align:center;padding:20px">Sem competencias financeiras registradas</td></tr>';
   markOverviewRendered('financeiroGeral');
+}
+
+// Mantem a operacao UBY leve: controles de custos compartilhados e leitura
+// financeira ficam montados somente na aba Financeiro UBY.
+function mountUbyFinanceWorkspace() {
+  const mount = document.getElementById('ubyFinanceWorkspaceMount');
+  const overview = document.getElementById('ubyFinanceOverview');
+  const distribution = document.getElementById('ubyDistribution');
+  const matrixList = document.getElementById('matrizCostList');
+  if (!mount || !overview || !distribution || !matrixList) return false;
+  const blocks = [overview, distribution.closest('section'), matrixList.closest('section')].filter(Boolean);
+  blocks.forEach(block => {
+    if (block.parentElement !== mount) mount.appendChild(block);
+  });
+  return true;
+}
+
+function renderUbyFinanceWorkspace(unitData) {
+  if (!mountUbyFinanceWorkspace()) return;
+  const sourceRows = getUbyChargerRows(unitData || []);
+  const includedRows = sourceRows.filter(row => row.included);
+  const sourceMonths = [...new Set(includedRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
+  const selectedMonth = sourceMonths[sourceMonths.length - 1] || '';
+  const monthlyMode = (document.getElementById('generalViewMode')?.value || 'month') !== 'accumulated';
+  const label = monthlyMode && selectedMonth ? `Mes atual (${monthLabel(selectedMonth)})` : 'Acumulado UBY';
+  renderUbyFinancialOverview(sourceRows, sourceMonths, monthlyMode, selectedMonth, label);
+  renderMatrizCosts(unitData || []);
 }
 
 // ── Potência ──────────────────────────────────────────────
@@ -9690,7 +9728,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   if (rows.length && !Number.isFinite(totalCostPerKWh) && Number.isFinite(plannedCostPerKWh)) {
     rowsEl.insertAdjacentHTML('beforeend', `<div class="finance-empty-guidance">Ainda nao houve venda de energia neste periodo. O custo inicial planejado da operacao esta em <strong>${fmtPerKWh(plannedCostPerKWh)}</strong>.</div>`);
   }
-  try { renderCostTree(rows, matrizTotal); } catch (e) { console.error('[fin-tree]', e); }
+  try { renderCostTree(rows, total.matrizCost || 0); } catch (e) { console.error('[fin-tree]', e); }
   if (monthlySeries) { try { renderUbyFinanceMonthlyChart(monthlySeries); } catch (e) { console.error('[fin-monthly-chart]', e); } }
 }
 
@@ -9800,8 +9838,6 @@ async function renderUbyOperation() {
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
   const accessRows = [...visibleRows.filter(row => row.included)]
     .sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
-  renderUbyFinancialOverview(sourceRows, sourceMonths, isMonthView, currentGeneralMonth, viewLabel);
-  try { renderMatrizCosts(sourceUnitData); } catch (e) { console.error('[matriz]', e); }
   await yieldToBrowser();
   if (renderSequence !== overviewRenderSequence.uby || document.getElementById('tabUby').style.display === 'none') return;
   const chartLabels = chartRows.map(row => {
@@ -11092,6 +11128,8 @@ function renderDetalhes() {
 // ── Navegação de abas ─────────────────────────────────────
 function showTab(name) {
   if (window.UBY_FINANCE_ONLY) return; // página financeira dedicada não usa as abas operacionais
+  // Mantém a matriz e o consolidado fora do painel operacional desde a primeira abertura.
+  mountUbyFinanceWorkspace();
   const isGeneral = name === 'geral';
   const isUby = name === 'uby';
   const isCustomers = name === 'clientes';
@@ -11171,7 +11209,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260808-financial-matrix-v2';
+const UBY_APP_VERSION = '20260808-financial-matrix-cloud1';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
