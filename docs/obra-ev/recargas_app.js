@@ -5071,6 +5071,22 @@ function matrizResolveTargetRow(target, rows = []) {
   // only one current UBY station in the work, it remains the correct target.
   return sameWork.length === 1 ? sameWork[0] : null;
 }
+function matrizTargetMatchesRow(target, row = {}) {
+  if (!target || !row) return false;
+  const targetData = typeof target === 'string' ? { scope: target } : target;
+  const resolved = matrizResolveTargetRow(targetData, [row]);
+  if (resolved && matrizRowsMatch(resolved, row)) return true;
+
+  // O cadastro da matriz pode ter sido salvo antes de uma troca de plataforma
+  // ou de conector. Estacao + obra continuam sendo a identidade operacional
+  // correta para custos compartilhados, mesmo se a chave do plug mudou.
+  const targetStation = normalizeStationForCompare(targetData.station || targetData.stationName || targetData.stationKey || '');
+  const rowStation = normalizeStationForCompare(row.station || row.stationName || '');
+  if (targetStation && rowStation && targetStation === rowStation) return true;
+
+  const targetWorkId = String(targetData.workId || String(targetData.scope || '').split('::')[0] || '');
+  return !!targetWorkId && targetWorkId === String(row.workId || '') && !targetStation;
+}
 function matrizMonthOffset(start, target) {
   if (!/^\d{4}-\d{2}$/.test(String(start || '')) || !/^\d{4}-\d{2}$/.test(String(target || ''))) return -1;
   return (Number(target.slice(0, 4)) - Number(start.slice(0, 4))) * 12 + Number(target.slice(5, 7)) - Number(start.slice(5, 7));
@@ -5156,18 +5172,27 @@ function matrizWeight(row, target, item, mk) {
 function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
   const rows = getUbyChargerRows(unitData).filter(candidate => candidate.included);
   return loadMatrizCosts().filter(item => matrizApplies(item, mk)).flatMap(item => {
-    const targets = (item.targets || []).filter(target => !target.startMonth || target.startMonth <= mk).map(target => ({ target, row: matrizResolveTargetRow(target, rows) })).filter(entry => entry.row);
-    const direct = targets.find(entry => matrizRowsMatch(entry.row, row));
+    const targets = (item.targets || [])
+      .filter(target => !target.startMonth || target.startMonth <= mk)
+      .map(target => ({ target, row: matrizResolveTargetRow(target, rows) }));
+    const activeTargets = targets.filter(entry => entry.row);
+    const direct = activeTargets.find(entry => matrizRowsMatch(entry.row, row))
+      || targets.find(entry => matrizTargetMatchesRow(entry.target, row));
     // Algumas plataformas trocam o identificador do conector entre exportacoes.
     // Quando ha somente um destino UBY na mesma obra, o rateio continua sendo
     // inequivoco mesmo se a chave antiga do conector nao existir mais.
-    const sameWorkTargets = targets.filter(entry => String(entry.row.workId || '') === String(row.workId || ''));
+    const sameWorkTargets = activeTargets.filter(entry => String(entry.row.workId || '') === String(row.workId || ''));
     const own = direct || (sameWorkTargets.length === 1 ? sameWorkTargets[0] : null);
     if (!own || !targets.length) return [];
-    const weighted = targets.map(entry => ({ ...entry, weight: matrizWeight(entry.row, entry.target, item, mk) }));
+    // Quando um destino antigo nao resolve pelo conector, ele ainda conta no
+    // denominador apenas se for identificavel por obra/estacao. Isso evita
+    // ratear valores para destinos inexistentes.
+    const weighted = activeTargets.map(entry => ({ ...entry, weight: matrizWeight(entry.row, entry.target, item, mk) }));
+    if (!weighted.length) return [];
     const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
-    const amount = totalWeight > 0 ? Number(item.amount || 0) * own.weight / totalWeight : Number(item.amount || 0) / targets.length;
-    return amount > 0 ? [{ id: item.id, label: item.name, amount, rule: `${matrizKindLabel(item.costKind)} | ${matrizMethodLabel(item.allocation)} | ${targets.length} destino(s)` }] : [];
+    const ownWeight = own.row ? matrizWeight(own.row, own.target, item, mk) : matrizWeight(row, own.target, item, mk);
+    const amount = totalWeight > 0 ? Number(item.amount || 0) * ownWeight / totalWeight : Number(item.amount || 0) / weighted.length;
+    return amount > 0 ? [{ id: item.id, label: item.name, amount, rule: `${matrizKindLabel(item.costKind)} | ${matrizMethodLabel(item.allocation)} | ${weighted.length} destino(s)` }] : [];
   });
 }
 function currentMatrizItems(mk = financeMonthKey()) {
