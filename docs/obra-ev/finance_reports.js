@@ -292,7 +292,7 @@
         { value: count(current.charges), label: 'Recargas' },
         { value: count(current.clients), label: 'Clientes' },
         { value: perKwh(current.totalCostPerKWh), label: 'Custo efetivo por kWh' },
-        { value: perKwh(current.matrizCostPerKWh), label: 'Matriz UBY por kWh' },
+        { value: perKwh(current.matrizCostPerKWh), label: 'Matriz UBY por kWh (competencia)' },
         { value: pct(current.operationMargin), label: 'Margem operacional', className: current.operationMargin >= 0 ? 'positive' : 'negative' }
       ]) +
       '<div class="section"><div class="section-title"><h2>Resultado do periodo</h2><span>Receitas, custos e distribuicao</span></div><div class="split"><div class="panel"><h3>Demonstrativo</h3><table><tbody>' +
@@ -301,7 +301,8 @@
       '<tr class="total-row"><td>Receitas totais</td><td class="value">' + esc(brl(current.totalRevenue)) + '</td></tr>' +
       '<tr><td>Gestao P3</td><td class="value">' + esc(brl(current.management)) + '</td></tr>' +
       (thirdPartyManagement ? '<tr><td>Royalty de marca UBY</td><td class="value">' + esc(brl(current.ubyRoyalty)) + '</td></tr>' : '') +
-      '<tr><td>Custos compartilhados da matriz UBY</td><td class="value">' + esc(brl(current.matrizCost)) + ' <small>(' + esc(perKwh(current.matrizCostPerKWh)) + ')</small></td></tr>' +
+      '<tr><td>Custos compartilhados da matriz UBY (competencia)</td><td class="value">' + esc(brl(current.matrizCost)) + ' <small>(' + esc(perKwh(current.matrizCostPerKWh)) + ')</small></td></tr>' +
+      '<tr><td>Parcelas da matriz no caixa</td><td class="value">' + esc(brl(current.matrizCash || 0)) + ' <small>(nao altera a competencia)</small></td></tr>' +
       '<tr><td>Custos operacionais (inclui matriz)</td><td class="value">' + esc(brl(current.totalOperatingCost)) + '</td></tr>' +
       '<tr class="total-row"><td>Resultado operacional</td><td class="value">' + esc(brl(current.operationNet)) + '</td></tr>' +
       '</tbody></table></div><div class="panel"><h3>Indicadores de capital</h3><table><tbody>' +
@@ -325,8 +326,9 @@
         { value: brl(accumulated.operationNet), label: 'Resultado acumulado', className: accumulated.operationNet >= 0 ? 'positive' : 'negative' },
         { value: pct(accumulated.occupancyPct), label: 'Ocupacao media ponderada' },
         { value: perKwh(accumulated.totalCostPerKWh), label: 'Custo medio acumulado' },
-        { value: brl(accumulated.matrizCost), label: 'Matriz UBY acumulada' },
+        { value: brl(accumulated.matrizCost), label: 'Matriz UBY acumulada (competencia)' },
         { value: perKwh(accumulated.matrizCostPerKWh), label: 'Matriz UBY media por kWh' },
+        { value: brl(accumulated.matrizCash || 0), label: 'Parcelas matriz acumuladas no caixa' },
         { value: pct(accumulated.operationMargin), label: 'Margem acumulada' },
         { value: brl(capital.distribution), label: externalSociety ? 'Distribuicao acumulada ao socio investidor' : ((current.operationModel === 'management_only' || thirdPartyManagement) ? 'Lucro acumulado distribuido ao parceiro' : 'Distribuicao acumulada aos investidores'), className: capital.distribution >= 0 ? 'positive' : 'negative' },
         { value: brl(capital.recovered), label: 'Resultado recuperado no payback', className: capital.recovered >= 0 ? 'positive' : 'negative' },

@@ -3686,6 +3686,7 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
     totalOperatingCost: Number(result.totalOperatingCost || 0),
     localExtraCosts: Number(result.localExtraCosts || 0),
     matrizCost: Number(result.matrizCost || 0),
+    matrizCash: Number(result.matrizCash || 0),
     matrizCostPerKWh: result.matrizCostPerKWh,
     management: Number(result.management || 0),
     ubyRoyalty: Number(result.ubyRoyalty || 0),
@@ -3714,7 +3715,7 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
 }
 
 function aggregateInvestorEntries(entries = [], investmentValue = null) {
-  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','management','ubyRoyalty','operationNet','paybackBase','saRetention','investorDistribution','partnerInvestorDistribution','finalDistribution','ubyRetained','localExtraCosts','matrizCost'];
+  const numeric = ['revenue','extraRevenue','totalRevenue','energy','charges','clients','maxKWh','totalOperatingCost','management','ubyRoyalty','operationNet','paybackBase','saRetention','investorDistribution','partnerInvestorDistribution','finalDistribution','ubyRetained','localExtraCosts','matrizCost','matrizCash'];
   const total = numeric.reduce((acc, key) => ({ ...acc, [key]: entries.reduce((sum, entry) => sum + Number(entry[key] || 0), 0) }), {});
   total.occupancyPct = total.maxKWh > 0 ? total.energy / total.maxKWh * 100 : 0;
   total.totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
@@ -4188,6 +4189,8 @@ function generateCurrentFinanceReportLegacy() {
     </tbody></table>
     <h2>Custos</h2><table><thead><tr><th>Item</th><th>Regra</th><th>Valor do mes</th><th>R$/kWh</th></tr></thead><tbody>
       <tr><td>Energia eletrica</td><td>${fmtBRL(settings.energyCostPerKWh)}/kWh</td><td>${fmtBRL(result.energyCost)}</td><td>${fmtPerKWh(settings.energyCostPerKWh)}</td></tr>${financeReportRuleRows(result.costRuleDetails, 'Sem custos adicionais')}
+      <tr><td>Custos da matriz UBY</td><td>Competencia compartilhada</td><td>${fmtBRL(result.matrizCost || 0)}</td><td>${fmtPerKWh(result.matrizCostPerKWh)}</td></tr>
+      <tr><td>Parcelas da matriz no caixa</td><td>Pagamento programado</td><td>${fmtBRL(result.matrizCash || 0)}</td><td><small>nao altera a competencia</small></td></tr>
       <tr><td>Gestao P3</td><td>${fmtPct(settings.managementPct)} do faturamento</td><td>${fmtBRL(result.management)}</td><td>${fmtPerKWh(result.energy > 0 ? result.management / result.energy : null)}</td></tr>
       <tr><td>App / plataforma</td><td>${fmtPct(settings.platformPct)} do faturamento</td><td>${fmtBRL(result.platform)}</td><td>${fmtPerKWh(result.energy > 0 ? result.platform / result.energy : null)}</td></tr>
       ${result.areaEligible ? `<tr><td>Participacao da area</td><td>${fmtPct(result.areaSharePct)} sobre ${settings.ownerTransferMode === 'net' ? 'lucro liquido' : 'faturamento'}</td><td>${fmtBRL(result.areaParticipation)}</td><td>${fmtPerKWh(result.energy > 0 ? result.areaParticipation / result.energy : null)}</td></tr>` : ''}
@@ -4623,7 +4626,7 @@ function updateFinanceRuleOutputs(result = {}) {
     const localPerKWh = Number(result.energy || 0) > 0 ? localCost / Number(result.energy || 0) : null;
     costTotal.innerHTML = `
       <tr><td colspan="4">Custos diretos locais (energia + itens)</td><td>${fmtBRL(localCost)}</td><td>-</td><td>${fmtPerKWh(localPerKWh)}</td><td></td><td></td><td></td></tr>
-      <tr class="finance-matrix-total"><td colspan="4">Rateio de custos da matriz UBY</td><td>${fmtBRL(result.matrizCost || 0)}</td><td>${fmtPerKWh(result.plannedMatrizCostPerKWh)}</td><td>${fmtPerKWh(result.matrizCostPerKWh)}</td><td></td><td></td><td></td></tr>
+      <tr class="finance-matrix-total"><td colspan="4">Rateio da matriz UBY (competencia${Number(result.matrizCash || 0) ? ` | caixa ${fmtBRL(result.matrizCash)}` : ''})</td><td>${fmtBRL(result.matrizCost || 0)}</td><td>${fmtPerKWh(result.plannedMatrizCostPerKWh)}</td><td>${fmtPerKWh(result.matrizCostPerKWh)}</td><td></td><td></td><td></td></tr>
       <tr><td colspan="4">Custos diretos totais</td><td>${fmtBRL(localCost + Number(result.matrizCost || 0))}</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td><td>${fmtPerKWh(result.directCostPerKWh)}</td><td></td><td></td><td></td></tr>`;
   }
   const revenueTotal = document.getElementById('financeRevenueRuleTotals');
@@ -4649,7 +4652,7 @@ function renderFinanceOperationalResults(result = {}) {
     : 'nenhum custo compartilhado rateado nesta competencia';
   container.innerHTML = `
     <div class="finance-result-card"><span>Custo operacional total</span><strong>${fmtBRL(result.totalOperatingCost || 0)}</strong><small>energia + itens + gestao P3 + plataforma</small></div>
-    <div class="finance-result-card"><span>Custos da matriz UBY</span><strong>${fmtBRL(result.matrizCost || 0)}</strong><small>${fmtPerKWh(result.matrizCostPerKWh)} do custo por kWh | ${fmtPct(result.matrizCostRevenuePct || 0)} da receita</small><small>${escapeHtml(matrizSub)}</small></div>
+    <div class="finance-result-card"><span>Custos da matriz UBY (competencia)</span><strong>${fmtBRL(result.matrizCost || 0)}</strong><small>${fmtPerKWh(result.matrizCostPerKWh)} do custo por kWh | ${fmtPct(result.matrizCostRevenuePct || 0)} da receita</small><small>${Number(result.matrizCash || 0) ? `Caixa programado no mes: ${fmtBRL(result.matrizCash)}` : 'Sem parcela de matriz a pagar no caixa neste mes'}</small><small>${escapeHtml(matrizSub)}</small></div>
     <div class="finance-result-card"><span>Custo efetivo por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>diluido pelos ${fmtKWh(result.energy || 0)} vendidos</small></div>
     <div class="finance-result-card"><span>Custo inicial por kWh</span><strong>${fmtPerKWh(result.plannedTotalCostPerKWh)}</strong><small>base: ${fmtKWh(result.planning?.planningKWh || 0)}</small></div>
     <div class="finance-result-card warn"><span>Ponto de equilibrio</span><strong>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</strong><small>${result.contributionPerKWh > 0 ? `${fmtPerKWh(result.contributionPerKWh)} de contribuicao` : 'preco de venda nao cobre os custos variaveis'}</small></div>
@@ -4749,10 +4752,13 @@ function financeForCharges(charges, settings = {}, options = {}) {
       id: String(item?.id || `matriz-${Math.random().toString(36).slice(2)}`),
       label: safeText(item?.label || item?.name || 'Custo da matriz'),
       amount: Math.max(0, Number(item?.amount || 0)),
+      cashAmount: Math.max(0, Number(item?.cashAmount || 0)),
+      coverageMonths: Math.max(1, Number(item?.coverageMonths || 1)),
       rule: safeText(item?.rule || 'Rateio da matriz')
     }))
     .filter(item => item.amount > 0);
   const matrizCost = matrizCostItems.reduce((sum, item) => sum + item.amount, 0);
+  const matrizCash = matrizCostItems.reduce((sum, item) => sum + item.cashAmount, 0);
   const matrizCostDetails = matrizCostItems.map(item => ({
     id: `matriz-${item.id}`,
     label: item.label,
@@ -4761,6 +4767,8 @@ function financeForCharges(charges, settings = {}, options = {}) {
     value: item.amount,
     actual: item.amount,
     planned: item.amount,
+    cashAmount: item.cashAmount,
+    coverageMonths: item.coverageMonths,
     actualPerKWh: planning.energy > 0 ? item.amount / planning.energy : null,
     plannedPerKWh: planning.planningKWh > 0 ? item.amount / planning.planningKWh : null,
     displayRule: item.rule,
@@ -4910,6 +4918,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     extraCosts,
     localExtraCosts,
     matrizCost,
+    matrizCash,
     matrizCostPerKWh,
     plannedMatrizCostPerKWh,
     matrizCostRevenuePct,
@@ -5153,33 +5162,74 @@ function matrizMonthOffset(start, target) {
   if (!/^\d{4}-\d{2}$/.test(String(start || '')) || !/^\d{4}-\d{2}$/.test(String(target || ''))) return -1;
   return (Number(target.slice(0, 4)) - Number(start.slice(0, 4))) * 12 + Number(target.slice(5, 7)) - Number(start.slice(5, 7));
 }
+function matrizAddMonths(mk, amount = 0) {
+  if (!/^\d{4}-\d{2}$/.test(String(mk || ''))) return '';
+  const index = Number(mk.slice(0, 4)) * 12 + Number(mk.slice(5, 7)) - 1 + Number(amount || 0);
+  return `${Math.floor(index / 12)}-${String(index % 12 + 1).padStart(2, '0')}`;
+}
 function matrizMethodLabel(method) { return ({ equal: 'Rateio igual', power: 'Por potencia', energy: 'Por kWh', revenue: 'Por faturamento', custom: 'Participacao definida' })[method] || 'Rateio igual'; }
 function matrizKindLabel(kind) { return ({ recurring: 'Recorrente', installment: 'Parcelado', one_off: 'Pontual' })[kind] || 'Recorrente'; }
 function matrizNormalizeCost(raw = {}) {
+  const costKind = ['recurring', 'installment', 'one_off'].includes(raw.costKind) ? raw.costKind : 'recurring';
+  const installments = Math.max(1, Number(raw.installments || 1));
+  // Custos parcelados podem cobrir mais meses do que parcelas. A competencia
+  // reconhece o total contratado durante a cobertura; o caixa segue as parcelas.
+  const coverageMonths = Math.max(1, Number(raw.coverageMonths || raw.competenceMonths || (costKind === 'installment' ? installments : 1)));
   const oldTargets = Array.isArray(raw.targetIds) ? raw.targetIds : [];
   const targets = Array.isArray(raw.targets) && raw.targets.length ? raw.targets : oldTargets.map(scope => ({ scope, startMonth: raw.startMonth || '', share: raw.customShares?.[scope] || 0 }));
   return {
     id: String(raw.id || `m${Date.now().toString(36)}`), name: safeText(raw.name || raw.nome || 'Custo sem nome'),
     category: safeText(raw.category || 'Outros custos'), supplier: safeText(raw.supplier || ''),
-    costKind: ['recurring', 'installment', 'one_off'].includes(raw.costKind) ? raw.costKind : 'recurring',
-    amount: Math.max(0, Number(raw.amount ?? raw.valor ?? 0)), installments: Math.max(1, Number(raw.installments || 1)),
+    costKind,
+    amount: Math.max(0, Number(raw.amount ?? raw.valor ?? 0)), installments, coverageMonths,
     startMonth: String(raw.startMonth || raw.effectiveMonth || ''), endMonth: String(raw.endMonth || ''), dueDay: Math.min(31, Math.max(1, Number(raw.dueDay || 1))),
     allocation: ['equal', 'power', 'energy', 'revenue', 'custom'].includes(raw.allocation) ? raw.allocation : 'equal',
     targets: targets.map(target => ({ scope: String(target.scope || ''), workId: String(target.workId || String(target.scope || '').split('::')[0] || ''), station: safeText(target.station || target.stationName || ''), stationKey: normalizeStationForCompare(target.stationKey || target.station || target.stationName || ''), workName: safeText(target.workName || ''), startMonth: String(target.startMonth || raw.startMonth || ''), share: Math.max(0, Number(target.share || 0)) })).filter(target => target.scope || (target.workId && target.stationKey)),
-    documentRef: safeText(raw.documentRef || ''), notes: safeText(raw.notes || ''), enabled: raw.enabled !== false && raw.ativo !== false,
+    documentRef: safeText(raw.documentRef || ''), notes: safeText(raw.notes || ''),
+    // Evita reaplicar migrações automáticas quando o usuário editar o custo.
+    accrualVersion: Math.max(0, Number(raw.accrualVersion || 0)), enabled: raw.enabled !== false && raw.ativo !== false,
     createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || new Date().toISOString()
   };
+}
+function matrizApplyLegacyCoveragePolicy(list = []) {
+  let changed = false;
+  const costs = list.map(matrizNormalizeCost).map(item => {
+    const normalizedName = String(item.name || '').trim().toLocaleLowerCase('pt-BR');
+    // Cadastro criado antes do controle de competência: quatro boletos do seguro
+    // cobrem doze meses e não devem pesar integralmente nos primeiros quatro.
+    const isLegacyInsurance = normalizedName === 'seguro carregadores'
+      && item.accrualVersion < 1
+      && item.costKind === 'recurring'
+      && Math.abs(Number(item.amount || 0) - 526.24) < 0.02;
+    if (!isLegacyInsurance) return item;
+    changed = true;
+    return {
+      ...item,
+      costKind: 'installment',
+      installments: 4,
+      coverageMonths: 12,
+      accrualVersion: 1,
+      updatedAt: new Date().toISOString()
+    };
+  });
+  return { costs, changed };
 }
 function loadMatrizCosts() {
   if (matrizCostsState.length) return matrizCostsState;
   try { matrizCostsState = (JSON.parse(localStorage.getItem(MATRIZ_COSTS_KEY) || '[]') || []).map(matrizNormalizeCost); } catch (_) { matrizCostsState = []; }
   if (!matrizCostsState.length) matrizCostsState = loadMatrizCostsLegacy().map(matrizNormalizeCost);
+  const migration = matrizApplyLegacyCoveragePolicy(matrizCostsState);
+  matrizCostsState = migration.costs;
+  if (migration.changed) {
+    try { localStorage.setItem(MATRIZ_COSTS_KEY, JSON.stringify(matrizCostsState)); } catch (_) {}
+  }
   return matrizCostsState;
 }
 function saveMatrizCosts(list, options = {}) {
-  matrizCostsState = (Array.isArray(list) ? list : []).map(matrizNormalizeCost);
+  const migration = matrizApplyLegacyCoveragePolicy(Array.isArray(list) ? list : []);
+  matrizCostsState = migration.costs;
   try { localStorage.setItem(MATRIZ_COSTS_KEY, JSON.stringify(matrizCostsState)); } catch (_) {}
-  if (options.remote !== false) persistMatrizCosts().catch(err => {
+  if (options.remote !== false || migration.changed) persistMatrizCosts().catch(err => {
     console.warn('[matriz-save]', err);
     setMatrizFeedback(`Salvo neste navegador. Nuvem pendente: ${err?.message || 'erro de sincronizacao'}`, true);
   }).then(result => {
@@ -5216,12 +5266,28 @@ function persistMatrizCosts() {
 }
 function matrizInput(id) { return document.getElementById(id); }
 function matrizSelectedTargets() { return [...(matrizInput('matrizCostTargets')?.selectedOptions || [])].map(option => option.value).filter(Boolean); }
+function matrizCoverageMonths(item = {}) {
+  return Math.max(1, Number(item.coverageMonths || (item.costKind === 'installment' ? item.installments : 1)));
+}
+function matrizCompetencyAmount(item = {}) {
+  if (item.costKind === 'installment') {
+    return Math.max(0, Number(item.amount || 0)) * Math.max(1, Number(item.installments || 1)) / matrizCoverageMonths(item);
+  }
+  return Math.max(0, Number(item.amount || 0));
+}
+function matrizCashAmount(item = {}, mk = '') {
+  const offset = matrizMonthOffset(item.startMonth || mk, mk);
+  if (offset < 0) return 0;
+  if (item.costKind === 'one_off') return offset === 0 ? Math.max(0, Number(item.amount || 0)) : 0;
+  if (item.costKind === 'installment') return offset < Math.max(1, Number(item.installments || 1)) ? Math.max(0, Number(item.amount || 0)) : 0;
+  return (!item.endMonth || mk <= item.endMonth) ? Math.max(0, Number(item.amount || 0)) : 0;
+}
 function matrizApplies(item, mk) {
   if (!item?.enabled || !mk) return false;
   const offset = matrizMonthOffset(item.startMonth || mk, mk);
   if (offset < 0 || (item.endMonth && mk > item.endMonth)) return false;
   if (item.costKind === 'one_off') return offset === 0;
-  return item.costKind !== 'installment' || offset < Number(item.installments || 1);
+  return item.costKind !== 'installment' || offset < matrizCoverageMonths(item);
 }
 function matrizWeight(row, target, item, mk) {
   if (item.allocation === 'custom') return Number(target.share || 0);
@@ -5259,8 +5325,14 @@ function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
     if (!weighted.length) return [];
     const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
     const ownWeight = own.row ? matrizWeight(own.row, own.target, item, mk) : matrizWeight(row, own.target, item, mk);
-    const amount = totalWeight > 0 ? Number(item.amount || 0) * ownWeight / totalWeight : Number(item.amount || 0) / weighted.length;
-    return amount > 0 ? [{ id: item.id, label: item.name, amount, rule: `${matrizKindLabel(item.costKind)} | ${matrizMethodLabel(item.allocation)} | ${weighted.length} destino(s)` }] : [];
+    const competencyAmount = matrizCompetencyAmount(item);
+    const cashAmount = matrizCashAmount(item, mk);
+    const amount = totalWeight > 0 ? competencyAmount * ownWeight / totalWeight : competencyAmount / weighted.length;
+    const cashShare = totalWeight > 0 ? cashAmount * ownWeight / totalWeight : cashAmount / weighted.length;
+    const coverage = item.costKind === 'installment'
+      ? `${item.installments} parcela(s) | cobertura ${matrizCoverageMonths(item)} mes(es)`
+      : matrizKindLabel(item.costKind);
+    return amount > 0 ? [{ id: item.id, label: item.name, amount, cashAmount: cashShare, coverageMonths: matrizCoverageMonths(item), rule: `${coverage} | ${matrizMethodLabel(item.allocation)} | ${weighted.length} destino(s)` }] : [];
   });
 }
 function matrizRowForUnit(unit = {}, unitData = getGeneralUnitData()) {
@@ -5284,6 +5356,7 @@ function resetMatrizCostForm() {
   const kind = matrizInput('matrizCostKind'); if (kind) kind.value = 'recurring';
   const method = matrizInput('matrizCostMethod'); if (method) method.value = 'equal';
   const installments = matrizInput('matrizCostInstallments'); if (installments) installments.value = 1;
+  const coverage = matrizInput('matrizCostCoverageMonths'); if (coverage) coverage.value = 1;
   const due = matrizInput('matrizCostDueDay'); if (due) due.value = 1;
   const button = matrizInput('matrizSaveButton'); if (button) button.textContent = 'Adicionar custo';
 }
@@ -5309,7 +5382,7 @@ function addMatrizCost() {
   const shares = safeText(matrizInput('matrizCostCustomShares')?.value || '').split(/[;,]/).map(value => Math.max(0, Number(value.trim().replace(',', '.')) || 0));
   const startMonth = matrizInput('matrizCostStartMonth')?.value || financeMonthKey();
   const cost = matrizNormalizeCost({ ...previous, id: previous?.id || `m${Date.now().toString(36)}`, name, amount,
-    category: matrizInput('matrizCostCategory')?.value || 'Outros custos', supplier: matrizInput('matrizCostSupplier')?.value || '', costKind: matrizInput('matrizCostKind')?.value || 'recurring', installments: matrizInput('matrizCostInstallments')?.value || 1, startMonth, endMonth: matrizInput('matrizCostEndMonth')?.value || '', dueDay: matrizInput('matrizCostDueDay')?.value || 1, allocation: matrizInput('matrizCostMethod')?.value || 'equal', documentRef: matrizInput('matrizCostDocument')?.value || '', notes: matrizInput('matrizCostNotes')?.value || '', enabled: true,
+    category: matrizInput('matrizCostCategory')?.value || 'Outros custos', supplier: matrizInput('matrizCostSupplier')?.value || '', costKind: matrizInput('matrizCostKind')?.value || 'recurring', installments: matrizInput('matrizCostInstallments')?.value || 1, coverageMonths: matrizInput('matrizCostCoverageMonths')?.value || 1, startMonth, endMonth: matrizInput('matrizCostEndMonth')?.value || '', dueDay: matrizInput('matrizCostDueDay')?.value || 1, allocation: matrizInput('matrizCostMethod')?.value || 'equal', documentRef: matrizInput('matrizCostDocument')?.value || '', notes: matrizInput('matrizCostNotes')?.value || '', enabled: true,
     targets: targetIds.map((scope, index) => {
       const existing = existingTargetForScope(scope);
       const row = matrizResolveTargetRow(scope, targetRows);
@@ -5322,7 +5395,7 @@ function addMatrizCost() {
 function editMatrizCost(id) {
   const item = loadMatrizCosts().find(cost => cost.id === id); if (!item) return;
   matrizEditingId = id;
-  const values = { matrizNewName:item.name, matrizCostCategory:item.category, matrizCostSupplier:item.supplier, matrizCostKind:item.costKind, matrizNewValue:item.amount, matrizCostInstallments:item.installments, matrizCostStartMonth:item.startMonth, matrizCostEndMonth:item.endMonth, matrizCostDueDay:item.dueDay, matrizCostMethod:item.allocation, matrizCostDocument:item.documentRef, matrizCostNotes:item.notes, matrizCostCustomShares:item.targets.map(target => target.share || 0).join(', ') };
+  const values = { matrizNewName:item.name, matrizCostCategory:item.category, matrizCostSupplier:item.supplier, matrizCostKind:item.costKind, matrizNewValue:item.amount, matrizCostInstallments:item.installments, matrizCostCoverageMonths:matrizCoverageMonths(item), matrizCostStartMonth:item.startMonth, matrizCostEndMonth:item.endMonth, matrizCostDueDay:item.dueDay, matrizCostMethod:item.allocation, matrizCostDocument:item.documentRef, matrizCostNotes:item.notes, matrizCostCustomShares:item.targets.map(target => target.share || 0).join(', ') };
   Object.entries(values).forEach(([idValue, value]) => { const el = matrizInput(idValue); if (el) el.value = value ?? ''; });
   const targets = matrizInput('matrizCostTargets'); if (targets) {
     const rows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
@@ -5366,6 +5439,7 @@ function ensureMatrizCostEditor() {
       <label class="sub">TIPO DE COBRANCA<select id="matrizCostKind" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="recurring">Recorrente mensal</option><option value="installment">Parcelado</option><option value="one_off">Pontual</option></select></label>
       <label class="sub">VALOR DE CADA PARCELA (R$)<input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Ex.: 526,24" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
       <label class="sub">NUMERO DE PARCELAS<input id="matrizCostInstallments" type="number" min="1" step="1" value="1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+      <label class="sub">MESES DE COBERTURA (DRE)<input id="matrizCostCoverageMonths" type="number" min="1" step="1" value="1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
       <label class="sub">MES INICIAL<input id="matrizCostStartMonth" type="month" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
       <label class="sub">MES FINAL (OPCIONAL)<input id="matrizCostEndMonth" type="month" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
       <label class="sub">DIA DE VENCIMENTO<input id="matrizCostDueDay" type="number" min="1" max="31" value="1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
@@ -5375,6 +5449,7 @@ function ensureMatrizCostEditor() {
       <label class="sub">CARREGADORES DE DESTINO (PODE SELECIONAR MAIS DE UM)<select id="matrizCostTargets" multiple size="5" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:8px;font:inherit"></select></label>
       <div><input id="matrizCostCustomShares" type="text" placeholder="Participacoes: 50, 30, 20" style="width:100%;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><div class="sub" style="margin-top:6px">Use participacao definida somente se quiser percentuais personalizados na mesma ordem dos destinos. Nos outros metodos este campo e ignorado.</div><input id="matrizCostDocument" type="text" placeholder="Referencia do boleto ou documento" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><input id="matrizCostNotes" type="text" placeholder="Observacao" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></div>
     </div>
+    <div class="sub" style="margin-top:12px;max-width:88ch">Para um seguro pago em 4 parcelas que cobre 12 meses, informe <b>4 parcelas</b> e <b>12 meses de cobertura</b>. O resultado e o custo por kWh reconhecem o total contratado dividido pelos 12 meses; o caixa mostra a parcela somente nos quatro meses de pagamento.</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px"><button id="matrizSaveButton" class="btn-open" type="button" onclick="addMatrizCost()">Adicionar custo</button><button class="btn-open" type="button" onclick="resetMatrizCostForm();renderMatrizCosts(getGeneralUnitData())">Limpar</button><span id="matrizFeedback" class="sub"></span></div>
     <div id="matrizRateio" style="margin-top:18px"></div>`;
 }
@@ -5384,15 +5459,19 @@ function renderMatrizCosts(unitData) {
   const mk = financeMonthKey() || getMonths().at(-1) || '';
   const rows = getUbyChargerRows(unitData).filter(row => row.included);
   const costs = loadMatrizCosts();
-  const planned = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const planned = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + matrizCompetencyAmount(item), 0);
   const monthEl = matrizInput('matrizMonthLabel'); if (monthEl) monthEl.textContent = mk ? `competencia ${monthLabel(mk)} | cadastro salvo separadamente das recargas` : 'selecione a competencia';
   listEl.innerHTML = costs.length ? costs.map(item => {
     const parcel = matrizMonthOffset(item.startMonth, mk) + 1;
-    const period = item.costKind === 'installment' ? `parcela ${Math.max(1, parcel)} de ${item.installments}` : item.costKind === 'one_off' ? 'lancamento unico' : 'recorrente mensal';
+    const period = item.costKind === 'installment' ? `parcela ${Math.max(1, parcel)} de ${item.installments} | cobertura ${matrizCoverageMonths(item)} mes(es)` : item.costKind === 'one_off' ? 'lancamento unico' : 'recorrente mensal';
     const activeTargets = item.targets.filter(target => !target.startMonth || target.startMonth <= mk);
     const targetNames = activeTargets.map(target => matrizResolveTargetRow(target, rows)?.station || target.station || '').filter(Boolean);
-    const allocated = rows.reduce((sum, row) => sum + matrizCostItemsForRow(row, mk, unitData).filter(cost => cost.id === item.id).reduce((subtotal, cost) => subtotal + Number(cost.amount || 0), 0), 0);
-    return `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="sub">${escapeHtml(item.category)}${item.supplier ? ` | ${escapeHtml(item.supplier)}` : ''}${item.documentRef ? ` | ${escapeHtml(item.documentRef)}` : ''}</div></td><td>${escapeHtml(period)}<div class="sub">inicio ${item.startMonth ? monthLabel(item.startMonth) : '-'} | venc. dia ${item.dueDay}</div></td><td>${matrizMethodLabel(item.allocation)}<div class="sub">${targetNames.length ? escapeHtml(targetNames.join(' | ')) : `${activeTargets.length} destino(s) sem base ativa`}</div></td><td class="num" style="text-align:right">${matrizApplies(item, mk) ? `${fmtBRL(item.amount)}<div class="sub">rateado: ${fmtBRL(allocated)}</div>` : 'fora da competencia'}</td><td style="text-align:right"><button class="btn-open" type="button" onclick="editMatrizCost('${escapeAttr(item.id)}')">Editar</button> <button class="btn-open" type="button" onclick="removeMatrizCost('${escapeAttr(item.id)}')">Desativar</button> <button class="btn-danger" type="button" onclick="deleteMatrizCost('${escapeAttr(item.id)}')">Excluir</button></td></tr>`;
+    const allocations = rows.flatMap(row => matrizCostItemsForRow(row, mk, unitData).filter(cost => cost.id === item.id));
+    const allocated = allocations.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+    const cashAllocated = allocations.reduce((sum, cost) => sum + Number(cost.cashAmount || 0), 0);
+    const competency = matrizCompetencyAmount(item);
+    const cash = matrizCashAmount(item, mk);
+    return `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="sub">${escapeHtml(item.category)}${item.supplier ? ` | ${escapeHtml(item.supplier)}` : ''}${item.documentRef ? ` | ${escapeHtml(item.documentRef)}` : ''}</div></td><td>${escapeHtml(period)}<div class="sub">inicio ${item.startMonth ? monthLabel(item.startMonth) : '-'} | venc. dia ${item.dueDay}</div></td><td>${matrizMethodLabel(item.allocation)}<div class="sub">${targetNames.length ? escapeHtml(targetNames.join(' | ')) : `${activeTargets.length} destino(s) sem base ativa`}</div></td><td class="num" style="text-align:right">${matrizApplies(item, mk) ? `competencia: ${fmtBRL(competency)}<div class="sub">caixa: ${fmtBRL(cash)} | rateado: ${fmtBRL(allocated)}${cashAllocated ? ` | caixa rateado: ${fmtBRL(cashAllocated)}` : ''}</div>` : 'fora da competencia'}</td><td style="text-align:right"><button class="btn-open" type="button" onclick="editMatrizCost('${escapeAttr(item.id)}')">Editar</button> <button class="btn-open" type="button" onclick="removeMatrizCost('${escapeAttr(item.id)}')">Desativar</button> <button class="btn-danger" type="button" onclick="deleteMatrizCost('${escapeAttr(item.id)}')">Excluir</button></td></tr>`;
   }).join('') : '<tr><td colspan="5" style="color:var(--p3-muted);text-align:center;padding:16px">Nenhum custo compartilhado cadastrado.</td></tr>';
   const foot = matrizInput('matrizCostFoot'); if (foot) foot.innerHTML = `<tr style="font-weight:700"><td colspan="3">Programado em ${mk ? monthLabel(mk) : '-'}</td><td class="num" style="text-align:right">${fmtBRL(planned)}</td><td></td></tr>`;
   const targets = matrizInput('matrizCostTargets');
@@ -5431,32 +5510,39 @@ function renderMatrizMonthlyDre(rows = [], activeMonth = '') {
   const costs = loadMatrizCosts();
   const chargeMonths = rows.flatMap(row => (row.charges || []).map(chargeMonthKey)).filter(mk => mk !== 'unknown');
   const starts = costs.map(item => item.startMonth).filter(mk => /^\d{4}-\d{2}$/.test(mk));
-  const candidates = [...new Set([...chargeMonths, ...starts, activeMonth].filter(mk => /^\d{4}-\d{2}$/.test(mk)))].sort();
+  // Mantem visiveis todos os meses de cobertura do custo parcelado, inclusive
+  // depois que a ultima parcela sair do caixa.
+  const coverageEnds = costs
+    .filter(item => item.costKind === 'installment' && item.startMonth)
+    .map(item => matrizAddMonths(item.startMonth, matrizCoverageMonths(item) - 1));
+  const candidates = [...new Set([...chargeMonths, ...starts, ...coverageEnds, activeMonth].filter(mk => /^\d{4}-\d{2}$/.test(mk)))].sort();
   if (!candidates.length) {
     host.innerHTML = '<h2 style="margin:0 0 6px">DRE mensal da matriz</h2><p class="sub">Cadastre um custo da matriz ou selecione uma competencia para visualizar o rateio mensal.</p>';
     return;
   }
   const months = matrizMonthSequence(candidates[0], candidates[candidates.length - 1]);
   const series = months.map(mk => {
-    const programmed = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const competency = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + matrizCompetencyAmount(item), 0);
+    const cash = costs.reduce((sum, item) => sum + matrizCashAmount(item, mk), 0);
     const allocated = rows.reduce((sum, row) => sum + matrizCostItemsForRow(row, mk).reduce((partial, item) => partial + Number(item.amount || 0), 0), 0);
-    return { mk, programmed, allocated, pending: Math.max(programmed - allocated, 0) };
+    return { mk, competency, cash, allocated, pending: Math.max(competency - allocated, 0) };
   });
-  const totals = series.reduce((sum, row) => ({ programmed: sum.programmed + row.programmed, allocated: sum.allocated + row.allocated, pending: sum.pending + row.pending }), { programmed: 0, allocated: 0, pending: 0 });
-  const max = Math.max(1, ...series.map(row => row.programmed));
+  const totals = series.reduce((sum, row) => ({ competency: sum.competency + row.competency, cash: sum.cash + row.cash, allocated: sum.allocated + row.allocated, pending: sum.pending + row.pending }), { competency: 0, cash: 0, allocated: 0, pending: 0 });
+  const max = Math.max(1, ...series.map(row => row.competency));
   host.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><h2 style="margin:0">DRE mensal da matriz</h2><span class="sub">custos programados, rateados e pendentes</span></div>
-    <p class="sub" style="margin:6px 0 16px;max-width:78ch">Este demonstrativo registra o custo compartilhado por competencia. O valor rateado e enviado para o resultado financeiro de cada carregador de destino.</p>
-    <div style="display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px;margin-bottom:16px">
-      <div class="finance-result-card"><span>Programado</span><strong>${fmtBRL(totals.programmed)}</strong><small>soma das competencias exibidas</small></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><h2 style="margin:0">DRE mensal da matriz</h2><span class="sub">competencia, caixa, rateio e pendencias</span></div>
+    <p class="sub" style="margin:6px 0 16px;max-width:78ch">A competencia entra no resultado e no custo por kWh dos carregadores. O caixa mostra somente as parcelas com vencimento no mes; ele nao altera o resultado contabil da competencia.</p>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;margin-bottom:16px">
+      <div class="finance-result-card"><span>Competencia reconhecida</span><strong>${fmtBRL(totals.competency)}</strong><small>soma dos custos pelo periodo de cobertura</small></div>
       <div class="finance-result-card"><span>Rateado aos carregadores</span><strong style="color:var(--p3-ok)">${fmtBRL(totals.allocated)}</strong><small>incluido nos custos individuais</small></div>
+      <div class="finance-result-card"><span>Caixa programado</span><strong style="color:var(--p3-primary)">${fmtBRL(totals.cash)}</strong><small>parcelas com vencimento nas competencias</small></div>
       <div class="finance-result-card"><span>Pendente de rateio</span><strong style="color:${totals.pending > 0 ? 'var(--p3-warn)' : 'var(--p3-ok)'}">${fmtBRL(totals.pending)}</strong><small>${totals.pending > 0 ? 'revise os destinos do custo' : 'todos os custos possuem destino'}</small></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
       ${series.map(row => {
-        const width = Math.max(3, row.programmed / max * 100);
-        const allocatedWidth = row.programmed ? row.allocated / row.programmed * 100 : 0;
-        return `<article style="background:var(--p3-card-soft);border:1px solid var(--p3-border);border-radius:8px;padding:14px"><strong>${escapeHtml(monthLabel(row.mk))}</strong><div style="display:flex;justify-content:space-between;gap:8px;margin-top:10px"><span class="sub">Programado</span><b>${fmtBRL(row.programmed)}</b></div><div style="height:7px;background:var(--p3-track);border-radius:999px;margin:7px 0 11px"><span style="display:block;height:100%;width:${width.toFixed(1)}%;background:var(--p3-primary);border-radius:inherit"></span></div><div style="display:flex;justify-content:space-between;gap:8px"><span class="sub">Rateado</span><b style="color:var(--p3-ok)">${fmtBRL(row.allocated)}</b></div><div class="sub" style="margin-top:6px;color:${row.pending > 0 ? 'var(--p3-warn)' : 'var(--p3-muted)'}">${row.pending > 0 ? `Pendente: ${fmtBRL(row.pending)} (${fmtPct(100 - allocatedWidth)})` : 'Rateio completo'}</div></article>`;
+        const width = Math.max(3, row.competency / max * 100);
+        const allocatedWidth = row.competency ? row.allocated / row.competency * 100 : 0;
+        return `<article style="background:var(--p3-card-soft);border:1px solid var(--p3-border);border-radius:8px;padding:14px"><strong>${escapeHtml(monthLabel(row.mk))}</strong><div style="display:flex;justify-content:space-between;gap:8px;margin-top:10px"><span class="sub">Competencia</span><b>${fmtBRL(row.competency)}</b></div><div style="height:7px;background:var(--p3-track);border-radius:999px;margin:7px 0 11px"><span style="display:block;height:100%;width:${width.toFixed(1)}%;background:var(--p3-primary);border-radius:inherit"></span></div><div style="display:flex;justify-content:space-between;gap:8px"><span class="sub">Caixa (parcelas)</span><b style="color:var(--p3-primary)">${fmtBRL(row.cash)}</b></div><div style="display:flex;justify-content:space-between;gap:8px;margin-top:6px"><span class="sub">Rateado</span><b style="color:var(--p3-ok)">${fmtBRL(row.allocated)}</b></div><div class="sub" style="margin-top:6px;color:${row.pending > 0 ? 'var(--p3-warn)' : 'var(--p3-muted)'}">${row.pending > 0 ? `Pendente: ${fmtBRL(row.pending)} (${fmtPct(100 - allocatedWidth)})` : 'Rateio completo'}</div></article>`;
       }).join('')}
     </div>`;
 }
