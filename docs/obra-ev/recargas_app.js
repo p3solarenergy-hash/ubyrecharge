@@ -7203,6 +7203,23 @@ function clientDisplayName(charge = {}) {
   return safeText(charge.userName || charge.userEmail || 'Cliente sem nome').trim();
 }
 
+function rechargeSourcePlatform(charge = {}) {
+  const direct = safeText(charge.sourcePlatform || charge.platform).trim();
+  if (direct) return direct;
+
+  const fileKey = safeText(charge._fileKey).trim();
+  const fileName = safeText(charge._file).trim();
+  const importedFile = loadedFiles.find(file =>
+    (fileKey && file?.fileKey === fileKey) ||
+    (!fileKey && fileName && file?.name === fileName)
+  );
+  return safeText(importedFile?.sourcePlatform).trim();
+}
+
+function isSpottRecharge(charge = {}) {
+  return normalizeHeaderName(rechargeSourcePlatform(charge)) === 'spott';
+}
+
 function recurringAbsentClients(charges = [], recentDays = 7, minSessions = 2) {
   const valid = charges
     .filter(isExecutedCharge)
@@ -7275,8 +7292,9 @@ function renderOperationQuality(prefix = 'usage', charges = []) {
 function renderAbsentClientAlerts(prefix = 'usage', charges = []) {
   const el = document.getElementById(`${prefix}AbsentClients`);
   if (!el) return;
-  const absent = recurringAbsentClients(charges, 7, 2);
-  const activeRecurring = clientRecurrenceStats(charges.filter(isExecutedCharge));
+  const spottCharges = charges.filter(isSpottRecharge);
+  const absent = recurringAbsentClients(spottCharges, 7, 2);
+  const activeRecurring = clientRecurrenceStats(spottCharges.filter(isExecutedCharge));
   const topLines = absent.slice(0, 8).map(client => `
     <div class="metric-line">
       <strong>${escapeHtml(client.name.split(' ').slice(0, 2).join(' '))}</strong>
@@ -7286,12 +7304,12 @@ function renderAbsentClientAlerts(prefix = 'usage', charges = []) {
   `).join('');
   el.innerHTML = `
     <div class="metric-strip">
-      <div class="metric-mini ${absent.length ? 'warn' : 'good'}"><span>Recorrentes ausentes</span><strong>${absent.length}</strong><span>clientes sem uso nos últimos 7 dias</span></div>
-      <div class="metric-mini"><span>Base recorrente</span><strong>${activeRecurring.recurring}</strong><span>${fmtPct(activeRecurring.pct)} dos clientes já voltaram</span></div>
-      <div class="metric-mini"><span>Critério</span><strong>2+</strong><span>recargas válidas no histórico</span></div>
+      <div class="metric-mini ${absent.length ? 'warn' : 'good'}"><span>Recorrentes ausentes</span><strong>${absent.length}</strong><span>clientes Spott sem uso nos últimos 7 dias</span></div>
+      <div class="metric-mini"><span>Base recorrente Spott</span><strong>${activeRecurring.recurring}</strong><span>${fmtPct(activeRecurring.pct)} dos clientes já voltaram</span></div>
+      <div class="metric-mini"><span>Critério</span><strong>2+</strong><span>recargas Spott válidas no histórico</span></div>
     </div>
-    <div class="note">${absent.length ? 'Use esta lista para acionar clientes que já tinham hábito de uso e pararam recentemente.' : 'Nenhum cliente recorrente relevante sumiu nos últimos 7 dias da base.'}</div>
-    <div class="metric-lines">${topLines || '<div class="metric-line"><strong>OK</strong><span>Clientes recorrentes continuam aparecendo no período recente.</span><b class="good">0</b></div>'}</div>
+    <div class="note">${spottCharges.length ? (absent.length ? 'Lista calculada somente pelas planilhas Spott para evitar falso ausente quando o mesmo cliente aparece com outro cadastro na Move.' : 'Nenhum cliente recorrente da base Spott deixou de aparecer nos últimos 7 dias.') : 'Ainda não há recargas Spott no histórico para calcular ausências.'}</div>
+    <div class="metric-lines">${topLines || '<div class="metric-line"><strong>OK</strong><span>Clientes recorrentes Spott continuam aparecendo no período recente.</span><b class="good">0</b></div>'}</div>
   `;
 }
 
