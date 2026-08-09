@@ -153,6 +153,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .c-byd{background:rgba(79,163,255,.15);color:var(--blue)}
 .c-geely{background:rgba(29,233,128,.15);color:var(--green)}
 .c-gm{background:rgba(255,140,66,.15);color:var(--orange)}
+.c-gac{background:rgba(183,121,255,.15);color:#c28cff}
+.c-leap{background:rgba(0,229,196,.15);color:var(--teal)}
 .c-outros{background:rgba(138,149,168,.12);color:var(--muted2)}
 .nc{font-weight:800;font-size:13px;text-align:right;color:var(--text)}
 .bar-r{display:flex;align-items:center;gap:8px;min-width:100px}
@@ -344,7 +346,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <!-- Chart mensal -->
     <div class="card">
       <div class="ch">
-        <div><div class="ct">Emplacamentos Mensais — 2026</div><div class="cs">Total eletrificados · BEV puro · Share de mercado até jun/26</div></div>
+        <div><div class="ct">Emplacamentos Mensais — 2026</div><div class="cs">Total eletrificados e BEV puro · fechamento ABVE até jul/26 · share geral até jun/26</div></div>
         <span class="tag blue">ABVE fechado até julho</span>
       </div>
       <div class="cb"><canvas id="cMensal" height="230"></canvas></div>
@@ -375,23 +377,25 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <!-- Ranking 2026 -->
   <div class="g3r">
     <div class="col">
-      <!-- Market share donut 2026 -->
+      <!-- Concentração de marca no último ranking BEV detalhado fechado -->
       <div class="card">
-        <div class="ch"><div><div class="ct">Market share BEV — 1º trimestre 2026</div><div class="cs">Por fabricante · ranking BEV</div></div></div>
+        <div class="ch"><div><div class="ct">Marcas no Top 10 BEV — jun/2026</div><div class="cs">Participação entre os 10 modelos BEV mais emplacados do mês</div></div></div>
         <div class="cb">
           <div class="dw">
             <div class="dc"><canvas id="cMarca" width="140" height="140"></canvas></div>
             <div class="lg">
-              <div class="li"><div class="ld" style="background:var(--blue)"></div><span class="ll">BYD</span><span class="lv">69,4%</span></div>
-              <div class="li"><div class="ld" style="background:var(--green)"></div><span class="ll">Geely</span><span class="lv">10,1%</span></div>
-              <div class="li"><div class="ld" style="background:var(--orange)"></div><span class="ll">GM</span><span class="lv">5,4%</span></div>
-              <div class="li"><div class="ld" style="background:rgba(148,163,184,.3)"></div><span class="ll">Outros</span><span class="lv">15,1%</span></div>
+              <div class="li"><div class="ld" style="background:var(--blue)"></div><span class="ll">BYD</span><span class="lv">64,5%</span></div>
+              <div class="li"><div class="ld" style="background:var(--green)"></div><span class="ll">Geely</span><span class="lv">22,8%</span></div>
+              <div class="li"><div class="ld" style="background:var(--orange)"></div><span class="ll">Chevrolet</span><span class="lv">4,0%</span></div>
+              <div class="li"><div class="ld" style="background:#c28cff"></div><span class="ll">GAC</span><span class="lv">4,7%</span></div>
+              <div class="li"><div class="ld" style="background:var(--teal)"></div><span class="ll">Leapmotor</span><span class="lv">2,7%</span></div>
+              <div class="li"><div class="ld" style="background:rgba(148,163,184,.55)"></div><span class="ll">GWM</span><span class="lv">1,3%</span></div>
             </div>
           </div>
           <div class="div"></div>
           <div class="alert i" style="margin-bottom:0">
             <div class="ai">📈</div>
-            <div><div class="at">BYD lidera, Geely pressiona no acesso</div><div class="ab">Dolphin Mini e Dolphin mantêm a BYD dominante, mas o <strong>EX2 já entrou no top 3</strong> e virou o principal sinal competitivo no segmento de entrada.</div></div>
+            <div><div class="at">BYD lidera, mas o pódio ficou mais competitivo</div><div class="ab">No Top 10 BEV fechado de junho, a BYD concentra <strong>64,5%</strong>; o <strong>Geely EX2</strong> soma 4.383 unidades e GAC e Leapmotor já colocam quatro modelos no ranking.</div></div>
           </div>
         </div>
       </div>
@@ -400,7 +404,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <!-- Tabela ranking -->
     <div class="card">
       <div class="ch">
-        <div><div class="ct">Ranking BEV — 1º trimestre 2026</div><div class="cs">Apenas veículos 100% elétricos · Fonte: ABVE / Canal VE</div></div>
+        <div><div class="ct">Ranking BEV — junho/2026</div><div class="cs">Top 10 de veículos 100% elétricos · último ranking detalhado fechado por modelo</div></div>
       </div>
       <div class="cb0">
         <table>
@@ -413,57 +417,71 @@ tr:hover td{background:rgba(255,255,255,.02)}
               <td class="rk">🥇</td>
               <td><div class="mn">Dolphin Mini</div></td>
               <td><span class="chip c-byd">BYD</span></td>
-              <td class="nc">14.757</td>
-              <td><div class="bar-r"><div class="pct">47,6%</div><div class="br"><div class="bf" style="width:100%;background:linear-gradient(90deg,var(--blue),var(--teal))"></div></div></div></td>
+              <td class="nc">6.457</td>
+              <td><div class="bar-r"><div class="pct">33,7%</div><div class="br"><div class="bf" style="width:100%;background:linear-gradient(90deg,var(--blue),var(--teal))"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">🥈</td>
               <td><div class="mn">Dolphin</div></td>
               <td><span class="chip c-byd">BYD</span></td>
-              <td class="nc">4.381</td>
-              <td><div class="bar-r"><div class="pct">14,1%</div><div class="br"><div class="bf" style="width:30%;background:var(--blue)"></div></div></div></td>
+              <td class="nc">5.512</td>
+              <td><div class="bar-r"><div class="pct">28,7%</div><div class="br"><div class="bf" style="width:85%;background:var(--blue)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">🥉</td>
-              <td><div class="mn">EX2<span class="new-badge">↑ Surpresa</span></div><div class="msub">Geely entrou forte no top 3</div></td>
+              <td><div class="mn">EX2<span class="new-badge">Top 3</span></div><div class="msub">Geely mantém forte presença no acesso</div></td>
               <td><span class="chip c-geely">Geely</span></td>
-              <td class="nc">2.474</td>
-              <td><div class="bar-r"><div class="pct">8,0%</div><div class="br"><div class="bf" style="width:17%;background:var(--green)"></div></div></div></td>
+              <td class="nc">4.383</td>
+              <td><div class="bar-r"><div class="pct">22,8%</div><div class="br"><div class="bf" style="width:68%;background:var(--green)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">4</td>
-              <td><div class="mn">Yuan Pro</div></td>
-              <td><span class="chip c-byd">BYD</span></td>
-              <td class="nc">1.575</td>
-              <td><div class="bar-r"><div class="pct">5,1%</div><div class="br"><div class="bf" style="width:11%;background:var(--blue)"></div></div></div></td>
+              <td><div class="mn">Spark EUV</div></td>
+              <td><span class="chip c-gm">Chevrolet</span></td>
+              <td class="nc">762</td>
+              <td><div class="bar-r"><div class="pct">4,0%</div><div class="br"><div class="bf" style="width:12%;background:var(--orange)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">5</td>
-              <td><div class="mn">Spark EUV</div></td>
-              <td><span class="chip c-gm">GM</span></td>
-              <td class="nc">984</td>
-              <td><div class="bar-r"><div class="pct">3,2%</div><div class="br"><div class="bf" style="width:7%;background:var(--orange)"></div></div></div></td>
+              <td><div class="mn">Aion UT<span class="new-badge">Estreia</span></div><div class="msub">GAC entra direto no Top 5</div></td>
+              <td><span class="chip c-gac">GAC</span></td>
+              <td class="nc">659</td>
+              <td><div class="bar-r"><div class="pct">3,4%</div><div class="br"><div class="bf" style="width:10%;background:#c28cff"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">6</td>
-              <td><div class="mn">Captiva EV</div></td>
-              <td><span class="chip c-gm">GM</span></td>
-              <td class="nc">701</td>
-              <td><div class="bar-r"><div class="pct">2,3%</div><div class="br"><div class="bf" style="width:5%;background:var(--orange)"></div></div></div></td>
+              <td><div class="mn">Yuan Pro</div></td>
+              <td><span class="chip c-byd">BYD</span></td>
+              <td class="nc">404</td>
+              <td><div class="bar-r"><div class="pct">2,1%</div><div class="br"><div class="bf" style="width:6%;background:var(--blue)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">7</td>
-              <td><div class="mn">EX5<span class="new-badge">Estreia</span></div><div class="msub">Novo modelo Geely em 2026</div></td>
-              <td><span class="chip c-geely">Geely</span></td>
-              <td class="nc">660</td>
-              <td><div class="bar-r"><div class="pct">2,1%</div><div class="br"><div class="bf" style="width:4.5%;background:var(--green)"></div></div></div></td>
+              <td><div class="mn">C10</div></td>
+              <td><span class="chip c-leap">Leapmotor</span></td>
+              <td class="nc">281</td>
+              <td><div class="bar-r"><div class="pct">1,5%</div><div class="br"><div class="bf" style="width:4.5%;background:var(--teal)"></div></div></div></td>
             </tr>
             <tr>
               <td class="rk">8</td>
-              <td><div class="mn">Seal</div></td>
-              <td><span class="chip c-byd">BYD</span></td>
-              <td class="nc">441</td>
-              <td><div class="bar-r"><div class="pct">1,4%</div><div class="br"><div class="bf" style="width:3%;background:var(--blue)"></div></div></div></td>
+              <td><div class="mn">Ora 03</div></td>
+              <td><span class="chip c-outros">GWM</span></td>
+              <td class="nc">250</td>
+              <td><div class="bar-r"><div class="pct">1,3%</div><div class="br"><div class="bf" style="width:4%;background:rgba(148,163,184,.65)"></div></div></div></td>
+            </tr>
+            <tr>
+              <td class="rk">9</td>
+              <td><div class="mn">Aion V</div></td>
+              <td><span class="chip c-gac">GAC</span></td>
+              <td class="nc">244</td>
+              <td><div class="bar-r"><div class="pct">1,3%</div><div class="br"><div class="bf" style="width:4%;background:#c28cff"></div></div></div></td>
+            </tr>
+            <tr>
+              <td class="rk">10</td>
+              <td><div class="mn">B10</div></td>
+              <td><span class="chip c-leap">Leapmotor</span></td>
+              <td class="nc">231</td>
+              <td><div class="bar-r"><div class="pct">1,2%</div><div class="br"><div class="bf" style="width:3.5%;background:var(--teal)"></div></div></div></td>
             </tr>
           </tbody>
         </table>
@@ -471,7 +489,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
 
-  <div class="src">📌 <a href="https://abve.org.br/abve-data/eletrificadosmhev/">ABVE Data - fechamento de julho/2026</a> · <a href="https://abve.org.br/recarga-rapida-dc-cresce-33-em-tres-meses-e-puxa-a-expansao-da-rede/">ABVE/Tupi - infraestrutura maio/2026</a> · <a href="https://canalve.com.br/carros-eletricos-mais-vendidos-brasil-2026-veja-ranking/">Canal VE ranking BEV</a></div>
+  <div class="src">📌 <a href="https://abve.org.br/abve-data/eletrificadosmhev/">ABVE Data - fechamento nacional de julho/2026</a> · <a href="https://abve.org.br/recarga-rapida-dc-cresce-33-em-tres-meses-e-puxa-a-expansao-da-rede/">ABVE/Tupi - infraestrutura maio/2026</a> · <a href="https://insideevs.uol.com.br/news/800330/ranking-eletricos-junho-2026-brasil-top10/">Top 10 BEV de junho/2026 - dados K.Lume</a></div>
 </div>
 
 <!-- ═══════ PAGE HISTÓRICO ═══════ -->
@@ -639,7 +657,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
   <div class="alert i">
     <div class="ai">i</div>
-    <div><div class="at">Leitura por estado</div><div class="ab">O painel nacional de vendas foi atualizado para junho/2026. Esta aba preserva a referencia exploratoria estadual de mercado 2025 e infraestrutura maio/2026; ela nao deve ser lida como ranking oficial ABVE de 2026 por UF.</div></div>
+    <div><div class="at">Leitura por estado</div><div class="ab">O painel nacional de vendas foi atualizado para julho/2026. Esta aba preserva a referencia exploratoria estadual de mercado 2025 e infraestrutura maio/2026; ela nao deve ser lida como ranking oficial ABVE de 2026 por UF.</div></div>
   </div>
 
   <div class="map-shell">
@@ -1501,9 +1519,9 @@ function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x
 new Chart(document.getElementById('cMarca'),{
   type:'doughnut',
   data:{
-    labels:['BYD','Geely','GM','Outros'],
-    datasets:[{data:[69.4,10.1,5.4,15.1],
-      backgroundColor:[C.b,C.g,C.o,'rgba(148,163,184,0.25)'],
+    labels:['BYD','Geely','Chevrolet','GAC','Leapmotor','GWM'],
+    datasets:[{data:[64.5,22.8,4.0,4.7,2.7,1.3],
+      backgroundColor:[C.b,C.g,C.o,'#c28cff',C.t,'rgba(148,163,184,0.55)'],
       borderColor:'rgba(0,0,0,0)',borderWidth:4,hoverOffset:6}]
   },
   options:{cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.parsed+'%'}}}}
