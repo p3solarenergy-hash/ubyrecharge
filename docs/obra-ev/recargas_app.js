@@ -3693,6 +3693,7 @@ function financeInvestorEntry(charges = [], settings = {}, mk = '', options = {}
     operationNet: Number(result.operationNet || 0),
     operationMargin: Number(result.operationMargin || 0),
     totalCostPerKWh: result.totalCostPerKWh,
+    plannedDirectCostPerKWh: result.plannedDirectCostPerKWh,
     plannedTotalCostPerKWh: result.plannedTotalCostPerKWh,
     investmentValue: Number(result.investmentValue || 0),
     paybackInvestmentValue: Number(result.paybackInvestmentValue || result.investmentValue || 0),
@@ -4003,6 +4004,7 @@ function investorEntryFromArchivedPayload(report = {}) {
     operationNet: Number(result.operationNet || 0),
     operationMargin: Number(result.operationMargin ?? (totalRevenue ? Number(result.operationNet || 0) / totalRevenue * 100 : 0)),
     totalCostPerKWh: result.totalCostPerKWh ?? (energy > 0 ? totalCost / energy : null),
+    plannedDirectCostPerKWh: result.plannedDirectCostPerKWh,
     plannedTotalCostPerKWh: result.plannedTotalCostPerKWh,
     investmentValue: Number(result.investmentValue ?? settings.investmentValue ?? 0),
     roiMonthly: Number(result.roiMonthly || 0),
@@ -4198,7 +4200,8 @@ function generateCurrentFinanceReportLegacy() {
     </tbody></table>
     <h2>Resultado e prestacao da area</h2><table><tbody>
       <tr><td>Resultado operacional</td><td>${fmtBRL(result.operationNet)}</td><td>Margem operacional</td><td>${fmtPct(result.operationMargin)}</td></tr>
-      <tr><td>Custo inicial por kWh</td><td>${fmtPerKWh(result.plannedTotalCostPerKWh)}</td><td>Custo efetivo por kWh</td><td>${fmtPerKWh(result.totalCostPerKWh)}</td></tr>
+      <tr><td>Custo base planejado por kWh</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td><td>Custo total projetado por kWh</td><td>${fmtPerKWh(result.plannedTotalCostPerKWh)}</td></tr>
+      <tr><td>Custo efetivo por kWh</td><td>${fmtPerKWh(result.totalCostPerKWh)}</td><td></td><td></td></tr>
       <tr><td>Ponto de equilibrio</td><td>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</td><td>Resultado por kWh</td><td>${fmtPerKWh(result.resultPerKWh)}</td></tr>
       <tr><td>Reembolso de energia ao parceiro</td><td>${fmtBRL(owner.energyReimbursement)}</td><td>${owner.selectedShareLabel}</td><td>${fmtBRL(owner.selectedShare)}</td></tr>
     </tbody></table>
@@ -4301,8 +4304,9 @@ function renderFinanceiro(applySaved = true) {
     result.areaEligible ? `<tr><td>Participacao do parceiro da area</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
     `<tr><td>Custos operacionais cadastrados</td><td>${fmtBRL(extraCosts)}</td></tr>`,
     `<tr><td>Custo operacional total</td><td>${fmtBRL(result.totalOperatingCost)}</td></tr>`,
+    `<tr><td>Custo base planejado por kWh</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td></tr>`,
+    `<tr><td>Custo total projetado por kWh</td><td>${fmtPerKWh(result.plannedTotalCostPerKWh)}</td></tr>`,
     `<tr><td>Custo efetivo por kWh</td><td>${fmtPerKWh(result.totalCostPerKWh)}</td></tr>`,
-    `<tr><td>Custo inicial por kWh</td><td>${fmtPerKWh(result.plannedTotalCostPerKWh)}</td></tr>`,
     `<tr><td>Ponto de equilibrio</td><td>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</td></tr>`,
     hasP3Society ? `<tr><td>Resultado P3 na sociedade</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
     isUbyModel ? `<tr><td>Resultado liquido UBY</td><td>${fmtBRL(ubyNet)}</td></tr>` : '',
@@ -4653,8 +4657,9 @@ function renderFinanceOperationalResults(result = {}) {
   container.innerHTML = `
     <div class="finance-result-card"><span>Custo operacional total</span><strong>${fmtBRL(result.totalOperatingCost || 0)}</strong><small>energia + itens + gestao P3 + plataforma</small></div>
     <div class="finance-result-card"><span>Custos da matriz UBY (competencia)</span><strong>${fmtBRL(result.matrizCost || 0)}</strong><small>${fmtPerKWh(result.matrizCostPerKWh)} do custo por kWh | ${fmtPct(result.matrizCostRevenuePct || 0)} da receita</small><small>${Number(result.matrizCash || 0) ? `Caixa programado no mes: ${fmtBRL(result.matrizCash)}` : 'Sem parcela de matriz a pagar no caixa neste mes'}</small><small>${escapeHtml(matrizSub)}</small></div>
-    <div class="finance-result-card"><span>Custo efetivo por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>diluido pelos ${fmtKWh(result.energy || 0)} vendidos</small></div>
-    <div class="finance-result-card"><span>Custo inicial por kWh</span><strong>${fmtPerKWh(result.plannedTotalCostPerKWh)}</strong><small>base: ${fmtKWh(result.planning?.planningKWh || 0)}</small></div>
+    <div class="finance-result-card"><span>Custo base planejado por kWh</span><strong>${fmtPerKWh(result.plannedDirectCostPerKWh)}</strong><small>energia, custos locais e matriz | base: ${fmtKWh(result.planning?.planningKWh || 0)}</small></div>
+    <div class="finance-result-card"><span>Custo total projetado por kWh</span><strong>${fmtPerKWh(result.plannedTotalCostPerKWh)}</strong><small>inclui gestao, plataforma, royalties e repasses</small></div>
+    <div class="finance-result-card"><span>Custo efetivo por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>diluido pelos ${fmtKWh(result.energy || 0)} realmente vendidos</small></div>
     <div class="finance-result-card warn"><span>Ponto de equilibrio</span><strong>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</strong><small>${result.contributionPerKWh > 0 ? `${fmtPerKWh(result.contributionPerKWh)} de contribuicao` : 'preco de venda nao cobre os custos variaveis'}</small></div>
     <div class="finance-result-card ${resultClass}"><span>Resultado operacional</span><strong>${fmtBRL(result.operationNet || 0)}</strong><small>receitas totais menos todos os custos</small></div>
     <div class="finance-result-card ${resultClass}"><span>Resultado por kWh</span><strong>${fmtPerKWh(result.resultPerKWh)}</strong><small>resultado diluido pela energia vendida</small></div>
