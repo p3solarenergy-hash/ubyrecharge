@@ -1301,8 +1301,14 @@ async function loadRechargeBase(workId = currentWorkId, options = {}) {
 function initWorkSelector() {
   const selector = document.getElementById('workSelector');
   if (!selector) return;
-  const works = selectorWorksWithoutDuplicateStations(workOptions()).sort(workSelectorOrder);
-  if (!works.some(work => work.id === currentWorkId)) currentWorkId = works[0]?.id || 'rio';
+  const sourceWorks = workOptions();
+  const works = selectorWorksWithoutDuplicateStations(sourceWorks).sort(workSelectorOrder);
+  if (!works.some(work => work.id === currentWorkId)) {
+    const requestedWork = sourceWorks.find(work => String(work.id) === String(currentWorkId));
+    const requestedStation = requestedWork && normalizeStationForCompare(workSelectorLabel(requestedWork));
+    const retainedWork = requestedStation && works.find(work => normalizeStationForCompare(workSelectorLabel(work)) === requestedStation);
+    currentWorkId = retainedWork?.id || works[0]?.id || 'rio';
+  }
   selector.innerHTML = works.map(work => `<option value="${escapeAttr(work.id)}">${escapeHtml(workSelectorLabel(work))}</option>`).join('');
   selector.value = currentWorkId;
   currentWorkName = currentWork().nome || currentWorkId;
