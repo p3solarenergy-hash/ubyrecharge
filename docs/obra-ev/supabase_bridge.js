@@ -820,6 +820,7 @@
     let query = sb
       .from("obra_finance_reports")
       .select("id,obra_id,station_key,station_name,report_type,period_key,period_start,period_end,status,version,payload,generated_at,closed_at,updated_at,generated_by_email")
+      .is("deleted_at", null)
       .order("period_end", { ascending: false })
       .order("version", { ascending: false });
     if (filters.workId) query = query.eq("obra_id", String(filters.workId));
@@ -903,6 +904,31 @@
     return { report: saved, unchanged: false };
   }
 
+  async function deleteFinanceReport(reportId) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre no Supabase antes de excluir relatorios financeiros.");
+    const id = String(reportId || "").trim();
+    if (!id) throw new Error("Relatorio invalido.");
+
+    const { data, error } = await sb
+      .from("obra_finance_reports")
+      .update({ deleted_at: new Date().toISOString(), deleted_by: user.id, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .is("deleted_at", null)
+      .select("id,obra_id,station_key,report_type,period_key,version")
+      .single();
+    if (error) throw error;
+    await insertAuditLog(sb, user, {
+      entidadeTipo: "obra_finance_reports",
+      entidadeId: id,
+      acao: "archive_finance_report",
+      resumo: { workId: data.obra_id, stationKey: data.station_key || "", reportType: data.report_type, periodKey: data.period_key, version: data.version }
+    });
+    return data;
+  }
+
   window.UBY_SUPABASE = {
     configured,
     client,
@@ -933,6 +959,7 @@
     loadRechargeCustomers,
     upsertRechargeCustomers,
     loadFinanceReports,
-    saveFinanceReport
+    saveFinanceReport,
+    deleteFinanceReport
   };
 })();

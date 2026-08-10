@@ -18,12 +18,18 @@ create table if not exists public.obra_finance_reports (
   generated_at timestamptz not null default now(),
   closed_at timestamptz,
   updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  deleted_by uuid references auth.users(id) on delete set null,
   constraint obra_finance_reports_period_check check (period_start <= period_end),
   constraint obra_finance_reports_version_unique unique (obra_id, station_key, report_type, period_key, version)
 );
 
 create index if not exists obra_finance_reports_work_period_idx
   on public.obra_finance_reports (obra_id, period_end desc, report_type, station_key);
+
+create index if not exists obra_finance_reports_active_period_idx
+  on public.obra_finance_reports (obra_id, period_end desc, report_type, station_key)
+  where deleted_at is null;
 
 create index if not exists obra_finance_reports_status_idx
   on public.obra_finance_reports (status, period_end desc);
@@ -39,6 +45,27 @@ set search_path = public
 as $$
 begin
   if tg_op = 'UPDATE' and old.status = 'closed' then
+    if new.deleted_at is not null
+       and old.deleted_at is null
+       and new.deleted_by is not null
+       and new.obra_id is not distinct from old.obra_id
+       and new.station_key is not distinct from old.station_key
+       and new.station_name is not distinct from old.station_name
+       and new.report_type is not distinct from old.report_type
+       and new.period_key is not distinct from old.period_key
+       and new.period_start is not distinct from old.period_start
+       and new.period_end is not distinct from old.period_end
+       and new.status is not distinct from old.status
+       and new.version is not distinct from old.version
+       and new.payload is not distinct from old.payload
+       and new.generated_by is not distinct from old.generated_by
+       and new.generated_by_email is not distinct from old.generated_by_email
+       and new.generated_at is not distinct from old.generated_at
+       and new.closed_at is not distinct from old.closed_at
+    then
+      new.updated_at := now();
+      return new;
+    end if;
     raise exception 'Relatorio financeiro fechado e imutavel. Crie uma nova versao para corrigir.';
   end if;
 

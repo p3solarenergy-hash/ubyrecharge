@@ -3352,14 +3352,22 @@ async function loadFinanceReportArchive(force = false) {
   financeReportArchivePromise = (async () => {
     const local = readLocalFinanceReports();
     let cloud = [];
+    let cloudLoaded = false;
     if (window.UBY_SUPABASE?.loadFinanceReports) {
       try {
         cloud = await window.UBY_SUPABASE.loadFinanceReports();
+        cloudLoaded = true;
       } catch (err) {
         console.warn('Historico financeiro em nuvem indisponivel:', err);
       }
     }
-    mergeFinanceReportArchive(local, cloud);
+    // Quando a nuvem responde, ela e a fonte de verdade para relatorios ja sincronizados.
+    // Mantemos apenas rascunhos locais ainda sem ID remoto, evitando que um cache antigo
+    // reintroduza um relatorio excluido em outro navegador.
+    const localFallback = cloudLoaded
+      ? local.filter(report => String(report?.id || '').startsWith('local-'))
+      : local;
+    mergeFinanceReportArchive(localFallback, cloud);
     writeLocalFinanceReports(financeReportArchive);
     financeReportArchiveLoaded = true;
     return financeReportArchive;
@@ -4086,7 +4094,7 @@ function reportLibraryCard(report = {}) {
     <div class="report-library-value"><b>${fmtKWh(energy)}</b><span>Energia</span></div>
     <div class="report-library-value optional"><b>${count}</b><span>Recargas</span></div>
     <div class="report-library-value optional"><b>${fmtBRL(resultValue)}</b><span>${resultLabel}</span></div>
-    <div class="report-library-actions"><button class="btn-recalc" type="button" onclick="openFinanceReportArchive('${escapeAttr(report.id)}',false)">Visualizar</button><button class="btn-recalc" type="button" onclick="openFinanceReportArchive('${escapeAttr(report.id)}',true)">PDF</button></div>
+    <div class="report-library-actions"><button class="btn-recalc" type="button" onclick="openFinanceReportArchive('${escapeAttr(report.id)}',false)">Visualizar</button><button class="btn-recalc" type="button" onclick="openFinanceReportArchive('${escapeAttr(report.id)}',true)">PDF</button><button class="btn-danger" type="button" onclick="deleteFinanceReportArchive('${escapeAttr(report.id)}')">Excluir</button></div>
   </div>`;
 }
 
@@ -4136,6 +4144,31 @@ function openFinanceReportArchive(reportId, printAfter = false) {
     ? window.UBY_FINANCE_REPORTS.areaReport(archivedPartnerAreaModel(report), options)
     : window.UBY_FINANCE_REPORTS.investorReport(archivedInvestorModel(report), options);
   openFinanceReportDocument(html);
+}
+
+async function deleteFinanceReportArchive(reportId) {
+  const report = financeReportArchive.find(item => String(item.id) === String(reportId));
+  if (!report) return alert('Relatorio nao encontrado no historico carregado.');
+  const confirmed = confirm(`Excluir o relatorio ${financeReportTypeLabel(report.reportType)} de ${report.stationName || 'esta unidade'} (${report.periodKey})?\n\nSomente este relatorio sera removido. Recargas, custos e fechamentos mensais nao serao alterados.`);
+  if (!confirmed) return;
+
+  try {
+    if (String(report.id || '').startsWith('local-')) {
+      financeReportArchive = financeReportArchive.filter(item => String(item.id) !== String(report.id));
+      writeLocalFinanceReports(financeReportArchive);
+    } else {
+      if (!window.UBY_SUPABASE?.deleteFinanceReport) throw new Error('Exclusao de relatorios ainda nao esta disponivel na nuvem. Atualize a pagina e tente novamente.');
+      await window.UBY_SUPABASE.deleteFinanceReport(report.id);
+      financeReportArchive = financeReportArchive.filter(item => String(item.id) !== String(report.id));
+      writeLocalFinanceReports(financeReportArchive);
+    }
+    renderIndividualFinanceReportLibrary();
+    renderUbyPartnerReportLibrary();
+    setStorageState('Relatorio removido. Recargas, custos e fechamentos permaneceram preservados.', false);
+  } catch (err) {
+    console.error('Falha ao excluir relatorio financeiro', err);
+    alert(`Nao foi possivel excluir o relatorio: ${err.message || err}`);
+  }
 }
 
 function financeReportRuleRows(details = [], emptyLabel = 'Nenhum item adicional') {
