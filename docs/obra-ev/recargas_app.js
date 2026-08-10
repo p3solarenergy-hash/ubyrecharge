@@ -10371,14 +10371,20 @@ async function renderUbyOperation() {
   const dcCount = included.filter(row => row.kind === 'dc').length;
   const acCount = included.filter(row => row.kind === 'ac').length;
   const totalCharges = allUbyCharges.length;
-  const avgTicket = totalCharges ? revenue / totalCharges : 0;
+  const cleanStats = cleanOperationStats(allUbyCharges);
+  const avgTicket = cleanStats.avgTicket;
+  const validDurations = cleanStats.executed
+    .map(charge => durToHours(charge.duration))
+    .filter(hours => hours > 0);
+  const avgDuration = validDurations.length
+    ? validDurations.reduce((sum, hours) => sum + hours, 0) / validDurations.length
+    : 0;
   const projectionMonth = isMonthView && currentGeneralMonth ? currentGeneralMonth : (sourceMonths.at(-1) || '');
   const unitForecasts = sourceIncluded
     .map(row => ubyNetworkProjectionForRow(row, projectionMonth))
     .filter(forecast => forecast.coveredDays > 0);
   const networkProjectedRevenue = unitForecasts.reduce((sum, forecast) => sum + forecast.projectedRevenue, 0);
   const networkProjectedEnergy = unitForecasts.reduce((sum, forecast) => sum + forecast.projectedEnergy, 0);
-  const cleanStats = cleanOperationStats(allUbyCharges);
   const calendarPower = included.reduce((sum, row) => sum + Number(workPowerById(row.workId) || 0), 0) || getPower();
   const trendRevenue = kpiDayTrend(allUbyCharges, 'revenue', sourceUbyCharges);
   const trendCharges = kpiDayTrend(allUbyCharges, 'count', sourceUbyCharges);
@@ -10420,7 +10426,10 @@ async function renderUbyOperation() {
     : 'Marque carregadores UBY ou suba planilhas das unidades UBY para iniciar o painel.';
 
   document.getElementById('kpiUby').innerHTML = `
-    <div class="card"><div class="label">Ticket medio UBY</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas UBY</div></div>
+    <div class="card"><div class="label">R$ medio por recarga</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">${cleanStats.executed.length} recarga(s) valida(s) no periodo</div></div>
+    <div class="card"><div class="label">kWh medio por recarga</div><div class="value">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh</div><div class="sub">energia das recargas validas</div></div>
+    <div class="card"><div class="label">Tempo medio de recarga</div><div class="value">${formatRechargeDuration(avgDuration)}</div><div class="sub">${validDurations.length} sessao(oes) validas com duracao</div></div>
+    <div class="card"><div class="label">Erros no periodo</div><div class="value">${cleanStats.failed.length}</div><div class="sub">${totalCharges ? fmtPct(cleanStats.failed.length / totalCharges * 100) : '0,00%'} das tentativas da rede</div></div>
     <div class="card"><div class="label">Projecao de faturamento da rede</div><div class="value">${fmtBRL(networkProjectedRevenue)}</div><div class="sub">${projectionMonth ? `${monthLabel(projectionMonth)} | ${unitForecasts.length} unidade(s), soma das projecoes individuais` : 'sem base para projetar'}${unitForecasts.length ? `<br>${fmtKWh(networkProjectedEnergy)} projetados` : ''}</div></div>
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
