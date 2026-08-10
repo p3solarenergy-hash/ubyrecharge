@@ -5700,7 +5700,14 @@ function renderMatrizMonthlyDre(rows = [], activeMonth = '') {
     host.innerHTML = '<h2 style="margin:0 0 6px">DRE mensal da matriz</h2><p class="sub">Cadastre um custo da matriz ou selecione uma competencia para visualizar o rateio mensal.</p>';
     return;
   }
-  const months = matrizMonthSequence(candidates[0], candidates[candidates.length - 1]);
+  // Mantem o historico ja reconhecido e abre, no minimo, doze competencias a
+  // partir do mes selecionado. Assim a DRE antecipa a cobertura contratada e
+  // as parcelas de caixa sem regravar nem alterar os meses fechados.
+  const horizonStart = /^\d{4}-\d{2}$/.test(activeMonth) ? activeMonth : candidates[candidates.length - 1];
+  const minimumHorizonEnd = matrizAddMonths(horizonStart, 11);
+  const latestKnownMonth = candidates[candidates.length - 1];
+  const horizonEnd = latestKnownMonth > minimumHorizonEnd ? latestKnownMonth : minimumHorizonEnd;
+  const months = matrizMonthSequence(candidates[0], horizonEnd);
   const series = months.map(mk => {
     const competency = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + matrizCompetencyAmount(item), 0);
     const cash = costs.reduce((sum, item) => sum + matrizCashAmount(item, mk), 0);
@@ -5710,7 +5717,7 @@ function renderMatrizMonthlyDre(rows = [], activeMonth = '') {
   const totals = series.reduce((sum, row) => ({ competency: sum.competency + row.competency, cash: sum.cash + row.cash, allocated: sum.allocated + row.allocated, pending: sum.pending + row.pending }), { competency: 0, cash: 0, allocated: 0, pending: 0 });
   const max = Math.max(1, ...series.map(row => row.competency));
   host.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><h2 style="margin:0">DRE mensal da matriz</h2><span class="sub">competencia, caixa, rateio e pendencias</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><h2 style="margin:0">DRE mensal da matriz</h2><span class="sub">${escapeHtml(monthLabel(horizonStart))} a ${escapeHtml(monthLabel(horizonEnd))} | competencia, caixa, rateio e pendencias</span></div>
     <p class="sub" style="margin:6px 0 16px;max-width:78ch">A competencia entra no resultado e no custo por kWh dos carregadores. O caixa mostra somente as parcelas com vencimento no mes; ele nao altera o resultado contabil da competencia.</p>
     <div style="display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;margin-bottom:16px">
       <div class="finance-result-card"><span>Competencia reconhecida</span><strong>${fmtBRL(totals.competency)}</strong><small>soma dos custos pelo periodo de cobertura</small></div>
