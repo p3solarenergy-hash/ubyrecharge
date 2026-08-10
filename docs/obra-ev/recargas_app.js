@@ -10313,6 +10313,31 @@ function ensureOverviewHistoryThenRerender(tabId, rerender) {
     .catch(() => {});
 }
 
+function ubyNetworkProjectionForRow(row = {}, monthKey = '') {
+  if (!/^\d{4}-\d{2}$/.test(String(monthKey))) {
+    return { revenue: 0, energy: 0, projectedRevenue: 0, projectedEnergy: 0, coveredDays: 0 };
+  }
+  const monthCharges = (row.charges || []).filter(charge => chargeMonthKey(charge) === monthKey);
+  const revenue = monthCharges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const energy = monthCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  if (!monthCharges.length) {
+    return { revenue, energy, projectedRevenue: 0, projectedEnergy: 0, coveredDays: 0 };
+  }
+  // Keep the network forecast aligned with each station's own monthly KPI window.
+  const operationStart = operationStartForCharges(row.charges || [], row);
+  const window = periodWindow(monthCharges, monthKey, 'mtd', operationStart);
+  const coveredDays = Math.max(Number(window?.hours || 0) / 24, 1);
+  const totalDays = daysInMonth(monthKey.slice(0, 4), monthKey.slice(5, 7));
+  const multiplier = totalDays / coveredDays;
+  return {
+    revenue,
+    energy,
+    projectedRevenue: revenue * multiplier,
+    projectedEnergy: energy * multiplier,
+    coveredDays
+  };
+}
+
 async function renderUbyOperation() {
   const __t0 = performance.now();
   const renderSequence = ++overviewRenderSequence.uby;
@@ -10347,6 +10372,12 @@ async function renderUbyOperation() {
   const acCount = included.filter(row => row.kind === 'ac').length;
   const totalCharges = allUbyCharges.length;
   const avgTicket = totalCharges ? revenue / totalCharges : 0;
+  const projectionMonth = isMonthView && currentGeneralMonth ? currentGeneralMonth : (sourceMonths.at(-1) || '');
+  const unitForecasts = sourceIncluded
+    .map(row => ubyNetworkProjectionForRow(row, projectionMonth))
+    .filter(forecast => forecast.coveredDays > 0);
+  const networkProjectedRevenue = unitForecasts.reduce((sum, forecast) => sum + forecast.projectedRevenue, 0);
+  const networkProjectedEnergy = unitForecasts.reduce((sum, forecast) => sum + forecast.projectedEnergy, 0);
   const cleanStats = cleanOperationStats(allUbyCharges);
   const calendarPower = included.reduce((sum, row) => sum + Number(workPowerById(row.workId) || 0), 0) || getPower();
   const trendRevenue = kpiDayTrend(allUbyCharges, 'revenue', sourceUbyCharges);
@@ -10390,6 +10421,7 @@ async function renderUbyOperation() {
 
   document.getElementById('kpiUby').innerHTML = `
     <div class="card"><div class="label">Ticket medio UBY</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">receita / recargas UBY</div></div>
+    <div class="card"><div class="label">Projecao de faturamento da rede</div><div class="value">${fmtBRL(networkProjectedRevenue)}</div><div class="sub">${projectionMonth ? `${monthLabel(projectionMonth)} | ${unitForecasts.length} unidade(s), soma das projecoes individuais` : 'sem base para projetar'}${unitForecasts.length ? `<br>${fmtKWh(networkProjectedEnergy)} projetados` : ''}</div></div>
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
     <div class="card"><div class="label">Carregadores UBY</div><div class="value">${included.length}</div><div class="sub">${dcCount} DC / ${acCount} AC incluidos</div></div>
