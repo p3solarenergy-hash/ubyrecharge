@@ -2293,6 +2293,15 @@ function durToHours(d) {
   const p = raw.split(':');
   return (+p[0]||0) + (+p[1]||0)/60 + (+p[2]||0)/3600;
 }
+
+function formatRechargeDuration(hours = 0) {
+  const totalMinutes = Math.round(Number(hours || 0) * 60);
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '—';
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return wholeHours ? `${wholeHours}h ${String(minutes).padStart(2, '0')}min` : `${minutes}min`;
+}
+
 function idleToMin(s) {
   if (!s) return 0;
   const raw = String(s).trim();
@@ -10787,6 +10796,10 @@ function renderKPIs(charges, mk, window) {
   const avgTkt  = charges.length ? rev / charges.length : 0;
   const cleanStats = cleanOperationStats(charges);
   const avgKwh  = cleanStats.avgKwh;
+  const validDurations = cleanStats.executed.map(charge => durToHours(charge.duration)).filter(hours => hours > 0);
+  const avgDuration = validDurations.length
+    ? validDurations.reduce((sum, hours) => sum + hours, 0) / validDurations.length
+    : 0;
   const revKwh  = energy > 0 ? rev / energy : 0;
   const clients = new Set(charges.map(c => c.userEmail || c.userName)).size;
   const occ     = occByInterval(charges, undefined, window);
@@ -10813,6 +10826,9 @@ function renderKPIs(charges, mk, window) {
     <div class="card"><div class="label">Sessão válida média</div>
       <div class="value">${avgKwh.toFixed(1).replace('.',',')} kWh</div>
       <div class="sub">${cleanStats.executed.length} recarga(s) executada(s)</div></div>
+    <div class="card"><div class="label">Tempo médio de recarga</div>
+      <div class="value">${formatRechargeDuration(avgDuration)}</div>
+      <div class="sub">${validDurations.length} sessão(ões) válida(s) com duração</div></div>
     <div class="card"><div class="label">Projeção mês</div>
       <div class="value">${fmtBRL(rev * proj)}</div>
       <div class="sub">${fmtKWh(energy * proj)} se mantiver o ritmo</div></div>
@@ -11325,6 +11341,12 @@ function renderAcumulado() {
     : 1;
   const avgRevenueDay = rev / calendarDays;
   const avgChargesDay = totalCharges / calendarDays;
+  const validDurations = cleanOperationStats(allCharges).executed
+    .map(charge => durToHours(charge.duration))
+    .filter(hours => hours > 0);
+  const avgDuration = validDurations.length
+    ? validDurations.reduce((sum, hours) => sum + hours, 0) / validDurations.length
+    : 0;
 
   document.getElementById('kpiAcc').innerHTML = `
     <div class="card"><div class="label">Total recargas</div>
@@ -11349,6 +11371,9 @@ function renderAcumulado() {
     <div class="card"><div class="label">Média de recargas por dia</div>
       <div class="value">${avgChargesDay.toFixed(2).replace('.', ',')}</div>
       <div class="sub">${totalCharges} recarga(s) em ${calendarDays} dia(s)</div></div>
+    <div class="card"><div class="label">Tempo médio de recarga</div>
+      <div class="value">${formatRechargeDuration(avgDuration)}</div>
+      <div class="sub">${validDurations.length} sessão(ões) válida(s) com duração</div></div>
   `;
 
   // Cada linha usa as regras financeiras salvas no proprio mes. Assim, uma
