@@ -5140,6 +5140,113 @@ let matrizCostsLoaded = false;
 let matrizCostsLoadPromise = null;
 let matrizCostsSaveChain = Promise.resolve();
 let matrizEditingId = '';
+let matrizDocumentsState = [];
+let matrizDocumentsLoadedKey = '';
+let matrizDocumentsLoadPromise = null;
+
+function matrizDocumentDate(value) {
+  const raw = String(value || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw.split('-').reverse().join('/') : 'Sem vencimento';
+}
+function matrizDocumentStatusLabel(status) {
+  return ({ pending: 'Pendente', paid: 'Pago', cancelled: 'Cancelado' })[status] || 'Pendente';
+}
+function setMatrizDocumentFeedback(message, isError = false) {
+  const el = matrizInput('matrizDocumentFeedback');
+  if (!el) return;
+  el.textContent = message || '';
+  el.style.color = isError ? 'var(--p3-danger)' : 'var(--p3-ok)';
+}
+async function ensureMatrizDocumentsLoaded(mk) {
+  if (!mk || matrizDocumentsLoadedKey === mk) return matrizDocumentsState;
+  if (matrizDocumentsLoadPromise) return matrizDocumentsLoadPromise;
+  matrizDocumentsLoadPromise = (async () => {
+    try {
+      if (!window.UBY_SUPABASE?.loadFinanceDocuments) throw new Error('Sincronizacao de documentos indisponivel.');
+      matrizDocumentsState = await window.UBY_SUPABASE.loadFinanceDocuments({ scope: 'matrix', competenceKey: mk, limit: 100 });
+      matrizDocumentsLoadedKey = mk;
+    } catch (error) {
+      matrizDocumentsState = [];
+      matrizDocumentsLoadedKey = mk;
+      setMatrizDocumentFeedback(`Documentos indisponiveis: ${error?.message || 'erro de acesso'}`, true);
+    } finally {
+      matrizDocumentsLoadPromise = null;
+      renderMatrizDocuments(mk);
+    }
+    return matrizDocumentsState;
+  })();
+  return matrizDocumentsLoadPromise;
+}
+function renderMatrizDocuments(mk = financeMonthKey()) {
+  const host = matrizInput('matrizDocumentsList');
+  if (!host || !mk) return;
+  const total = matrizDocumentsState.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const paid = matrizDocumentsState.filter(item => item.status === 'paid').reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const pending = matrizDocumentsState.filter(item => item.status === 'pending').reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const totalEl = matrizInput('matrizDocumentsTotal'); if (totalEl) totalEl.textContent = fmtBRL(total);
+  const paidEl = matrizInput('matrizDocumentsPaid'); if (paidEl) paidEl.textContent = fmtBRL(paid);
+  const pendingEl = matrizInput('matrizDocumentsPending'); if (pendingEl) pendingEl.textContent = fmtBRL(pending);
+  const costSelect = matrizInput('matrizDocumentCost');
+  if (costSelect && !costSelect.dataset.ready) {
+    const costs = loadMatrizCosts();
+    costSelect.innerHTML = `<option value="">Sem vinculo com custo da matriz</option>${costs.map(item => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`).join('')}`;
+    costSelect.dataset.ready = '1';
+  }
+  host.innerHTML = matrizDocumentsState.length ? matrizDocumentsState.map(item => {
+    const cost = loadMatrizCosts().find(entry => entry.id === item.matrix_cost_id);
+    const installment = item.installment_number ? ` | parcela ${item.installment_number}${item.installment_total ? `/${item.installment_total}` : ''}` : '';
+    const file = item.storage_path ? `<button class="btn-open" type="button" onclick="openMatrizDocument('${escapeAttr(item.id)}')">Abrir arquivo</button>` : '<span class="sub">Sem arquivo</span>';
+    return `<tr><td><strong>${escapeHtml(item.supplier || 'Documento financeiro')}</strong><div class="sub">${escapeHtml(item.category || 'Outros custos')}${item.document_number ? ` | ${escapeHtml(item.document_number)}` : ''}</div></td><td>${matrizDocumentDate(item.due_date)}<div class="sub">${escapeHtml(matrizDocumentStatusLabel(item.status))}${installment}</div></td><td>${cost ? escapeHtml(cost.name) : '<span class="sub">Nao vinculado</span>'}</td><td class="num" style="text-align:right">${fmtBRL(item.amount)}</td><td style="text-align:right">${file} <button class="btn-danger" type="button" onclick="deleteMatrizDocument('${escapeAttr(item.id)}')">Excluir</button></td></tr>`;
+  }).join('') : '<tr><td colspan="5" style="color:var(--p3-muted);text-align:center;padding:16px">Nenhum boleto ou documento cadastrado nesta competencia.</td></tr>';
+  if (!matrizDocumentsLoadedKey || matrizDocumentsLoadedKey !== mk) ensureMatrizDocumentsLoaded(mk);
+}
+async function saveMatrizDocument() {
+  const mk = financeMonthKey();
+  const supplier = safeText(matrizInput('matrizDocumentSupplier')?.value || '').trim();
+  const amount = Math.max(0, Number(matrizInput('matrizDocumentAmount')?.value || 0));
+  if (!mk || !supplier || !amount) { setMatrizDocumentFeedback('Informe fornecedor, valor e competencia.', true); return; }
+  const button = matrizInput('matrizDocumentSave');
+  if (button) { button.disabled = true; button.textContent = 'Salvando...'; }
+  try {
+    const file = matrizInput('matrizDocumentFile')?.files?.[0] || null;
+    await window.UBY_SUPABASE.createFinanceDocument({
+      scope: 'matrix', competenceKey: mk, supplier,
+      category: matrizInput('matrizDocumentCategory')?.value || 'Outros custos',
+      documentNumber: matrizInput('matrizDocumentNumber')?.value || '',
+      documentType: matrizInput('matrizDocumentType')?.value || 'boleto',
+      amount, dueDate: matrizInput('matrizDocumentDueDate')?.value || null,
+      status: matrizInput('matrizDocumentStatus')?.value || 'pending',
+      installmentNumber: matrizInput('matrizDocumentInstallment')?.value || null,
+      installmentTotal: matrizInput('matrizDocumentInstallments')?.value || null,
+      matrixCostId: matrizInput('matrizDocumentCost')?.value || null,
+      notes: matrizInput('matrizDocumentNotes')?.value || ''
+    }, file);
+    ['matrizDocumentSupplier','matrizDocumentNumber','matrizDocumentAmount','matrizDocumentDueDate','matrizDocumentInstallment','matrizDocumentInstallments','matrizDocumentNotes'].forEach(id => { const input = matrizInput(id); if (input) input.value = ''; });
+    const fileInput = matrizInput('matrizDocumentFile'); if (fileInput) fileInput.value = '';
+    matrizDocumentsLoadedKey = '';
+    await ensureMatrizDocumentsLoaded(mk);
+    setMatrizDocumentFeedback('Documento salvo na nuvem. O custo continua sendo calculado somente pela regra vinculada da matriz.', false);
+  } catch (error) {
+    setMatrizDocumentFeedback(error?.message || 'Nao foi possivel salvar o documento.', true);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = 'Salvar documento'; }
+  }
+}
+async function openMatrizDocument(id) {
+  try {
+    const result = await window.UBY_SUPABASE.openFinanceDocument(id);
+    window.open(result.url, '_blank', 'noopener');
+  } catch (error) { setMatrizDocumentFeedback(error?.message || 'Nao foi possivel abrir o arquivo.', true); }
+}
+async function deleteMatrizDocument(id) {
+  if (!window.confirm('Excluir este documento e o arquivo privado anexado? Esta acao nao altera o custo da matriz.')) return;
+  try {
+    await window.UBY_SUPABASE.deleteFinanceDocument(id);
+    matrizDocumentsLoadedKey = '';
+    await ensureMatrizDocumentsLoaded(financeMonthKey());
+    setMatrizDocumentFeedback('Documento excluido.', false);
+  } catch (error) { setMatrizDocumentFeedback(error?.message || 'Nao foi possivel excluir o documento.', true); }
+}
 
 function matrizScopeKey(row = {}) { return `${String(row.workId || '')}::${String(row.key || normalizeStationForCompare(row.station || row.workName || ''))}`; }
 function matrizStationScope(row = {}) { return `${String(row.workId || '')}::${normalizeStationForCompare(row.station || row.stationName || row.workName || '')}`; }
@@ -5498,7 +5605,32 @@ function ensureMatrizCostEditor() {
     </div>
     <div class="sub" style="margin-top:12px;max-width:88ch">Para um seguro pago em 4 parcelas que cobre 12 meses, informe <b>4 parcelas</b> e <b>12 meses de cobertura</b>. O resultado e o custo por kWh reconhecem o total contratado dividido pelos 12 meses; o caixa mostra a parcela somente nos quatro meses de pagamento.</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px"><button id="matrizSaveButton" class="btn-open" type="button" onclick="addMatrizCost()">Adicionar custo</button><button class="btn-open" type="button" onclick="resetMatrizCostForm();renderMatrizCosts(getGeneralUnitData())">Limpar</button><span id="matrizFeedback" class="sub"></span></div>
-    <div id="matrizRateio" style="margin-top:18px"></div>`;
+    <div id="matrizRateio" style="margin-top:18px"></div>
+    <section style="margin-top:24px;padding-top:20px;border-top:1px solid var(--p3-border)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><h3 style="margin:0">Boletos e documentos da matriz</h3><span class="sub">PDF ou imagem privada, carregada somente ao abrir</span></div>
+      <p class="sub" style="margin:6px 0 14px;max-width:82ch">Use este cadastro para organizar comprovantes, boletos e vencimentos. Vincule ao custo da matriz quando existir; o valor do documento nao soma custo novamente, pois a DRE continua usando a regra financeira cadastrada acima.</p>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px;margin-bottom:14px">
+        <div class="finance-result-card"><span>Documentos da competencia</span><strong id="matrizDocumentsTotal">R$ 0,00</strong><small>valor registrado</small></div>
+        <div class="finance-result-card"><span>Pagos</span><strong id="matrizDocumentsPaid" style="color:var(--p3-ok)">R$ 0,00</strong><small>controle de caixa</small></div>
+        <div class="finance-result-card"><span>Pendentes</span><strong id="matrizDocumentsPending" style="color:var(--p3-warn)">R$ 0,00</strong><small>acompanhar vencimentos</small></div>
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Documento</th><th>Vencimento e status</th><th>Custo vinculado</th><th style="text-align:right">Valor</th><th style="text-align:right">Acao</th></tr></thead><tbody id="matrizDocumentsList"><tr><td colspan="5" class="sub">Carregando documentos...</td></tr></tbody></table></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:16px">
+        <label class="sub">FORNECEDOR OU EMISSOR<input id="matrizDocumentSupplier" type="text" placeholder="Ex.: Seguradora" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+        <label class="sub">CATEGORIA<select id="matrizDocumentCategory" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Seguro</option><option>Locacao / aluguel</option><option>Internet / dados</option><option>Manutencao</option><option>Licenca / plataforma</option><option>Administrativo</option><option>Outros custos</option></select></label>
+        <label class="sub">VALOR DO DOCUMENTO (R$)<input id="matrizDocumentAmount" type="number" min="0" step="0.01" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+        <label class="sub">VENCIMENTO<input id="matrizDocumentDueDate" type="date" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+        <label class="sub">SITUACAO<select id="matrizDocumentStatus" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="pending">Pendente</option><option value="paid">Pago</option><option value="cancelled">Cancelado</option></select></label>
+        <label class="sub">TIPO<select id="matrizDocumentType" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="boleto">Boleto</option><option value="nota_fiscal">Nota fiscal</option><option value="contrato">Contrato</option><option value="comprovante">Comprovante</option><option value="outro">Outro</option></select></label>
+        <label class="sub">NUMERO / REFERENCIA<input id="matrizDocumentNumber" type="text" placeholder="Nosso numero, NF, contrato" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+        <label class="sub">CUSTO DA MATRIZ VINCULADO<select id="matrizDocumentCost" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></select></label>
+        <label class="sub">PARCELA<input id="matrizDocumentInstallment" type="number" min="1" step="1" placeholder="Ex.: 1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+        <label class="sub">TOTAL DE PARCELAS<input id="matrizDocumentInstallments" type="number" min="1" step="1" placeholder="Ex.: 4" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+        <label class="sub">ARQUIVO PRIVADO (PDF, JPG, PNG OU WEBP)<input id="matrizDocumentFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" style="display:block;width:100%;margin-top:5px;color:var(--p3-text);font:inherit"></label>
+      </div>
+      <label class="sub" style="display:block;margin-top:10px">OBSERVACAO<input id="matrizDocumentNotes" type="text" placeholder="Observacao interna" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px"><button id="matrizDocumentSave" class="btn-open" type="button" onclick="saveMatrizDocument()">Salvar documento</button><span id="matrizDocumentFeedback" class="sub"></span></div>
+    </section>`;
 }
 function renderMatrizCosts(unitData) {
   ensureMatrizCostEditor();
@@ -5525,6 +5657,7 @@ function renderMatrizCosts(unitData) {
   if (targets && !matrizEditingId) targets.innerHTML = rows.map(row => `<option value="${escapeAttr(matrizScopeKey(row))}" selected>${escapeHtml(row.station || row.workName)} | ${escapeHtml(row.workName)}</option>`).join('');
   const rateio = matrizInput('matrizRateio'); if (rateio) rateio.textContent = rows.length ? `Destinos ativos: ${rows.map(row => row.station || row.workName).join(' | ')}.` : '';
   renderMatrizMonthlyDre(rows, mk);
+  renderMatrizDocuments(mk);
 }
 
 function matrizMonthSequence(from, to) {
@@ -10517,7 +10650,9 @@ async function ensureAllOverviewSessionsLoaded() {
 
 async function handleGeneralViewModeChange() {
   const view = document.getElementById('generalViewMode')?.value || 'month';
-  if (view === 'accumulated' || view.startsWith('month:')) {
+  if (document.getElementById('generalViewMode')?.value === 'accumulated') {
+    await ensureAllOverviewSessionsLoaded();
+  } else if (view.startsWith('month:')) {
     await ensureAllOverviewSessionsLoaded();
   }
   syncOverviewMonthOptions();

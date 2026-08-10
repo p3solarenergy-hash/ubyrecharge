@@ -568,6 +568,110 @@
     return { cloud: true, updatedAt: data?.updated_at || null };
   }
 
+  // Documentos financeiros nao sao incluidos no payload da matriz: os metadados
+  // ficam em tabela propria e o arquivo privado so e baixado quando solicitado.
+  async function loadFinanceDocuments(options = {}) {
+    const sb = client();
+    if (!sb || !(await currentUser())) return [];
+    const scope = String(options.scope || 'matrix');
+    let query = sb
+      .from('uby_finance_documents')
+      .select('id,scope,work_id,matrix_cost_id,competence_key,supplier,category,document_number,document_type,amount,due_date,status,installment_number,installment_total,storage_path,file_name,mime_type,file_size,notes,created_by_email,created_at,updated_at')
+      .eq('scope', scope)
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(Math.min(200, Math.max(1, Number(options.limit || 100))));
+    if (options.competenceKey) query = query.eq('competence_key', String(options.competenceKey));
+    if (options.workId) query = query.eq('work_id', String(options.workId));
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function createFinanceDocument(record = {}, file = null) {
+    const sb = client();
+    if (!sb) throw new Error('Supabase ainda nao configurado.');
+    const user = await currentUser();
+    if (!user) throw new Error('Entre no Supabase antes de salvar o documento financeiro.');
+    const fallbackUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
+      const value = Math.floor(Math.random() * 16);
+      return (char === 'x' ? value : ((value & 0x3) | 0x8)).toString(16);
+    });
+    const id = String(record.id || (window.crypto?.randomUUID ? window.crypto.randomUUID() : fallbackUuid()));
+    let storagePath = '';
+    try {
+      if (file) {
+        const permitted = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+        if (!permitted.includes(file.type)) throw new Error('Envie PDF, JPG, PNG ou WEBP.');
+        if (Number(file.size || 0) > 15728640) throw new Error('O arquivo deve ter no maximo 15 MB.');
+        const sanitized = String(file.name || 'documento').replace(/[^a-zA-Z0-9._-]/g, '_');
+        storagePath = `${user.id}/${id}/${sanitized}`;
+        const { error: uploadError } = await sb.storage.from('finance-documents').upload(storagePath, file, { contentType: file.type, upsert: false });
+        if (uploadError) throw uploadError;
+      }
+      const payload = {
+        id,
+        scope: String(record.scope || 'matrix'),
+        work_id: record.workId ? String(record.workId) : null,
+        matrix_cost_id: record.matrixCostId ? String(record.matrixCostId) : null,
+        competence_key: String(record.competenceKey || ''),
+        supplier: String(record.supplier || ''),
+        category: String(record.category || 'Outros custos'),
+        document_number: String(record.documentNumber || ''),
+        document_type: String(record.documentType || 'boleto'),
+        amount: Math.max(0, Number(record.amount || 0)),
+        due_date: record.dueDate || null,
+        status: ['pending', 'paid', 'cancelled'].includes(record.status) ? record.status : 'pending',
+        installment_number: record.installmentNumber ? Math.max(1, Number(record.installmentNumber)) : null,
+        installment_total: record.installmentTotal ? Math.max(1, Number(record.installmentTotal)) : null,
+        storage_path: storagePath || null,
+        file_name: file?.name || null,
+        mime_type: file?.type || null,
+        file_size: file?.size || null,
+        notes: String(record.notes || ''),
+        created_by: user.id,
+        created_by_email: user.email || '',
+        updated_at: new Date().toISOString()
+      };
+      const { data, error } = await sb.from('uby_finance_documents').insert(payload).select().single();
+      if (error) throw error;
+      await insertAuditLog(sb, user, { entidadeTipo: 'uby_finance_documents', entidadeId: id, acao: 'create_finance_document', resumo: { scope: payload.scope, competence: payload.competence_key, amount: payload.amount, attached: !!storagePath } });
+      return data;
+    } catch (error) {
+      if (storagePath) await sb.storage.from('finance-documents').remove([storagePath]).catch(() => {});
+      throw error;
+    }
+  }
+
+  async function openFinanceDocument(id) {
+    const sb = client();
+    if (!sb || !(await currentUser())) throw new Error('Entre no Supabase para abrir o documento.');
+    const { data: row, error } = await sb.from('uby_finance_documents').select('storage_path,file_name').eq('id', String(id)).maybeSingle();
+    if (error) throw error;
+    if (!row?.storage_path) throw new Error('Este lancamento nao possui arquivo anexado.');
+    const { data, error: signedError } = await sb.storage.from('finance-documents').createSignedUrl(row.storage_path, 60);
+    if (signedError) throw signedError;
+    return { url: data.signedUrl, fileName: row.file_name || 'documento' };
+  }
+
+  async function deleteFinanceDocument(id) {
+    const sb = client();
+    if (!sb) throw new Error('Supabase ainda nao configurado.');
+    const user = await currentUser();
+    if (!user) throw new Error('Entre no Supabase antes de excluir o documento.');
+    const { data: row, error: readError } = await sb.from('uby_finance_documents').select('id,storage_path,scope,competence_key,amount').eq('id', String(id)).maybeSingle();
+    if (readError) throw readError;
+    if (!row) return { deleted: false };
+    if (row.storage_path) {
+      const { error: storageError } = await sb.storage.from('finance-documents').remove([row.storage_path]);
+      if (storageError) throw storageError;
+    }
+    const { error } = await sb.from('uby_finance_documents').delete().eq('id', String(id));
+    if (error) throw error;
+    await insertAuditLog(sb, user, { entidadeTipo: 'uby_finance_documents', entidadeId: String(id), acao: 'delete_finance_document', resumo: { scope: row.scope, competence: row.competence_key, amount: row.amount } });
+    return { deleted: true };
+  }
+
   async function clearRechargeBase(workId) {
     const sb = client();
     if (!sb) throw new Error("Supabase ainda nao configurado.");
@@ -948,6 +1052,10 @@
     saveRechargeMetadata,
     loadFinancialMatrix,
     saveFinancialMatrix,
+    loadFinanceDocuments,
+    createFinanceDocument,
+    openFinanceDocument,
+    deleteFinanceDocument,
     clearRechargeBase,
     loadRechargeBase,
     loadAllRechargeBases,
