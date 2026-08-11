@@ -60,6 +60,9 @@
     .sub    { color:var(--p3-muted); font-size:11px; line-height:1.45; margin-top:6px; }
     .section   { margin-top:18px; display:grid; grid-template-columns:1.15fr .85fr; gap:18px; align-items:start; }
     .section-3 { grid-template-columns:1.1fr .95fr .95fr; }
+    .section-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .section-client-insights { align-items:stretch; }
+    .section-client-insights > .card { min-width:0; height:100%; }
     .tech-section { margin-top:28px; }
 
     /* Tipografia */
@@ -147,6 +150,10 @@
     .ai-card p { margin:0 0 10px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
     .ai-card .action { color:#E8EFEB; font-size:12px; font-weight:700; }
     .daily-metrics { display:grid; gap:10px; }
+    .daily-metrics.is-scrollable { max-height:360px; overflow-y:auto; overscroll-behavior:contain; padding-right:4px; scrollbar-color:#2D7FF9 transparent; }
+    .daily-metrics.is-scrollable::-webkit-scrollbar { width:7px; }
+    .daily-metrics.is-scrollable::-webkit-scrollbar-thumb { background:#2D7FF9; border-radius:8px; }
+    .daily-metrics.is-scrollable::-webkit-scrollbar-track { background:transparent; }
     .metric-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; align-items:stretch; }
     .metric-mini { position:relative; overflow:hidden; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:11px 12px; min-height:104px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:var(--p3-shadow); }
     .metric-mini::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
@@ -691,7 +698,7 @@
 
     @media (max-width:1180px) {
       .kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
-      .section-3 { grid-template-columns:1fr; }
+      .section-3, .section-2 { grid-template-columns:1fr; }
       .acc-grid { grid-template-columns:1fr; }
       .general-split { grid-template-columns:1fr; }
       .metric-strip { grid-template-columns:1fr; }
@@ -781,7 +788,7 @@
       .kpi-feature .value { font-size:36px; }
       .kpi-feature { grid-column:1/-1; }
       .bar { height:8px; margin-top:8px; }
-      .section, .section-3, .general-split, .acc-grid { gap:12px; margin-top:12px; }
+      .section, .section-2, .section-3, .general-split, .acc-grid { gap:12px; margin-top:12px; }
 
       .usage-grid .card { min-height:auto; }
       .usage-grid canvas { height:190px !important; max-height:200px; }
@@ -1075,9 +1082,9 @@
       <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageGeneralDailyMetrics"></div></div>
       <div class="card"><h2>Saúde operacional e erros</h2><div class="daily-metrics" id="usageGeneralOperationalHealth"></div></div>
     </section>
-    <section class="section section-3" style="margin-top:18px">
-      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics" id="usageGeneralNewClients"></div></div>
-      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageGeneralAbsentClients"></div></div>
+    <section class="section section-2 section-client-insights" style="margin-top:18px">
+      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics is-scrollable" id="usageGeneralNewClients"></div></div>
+      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics is-scrollable" id="usageGeneralAbsentClients"></div></div>
     </section>
     <section class="section usage-grid" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Calendário operacional</h2><div id="usageGeneralCalendar"></div></div>
@@ -1437,9 +1444,9 @@
       <div class="card"><h2>Metricas dia a dia</h2><div class="daily-metrics" id="usageUbyDailyMetrics"></div></div>
       <div class="card"><h2>Saude operacional e erros</h2><div class="daily-metrics" id="usageUbyOperationalHealth"></div></div>
     </section>
-    <section class="section section-3" style="margin-top:18px">
-      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics" id="usageUbyNewClients"></div></div>
-      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageUbyAbsentClients"></div></div>
+    <section class="section section-2 section-client-insights" style="margin-top:18px">
+      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics is-scrollable" id="usageUbyNewClients"></div></div>
+      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics is-scrollable" id="usageUbyAbsentClients"></div></div>
     </section>
     <section class="section usage-grid" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Calendario operacional UBY</h2><div id="usageUbyCalendar"></div></div>
@@ -1578,9 +1585,9 @@
       <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageDailyMetrics"></div></div>
       <div class="card"><h2>Saúde operacional e erros</h2><div class="daily-metrics" id="usageOperationalHealth"></div></div>
     </section>
-    <section class="section section-3" style="margin-top:18px">
-      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics" id="usageNewClients"></div></div>
-      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics" id="usageAbsentClients"></div></div>
+    <section class="section section-2 section-client-insights" style="margin-top:18px">
+      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics is-scrollable" id="usageNewClients"></div></div>
+      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics is-scrollable" id="usageAbsentClients"></div></div>
     </section>
     <section class="section usage-grid" style="margin-top:18px">
       <div class="card" style="grid-column:1/-1"><h2>Calendário operacional</h2><div id="usageCalendar"></div></div>
@@ -2054,6 +2061,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260810-operational-health1"></script>
+<script src="recargas_app.js?v=20260810-client-layout1"></script>
 </body>
 </html>
