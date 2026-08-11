@@ -179,6 +179,11 @@
     .visual-card.feature .visual-value { font-size:30px; }
     .visual-card .visual-sub { position:relative; z-index:1; color:var(--p3-muted); font-size:11px; margin-top:6px; line-height:1.35; }
     .visual-card .visual-trend { position:absolute; right:12px; bottom:16px; z-index:1; display:grid; place-items:center; width:26px; height:26px; border-radius:999px; color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.28); font-weight:900; font-size:15px; }
+    .visual-card .visual-period-trend { position:absolute; right:12px; bottom:14px; z-index:2; display:grid; justify-items:center; gap:2px; min-width:76px; padding:6px 8px; border-radius:7px; color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.28); font-size:12px; font-weight:900; line-height:1.05; white-space:nowrap; }
+    .visual-card .visual-period-trend small { color:inherit; font-size:9px; font-weight:700; opacity:.84; }
+    .visual-card .visual-period-trend.up { color:#BFEBD6; background:rgba(56,201,111,.16); border-color:rgba(56,201,111,.3); }
+    .visual-card .visual-period-trend.down { color:#FFD0D0; background:rgba(230,75,75,.16); border-color:rgba(230,75,75,.32); }
+    .visual-card .visual-period-trend.flat { color:#FFE4A0; background:rgba(242,169,61,.16); border-color:rgba(242,169,61,.3); }
     .visual-card.warn { background:var(--surface-bg); border-color:rgba(255,214,107,.32); }
     .visual-card.warn::before { background:#FFD66B; }
     .visual-card.warn .visual-value { color:#FFD66B; }
@@ -2061,6 +2066,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260810-client-layout1"></script>
+<script src="recargas_app.js?v=20260810-period-trend1"></script>
 </body>
 </html>

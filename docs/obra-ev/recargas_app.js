@@ -6616,6 +6616,31 @@ function trendInfo(value, formatter = signedNumber) {
   return { cls, arrow, text: formatter(n) };
 }
 
+function periodChangeBadge(current = 0, previous = 0, hasPrevious = true) {
+  if (!hasPrevious) return { cls: 'flat', arrow: '&#8594;', text: 'Sem base' };
+  const now = Number(current || 0);
+  const before = Number(previous || 0);
+  if (Math.abs(before) < 0.0001) {
+    if (Math.abs(now) < 0.0001) return { cls: 'flat', arrow: '&#8594;', text: '0,0%' };
+    return { cls: 'up', arrow: '&#8599;', text: 'Novo' };
+  }
+  const change = (now - before) / Math.abs(before) * 100;
+  const cls = change > 0.009 ? 'up' : (change < -0.009 ? 'down' : 'flat');
+  const arrow = cls === 'up' ? '&#8599;' : (cls === 'down' ? '&#8600;' : '&#8594;');
+  const signal = change > 0 ? '+' : (change < 0 ? '-' : '');
+  return { cls, arrow, text: `${signal}${fmtPct(Math.abs(change))}` };
+}
+
+function dailyOccupationPct(energy = 0, date, availability, power) {
+  if (!date || Number.isNaN(date.getTime())) return 0;
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  const hours = stationAvailableHours(availability, dayStart, dayEnd);
+  const capacity = Math.max(Number(power) || 0, 0) * hours;
+  return capacity > 0 ? Number(energy || 0) / capacity * 100 : 0;
+}
+
 // Faixa visual unica para todos os indicadores de ocupacao.
 function occupationBand(value = 0) {
   const pct = Math.max(0, Number(value) || 0);
@@ -6650,19 +6675,28 @@ function renderVisualSummary(elId, charges = [], options = {}) {
   const rows = dailyOperationalRows(charges, options.historyCharges || charges);
   const last = rows[rows.length - 1] || {};
   const prev = rows[rows.length - 2] || {};
+  const hasPrevious = rows.length > 1;
   const revenueDiff = Number(last.revenue || 0) - Number(prev.revenue || 0);
   const countDiff = Number(last.count || 0) - Number(prev.count || 0);
   const energyDiff = Number(last.energy || 0) - Number(prev.energy || 0);
+  const availability = stationAvailabilityFor(
+    currentWorkId,
+    currentStationReportName || canonicalStationNameForWork(currentWorkId, charges[0]?.station || currentWorkName, currentWorkName),
+    currentWorkName
+  );
+  const power = Number(occ.power || options.power || getPower() || 0);
+  const lastOccupation = dailyOccupationPct(last.energy, last.date, availability, power);
+  const previousOccupation = dailyOccupationPct(prev.energy, prev.date, availability, power);
   const occBand = occupationBand(occ.pct);
   const trendGlyph = value => value > 0 ? '&#8599;' : (value < 0 ? '&#8600;' : '&#8594;');
   const imgBolt = "url('assets/brand/v2/09_sobre_midnight.png')";
   const imgBadge = "url('assets/brand/v2/09_sobre_midnight.png')";
   const cards = [
-    { title: 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: `faixa ${occBand.label}: ${occBand.range}`, trend: trendGlyph(occ.pct - 10), cls: occBand.className, img: imgBolt },
-    { title: 'Faturamento', value: fmtBRL(revenue), sub: `${signedMoney(revenueDiff)} vs dia anterior`, trend: trendGlyph(revenueDiff), cls: revenueDiff < 0 ? 'bad' : '', img: imgBadge },
-    { title: 'Consumo de energia', value: fmtKWh(energy), sub: `${signedNumber(energyDiff, ' kWh')} vs dia anterior`, trend: trendGlyph(energyDiff), cls: energyDiff < 0 ? 'warn' : '', img: imgBolt },
-    { title: 'Clientes atendidos', value: String(clients), sub: `${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, trend: trendGlyph(clients), cls: '', img: imgBadge },
-    { title: 'Total de transacoes', value: String(total), sub: `${signedNumber(countDiff)} vs dia anterior`, trend: trendGlyph(countDiff), cls: countDiff < 0 ? 'warn' : '', img: imgBolt }
+    { title: 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: `faixa ${occBand.label}: ${occBand.range}`, trend: trendGlyph(occ.pct - 10), badge: periodChangeBadge(lastOccupation, previousOccupation, hasPrevious), cls: occBand.className, img: imgBolt },
+    { title: 'Faturamento', value: fmtBRL(revenue), sub: `${signedMoney(revenueDiff)} vs dia anterior`, trend: trendGlyph(revenueDiff), badge: periodChangeBadge(last.revenue, prev.revenue, hasPrevious), cls: revenueDiff < 0 ? 'bad' : '', img: imgBadge },
+    { title: 'Consumo de energia', value: fmtKWh(energy), sub: `${signedNumber(energyDiff, ' kWh')} vs dia anterior`, trend: trendGlyph(energyDiff), badge: periodChangeBadge(last.energy, prev.energy, hasPrevious), cls: energyDiff < 0 ? 'warn' : '', img: imgBolt },
+    { title: 'Clientes atendidos', value: String(clients), sub: `${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, trend: trendGlyph(clients), badge: periodChangeBadge(last.clientCount, prev.clientCount, hasPrevious), cls: '', img: imgBadge },
+    { title: 'Total de transacoes', value: String(total), sub: `${signedNumber(countDiff)} vs dia anterior`, trend: trendGlyph(countDiff), badge: periodChangeBadge(last.count, prev.count, hasPrevious), cls: countDiff < 0 ? 'warn' : '', img: imgBolt }
   ];
   el.innerHTML = cards.map((card, index) => `
     <div class="visual-card ${index < 2 ? 'feature main' : ''} ${card.cls || ''}" style="--visual-img:${card.img}">
@@ -6671,7 +6705,10 @@ function renderVisualSummary(elId, charges = [], options = {}) {
         <div class="visual-value">${card.value}</div>
         <div class="visual-sub">${card.sub}</div>
       </div>
-      <div class="visual-trend">${card.trend}</div>
+      <div class="visual-period-trend ${card.badge.cls}" title="Comparacao com ${escapeHtml(prev.label || 'periodo anterior')}">
+        <span>${card.badge.arrow} ${card.badge.text}</span>
+        <small>ultimo periodo</small>
+      </div>
     </div>
   `).join('');
 }
