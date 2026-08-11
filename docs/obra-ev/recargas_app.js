@@ -7773,6 +7773,42 @@ function renderRecentFailureDiagnostics(prefix = 'usage', charges = []) {
   `;
 }
 
+function renderOperationalHealth(prefix = 'usage', charges = []) {
+  const el = document.getElementById(`${prefix}OperationalHealth`);
+  if (!el) return;
+  const stats = cleanOperationStats(charges);
+  const removedShare = stats.total ? stats.removed.length / stats.total * 100 : 0;
+  const qualityClass = removedShare > 15 ? 'warn' : 'good';
+  const recent = recentCharges(charges, 7).charges.sort((a, b) => (b.startDate || 0) - (a.startDate || 0));
+  const failed = recent.filter(isFailedCharge);
+  const inferredIssues = failed.filter(charge => rechargeControlIssue(charge)?.type === 'near_zero');
+  const reasonMap = {};
+  failed.forEach(charge => {
+    const reason = rechargeControlIssue(charge)?.label || 'Sem motivo na planilha';
+    reasonMap[reason] = (reasonMap[reason] || 0) + 1;
+  });
+  const topReason = topEntries(reasonMap, 1)[0];
+  const alertLines = failed.slice(0, 7).map(charge => {
+    const reason = rechargeControlIssue(charge)?.label || 'Sem motivo';
+    const station = safeText(charge.station || charge.workName || 'Unidade').trim();
+    return `<div class="metric-line"><strong>${chargeDayLabel(charge)}</strong><span>${escapeHtml(station)} · ${escapeHtml(reason)}</span><b class="warn">${fmtKWh(charge.energyKWh || 0)}</b></div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="metric-strip">
+      <div class="metric-mini ${failed.length ? 'warn' : 'good'}"><span>Falhas 7 dias</span><strong>${failed.length}</strong><span>${recent.length} tentativa(s) recentes</span></div>
+      <div class="metric-mini ${inferredIssues.length ? 'warn' : 'good'}"><span>Alertas por dados</span><strong>${inferredIssues.length}</strong><span>até 0,25 kWh e R$ 1,00</span></div>
+      <div class="metric-mini ${failed.length ? 'warn' : 'good'}"><span>Taxa de erro</span><strong>${recent.length ? fmtPct(failed.length / recent.length * 100) : '0,00%'}</strong><span>falhas / tentativas recentes</span></div>
+      <div class="metric-mini"><span>Principal motivo</span><strong style="font-size:14px;white-space:normal">${escapeHtml(topReason?.[0] || '-')}</strong><span>${topReason ? `${topReason[1]} ocorrência(s)` : 'sem falhas'}</span></div>
+      <div class="metric-mini good"><span>kWh médio válido</span><strong>${stats.avgKwh.toFixed(1).replace('.', ',')} kWh</strong><span>${stats.executed.length} sessão(ões) executada(s)</span></div>
+      <div class="metric-mini ${qualityClass}"><span>Sessões excluídas da média</span><strong>${stats.removed.length}</strong><span>${fmtPct(removedShare)} da base filtrada</span></div>
+      <div class="metric-mini"><span>Ticket válido</span><strong>${fmtBRL(stats.avgTicket)}</strong><span>somente recargas executadas</span></div>
+      <div class="metric-mini"><span>Potência média válida</span><strong>${stats.avgPower.toFixed(1).replace('.', ',')} kW</strong><span>kWh / horas conectadas válidas</span></div>
+    </div>
+    <div class="note">A média válida ignora falhas declaradas e sessões com até 0,25 kWh e R$ 1,00. Elas seguem salvas para auditoria e são listadas abaixo uma única vez; priorize o motivo recorrente antes de analisar campanhas ou crescimento.</div>
+    <div class="metric-lines">${alertLines || '<div class="metric-line"><strong>OK</strong><span>Nenhuma falha recente para listar. A filtragem de qualidade do período continua aplicada nas métricas válidas.</span><b class="good">0</b></div>'}</div>
+  `;
+}
+
 function clientRecurrenceStats(charges = []) {
   const byClient = {};
   charges.forEach(charge => {
@@ -8008,8 +8044,7 @@ async function renderUsageInsights(charges = [], prefix = 'usage', historyCharge
   renderWeekdayOccupancyReport(`${prefix}WeekdayReport`, charges, weekdayPower, 'Dinamica semanal de ocupacao', weekdayBounds);
   renderDailyOperationalMetrics(prefix, charges, historyCharges);
   await yieldToBrowser();
-  renderRecentFailureDiagnostics(prefix, charges);
-  renderOperationQuality(prefix, charges);
+  renderOperationalHealth(prefix, charges);
   renderNewClients(prefix, charges, historyCharges, options.networkHistory || networkHistoryCharges(historyCharges));
   renderAbsentClientAlerts(prefix, historyCharges);
   await yieldToBrowser();
