@@ -6630,6 +6630,24 @@ function periodChangeBadge(current = 0, previous = 0, hasPrevious = true, format
   return { cls, arrow, text: formatter(change) };
 }
 
+function signedDuration(value = 0) {
+  const n = Number(value || 0);
+  const sign = n > 0.009 ? '+' : (n < -0.009 ? '-' : '');
+  return `${sign}${formatRechargeDuration(Math.abs(n))}`;
+}
+
+function metricPeriodTrend(current, previous, comparison, formatter = signedNumber, inverse = false) {
+  const badge = periodChangeBadge(current, previous, comparison?.hasPrevious, formatter);
+  const cls = inverse && badge.cls !== 'flat'
+    ? (badge.cls === 'up' ? 'down' : 'up')
+    : badge.cls;
+  const label = comparison?.label || 'sem base';
+  return `<div class="metric-period-trend ${cls}">
+    <span class="metric-period-arrow">${badge.arrow}</span>
+    <span><strong>${badge.text}</strong><small>${label}</small></span>
+  </div>`;
+}
+
 function shiftToPreviousMonth(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
   const targetYear = date.getFullYear();
@@ -6640,12 +6658,24 @@ function shiftToPreviousMonth(date) {
 
 function summaryMetrics(charges = []) {
   const clean = cleanOperationStats(charges);
+  const validDurations = clean.executed.map(charge => durToHours(charge.duration)).filter(hours => hours > 0);
+  const revenue = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const count = charges.length;
   return {
-    revenue: charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0),
-    energy: charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0),
-    count: charges.length,
+    revenue,
+    energy,
+    count,
     clients: new Set(charges.map(charge => clientKeyFromCharge(charge)).filter(Boolean)).size,
-    clean
+    clean,
+    avgTicket: count ? revenue / count : 0,
+    revenuePerKwh: energy ? revenue / energy : 0,
+    avgKwh: clean.avgKwh,
+    avgDuration: validDurations.length
+      ? validDurations.reduce((sum, hours) => sum + hours, 0) / validDurations.length
+      : 0,
+    idleValue: charges.reduce((sum, charge) => sum + Number(charge.idleValue || 0), 0),
+    failedCount: charges.filter(charge => isFailedCharge(charge)).length
   };
 }
 
@@ -6687,7 +6717,15 @@ function monthlyEquivalentComparison(charges = [], historyCharges = charges, bou
     occupation = currentEnergy > 0 ? Number(occ?.pct || 0) * metrics.energy / currentEnergy : 0;
   }
 
-  return { hasPrevious: previousCharges.length > 0, label, metrics, occupation, currentMonthKey };
+  return {
+    hasPrevious: previousCharges.length > 0,
+    label,
+    metrics,
+    occupation,
+    currentMonthKey,
+    previousStart,
+    previousEnd
+  };
 }
 
 function dailyOccupationPct(energy = 0, date, availability, power) {
@@ -11140,7 +11178,7 @@ async function renderMensal() {
   renderHero(charges, mk, window);
   renderVisualSummary('monthlyVisualSummary', charges, { bounds: window, historyCharges: allCharges });
   renderCommercialOccupancyPanel(charges, window);
-  renderKPIs(charges, mk, window);
+  renderKPIs(charges, mk, window, allCharges);
   enhanceIndividualKpis();
   renderWeekdayOccupancyReport('weekdayOccupancyMensal', charges, getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
   await yieldToBrowser();
@@ -11187,7 +11225,7 @@ function renderHero(charges, mk, window) {
      <strong style="color:#57B7FF">= ${fmtPct(occ.pct)}</strong>`;
 }
 
-function renderKPIs(charges, mk, window) {
+function renderKPIs(charges, mk, window, historyCharges = charges) {
   const energy  = charges.reduce((s, c) => s + c.energyKWh, 0);
   const rev     = charges.reduce((s, c) => s + c.revenue, 0);
   const avgTkt  = charges.length ? rev / charges.length : 0;
@@ -11212,35 +11250,25 @@ function renderKPIs(charges, mk, window) {
   const calendarDays = Math.max(calendarDayCount(window.start, window.end), 1);
   const avgRevenueDay = rev / calendarDays;
   const avgChargesDay = charges.length / calendarDays;
+  const comparison = monthlyEquivalentComparison(charges, historyCharges, window, occ, occ.power);
+  const previous = comparison.metrics;
+  const previousDays = Math.max(calendarDayCount(comparison.previousStart, comparison.previousEnd), 1);
+  const previousProjection = previous.revenue * (dMonth / previousDays);
+  const metricCard = (label, value, sub, trend = '') => `
+    <div class="card metric-card"><div class="label">${label}</div>
+      <div class="value">${value}</div>
+      <div class="sub">${sub}</div>${trend}</div>`;
 
   document.getElementById('kpiGrid').innerHTML = `
-    <div class="card"><div class="label">Ticket médio</div>
-      <div class="value">${fmtBRL(avgTkt)}</div>
-      <div class="sub">${avgKwh.toFixed(1).replace('.',',')} kWh por sessão válida</div></div>
-    <div class="card"><div class="label">R$/kWh médio</div>
-      <div class="value">${fmtBRL(revKwh)}</div>
-      <div class="sub">receita ÷ energia</div></div>
-    <div class="card"><div class="label">Sessão válida média</div>
-      <div class="value">${avgKwh.toFixed(1).replace('.',',')} kWh</div>
-      <div class="sub">${cleanStats.executed.length} recarga(s) executada(s)</div></div>
-    <div class="card"><div class="label">Tempo médio de recarga</div>
-      <div class="value">${formatRechargeDuration(avgDuration)}</div>
-      <div class="sub">${validDurations.length} sessão(ões) válida(s) com duração</div></div>
-    <div class="card"><div class="label">Projeção mês</div>
-      <div class="value">${fmtBRL(rev * proj)}</div>
-      <div class="sub">${fmtKWh(energy * proj)} se mantiver o ritmo</div></div>
-    <div class="card"><div class="label">Ociosidade</div>
-      <div class="value">${fmtBRL(idleValue)}</div>
-      <div class="sub">valor estimado parado após recarga</div></div>
-    <div class="card"><div class="label">Falhas no período</div>
-      <div class="value">${failedCount}</div>
-      <div class="sub">${charges.length ? fmtPct(failedCount / charges.length * 100) : '0,00%'} das tentativas</div></div>
-    <div class="card"><div class="label">Média de faturamento por dia</div>
-      <div class="value">${fmtBRL(avgRevenueDay)}</div>
-      <div class="sub">${calendarDays} dia(s), incluindo dias sem faturamento</div></div>
-    <div class="card"><div class="label">Média de recargas por dia</div>
-      <div class="value">${avgChargesDay.toFixed(2).replace('.', ',')}</div>
-      <div class="sub">${charges.length} recarga(s) em ${calendarDays} dia(s)</div></div>
+    ${metricCard('Ticket médio', fmtBRL(avgTkt), `${avgKwh.toFixed(1).replace('.', ',')} kWh por sessão válida`, metricPeriodTrend(avgTkt, previous.avgTicket, comparison, signedMoney))}
+    ${metricCard('R$/kWh médio', fmtBRL(revKwh), 'receita ÷ energia', metricPeriodTrend(revKwh, previous.revenuePerKwh, comparison, signedMoney))}
+    ${metricCard('Sessão válida média', `${avgKwh.toFixed(1).replace('.', ',')} kWh`, `${cleanStats.executed.length} recarga(s) executada(s)`, metricPeriodTrend(avgKwh, previous.avgKwh, comparison, value => signedNumber(value, ' kWh')))}
+    ${metricCard('Tempo médio de recarga', formatRechargeDuration(avgDuration), `${validDurations.length} sessão(ões) válida(s) com duração`, metricPeriodTrend(avgDuration, previous.avgDuration, comparison, signedDuration))}
+    ${metricCard('Projeção mês', fmtBRL(rev * proj), `${fmtKWh(energy * proj)} se mantiver o ritmo`, metricPeriodTrend(rev * proj, previousProjection, comparison, signedMoney))}
+    ${metricCard('Ociosidade', fmtBRL(idleValue), 'valor estimado parado após recarga', metricPeriodTrend(idleValue, previous.idleValue, comparison, signedMoney, true))}
+    ${metricCard('Falhas no período', failedCount, `${charges.length ? fmtPct(failedCount / charges.length * 100) : '0,00%'} das tentativas`, metricPeriodTrend(failedCount, previous.failedCount, comparison, signedNumber, true))}
+    ${metricCard('Média de faturamento por dia', fmtBRL(avgRevenueDay), `${calendarDays} dia(s), incluindo dias sem faturamento`, metricPeriodTrend(avgRevenueDay, previous.revenue / previousDays, comparison, signedMoney))}
+    ${metricCard('Média de recargas por dia', avgChargesDay.toFixed(2).replace('.', ','), `${charges.length} recarga(s) em ${calendarDays} dia(s)`, metricPeriodTrend(avgChargesDay, previous.count / previousDays, comparison))}
   `;
 }
 

@@ -214,7 +214,16 @@
     .compact-kpis .card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.9; }
     .compact-kpis .card::after { content:""; position:absolute; right:-28px; bottom:-38px; width:108px; height:108px; border-radius:50%; background:rgba(87,183,255,.075); pointer-events:none; }
     .compact-kpis .card > * { position:relative; z-index:1; }
-    .compact-kpis .card .value { font-size:26px; }
+.compact-kpis .card .value { font-size:26px; }
+.metric-card { display:flex; flex-direction:column; }
+.metric-card .metric-period-trend { align-self:flex-start; display:inline-flex; align-items:center; gap:5px; min-width:0; max-width:100%; margin-top:auto; padding:4px 6px; border-radius:7px; font-size:9px; line-height:1.1; font-weight:900; }
+.metric-card .metric-period-trend > span:last-child { display:grid; gap:1px; min-width:0; }
+.metric-card .metric-period-trend strong { font-size:10px; line-height:1.1; }
+.metric-card .metric-period-trend small { display:block; color:inherit; font-size:8px; font-weight:700; line-height:1.1; opacity:.84; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.metric-card .metric-period-arrow { flex:0 0 auto; font-size:13px; line-height:1; }
+.metric-card .metric-period-trend.up { color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.3); }
+.metric-card .metric-period-trend.down { color:#FFD0D0; background:rgba(230,75,75,.16); border:1px solid rgba(230,75,75,.32); }
+.metric-card .metric-period-trend.flat { color:#FFE4A0; background:rgba(242,169,61,.16); border:1px solid rgba(242,169,61,.3); }
     .day-compare-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; }
     .day-kpi-card { position:relative; overflow:hidden; min-height:118px; border:1px solid var(--surface-border); border-radius:12px; background:var(--surface-bg); padding:14px; box-shadow:var(--p3-shadow); }
     .day-kpi-card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.9; }
@@ -2075,6 +2084,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260811-monthly-trend2"></script>
+<script src="recargas_app.js?v=20260811-kpi-trend3"></script>
 </body>
 </html>
