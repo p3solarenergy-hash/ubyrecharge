@@ -6616,19 +6616,78 @@ function trendInfo(value, formatter = signedNumber) {
   return { cls, arrow, text: formatter(n) };
 }
 
-function periodChangeBadge(current = 0, previous = 0, hasPrevious = true) {
+function periodChangeBadge(current = 0, previous = 0, hasPrevious = true, formatter = signedNumber) {
   if (!hasPrevious) return { cls: 'flat', arrow: '&#8594;', text: 'Sem base' };
   const now = Number(current || 0);
   const before = Number(previous || 0);
   if (Math.abs(before) < 0.0001) {
-    if (Math.abs(now) < 0.0001) return { cls: 'flat', arrow: '&#8594;', text: '0,0%' };
+    if (Math.abs(now) < 0.0001) return { cls: 'flat', arrow: '&#8594;', text: formatter(0) };
     return { cls: 'up', arrow: '&#8599;', text: 'Novo' };
   }
-  const change = (now - before) / Math.abs(before) * 100;
+  const change = now - before;
   const cls = change > 0.009 ? 'up' : (change < -0.009 ? 'down' : 'flat');
   const arrow = cls === 'up' ? '&#8599;' : (cls === 'down' ? '&#8600;' : '&#8594;');
-  const signal = change > 0 ? '+' : (change < 0 ? '-' : '');
-  return { cls, arrow, text: `${signal}${fmtPct(Math.abs(change))}` };
+  return { cls, arrow, text: formatter(change) };
+}
+
+function shiftToPreviousMonth(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  const targetYear = date.getFullYear();
+  const targetMonth = date.getMonth() - 1;
+  const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+  return new Date(targetYear, targetMonth, Math.min(date.getDate(), lastDay), date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+}
+
+function summaryMetrics(charges = []) {
+  const clean = cleanOperationStats(charges);
+  return {
+    revenue: charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0),
+    energy: charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0),
+    count: charges.length,
+    clients: new Set(charges.map(charge => clientKeyFromCharge(charge)).filter(Boolean)).size,
+    clean
+  };
+}
+
+function monthlyEquivalentComparison(charges = [], historyCharges = charges, bounds, occ, power) {
+  const dated = (historyCharges || []).filter(charge => isPlausibleChargeDate(charge?.startDate));
+  const fallbackEnd = dated.reduce((latest, charge) => !latest || charge.startDate > latest ? charge.startDate : latest, null);
+  const end = bounds?.end instanceof Date && !Number.isNaN(bounds.end.getTime()) ? new Date(bounds.end) : fallbackEnd;
+  if (!end) return { hasPrevious: false, label: 'sem base', metrics: summaryMetrics([]), occupation: 0 };
+
+  const start = bounds?.start instanceof Date && !Number.isNaN(bounds.start.getTime())
+    ? new Date(bounds.start)
+    : new Date(end.getFullYear(), end.getMonth(), 1, 0, 0, 0, 0);
+  const previousStart = shiftToPreviousMonth(start);
+  const previousEnd = shiftToPreviousMonth(end);
+  if (!previousStart || !previousEnd || previousEnd < previousStart) {
+    return { hasPrevious: false, label: 'sem base', metrics: summaryMetrics([]), occupation: 0 };
+  }
+
+  const previousCharges = dated.filter(charge => charge.startDate >= previousStart && charge.startDate <= previousEnd);
+  const metrics = summaryMetrics(previousCharges);
+  const previousMonthKey = `${previousEnd.getFullYear()}-${String(previousEnd.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthKey = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
+  const coversWholeMonth = start.getDate() === 1 && end.getDate() === new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+  const label = coversWholeMonth
+    ? `vs ${monthLabel(previousMonthKey)}`
+    : `vs ${monthLabel(previousMonthKey)} (1-${previousEnd.getDate()})`;
+
+  let occupation = 0;
+  const exactCapacity = Number(occ?.maxKWh || 0);
+  if (exactCapacity > 0) {
+    occupation = occByInterval(previousCharges, power, {
+      start: previousStart,
+      end: previousEnd,
+      hours: Math.max((previousEnd - previousStart) / 3_600_000, 0),
+      monthKey: previousMonthKey
+    }).pct;
+  } else {
+    const currentEnergy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+    occupation = currentEnergy > 0 ? Number(occ?.pct || 0) * metrics.energy / currentEnergy : 0;
+  }
+
+  return { hasPrevious: previousCharges.length > 0, label, metrics, occupation, currentMonthKey };
 }
 
 function dailyOccupationPct(energy = 0, date, availability, power) {
@@ -6666,48 +6725,39 @@ function kpiDayTrend(charges = [], metric = 'revenue', historyCharges = charges)
 function renderVisualSummary(elId, charges = [], options = {}) {
   const el = document.getElementById(elId);
   if (!el) return;
-  const total = charges.length;
-  const revenue = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
-  const energy = charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
-  const clients = new Set(charges.map(charge => clientKeyFromCharge(charge)).filter(Boolean)).size;
+  const current = summaryMetrics(charges);
+  const total = current.count;
+  const revenue = current.revenue;
+  const energy = current.energy;
+  const clients = current.clients;
   const occ = options.occ || occByInterval(charges, options.power, options.bounds);
-  const cleanStats = cleanOperationStats(charges);
-  const rows = dailyOperationalRows(charges, options.historyCharges || charges);
-  const last = rows[rows.length - 1] || {};
-  const prev = rows[rows.length - 2] || {};
-  const hasPrevious = rows.length > 1;
-  const revenueDiff = Number(last.revenue || 0) - Number(prev.revenue || 0);
-  const countDiff = Number(last.count || 0) - Number(prev.count || 0);
-  const energyDiff = Number(last.energy || 0) - Number(prev.energy || 0);
-  const availability = stationAvailabilityFor(
-    currentWorkId,
-    currentStationReportName || canonicalStationNameForWork(currentWorkId, charges[0]?.station || currentWorkName, currentWorkName),
-    currentWorkName
-  );
   const power = Number(occ.power || options.power || getPower() || 0);
-  const lastOccupation = dailyOccupationPct(last.energy, last.date, availability, power);
-  const previousOccupation = dailyOccupationPct(prev.energy, prev.date, availability, power);
+  const comparison = options.showMonthComparison === false
+    ? { hasPrevious: false, label: 'sem comparacao', metrics: summaryMetrics([]), occupation: 0 }
+    : monthlyEquivalentComparison(charges, options.historyCharges || charges, options.bounds, occ, power);
+  const previous = comparison.metrics;
   const occBand = occupationBand(occ.pct);
-  const trendGlyph = value => value > 0 ? '&#8599;' : (value < 0 ? '&#8600;' : '&#8594;');
   const imgBolt = "url('assets/brand/v2/09_sobre_midnight.png')";
   const imgBadge = "url('assets/brand/v2/09_sobre_midnight.png')";
   const cards = [
-    { title: 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: `faixa ${occBand.label}: ${occBand.range}`, trend: trendGlyph(occ.pct - 10), badge: periodChangeBadge(lastOccupation, previousOccupation, hasPrevious), cls: occBand.className, img: imgBolt },
-    { title: 'Faturamento', value: fmtBRL(revenue), sub: `${signedMoney(revenueDiff)} vs dia anterior`, trend: trendGlyph(revenueDiff), badge: periodChangeBadge(last.revenue, prev.revenue, hasPrevious), cls: revenueDiff < 0 ? 'bad' : '', img: imgBadge },
-    { title: 'Consumo de energia', value: fmtKWh(energy), sub: `${signedNumber(energyDiff, ' kWh')} vs dia anterior`, trend: trendGlyph(energyDiff), badge: periodChangeBadge(last.energy, prev.energy, hasPrevious), cls: energyDiff < 0 ? 'warn' : '', img: imgBolt },
-    { title: 'Clientes atendidos', value: String(clients), sub: `${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, trend: trendGlyph(clients), badge: periodChangeBadge(last.clientCount, prev.clientCount, hasPrevious), cls: '', img: imgBadge },
-    { title: 'Total de transacoes', value: String(total), sub: `${signedNumber(countDiff)} vs dia anterior`, trend: trendGlyph(countDiff), badge: periodChangeBadge(last.count, prev.count, hasPrevious), cls: countDiff < 0 ? 'warn' : '', img: imgBolt }
+    { title: 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: `faixa ${occBand.label}: ${occBand.range}`, badge: periodChangeBadge(occ.pct, comparison.occupation, comparison.hasPrevious, value => `${value >= 0 ? '+' : '-'}${fmtPct(Math.abs(value))} p.p.`), cls: occBand.className, img: imgBolt },
+    { title: 'Faturamento', value: fmtBRL(revenue), sub: 'acumulado no periodo selecionado', badge: periodChangeBadge(revenue, previous.revenue, comparison.hasPrevious, signedMoney), cls: '', img: imgBadge },
+    { title: 'Consumo de energia', value: fmtKWh(energy), sub: 'energia entregue no periodo', badge: periodChangeBadge(energy, previous.energy, comparison.hasPrevious, value => signedNumber(value, ' kWh')), cls: 'warn', img: imgBolt },
+    { title: 'Clientes atendidos', value: String(clients), sub: `${current.clean.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, badge: periodChangeBadge(clients, previous.clients, comparison.hasPrevious, signedNumber), cls: '', img: imgBadge },
+    { title: 'Total de transacoes', value: String(total), sub: 'recargas no periodo selecionado', badge: periodChangeBadge(total, previous.count, comparison.hasPrevious, signedNumber), cls: 'warn', img: imgBolt }
   ];
   el.innerHTML = cards.map((card, index) => `
     <div class="visual-card ${index < 2 ? 'feature main' : ''} ${card.cls || ''}" style="--visual-img:${card.img}">
       <div class="visual-title">${card.title}</div>
-      <div>
+      <div class="visual-content">
         <div class="visual-value">${card.value}</div>
-        <div class="visual-sub">${card.sub}</div>
       </div>
-      <div class="visual-period-trend ${card.badge.cls}" title="Comparacao com ${escapeHtml(prev.label || 'periodo anterior')}">
-        <span>${card.badge.arrow} ${card.badge.text}</span>
-        <small>ultimo periodo</small>
+      <div class="visual-footer">
+        <div class="visual-sub">${card.sub}</div>
+        <div class="visual-period-trend ${card.badge.cls}" title="Comparacao com o mesmo corte do mes anterior">
+          <span class="visual-period-arrow">${card.badge.arrow}</span>
+          <span><strong>${card.badge.text}</strong><small>${comparison.label}</small></span>
+        </div>
       </div>
     </div>
   `).join('');

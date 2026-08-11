@@ -169,18 +169,23 @@
     .metric-line .warn { color:var(--p3-warn); }
     .metric-line .good { color:#38C96F; }
     .visual-summary { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:12px; margin:18px 0; }
-    .visual-card { grid-column:span 2; position:relative; min-height:132px; overflow:hidden; border-radius:12px; border:1px solid var(--surface-border); background:var(--surface-bg); color:var(--p3-text); box-shadow:var(--p3-shadow); padding:18px 16px; display:flex; flex-direction:column; justify-content:space-between; }
+    .visual-card { grid-column:span 2; position:relative; min-height:136px; overflow:hidden; border-radius:12px; border:1px solid var(--surface-border); background:var(--surface-bg); color:var(--p3-text); box-shadow:var(--p3-shadow); padding:16px; display:flex; flex-direction:column; justify-content:space-between; gap:10px; }
     .visual-card.feature { grid-column:span 3; min-height:152px; }
     .visual-card::before { content:""; position:absolute; inset:auto 0 0 0; height:4px; background:#57B7FF; opacity:.95; }
     .visual-card::after { content:""; display:none; position:absolute; right:-18px; top:-10px; width:120px; height:120px; background:var(--visual-img) center/contain no-repeat; opacity:.07; filter:grayscale(1) brightness(2.1); }
     .visual-card.main::after { display:block; }
-    .visual-card .visual-title { position:relative; z-index:1; color:#BFEAD8; font-size:14px; font-weight:900; line-height:1.25; max-width:72%; }
+    .visual-card .visual-title { position:relative; z-index:1; color:#BFEAD8; font-size:14px; font-weight:900; line-height:1.25; max-width:calc(100% - 30px); }
     .visual-card .visual-value { position:relative; z-index:1; color:#57B7FF; font-size:24px; font-weight:900; line-height:1; }
     .visual-card.feature .visual-value { font-size:30px; }
-    .visual-card .visual-sub { position:relative; z-index:1; color:var(--p3-muted); font-size:11px; margin-top:6px; line-height:1.35; }
+    .visual-card .visual-content { position:relative; z-index:1; min-width:0; }
+    .visual-card .visual-footer { position:relative; z-index:1; display:flex; align-items:flex-end; justify-content:space-between; gap:9px; min-width:0; }
+    .visual-card .visual-sub { color:var(--p3-muted); font-size:11px; line-height:1.35; max-width:58%; min-width:0; }
     .visual-card .visual-trend { position:absolute; right:12px; bottom:16px; z-index:1; display:grid; place-items:center; width:26px; height:26px; border-radius:999px; color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.28); font-weight:900; font-size:15px; }
-    .visual-card .visual-period-trend { position:absolute; right:12px; bottom:14px; z-index:2; display:grid; justify-items:center; gap:2px; min-width:76px; padding:6px 8px; border-radius:7px; color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.28); font-size:12px; font-weight:900; line-height:1.05; white-space:nowrap; }
-    .visual-card .visual-period-trend small { color:inherit; font-size:9px; font-weight:700; opacity:.84; }
+    .visual-card .visual-period-trend { display:inline-flex; align-items:center; gap:5px; flex:0 0 auto; max-width:42%; min-width:0; padding:5px 7px; border-radius:7px; color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.28); font-size:10px; font-weight:900; line-height:1.1; text-align:left; }
+    .visual-card .visual-period-trend > span:last-child { display:grid; gap:2px; min-width:0; }
+    .visual-card .visual-period-trend strong { font-size:10px; line-height:1.1; }
+    .visual-card .visual-period-trend small { display:block; color:inherit; font-size:8px; font-weight:700; line-height:1.1; opacity:.84; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .visual-card .visual-period-arrow { flex:0 0 auto; font-size:14px; line-height:1; }
     .visual-card .visual-period-trend.up { color:#BFEBD6; background:rgba(56,201,111,.16); border-color:rgba(56,201,111,.3); }
     .visual-card .visual-period-trend.down { color:#FFD0D0; background:rgba(230,75,75,.16); border-color:rgba(230,75,75,.32); }
     .visual-card .visual-period-trend.flat { color:#FFE4A0; background:rgba(242,169,61,.16); border-color:rgba(242,169,61,.3); }
@@ -709,6 +714,8 @@
       .metric-strip { grid-template-columns:1fr; }
       .visual-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .visual-card, .visual-card.feature { grid-column:span 1; }
+      .visual-card .visual-footer { align-items:flex-start; flex-direction:column; gap:5px; }
+      .visual-card .visual-sub, .visual-card .visual-period-trend { max-width:100%; }
       .day-compare-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .decision-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .calendar-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
@@ -801,10 +808,12 @@
       canvas { max-height:240px; }
       .pay-grid, .metric-strip, .club-print-foot { grid-template-columns:1fr; }
       .visual-summary { grid-template-columns:1fr 1fr; gap:8px; }
-      .visual-card, .visual-card.feature { grid-column:span 1; min-height:118px; }
-      .visual-card { min-height:118px; padding:14px 12px; }
+      .visual-card, .visual-card.feature { grid-column:span 1; min-height:136px; }
+      .visual-card { min-height:136px; padding:13px 12px; gap:7px; }
       .visual-card .visual-title { font-size:12px; }
       .visual-card .visual-value, .visual-card.feature .visual-value { font-size:19px; }
+      .visual-card .visual-footer { align-items:flex-start; flex-direction:column; gap:4px; }
+      .visual-card .visual-sub, .visual-card .visual-period-trend { max-width:100%; }
       .day-compare-grid { grid-template-columns:1fr 1fr; gap:8px; }
       .day-kpi-card { min-height:112px; padding:12px; }
       .day-kpi-card strong { font-size:20px; }
@@ -2066,6 +2075,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260810-period-trend1"></script>
+<script src="recargas_app.js?v=20260811-monthly-trend2"></script>
 </body>
 </html>
