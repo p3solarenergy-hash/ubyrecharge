@@ -4719,23 +4719,53 @@ function renderFinanceOperationalResults(result = {}) {
   if (!container) return;
   const resultClass = result.operationNet > 0 ? 'good' : (result.operationNet < 0 ? 'bad' : 'warn');
   const marginClass = result.margin >= 20 ? 'good' : (result.margin >= 0 ? 'warn' : 'bad');
+  const energyCost = Number(result.energyCost || 0);
+  const localCosts = Number(result.localExtraCosts || 0);
+  const matrixCost = Number(result.matrizCost || 0);
+  const management = Number(result.management || 0);
+  const platform = Number(result.platform || 0);
+  const royalty = Number(result.ubyRoyalty || 0);
+  const areaParticipation = Number(result.areaParticipation || 0);
+  const directBaseCost = energyCost + localCosts + matrixCost;
+  const distributionCost = management + platform + royalty + areaParticipation;
   const matrizDetails = (result.costRuleDetails || [])
     .filter(item => (item?.isMatrix || String(item?.id || '').startsWith('matriz-')) && Number(item?.actual || 0) > 0)
     .map(item => `${item.label}: ${fmtBRL(item.actual)} (${fmtPerKWh(item.actualPerKWh)})`);
   const matrizSub = matrizDetails.length
     ? matrizDetails.join(' | ')
     : 'nenhum custo compartilhado rateado nesta competencia';
+  container.classList.add('finance-result-stages');
   container.innerHTML = `
-    <div class="finance-result-card"><span>Custo operacional total</span><strong>${fmtBRL(result.totalOperatingCost || 0)}</strong><small>energia + itens + gestao P3 + plataforma</small></div>
-    <div class="finance-result-card"><span>Custos da matriz UBY (competencia)</span><strong>${fmtBRL(result.matrizCost || 0)}</strong><small>${fmtPerKWh(result.matrizCostPerKWh)} do custo por kWh | ${fmtPct(result.matrizCostRevenuePct || 0)} da receita</small><small>${Number(result.matrizCash || 0) ? `Caixa programado no mes: ${fmtBRL(result.matrizCash)}` : 'Sem parcela de matriz a pagar no caixa neste mes'}</small><small>${escapeHtml(matrizSub)}</small></div>
-    <div class="finance-result-card"><span>Custo base planejado por kWh</span><strong>${fmtPerKWh(result.plannedDirectCostPerKWh)}</strong><small>energia, custos locais e matriz | base: ${fmtKWh(result.planning?.planningKWh || 0)}</small></div>
-    <div class="finance-result-card"><span>Custo total projetado por kWh</span><strong>${fmtPerKWh(result.plannedTotalCostPerKWh)}</strong><small>inclui gestao, plataforma, royalties e repasses</small></div>
-    <div class="finance-result-card"><span>Custo efetivo por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>diluido pelos ${fmtKWh(result.energy || 0)} realmente vendidos</small></div>
-    <div class="finance-result-card warn"><span>Ponto de equilibrio</span><strong>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</strong><small>${result.contributionPerKWh > 0 ? `${fmtPerKWh(result.contributionPerKWh)} de contribuicao` : 'preco de venda nao cobre os custos variaveis'}</small></div>
-    <div class="finance-result-card ${resultClass}"><span>Resultado operacional</span><strong>${fmtBRL(result.operationNet || 0)}</strong><small>receitas totais menos todos os custos</small></div>
-    <div class="finance-result-card ${resultClass}"><span>Resultado por kWh</span><strong>${fmtPerKWh(result.resultPerKWh)}</strong><small>resultado diluido pela energia vendida</small></div>
-    <div class="finance-result-card ${marginClass}"><span>Margem operacional</span><strong>${fmtPct(result.operationMargin || 0)}</strong><small>resultado / receitas totais</small></div>
-    <div class="finance-result-card"><span>Preco medio vendido</span><strong>${fmtPerKWh(result.planning?.salePricePerKWh || 0)}</strong><small>comparar com custo efetivo e custo inicial</small></div>
+    <section class="finance-result-stage">
+      <div class="finance-result-stage-head"><h3>1. Custos base da operacao</h3><p>Energia, custos da unidade e rateio da matriz.</p></div>
+      <div class="finance-result-stage-grid">
+        <div class="finance-result-card"><span>Energia eletrica</span><strong>${fmtBRL(energyCost)}</strong><small>${fmtPerKWh(result.energyRate || 0)} aplicado aos ${fmtKWh(result.energy || 0)} vendidos</small></div>
+        <div class="finance-result-card"><span>Custos da unidade</span><strong>${fmtBRL(localCosts)}</strong><small>itens operacionais exclusivos deste carregador</small></div>
+        <div class="finance-result-card"><span>Custos da matriz UBY</span><strong>${fmtBRL(matrixCost)}</strong><small>${fmtPerKWh(result.matrizCostPerKWh)} do custo por kWh | ${fmtPct(result.matrizCostRevenuePct || 0)} da receita</small><small>${escapeHtml(matrizSub)}</small></div>
+        <div class="finance-result-card is-reference"><span>Base planejada por kWh</span><strong>${fmtPerKWh(result.plannedDirectCostPerKWh)}</strong><small>energia, unidade e matriz sobre ${fmtKWh(result.planning?.planningKWh || 0)} planejados</small></div>
+      </div>
+    </section>
+    <section class="finance-result-stage">
+      <div class="finance-result-stage-head"><h3>2. Gestao, plataforma e repasses</h3><p>Custos e distribuicoes calculados sobre a regra comercial do ponto.</p></div>
+      <div class="finance-result-stage-grid">
+        <div class="finance-result-card"><span>Gestao P3</span><strong>${fmtBRL(management)}</strong><small>percentual de gestao sobre o faturamento</small></div>
+        <div class="finance-result-card"><span>App / plataforma</span><strong>${fmtBRL(platform)}</strong><small>servico de terceiros sobre o faturamento</small></div>
+        ${royalty > 0 ? `<div class="finance-result-card"><span>Royalty de marca UBY</span><strong>${fmtBRL(royalty)}</strong><small>uso da marca no modelo comercial selecionado</small></div>` : ''}
+        ${result.areaEligible || areaParticipation > 0 ? `<div class="finance-result-card"><span>Repasse da area</span><strong>${fmtBRL(areaParticipation)}</strong><small>participacao definida para o parceiro/local</small></div>` : ''}
+        <div class="finance-result-card is-reference"><span>Custo total projetado por kWh</span><strong>${fmtPerKWh(result.plannedTotalCostPerKWh)}</strong><small>base + gestao, plataforma, royalties e repasses</small></div>
+      </div>
+    </section>
+    <section class="finance-result-stage finance-result-stage--actual">
+      <div class="finance-result-stage-head"><h3>3. Resultado real da competencia</h3><p>Leitura final sobre as vendas efetivamente registradas no periodo.</p></div>
+      <div class="finance-result-stage-grid">
+        <div class="finance-result-card is-primary"><span>Custo efetivo real por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>${fmtBRL(result.totalOperatingCost || 0)} de custo total, diluido pelos ${fmtKWh(result.energy || 0)} realmente vendidos</small></div>
+        <div class="finance-result-card"><span>Preco medio vendido</span><strong>${fmtPerKWh(result.planning?.salePricePerKWh || 0)}</strong><small>referencia para comparar com o custo efetivo</small></div>
+        <div class="finance-result-card warn"><span>Ponto de equilibrio</span><strong>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</strong><small>${result.contributionPerKWh > 0 ? `${fmtPerKWh(result.contributionPerKWh)} de contribuicao` : 'preco de venda nao cobre os custos variaveis'}</small></div>
+        <div class="finance-result-card ${resultClass} is-primary"><span>Resultado operacional real</span><strong>${fmtBRL(result.operationNet || 0)}</strong><small>receitas menos ${fmtBRL(directBaseCost)} de base e ${fmtBRL(distributionCost)} de gestao, plataforma e repasses</small></div>
+        <div class="finance-result-card ${resultClass}"><span>Resultado por kWh</span><strong>${fmtPerKWh(result.resultPerKWh)}</strong><small>resultado diluido pela energia vendida</small></div>
+        <div class="finance-result-card ${marginClass}"><span>Margem operacional</span><strong>${fmtPct(result.operationMargin || 0)}</strong><small>resultado operacional / receitas totais</small></div>
+      </div>
+    </section>
   `;
 }
 
