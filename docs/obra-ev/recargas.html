@@ -240,7 +240,11 @@
     .kpi-trend.up { color:#BFEBD6; background:rgba(56,201,111,.14); border-color:rgba(56,201,111,.32); }
     .kpi-trend.down { color:#FFD0D0; background:rgba(230,75,75,.14); border-color:rgba(230,75,75,.32); }
     .kpi-trend.flat { color:#FFD66B; background:rgba(242,169,61,.14); border-color:rgba(242,169,61,.32); }
-    .weekday-report { margin-top:18px; }
+    .weekday-report {
+      margin-top:18px;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+    .weekday-report > .card { min-width:0; }
     .weekday-bars { display:grid; gap:8px; }
     .weekday-bar { display:grid; grid-template-columns:46px 1fr 104px; gap:10px; align-items:center; color:var(--p3-muted); font-size:12px; }
     .weekday-bar strong { color:var(--p3-text); }
