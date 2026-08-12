@@ -221,6 +221,12 @@ img[src*="09_sobre_midnight"]{
   transform:scale(2.15);
 }
 
+.uby-sidebar .uby-brand-mark img,
+.uby-topbar .uby-brand-mark img{
+  transform:none;
+  object-fit:contain;
+}
+
 .uby-brand-logo{
   display:block;
   max-width:100%;
