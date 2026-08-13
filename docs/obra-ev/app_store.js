@@ -229,14 +229,12 @@
       if (!rows) return fallback;
       const mapped = rows.map(rowToWork);
       const archivedIds = mapped.filter(item => item.archived).map(item => item.id);
-      if (archivedIds.length) {
-        writeLocal(DELETED_WORKS_KEY, [...new Set([...readLocal(DELETED_WORKS_KEY, []), ...archivedIds])]);
-      }
-      const archived = new Set([...readLocal(DELETED_WORKS_KEY, []), ...archivedIds]);
-      const works = mapped.filter(item => !item.archived && !archived.has(item.id));
-      const merged = mergeWorks(fallback, works);
-      if (merged.length) writeLocal(WORKS_KEY, merged);
-      return merged.length ? merged : fallback;
+    // A successful cloud response is authoritative. Browser-specific cache must
+    // never add or hide works after Supabase has confirmed the official state.
+    writeLocal(DELETED_WORKS_KEY, archivedIds);
+    const works = mapped.filter(item => !item.archived);
+    writeLocal(WORKS_KEY, works);
+    return works;
     } catch (err) {
       console.warn("Falha ao ler obras no Supabase:", err.message);
       return fallback;
