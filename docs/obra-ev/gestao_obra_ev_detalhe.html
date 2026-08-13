@@ -198,7 +198,7 @@
       <div class="ctrl"><label>Carregadores</label><input id="qtdCarregadores" type="number" min="1" step="1"></div>
       <div class="ctrl"><label>kW por carregador</label><input id="potenciaCarregador" type="number" min="1" step="1"></div>
       <div class="ctrl"><label>Entrega prevista</label><input id="entrega" type="date"></div>
-      <div class="ctrl"><label>Status executivo</label><select id="statusExec"><option>Em obra</option><option>Projeto</option><option>Aguardando cliente</option><option>Concluida</option></select></div>
+      <div class="ctrl"><label>Status executivo</label><select id="statusExec"><option>Prospecção / Estudo</option><option>Em obra</option><option>Projeto</option><option>Aguardando cliente</option><option>Concluida</option></select></div>
     </div>
     <div class="controls" style="grid-template-columns:1fr 1fr 1.5fr">
       <div class="ctrl"><label>ID do ponto na prospeccao</label><input id="prospectId" placeholder="Ex: CRM-0001"></div>
@@ -403,6 +403,6 @@ document.getElementById("obraSheetUrl").addEventListener("change",save);
 uploadDocFile=async function(docId,file){if(!file)return;try{const result=await window.UBY_SUPABASE.uploadDocumentFile(obraParam,state.project.obraNome,docId,file);const doc=state.documents.find(d=>d.id===docId);if(doc){doc.link=result.link;doc.storagePath=result.storagePath;doc.fileName=result.fileName;doc.status="done"}localStorage.setItem(storeKey,JSON.stringify(state));recordProjectChange("document",doc?.name||"Documento","Arquivo enviado para Supabase Storage","storagePath","",result.storagePath);await persistDashboardCard();render();alert("Arquivo enviado para o Supabase Storage da obra.")}catch(err){alert("Nao foi possivel enviar para o banco da obra: "+err.message+". Confira login e o bucket obra-documentos no Supabase.")}};
 window.UBY_ACTIVITY?.refresh?.().then(renderProjectActivity).catch(err=>console.warn("Nao foi possivel atualizar historico:",err.message));
 </script>
-</body>
+<script src="prospeccao.js"></script></body>
 </html>
 
