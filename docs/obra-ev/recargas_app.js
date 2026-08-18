@@ -8625,7 +8625,14 @@ function customerRegistryRowsFromSheet(rows = []) {
 }
 
 function customerRegistryIdentityKeys(row = {}) {
-  return [row.email ? `email:${row.email}` : '', row.phone ? `phone:${normalizePhone(row.phone)}` : ''].filter(Boolean);
+  const email = safeText(row.email).trim().toLowerCase();
+  const phone = normalizePhone(row.phone);
+  const name = normalizeHeaderName(row.name || '');
+  return [
+    email ? `email:${email}` : '',
+    phone ? `phone:${phone}` : '',
+    name ? `name:${name}` : ''
+  ].filter(Boolean);
 }
 
 function mergeCustomerRegistry(incoming = [], source = 'importacao manual') {
@@ -8650,15 +8657,28 @@ async function saveCustomerRegistryCloud(payload) {
 
 async function loadCustomerRegistry() {
   try {
-    const cloud = await window.UBY_SUPABASE?.loadRechargeCustomers?.({ limit: 500 });
-    if (Array.isArray(cloud?.rows)) {
-      const rows = cloud.rows.map(row => ({
+    if (!window.UBY_SUPABASE?.loadRechargeCustomers) return;
+    const firstPage = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500 });
+    // Nunca substitua a base local por um resultado vazio que apenas indica
+    // que o Supabase nao esta configurado ou que a sessao expirou.
+    if (!firstPage?.available) return;
+
+    const cloudRows = [...(firstPage.rows || [])];
+    const total = Number(firstPage.count || cloudRows.length);
+    for (let offset = cloudRows.length; offset < total; offset += 500) {
+      const page = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500, offset });
+      if (!page?.available) throw new Error('A conexao com a base de clientes foi interrompida.');
+      cloudRows.push(...(page.rows || []));
+    }
+
+    if (Array.isArray(cloudRows)) {
+      const rows = cloudRows.map(row => ({
         customerKey: row.customer_key, name: row.name || '', email: row.email || '', phone: row.phone || '',
         complement: row.complement || '', chargers: Number(row.chargers_count || 0),
         transactions: Number(row.transactions_count || 0), energy: Number(row.energy_kwh || 0),
         chargeTime: row.charge_time_text || '', spent: Number(row.total_spent || 0), source: row.source || 'banco online'
       }));
-      writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, { rows, total: cloud.count, updatedAt: new Date().toISOString(), source: 'Supabase normalizado' });
+      writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, { rows, total, updatedAt: new Date().toISOString(), source: 'Supabase normalizado' });
     }
   } catch (err) {
     console.warn('Base de clientes mantida no cache local:', err.message);

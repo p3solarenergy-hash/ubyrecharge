@@ -862,7 +862,10 @@
 
   async function loadRechargeCustomers(filters = {}) {
     const sb = client();
-    if (!sb || !(await currentUser())) return { rows: [], count: 0 };
+    // "Sem conexao" nao e o mesmo que uma tabela sem clientes.  Quem chama
+    // esta funcao usa essa distincao para nao apagar o cache local enquanto o
+    // usuario ainda nao entrou no Supabase (ou esta trabalhando offline).
+    if (!sb || !(await currentUser())) return { rows: [], count: 0, available: false };
     const limit = Math.min(Math.max(Number(filters.limit || 100), 1), 500);
     const offset = Math.max(Number(filters.offset || 0), 0);
     let query = sb.from("recharge_customers")
@@ -872,7 +875,7 @@
     if (filters.search) query = query.or(`name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`);
     const { data, error, count } = await query;
     if (error) throw error;
-    return { rows: data || [], count: Number(count || 0) };
+    return { rows: data || [], count: Number(count || 0), available: true };
   }
 
   async function upsertRechargeCustomers(rows = []) {
@@ -880,7 +883,10 @@
     if (!sb) throw new Error("Supabase ainda nao configurado.");
     if (!(await currentUser())) throw new Error("Entre no Supabase antes de salvar clientes.");
     const payload = (Array.isArray(rows) ? rows : []).map((row, index) => ({
-      customer_key: String(row.customerKey || row.customer_key || row.email || row.phone || `manual-${index}`).toLowerCase(),
+      customer_key: String(
+        row.customerKey || row.customer_key || row.email || row.phone ||
+        `name:${String(row.name || '').trim().toLowerCase() || `manual-${index}`}`
+      ).toLowerCase(),
       name: row.name || "", email: row.email || null, phone: row.phone || null,
       complement: row.complement || "", chargers_count: Number(row.chargers || row.chargers_count || 0),
       transactions_count: Number(row.transactions || row.transactions_count || 0),
