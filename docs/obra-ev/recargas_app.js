@@ -8657,6 +8657,7 @@ async function saveCustomerRegistryCloud(payload) {
 
 async function loadCustomerRegistry() {
   try {
+    const local = customerRegistryStore();
     if (!window.UBY_SUPABASE?.loadRechargeCustomers) return;
     const firstPage = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500 });
     // Nunca substitua a base local por um resultado vazio que apenas indica
@@ -8669,6 +8670,21 @@ async function loadCustomerRegistry() {
       const page = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500, offset });
       if (!page?.available) throw new Error('A conexao com a base de clientes foi interrompida.');
       cloudRows.push(...(page.rows || []));
+    }
+
+    // Uma importacao acaba de atualizar o cache local antes de tentar a
+    // sincronizacao online. Nunca deixe uma copia mais antiga da nuvem
+    // (por exemplo, os 80 clientes anteriores) apagar esses registros ao
+    // alternar de aba.
+    const cloudUpdatedAt = cloudRows.reduce((latest, row) => {
+      const timestamp = Date.parse(row?.updated_at || '');
+      return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+    }, 0);
+    const localUpdatedAt = Date.parse(local.updatedAt || '') || 0;
+    if (local.rows.length && localUpdatedAt >= cloudUpdatedAt) {
+      const status = document.getElementById('customerRegistryStatus');
+      if (status && cloudUpdatedAt) status.textContent = 'Base local mais recente preservada; sincronizacao online pendente.';
+      return;
     }
 
     if (Array.isArray(cloudRows)) {
