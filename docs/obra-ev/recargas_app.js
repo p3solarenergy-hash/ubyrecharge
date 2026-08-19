@@ -8603,17 +8603,23 @@ function customerRegistryNumber(value = '') {
 function customerRegistryRow(row = [], headers = []) {
   const email = headerValue(row, headers, ['Email', 'E-mail']).trim().toLowerCase();
   const phoneRaw = headerValue(row, headers, ['Telefone', 'WhatsApp', 'Whatsapp']);
+  const local = headerValue(row, headers, ['Local', 'Estacao', 'Estação']).trim();
   return {
     name: headerValue(row, headers, ['Nome', 'Motorista']),
     complement: headerValue(row, headers, ['Complemento']),
     email,
+    cpf: headerValue(row, headers, ['CPF']).replace(/\D/g, ''),
     phone: normalizePhone(phoneRaw),
     phoneDisplay: phoneRaw,
+    // A exportacao da Spott nao traz uma coluna "Carregadores". O valor
+    // correto para esse relatorio e a quantidade de locais distintos onde o
+    // motorista aparece, calculada na consolidacao abaixo.
     chargers: customerRegistryNumber(headerValue(row, headers, ['Carregadores'])),
     transactions: customerRegistryNumber(headerValue(row, headers, ['Total de transacoes', 'Total de transações', 'Transacoes', 'Transações'])),
     energy: customerRegistryNumber(headerValue(row, headers, ['Total de kWh', 'kWh'])),
     chargeTime: headerValue(row, headers, ['Tempo total de recarga', 'Tempo de recarga']),
-    spent: customerRegistryNumber(headerValue(row, headers, ['Total gasto', 'Faturamento', 'Receita']))
+    spent: customerRegistryNumber(headerValue(row, headers, ['Total gasto', 'Faturamento', 'Receita'])),
+    locations: local ? [local] : []
   };
 }
 
@@ -8627,18 +8633,70 @@ function customerRegistryRowsFromSheet(rows = []) {
 function customerRegistryIdentityKeys(row = {}) {
   const email = safeText(row.email).trim().toLowerCase();
   const phone = normalizePhone(row.phone);
+  const cpf = safeText(row.cpf).replace(/\D/g, '');
   const name = normalizeHeaderName(row.name || '');
   return [
+    cpf ? `cpf:${cpf}` : '',
     email ? `email:${email}` : '',
     phone ? `phone:${phone}` : '',
     name ? `name:${name}` : ''
   ].filter(Boolean);
 }
 
+function consolidateCustomerRegistryRows(incoming = []) {
+  const groups = [];
+  const mergeInto = (target, row) => {
+    target.keys = new Set([...target.keys, ...customerRegistryIdentityKeys(row)]);
+    target.name = target.name || row.name || '';
+    target.complement = target.complement || row.complement || '';
+    target.email = target.email || row.email || '';
+    target.cpf = target.cpf || row.cpf || '';
+    target.phone = target.phone || row.phone || '';
+    target.phoneDisplay = target.phoneDisplay || row.phoneDisplay || '';
+    target.chargers = Math.max(target.chargers, Number(row.chargers || 0));
+    target.transactions += Number(row.transactions || 0);
+    target.energy += Number(row.energy || 0);
+    target.spent += Number(row.spent || 0);
+    target.durationHours += durToHours(row.chargeTime);
+    (Array.isArray(row.locations) ? row.locations : []).forEach(location => {
+      const clean = safeText(location).trim();
+      if (clean) target.locations.add(clean);
+    });
+  };
+  (Array.isArray(incoming) ? incoming : []).forEach(row => {
+    const keys = customerRegistryIdentityKeys(row);
+    let matches = groups.filter(group => keys.some(key => group.keys.has(key)));
+    const target = matches.shift() || {
+      keys: new Set(), name: '', complement: '', email: '', cpf: '', phone: '', phoneDisplay: '',
+      chargers: 0, transactions: 0, energy: 0, spent: 0, durationHours: 0, locations: new Set()
+    };
+    if (!groups.includes(target)) groups.push(target);
+    mergeInto(target, row);
+    // Um registro pode unir grupos antes separados (por exemplo, uma linha
+    // com CPF e outra com e-mail). Junta-los evita duplicar o motorista.
+    matches.forEach(group => {
+      mergeInto(target, {
+        ...group,
+        locations: [...group.locations],
+        chargeTime: String(group.durationHours || 0) + 'h'
+      });
+      const index = groups.indexOf(group);
+      if (index >= 0) groups.splice(index, 1);
+    });
+  });
+  return groups.map(group => ({
+    name: group.name, complement: group.complement, email: group.email, cpf: group.cpf,
+    phone: group.phone, phoneDisplay: group.phoneDisplay || group.phone,
+    chargers: group.locations.size || group.chargers || 0, transactions: group.transactions, energy: group.energy,
+    chargeTime: formatRechargeDuration(group.durationHours), spent: group.spent,
+    locations: [...group.locations].sort()
+  }));
+}
+
 function mergeCustomerRegistry(incoming = [], source = 'importacao manual') {
   const current = customerRegistryStore().rows;
   const rows = [...current];
-  incoming.forEach(next => {
+  consolidateCustomerRegistryRows(incoming).forEach(next => {
     const keys = new Set(customerRegistryIdentityKeys(next));
     const index = rows.findIndex(existing => customerRegistryIdentityKeys(existing).some(key => keys.has(key)));
     if (index >= 0) rows[index] = { ...rows[index], ...next };
