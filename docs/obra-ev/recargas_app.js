@@ -6814,8 +6814,8 @@ function renderDayComparison(prefix = 'usage', charges = [], historyCharges = ch
   const metrics = [
     { label: 'Faturamento do dia', value: fmtBRL(last.revenue), diff: last.revenue - previous.revenue, formatter: signedMoney, sub: `${last.label} vs ${previous.label}` },
     { label: 'Transacoes', value: String(last.count), diff: last.count - previous.count, formatter: value => signedNumber(value), sub: `${last.newClientCount || 0} cliente(s) novo(s)` },
-    { label: 'Energia entregue', value: fmtKWh(last.energy), diff: last.energy - previous.energy, formatter: value => signedNumber(value, ' kWh'), sub: `${last.clientCount || 0} cliente(s) no dia` },
-    { label: 'Falhas do dia', value: String(last.failed || 0), diff: (last.failed || 0) - (previous.failed || 0), formatter: value => signedNumber(value), sub: 'queda em falhas e melhor' }
+    { label: 'Energia entregue', value: fmtKWh(last.energy), diff: last.energy - previous.energy, formatter: value => signedNumber(value, ' kWh'), sub: `${last.clientCount || 0} cliente(s) no dia`, tone: 'is-warning' },
+    { label: 'Falhas do dia', value: String(last.failed || 0), diff: (last.failed || 0) - (previous.failed || 0), formatter: value => signedNumber(value), sub: 'queda em falhas e melhor', tone: (last.failed || 0) > 0 ? 'is-danger' : '' }
   ];
   el.innerHTML = metrics.map(metric => {
     const trend = trendInfo(metric.diff, metric.formatter);
