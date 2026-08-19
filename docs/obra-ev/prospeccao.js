@@ -157,4 +157,22 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
   else mount();
+
+  // O detalhe da obra inicia com uma copia local e troca o objeto `state`
+  // quando a resposta oficial chega do Supabase. Este painel e inserido logo
+  // depois do bootstrap; sem esta checagem ele continuava mostrando a copia
+  // vazia, apesar de a obra ja ter sido carregada da nuvem.
+  const initialState = getState();
+  let refreshAttempts = 0;
+  const refreshFromCloudState = window.setInterval(() => {
+    const current = getState();
+    if (current && current !== initialState) {
+      window.clearInterval(refreshFromCloudState);
+      const panel = document.getElementById('prospecting-panel');
+      if (panel) render(panel);
+      return;
+    }
+    refreshAttempts += 1;
+    if (refreshAttempts >= 60) window.clearInterval(refreshFromCloudState);
+  }, 200);
 })();

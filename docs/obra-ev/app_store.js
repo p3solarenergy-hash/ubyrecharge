@@ -285,13 +285,16 @@
   async function loadDetail(id, fallback) {
     try {
       const user = await requireUser();
-      if (!user) return fallback;
+      // A copia local e somente um fallback de leitura. Ela nunca pode ser
+      // interpretada como uma resposta valida da nuvem, pois a pagina de
+      // detalhe poderia salva-la de volta e substituir dados de outro PC.
+      if (!user) return null;
       const { data, error } = await window.UBY_SUPABASE.client().from("obras").select("raw_data").eq("id", id).maybeSingle();
       if (error) throw error;
-      return data?.raw_data?.project ? data.raw_data : fallback;
+      return data?.raw_data?.project ? data.raw_data : null;
     } catch (err) {
       console.warn("Falha ao ler detalhe no Supabase:", err.message);
-      return fallback;
+      return null;
     } finally {
       if (String(window.__UBY_DETAIL_LOADING_ID__ || "") === String(id || "")) {
         window.__UBY_DETAIL_LOADING_ID__ = "";

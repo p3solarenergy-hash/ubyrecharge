@@ -155,6 +155,7 @@
     <div class="brand"><div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt=""></div><div><div class="brand-name">UBY Recharge</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div></div>
     <h1>Gestao de Obra EV</h1>
     <div class="subtitle" id="subtitle">Rio Beach EV - Implantacao de carregadores</div>
+    <div class="subtitle" id="detailCloudStatus" aria-live="polite">Conferindo a base online da obra…</div>
     <div class="header-meta">
       <div><div class="label">Cliente</div><div class="value" id="mCliente">Rio Beach</div></div>
       <div><div class="label">Local</div><div class="value" id="mLocal">Rio de Janeiro - RJ</div></div>
@@ -296,7 +297,7 @@
   <div class="part-divider"><div class="num">6</div><div><h2>Checklist operacional</h2><p>Marque OK ou N/A para liberar o progresso ate 100%.</p></div></div>
   <section id="checklist"></section>
 
-  <footer><strong>P3 Energy</strong> - Prototipo dedicado da obra EV<br>Dados salvos no navegador para teste visual antes de anexar a plataforma.</footer>
+  <footer><strong>P3 Energy</strong> - Gestão de obra EV<br>Dados locais são uma cópia de segurança; a base oficial é carregada e gravada no Supabase para usuários autenticados.</footer>
 </div>
 
 <script src="sidebar.js"></script>
@@ -304,8 +305,8 @@
 <script src="drive_config.js"></script>
 <script src="supabase_config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_bridge.js?v=20260714-integrity1"></script>
-<script src="app_store.js"></script>
+<script src="supabase_bridge.js?v=20260819-shared-data1"></script>
+<script src="app_store.js?v=20260819-no-empty-overwrite1"></script>
 <script src="activity.js"></script>
 <script>
 const themeKey="p3_obras_theme";const root=document.documentElement;const themeBtn=document.getElementById("themeToggle");function applyTheme(t){root.setAttribute("data-theme",t);themeBtn.textContent=t==="light"?"Lua":"Sol"}applyTheme(localStorage.getItem(themeKey)||"dark");themeBtn.onclick=()=>{const nxt=root.getAttribute("data-theme")==="light"?"dark":"light";localStorage.setItem(themeKey,nxt);applyTheme(nxt)};
@@ -402,7 +403,10 @@ function dashboardCardFromState(){const tasks=allTasks();const s=stats(tasks);co
 document.getElementById("obraSheetUrl").addEventListener("change",save);
 uploadDocFile=async function(docId,file){if(!file)return;try{const result=await window.UBY_SUPABASE.uploadDocumentFile(obraParam,state.project.obraNome,docId,file);const doc=state.documents.find(d=>d.id===docId);if(doc){doc.link=result.link;doc.storagePath=result.storagePath;doc.fileName=result.fileName;doc.status="done"}localStorage.setItem(storeKey,JSON.stringify(state));recordProjectChange("document",doc?.name||"Documento","Arquivo enviado para Supabase Storage","storagePath","",result.storagePath);await persistDashboardCard();render();alert("Arquivo enviado para o Supabase Storage da obra.")}catch(err){alert("Nao foi possivel enviar para o banco da obra: "+err.message+". Confira login e o bucket obra-documentos no Supabase.")}};
 window.UBY_ACTIVITY?.refresh?.().then(renderProjectActivity).catch(err=>console.warn("Nao foi possivel atualizar historico:",err.message));
+// Este indicador confirma a leitura remota sem nunca enviar o estado inicial
+// do navegador. Assim fica visivel quando a tela esta usando a base oficial.
+setTimeout(async()=>{const status=document.getElementById("detailCloudStatus");const paint=(message,color)=>{if(status){status.textContent=message;status.style.color=color}};try{const user=await window.UBY_SUPABASE?.currentUser?.();if(!user){paint("Entre para carregar a base compartilhada; nenhuma cópia local será enviada automaticamente.","var(--p3-muted)");return}const cloud=await window.UBY_STORE?.loadDetail?.(obraParam,null);paint(cloud?.project?"Base oficial carregada do Supabase.":"Base online não confirmada; nenhuma cópia vazia será enviada.",cloud?.project?"var(--p3-ok)":"var(--p3-danger)")}catch(err){paint("Base online não confirmada; nenhuma cópia vazia será enviada.","var(--p3-danger)")}},0);
 </script>
-<script src="prospeccao.js"></script></body>
+<script src="prospeccao.js?v=20260819-cloud-state1"></script></body>
 </html>
 
