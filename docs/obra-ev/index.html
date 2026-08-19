@@ -153,7 +153,9 @@
   .activity-item strong{display:block;color:var(--p3-text);font-size:12px;margin-bottom:3px}
   .activity-item span{display:block;color:var(--p3-muted);font-size:11px;line-height:1.4}
   .activity-item .meta{color:var(--p3-primary);font-weight:800;text-transform:uppercase;letter-spacing:.4px;font-size:9px;margin-bottom:4px}
-  @media(max-width:880px){.activity-grid{grid-template-columns:1fr}}
+  .operational-board{background:linear-gradient(135deg,rgba(19,56,88,.98),rgba(10,29,48,.98));border:1px solid #2C6D9C;border-radius:14px;padding:20px;margin:0 0 28px;box-shadow:var(--p3-shadow)}
+  .operational-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}.operational-head h2{font-size:18px;color:#7FCCFF;margin-bottom:4px}.operational-head .sub{max-width:700px}.operational-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.task-focus{background:rgba(7,20,34,.86);border:1px solid var(--p3-border);border-radius:10px;padding:12px;min-height:156px}.task-focus h3{font-size:12px;color:var(--p3-primary);text-transform:uppercase;letter-spacing:.7px;margin:0 0 9px}.task-focus-item{border-left:3px solid var(--p3-accent);padding:7px 0 7px 9px;border-bottom:1px solid rgba(70,108,139,.34)}.task-focus-item:last-child{border-bottom:0}.task-focus-item.urgent{border-left-color:var(--p3-danger)}.task-focus-item.done{border-left-color:var(--p3-ok)}.task-focus-item strong{display:block;font-size:12px;color:var(--p3-text)}.task-focus-item span{display:block;font-size:10px;color:var(--p3-muted);margin-top:2px}.task-focus-empty{font-size:11px;color:var(--p3-muted);padding:10px 0}
+  @media(max-width:880px){.activity-grid,.operational-columns{grid-template-columns:1fr}.operational-head{flex-direction:column}}
 
 </style>
 </head>
@@ -205,6 +207,18 @@
       <button class="ghost-btn" id="refreshCloud">Atualizar agora</button>
     </div>
   </div>
+
+  <section class="operational-board" aria-label="Controle operacional de tarefas">
+    <div class="operational-head">
+      <div><h2>Controle operacional das obras</h2><div class="sub">Próximos passos, prazos e entregas reunidos em um só lugar. As alterações ficam vinculadas à central compartilhada de tarefas.</div></div>
+      <a class="new-btn" href="../tarefas/">Abrir gestão de tarefas</a>
+    </div>
+    <div class="operational-columns">
+      <div class="task-focus"><h3>Foco de hoje</h3><div id="tasksToday"></div></div>
+      <div class="task-focus"><h3>Próximos 7 dias</h3><div id="tasksWeek"></div></div>
+      <div class="task-focus"><h3>Concluído nesta semana</h3><div id="tasksDoneWeek"></div></div>
+    </div>
+  </section>
 
   <div class="activity-grid">
     <div class="activity-panel">
@@ -345,6 +359,12 @@ function sortObras(list){return [...list].sort((a,b)=>(a.pct??0)-(b.pct??0)||a.n
 async function deleteObra(nome){const alvo=obras.find(o=>o.nome===nome);if(!alvo)return;if(!confirm(`Arquivar a obra "${nome}"? Ela sairá do painel, mas as recargas e todo o histórico continuarão preservados.`))return;const detail=(()=>{try{return alvo.detail||JSON.parse(localStorage.getItem(detailKey(alvo.id))||"null")}catch{return alvo.detail||null}})();const archivedDetail=detail?{...detail,archived:true,project:{...(detail.project||{}),statusExec:"Arquivada"}}:{...alvo,archived:true,status:"Arquivada"};try{const result=await window.UBY_STORE?.saveWork({...alvo,archived:true,status:"Arquivada"},archivedDetail);if(!result?.cloud)throw new Error("não houve confirmação de gravação na base compartilhada. Verifique se você está logado na plataforma.")}catch(err){alert("A obra não foi alterada: "+err.message);return}const deleted=[...new Set([...effectiveDeletedIds(),alvo.id])];localStorage.setItem(deletedKey,JSON.stringify(deleted));obras=normalizeDefaults(obras.filter(o=>o.id!==alvo.id)).map(mergeDetailData);saveObras();renderCards(filteredObras());updateStats();alert("Obra arquivada com segurança. As recargas e o histórico foram preservados.")}
 function filteredObras(){const q=document.getElementById("searchInput").value.toLowerCase();return sortObras(obras.filter(o=>[o.nome,o.cliente,o.local,o.status,...o.flags].join(" ").toLowerCase().includes(q)))}
 function updateStats(){document.getElementById("statObras").textContent=obras.length;const avg=obras.length?Math.round(obras.reduce((a,o)=>a+o.pct,0)/obras.length):0;document.getElementById("statProgresso").innerHTML=avg+'<span class="unit">%</span>';document.getElementById("statCriticas").textContent=obras.reduce((a,o)=>a+o.crit,0);document.getElementById("statKw").innerHTML=obras.reduce((a,o)=>a+o.kw,0)+'<span class="unit">kW</span>';renderPhases();renderMacro()}
+function operationalTasks(){try{return JSON.parse(localStorage.getItem("uby-tarefas-v1"))||[]}catch{return[]}}
+function taskDaysUntil(due){if(!due)return 999;const now=new Date();now.setHours(0,0,0,0);const date=new Date(`${due}T00:00:00`);return Math.round((date-now)/86400000)}
+function taskText(value){return String(value||"").replace(/[&<>\"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[char]))}
+function taskFocusMarkup(items,empty,done=false){if(!items.length)return `<div class="task-focus-empty">${empty}</div>`;return items.slice(0,4).map(task=>{const days=taskDaysUntil(task.due);const deadline=done?`Concluída ${new Date(task.completedAt).toLocaleDateString("pt-BR")}`:(!task.due?"Sem prazo":days<0?`${Math.abs(days)} dia(s) atrasada`:days===0?"Prazo hoje":days===1?"Prazo amanhã":`Prazo em ${days} dias`);return `<div class="task-focus-item ${done?"done":days<=0?"urgent":""}"><strong>${taskText(task.title)}</strong><span>${taskText(task.project||"Geral")} · ${taskText(task.owner||"Sem responsável")} · ${deadline}</span></div>`}).join("")}
+function renderOperationalTasks(tasks=operationalTasks()){const open=tasks.filter(task=>task.status!=="Concluida");const today=open.filter(task=>taskDaysUntil(task.due)<=0).sort((a,b)=>taskDaysUntil(a.due)-taskDaysUntil(b.due));const week=open.filter(task=>{const days=taskDaysUntil(task.due);return days>=1&&days<=7}).sort((a,b)=>taskDaysUntil(a.due)-taskDaysUntil(b.due));const weekStart=Date.now()-7*86400000;const completed=tasks.filter(task=>task.status==="Concluida"&&task.completedAt&&new Date(task.completedAt).getTime()>=weekStart).sort((a,b)=>new Date(b.completedAt)-new Date(a.completedAt));document.getElementById("tasksToday").innerHTML=taskFocusMarkup(today,"Nenhuma tarefa vencida ou para hoje.");document.getElementById("tasksWeek").innerHTML=taskFocusMarkup(week,"Nenhuma tarefa com prazo nos próximos 7 dias.");document.getElementById("tasksDoneWeek").innerHTML=taskFocusMarkup(completed,"As conclusões desta semana aparecerão aqui.",true)}
+async function refreshOperationalTasks(){const local=operationalTasks();renderOperationalTasks(local);try{const cloud=await window.UBY_STORE?.loadTasks(local);if(Array.isArray(cloud)){localStorage.setItem("uby-tarefas-v1",JSON.stringify(cloud));renderOperationalTasks(cloud)}}catch(err){console.warn("Falha ao carregar tarefas compartilhadas:",err.message)}}
 function stageLabel(status){if(/prospec|estudo/i.test(status))return"Prospecção / Estudo";if(/conclu/i.test(status))return"Concluida";if(/obra/i.test(status))return"Em obra";if(/aguard/i.test(status))return"Aguardando cliente";return"Projeto"}
 function renderMacro(){const total=obras.length||1;const crit=obras.reduce((a,o)=>a+o.crit,0);const low=sortObras(obras).filter(o=>o.pct<50);const highPower=[...obras].sort((a,b)=>b.kw-a.kw)[0];const stuck=sortObras(obras).find(o=>o.crit>0)||low[0];const priorityProspects=prospects.filter(p=>p.prioridade.startsWith("1."));const insights=[];if(stuck)insights.push(["Atencao operacional",`${stuck.nome} pede foco: ${stuck.pct}% de avanco, ${stuck.crit} critica(s) e status ${stuck.status}.`,stuck.crit?"danger":"warn"]);if(highPower)insights.push(["Maior impacto tecnico",`${highPower.nome} concentra ${highPower.kw} kW. Antes de acelerar compras, validar demanda, DLM e concessionaria.`,highPower.kw>=50?"warn":"ok"]);insights.push(["Prospecao alimentando obras",`${priorityProspects.length} ponto(s) de prioridade 1 na base. Proximo corte: transformar estudo aprovado em obra vinculada.`,"ok"]);document.getElementById("macroInsights").innerHTML=insights.slice(0,3).map(i=>`<div class="macro-item ${i[2]}"><strong>${i[0]}</strong><span>${i[1]}</span></div>`).join("");const order=["Prospecção / Estudo","Projeto","Aguardando cliente","Em obra","Concluida"];document.getElementById("pipelineChart").innerHTML=order.map(stage=>{const count=obras.filter(o=>stageLabel(o.status)===stage).length;const pct=Math.round(count/total*100);return`<div class="pipeline-row"><strong>${stage}</strong><div class="pipeline-track"><div class="pipeline-fill" style="width:${pct}%;background:${stage==="Concluida"?"var(--p3-ok)":stage==="Em obra"?"var(--p3-warn)":"var(--p3-accent)"}"></div></div><span>${count}</span></div>`}).join("")}
 function createSlug(text){return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,48)||("obra-"+Date.now())}
@@ -405,7 +425,7 @@ document.getElementById("importBackup").addEventListener("click",()=>document.ge
 document.getElementById("backupFile").addEventListener("change",e=>window.UBY_BACKUP.importFile(e.target.files[0]));
 document.getElementById("refreshCloud").addEventListener("click",()=>refreshCloudData({manual:true}));
 document.getElementById("sendGeneralMessage").addEventListener("click",sendGeneralMessage);
-async function initData(){renderPhases();renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();try{await window.UBY_ACTIVITY?.refresh?.();await refreshCloudData();renderActivityCenter();}catch(err){setCloudStatus("Banco indisponivel: "+err.message,"danger")}}
+async function initData(){renderPhases();renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();renderOperationalTasks();try{await window.UBY_ACTIVITY?.refresh?.();await refreshCloudData();await refreshOperationalTasks();renderActivityCenter();}catch(err){setCloudStatus("Banco indisponivel: "+err.message,"danger")}}
 initData();
 </script>
 </body>

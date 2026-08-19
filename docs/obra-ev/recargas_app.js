@@ -11261,6 +11261,7 @@ async function renderMensal() {
   const window = periodWindow(monthCharges, mk);
   const charges = filterChargesByWindow(monthCharges, window);
   if (!charges.length) {
+    renderDayComparison('usage', [], allCharges);
     renderVisualSummary('monthlyVisualSummary', [], { historyCharges: allCharges });
     renderCommercialOccupancyPanel([], window);
     renderWeekdayOccupancyReport('weekdayOccupancyMensal', [], getPower(), `Dinamica semanal - ${monthLabel(mk)}`, window);
@@ -11270,6 +11271,7 @@ async function renderMensal() {
   }
 
   renderHero(charges, mk, window);
+  renderDayComparison('usage', charges, allCharges);
   renderVisualSummary('monthlyVisualSummary', charges, { bounds: window, historyCharges: allCharges });
   renderCommercialOccupancyPanel(charges, window);
   renderKPIs(charges, mk, window, allCharges);
