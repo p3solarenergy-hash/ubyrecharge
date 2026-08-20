@@ -6823,11 +6823,10 @@ function renderDayComparison(prefix = 'usage', charges = [], historyCharges = ch
       ? (metric.diff < 0 ? 'up' : (metric.diff > 0 ? 'down' : 'flat'))
       : trend.cls;
     return `
-      <div class="day-kpi-card">
+      <div class="day-kpi-card ${metric.tone || ''}" style="--day-visual-img:url('assets/brand/v2/09_sobre_midnight.png')">
         <div class="label">${metric.label}</div>
         <strong>${metric.value}</strong>
-        <small>${metric.sub}</small>
-        <span class="trend-badge ${trendClass}">${trend.arrow} ${trend.text}</span>
+        <div class="day-footer"><small>${metric.sub}</small><span class="trend-badge ${trendClass}"><span>${trend.arrow}</span><span><strong>${trend.text}</strong><small>vs ${previous.label}</small></span></span></div>
       </div>
     `;
   }).join('');
