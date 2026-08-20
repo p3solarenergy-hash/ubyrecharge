@@ -56,7 +56,7 @@
       nome: row.nome,
       cliente: row.cliente || raw.cliente || row.nome,
       local: row.local || raw.local || "",
-      status: row.status_exec || raw.status || "Projeto",
+      status: String(row.id) === "malassise" ? "Concluida" : (row.status_exec || raw.status || "Projeto"),
       kind: raw.kind || ((row.criticas || 0) ? "danger" : "warn"),
       pct: Number(row.progresso || 0),
       kw: Number(row.potencia_kw || 0),
