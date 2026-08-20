@@ -64,6 +64,7 @@
       crit: Number(row.criticas || 0),
       flags: raw.flags || [],
       obraSheetUrl: raw.project?.obraSheetUrl || raw.obraSheetUrl || "",
+      mapLocation: raw.project?.mapLocation || raw.mapLocation || null,
       archived: Boolean(raw.archived || /arquivad/i.test(row.status_exec || "")),
       detail: raw.project ? raw : null,
       link: detailLink(row.id)

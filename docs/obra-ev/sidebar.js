@@ -10,6 +10,7 @@
   const engineeringHref = inPrototypes ? "../../docs/obra-ev/engenharia.html" : base + "engenharia.html";
   const analyzersHref = inPrototypes ? "../../docs/obra-ev/analisadores/dashboard.html" : base + "analisadores/dashboard.html";
   const marketHref = inPrototypes ? "../../docs/obra-ev/mercado.html" : base + "mercado.html";
+  const mapHref = inPrototypes ? "../../docs/obra-ev/mapa-implantacao.html" : base + "mapa-implantacao.html";
   const recargasHref = inPrototypes ? "../../docs/obra-ev/recargas.html" : base + "recargas.html";
   const recargasFinanceiroHref = inPrototypes ? "../../docs/obra-ev/recargas-financeiro.html" : base + "recargas-financeiro.html";
   const tasksHref = inAnalyzers ? "../../tarefas/" : inTasks ? "./" : inRoot ? "tarefas/" : "../tarefas/";
@@ -18,6 +19,7 @@
   const isDetail = current === "gestao_obra_ev_detalhe.html";
   const isEngineering = current === "engenharia.html";
   const isMarket = current === "mercado.html";
+  const isMap = current === "mapa-implantacao.html";
   const isRecargas = current === "recargas.html" || current === "recargas-financeiro.html" || current === "financeiro.html";
   const isLogin = current === "login.html";
   const isAnalyzer = inAnalyzers;
@@ -41,7 +43,7 @@
     return isAdmin || module === "login" || (profile?.modules || []).includes(module);
   }
 
-  const currentModule = isLogin ? "login" : isTasks ? "tasks" : isAnalyzer ? "analyzers" : isEngineering ? "engineering" : isMarket ? "market" : isRecargas ? "recargas" : isDetail ? "detail" : isDashboard ? "dashboard" : isHome ? "home" : "home";
+  const currentModule = isLogin ? "login" : isTasks ? "tasks" : isAnalyzer ? "analyzers" : isEngineering ? "engineering" : isMarket ? "market" : isRecargas ? "recargas" : isMap ? "dashboard" : isDetail ? "detail" : isDashboard ? "dashboard" : isHome ? "home" : "home";
   if (!profile && currentModule !== "login") {
     const next = encodeURIComponent(`${location.pathname}${location.search}${location.hash}`);
     location.href = `${loginHref}?next=${next}`;
@@ -58,6 +60,7 @@
       items: [
         ["Pagina inicial", home, "P", isHome, "home"],
         ["Dashboard obras", dashboardHref, "O", isDashboard && !isHome, "dashboard"],
+        ["Mapa de implantacao", mapHref, "P", isMap, "dashboard"],
         ["Mercado", marketHref, "M", isMarket, "market"],
         ["Recargas", recargasHref, "G", isRecargas, "recargas"],
         ["Financeiro recargas", recargasFinanceiroHref, "F", current === "recargas-financeiro.html", "recargas"],
@@ -68,6 +71,7 @@
       title: "Gestao de obra",
       items: [
         ["Controle de obras", dashboardHref, "C", isDashboard && !isHome, "dashboard"],
+        ["Mapa de implantacao", mapHref, "P", isMap, "dashboard"],
         ["Concessionaria", engineeringHref, "K", isEngineering, "utility"],
         ["Orcamentos", dashboardHref + "#obras", "R", false, "budgets"],
         ["Operacao de recargas", recargasHref, "G", isRecargas, "recargas"],
