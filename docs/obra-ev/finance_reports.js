@@ -291,8 +291,6 @@
         { value: brl(current.operationNet), label: 'Resultado operacional', className: current.operationNet >= 0 ? 'positive' : 'negative' },
         { value: count(current.charges), label: 'Recargas' },
         { value: count(current.clients), label: 'Clientes' },
-        { value: perKwh(current.plannedDirectCostPerKWh), label: 'Custo base planejado por kWh' },
-        { value: perKwh(current.plannedTotalCostPerKWh), label: 'Custo total projetado por kWh' },
         { value: perKwh(current.totalCostPerKWh), label: 'Custo efetivo por kWh' },
         { value: perKwh(current.matrizCostPerKWh), label: 'Matriz UBY por kWh (competencia)' },
         { value: pct(current.operationMargin), label: 'Margem operacional', className: current.operationMargin >= 0 ? 'positive' : 'negative' }
