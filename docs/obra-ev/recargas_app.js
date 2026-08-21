@@ -6801,7 +6801,7 @@ function renderVisualSummary(elId, charges = [], options = {}) {
   `).join('');
 }
 
-function renderDayComparison(prefix = 'usage', charges = [], historyCharges = charges, options = {}) {
+function renderDayComparison(prefix = 'usage', charges = [], historyCharges = charges) {
   const el = document.getElementById(`${prefix}DayCompare`);
   if (!el) return;
   const rows = dailyOperationalRows(charges, historyCharges);
@@ -6811,15 +6811,9 @@ function renderDayComparison(prefix = 'usage', charges = [], historyCharges = ch
   }
   const last = rows[rows.length - 1];
   const previous = rows[rows.length - 2] || { label: 'dia anterior', revenue: 0, count: 0, energy: 0, clientCount: 0, failed: 0 };
-  const dailyNetworkChargerCounts = options.dailyNetworkChargerCounts || {};
-  const lastNetworkChargers = Number(dailyNetworkChargerCounts[last.key] || 0);
-  const previousNetworkChargers = Number(dailyNetworkChargerCounts[previous.key] || 0);
-  const lastNetworkAverage = lastNetworkChargers ? last.count / lastNetworkChargers : 0;
-  const previousNetworkAverage = previousNetworkChargers ? previous.count / previousNetworkChargers : 0;
   const metrics = [
     { label: 'Faturamento do dia', value: fmtBRL(last.revenue), diff: last.revenue - previous.revenue, formatter: signedMoney, sub: `${last.label} vs ${previous.label}` },
     { label: 'Transacoes', value: String(last.count), diff: last.count - previous.count, formatter: value => signedNumber(value), sub: `${last.newClientCount || 0} cliente(s) novo(s)` },
-    ...(lastNetworkChargers ? [{ label: 'Media da rede no dia', value: lastNetworkAverage.toLocaleString('pt-BR', { maximumFractionDigits: 1 }), diff: lastNetworkAverage - previousNetworkAverage, formatter: value => signedNumber(value), sub: `${last.count} recarga(s) em ${lastNetworkChargers} carregador(es)` }] : []),
     { label: 'Energia entregue', value: fmtKWh(last.energy), diff: last.energy - previous.energy, formatter: value => signedNumber(value, ' kWh'), sub: `${last.clientCount || 0} cliente(s) no dia`, tone: 'is-warning' },
     { label: 'Falhas do dia', value: String(last.failed || 0), diff: (last.failed || 0) - (previous.failed || 0), formatter: value => signedNumber(value), sub: 'queda em falhas e melhor', tone: (last.failed || 0) > 0 ? 'is-danger' : '' }
   ];
@@ -8170,7 +8164,7 @@ async function renderUsageInsights(charges = [], prefix = 'usage', historyCharge
   const weekdayBounds = options.weekdayBounds || options.bounds || null;
   renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
   renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
-  renderDayComparison(prefix, charges, historyCharges, options);
+  renderDayComparison(prefix, charges, historyCharges);
   renderWeekdayOccupancyReport(`${prefix}WeekdayReport`, charges, weekdayPower, 'Dinamica semanal de ocupacao', weekdayBounds);
   renderDailyOperationalMetrics(prefix, charges, historyCharges);
   await yieldToBrowser();
@@ -10689,12 +10683,19 @@ async function renderUbyOperation() {
   const dcCount = included.filter(row => row.kind === 'dc').length;
   const acCount = included.filter(row => row.kind === 'ac').length;
   const totalCharges = allUbyCharges.length;
-  const averageNetworkCharges = included.length ? totalCharges / included.length : 0;
-  const dailyNetworkChargerCounts = included.reduce((counts, row) => {
-    new Set(row.charges.map(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()) ? chargeDayKeyFromDate(charge.startDate) : '').filter(Boolean))
-      .forEach(dayKey => { counts[dayKey] = (counts[dayKey] || 0) + 1; });
-    return counts;
-  }, {});
+  const dailyNetworkAverages = included.map(row => {
+    const dates = row.charges.map(charge => charge.startDate).filter(date => date && !Number.isNaN(date.getTime()));
+    const firstDay = dates.length ? dateOnly(new Date(Math.min(...dates))) : null;
+    const lastDay = dates.length ? dateOnly(new Date(Math.max(...dates))) : null;
+    const daysWithData = firstDay && lastDay ? Math.round((lastDay - firstDay) / 86_400_000) + 1 : 0;
+    return { stationName: row.stationName || row.workName || 'Carregador', dailyAverage: daysWithData ? row.count / daysWithData : 0 };
+  });
+  const averageNetworkCharges = dailyNetworkAverages.length
+    ? dailyNetworkAverages.reduce((sum, row) => sum + row.dailyAverage, 0) / dailyNetworkAverages.length
+    : 0;
+  const dailyNetworkBreakdown = dailyNetworkAverages.slice(0, 3)
+    .map(row => `${row.stationName}: ${row.dailyAverage.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/dia`)
+    .join(' · ');
   const cleanStats = cleanOperationStats(allUbyCharges);
   const avgTicket = cleanStats.avgTicket;
   const validDurations = cleanStats.executed
@@ -10758,7 +10759,7 @@ async function renderUbyOperation() {
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
     <div class="card"><div class="label">Carregadores UBY</div><div class="value">${included.length}</div><div class="sub">${dcCount} DC / ${acCount} AC incluidos</div></div>
-    <div class="card"><div class="label">Media de carregamentos da rede</div><div class="value">${averageNetworkCharges.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="sub">${totalCharges} recargas validas ÷ ${included.length} carregador(es) ativo(s)</div></div>
+    <div class="card"><div class="label">Media de recargas da rede por dia</div><div class="value">${averageNetworkCharges.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="sub">Media diaria dos ${included.length} carregador(es) ativos${dailyNetworkBreakdown ? `<br>${dailyNetworkBreakdown}` : ''}</div></div>
     <div class="card"><div class="label">Melhor unidade UBY</div><div class="value" style="font-size:18px;white-space:normal">${included[0]?.stationName || '-'}</div><div class="sub">${included[0] ? fmtBRL(included[0].revenue) : 'sem dados'}</div></div>
   `;
 
@@ -10767,8 +10768,7 @@ async function renderUbyOperation() {
   scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower },
     weekdayPower: calendarPower,
-    weekdayBounds: { start: firstPeriod, end: lastPeriod },
-    dailyNetworkChargerCounts
+    weekdayBounds: { start: firstPeriod, end: lastPeriod }
   }));
 
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
