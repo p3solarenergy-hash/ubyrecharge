@@ -10683,6 +10683,7 @@ async function renderUbyOperation() {
   const dcCount = included.filter(row => row.kind === 'dc').length;
   const acCount = included.filter(row => row.kind === 'ac').length;
   const totalCharges = allUbyCharges.length;
+  const averageNetworkCharges = included.length ? totalCharges / included.length : 0;
   const cleanStats = cleanOperationStats(allUbyCharges);
   const avgTicket = cleanStats.avgTicket;
   const validDurations = cleanStats.executed
@@ -10746,6 +10747,7 @@ async function renderUbyOperation() {
     <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
     <div class="card"><div class="label">Carregadores UBY</div><div class="value">${included.length}</div><div class="sub">${dcCount} DC / ${acCount} AC incluidos</div></div>
+    <div class="card"><div class="label">Media de carregamentos da rede</div><div class="value">${averageNetworkCharges.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="sub">${totalCharges} recargas validas ÷ ${included.length} carregador(es) ativo(s)</div></div>
     <div class="card"><div class="label">Melhor unidade UBY</div><div class="value" style="font-size:18px;white-space:normal">${included[0]?.stationName || '-'}</div><div class="sub">${included[0] ? fmtBRL(included[0].revenue) : 'sem dados'}</div></div>
   `;
 

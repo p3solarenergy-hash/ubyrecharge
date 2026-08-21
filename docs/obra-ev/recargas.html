@@ -831,9 +831,13 @@
       .visual-card .visual-value, .visual-card.feature .visual-value { font-size:19px; }
       .visual-card .visual-footer { align-items:flex-start; flex-direction:column; gap:4px; }
       .visual-card .visual-sub, .visual-card .visual-period-trend { max-width:100%; }
-      .day-compare-grid { grid-template-columns:1fr 1fr; gap:8px; }
-      .day-kpi-card { min-height:112px; padding:12px; }
+      .day-compare-grid { grid-template-columns:1fr; gap:8px; }
+      .day-kpi-card { min-height:138px; padding:12px; gap:7px; }
       .day-kpi-card strong { font-size:20px; }
+      .day-kpi-card .day-footer { align-items:flex-end; flex-direction:row; gap:8px; }
+      .day-kpi-card .day-footer > small { max-width:58%; min-height:0; }
+      .day-kpi-card .trend-badge { max-width:42%; width:max-content; padding:4px 6px; }
+      .day-kpi-card .trend-badge strong { font-size:9px; }
       .weekday-bar { grid-template-columns:38px 1fr 82px; gap:8px; }
       .metric-mini { min-height:auto; }
       .metric-line { grid-template-columns:1fr auto; gap:6px; }
