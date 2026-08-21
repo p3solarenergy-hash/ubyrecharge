@@ -6801,7 +6801,7 @@ function renderVisualSummary(elId, charges = [], options = {}) {
   `).join('');
 }
 
-function renderDayComparison(prefix = 'usage', charges = [], historyCharges = charges) {
+function renderDayComparison(prefix = 'usage', charges = [], historyCharges = charges, options = {}) {
   const el = document.getElementById(`${prefix}DayCompare`);
   if (!el) return;
   const rows = dailyOperationalRows(charges, historyCharges);
@@ -6811,9 +6811,15 @@ function renderDayComparison(prefix = 'usage', charges = [], historyCharges = ch
   }
   const last = rows[rows.length - 1];
   const previous = rows[rows.length - 2] || { label: 'dia anterior', revenue: 0, count: 0, energy: 0, clientCount: 0, failed: 0 };
+  const dailyNetworkChargerCounts = options.dailyNetworkChargerCounts || {};
+  const lastNetworkChargers = Number(dailyNetworkChargerCounts[last.key] || 0);
+  const previousNetworkChargers = Number(dailyNetworkChargerCounts[previous.key] || 0);
+  const lastNetworkAverage = lastNetworkChargers ? last.count / lastNetworkChargers : 0;
+  const previousNetworkAverage = previousNetworkChargers ? previous.count / previousNetworkChargers : 0;
   const metrics = [
     { label: 'Faturamento do dia', value: fmtBRL(last.revenue), diff: last.revenue - previous.revenue, formatter: signedMoney, sub: `${last.label} vs ${previous.label}` },
     { label: 'Transacoes', value: String(last.count), diff: last.count - previous.count, formatter: value => signedNumber(value), sub: `${last.newClientCount || 0} cliente(s) novo(s)` },
+    ...(lastNetworkChargers ? [{ label: 'Media da rede no dia', value: lastNetworkAverage.toLocaleString('pt-BR', { maximumFractionDigits: 1 }), diff: lastNetworkAverage - previousNetworkAverage, formatter: value => signedNumber(value), sub: `${last.count} recarga(s) em ${lastNetworkChargers} carregador(es)` }] : []),
     { label: 'Energia entregue', value: fmtKWh(last.energy), diff: last.energy - previous.energy, formatter: value => signedNumber(value, ' kWh'), sub: `${last.clientCount || 0} cliente(s) no dia`, tone: 'is-warning' },
     { label: 'Falhas do dia', value: String(last.failed || 0), diff: (last.failed || 0) - (previous.failed || 0), formatter: value => signedNumber(value), sub: 'queda em falhas e melhor', tone: (last.failed || 0) > 0 ? 'is-danger' : '' }
   ];
@@ -8164,7 +8170,7 @@ async function renderUsageInsights(charges = [], prefix = 'usage', historyCharge
   const weekdayBounds = options.weekdayBounds || options.bounds || null;
   renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
   renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
-  renderDayComparison(prefix, charges, historyCharges);
+  renderDayComparison(prefix, charges, historyCharges, options);
   renderWeekdayOccupancyReport(`${prefix}WeekdayReport`, charges, weekdayPower, 'Dinamica semanal de ocupacao', weekdayBounds);
   renderDailyOperationalMetrics(prefix, charges, historyCharges);
   await yieldToBrowser();
@@ -10684,6 +10690,11 @@ async function renderUbyOperation() {
   const acCount = included.filter(row => row.kind === 'ac').length;
   const totalCharges = allUbyCharges.length;
   const averageNetworkCharges = included.length ? totalCharges / included.length : 0;
+  const dailyNetworkChargerCounts = included.reduce((counts, row) => {
+    new Set(row.charges.map(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()) ? chargeDayKeyFromDate(charge.startDate) : '').filter(Boolean))
+      .forEach(dayKey => { counts[dayKey] = (counts[dayKey] || 0) + 1; });
+    return counts;
+  }, {});
   const cleanStats = cleanOperationStats(allUbyCharges);
   const avgTicket = cleanStats.avgTicket;
   const validDurations = cleanStats.executed
@@ -10756,7 +10767,8 @@ async function renderUbyOperation() {
   scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower },
     weekdayPower: calendarPower,
-    weekdayBounds: { start: firstPeriod, end: lastPeriod }
+    weekdayBounds: { start: firstPeriod, end: lastPeriod },
+    dailyNetworkChargerCounts
   }));
 
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
