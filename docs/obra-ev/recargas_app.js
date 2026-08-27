@@ -10717,30 +10717,38 @@ async function renderUbyOperation() {
   const energy = included.reduce((sum, row) => sum + row.energy, 0);
   const clients = new Set(allUbyCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
   const acdc = generalAcDcStats(allUbyCharges);
+  const dcChargesOnly = allUbyCharges.filter(charge => chargerKind(charge) === 'dc');
+  const acChargesOnly = allUbyCharges.filter(charge => chargerKind(charge) === 'ac');
+  const dcCleanStats = cleanOperationStats(dcChargesOnly);
+  const acCleanStats = cleanOperationStats(acChargesOnly);
   const dcCount = included.filter(row => row.kind === 'dc').length;
   const acCount = included.filter(row => row.kind === 'ac').length;
   const totalCharges = allUbyCharges.length;
-  const dailyNetworkAverages = included.map(row => {
+  const dailyAveragesForRows = rows => rows.map(row => {
     const dates = row.charges.map(charge => charge.startDate).filter(date => date && !Number.isNaN(date.getTime()));
     const firstDay = dates.length ? dateOnly(new Date(Math.min(...dates))) : null;
     const lastDay = dates.length ? dateOnly(new Date(Math.max(...dates))) : null;
     const daysWithData = firstDay && lastDay ? Math.round((lastDay - firstDay) / 86_400_000) + 1 : 0;
     return { stationName: row.stationName || row.workName || 'Carregador', dailyAverage: daysWithData ? row.count / daysWithData : 0 };
   });
+  const dailyNetworkAverages = dailyAveragesForRows(included);
+  const dailyDcAverages = dailyAveragesForRows(included.filter(row => row.kind === 'dc'));
   const averageNetworkCharges = dailyNetworkAverages.length
     ? dailyNetworkAverages.reduce((sum, row) => sum + row.dailyAverage, 0) / dailyNetworkAverages.length
     : 0;
-  const dailyNetworkBreakdown = dailyNetworkAverages.slice(0, 3)
+  const averageDcCharges = dailyDcAverages.length
+    ? dailyDcAverages.reduce((sum, row) => sum + row.dailyAverage, 0) / dailyDcAverages.length
+    : 0;
+  const dailyDcBreakdown = dailyDcAverages.slice(0, 3)
     .map(row => `${row.stationName}: ${row.dailyAverage.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/dia`)
     .join(' · ');
-  const cleanStats = cleanOperationStats(allUbyCharges);
-  const avgTicket = cleanStats.avgTicket;
-  const validDurations = cleanStats.executed
+  const dcValidDurations = dcCleanStats.executed
     .map(charge => durToHours(charge.duration))
     .filter(hours => hours > 0);
-  const avgDuration = validDurations.length
-    ? validDurations.reduce((sum, hours) => sum + hours, 0) / validDurations.length
+  const dcAvgDuration = dcValidDurations.length
+    ? dcValidDurations.reduce((sum, hours) => sum + hours, 0) / dcValidDurations.length
     : 0;
+  const bestDcUnit = included.filter(row => row.kind === 'dc').sort((a, b) => b.revenue - a.revenue)[0];
   const projectionMonth = isMonthView && currentGeneralMonth ? currentGeneralMonth : (sourceMonths.at(-1) || '');
   const unitForecasts = sourceIncluded
     .map(row => ubyNetworkProjectionForRow(row, projectionMonth))
@@ -10788,16 +10796,19 @@ async function renderUbyOperation() {
     : 'Marque carregadores UBY ou suba planilhas das unidades UBY para iniciar o painel.';
 
   document.getElementById('kpiUby').innerHTML = `
-    <div class="card"><div class="label">R$ medio por recarga</div><div class="value">${fmtBRL(avgTicket)}</div><div class="sub">${cleanStats.executed.length} recarga(s) valida(s) no periodo</div></div>
-    <div class="card"><div class="label">kWh medio por recarga</div><div class="value">${cleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh</div><div class="sub">energia das recargas validas</div></div>
-    <div class="card"><div class="label">Tempo medio de recarga</div><div class="value">${formatRechargeDuration(avgDuration)}</div><div class="sub">${validDurations.length} sessao(oes) validas com duracao</div></div>
-    <div class="card"><div class="label">Erros no periodo</div><div class="value">${cleanStats.failed.length}</div><div class="sub">${totalCharges ? fmtPct(cleanStats.failed.length / totalCharges * 100) : '0,00%'} das tentativas da rede</div></div>
-    <div class="card"><div class="label">Projecao de faturamento da rede</div><div class="value">${fmtBRL(networkProjectedRevenue)}</div><div class="sub">${projectionMonth ? `${monthLabel(projectionMonth)} | ${unitForecasts.length} unidade(s), soma das projecoes individuais` : 'sem base para projetar'}${unitForecasts.length ? `<br>${fmtKWh(networkProjectedEnergy)} projetados` : ''}</div></div>
-    <div class="card"><div class="label">Total AC</div><div class="value">${acdc.acCharges}</div><div class="sub">${fmtKWh(acdc.acEnergy)} - ${fmtBRL(acdc.acRevenue)}</div></div>
-    <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} - ${fmtBRL(acdc.dcRevenue)}</div></div>
-    <div class="card"><div class="label">Carregadores UBY</div><div class="value">${included.length}</div><div class="sub">${dcCount} DC / ${acCount} AC incluidos</div></div>
-    <div class="card"><div class="label">Media de recargas da rede por dia</div><div class="value">${averageNetworkCharges.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="sub">Media diaria dos ${included.length} carregador(es) ativos${dailyNetworkBreakdown ? `<br>${dailyNetworkBreakdown}` : ''}</div></div>
-    <div class="card"><div class="label">Melhor unidade UBY</div><div class="value" style="font-size:18px;white-space:normal">${included[0]?.stationName || '-'}</div><div class="sub">${included[0] ? fmtBRL(included[0].revenue) : 'sem dados'}</div></div>
+    <div class="dc-kpi-heading"><span>Indicadores DC · rede rápida</span><small>médias calculadas somente nas recargas DC</small></div>
+    <div class="card dc-metric-card"><div class="label">R$ médio por recarga DC</div><div class="value">${fmtBRL(dcCleanStats.avgTicket)}</div><div class="sub">${dcCleanStats.executed.length} recarga(s) válida(s) DC</div></div>
+    <div class="card dc-metric-card"><div class="label">kWh médio por recarga DC</div><div class="value">${dcCleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh</div><div class="sub">energia das recargas válidas DC</div></div>
+    <div class="card dc-metric-card"><div class="label">Tempo médio de recarga DC</div><div class="value">${formatRechargeDuration(dcAvgDuration)}</div><div class="sub">${dcValidDurations.length} sessão(ões) DC com duração</div></div>
+    <div class="card dc-metric-card"><div class="label">Média de recargas DC por dia</div><div class="value">${averageDcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="sub">média dos ${dcCount} carregador(es) DC${dailyDcBreakdown ? `<br>${dailyDcBreakdown}` : ''}</div></div>
+    <div class="card dc-metric-card"><div class="label">Falhas DC no período</div><div class="value">${dcCleanStats.failed.length}</div><div class="sub">${dcChargesOnly.length ? fmtPct(dcCleanStats.failed.length / dcChargesOnly.length * 100) : '0,00%'} das tentativas DC</div></div>
+    <div class="dc-kpi-heading"><span>Visão consolidada da rede</span><small>totais AC + DC para gestão comercial</small></div>
+    <div class="card"><div class="label">Projeção de faturamento da rede</div><div class="value">${fmtBRL(networkProjectedRevenue)}</div><div class="sub">${projectionMonth ? `${monthLabel(projectionMonth)} | ${unitForecasts.length} unidade(s), soma das projeções individuais` : 'sem base para projetar'}${unitForecasts.length ? `<br>${fmtKWh(networkProjectedEnergy)} projetados` : ''}</div></div>
+    <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} · ${fmtBRL(acdc.dcRevenue)}</div></div>
+    <div class="card"><div class="label">Carregadores DC</div><div class="value">${dcCount}</div><div class="sub">dos ${included.length} carregadores UBY incluídos</div></div>
+    <div class="card"><div class="label">Média da rede por dia</div><div class="value">${averageNetworkCharges.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="sub">todas as unidades AC + DC</div></div>
+    <div class="card"><div class="label">Melhor unidade DC</div><div class="value" style="font-size:18px;white-space:normal">${bestDcUnit?.stationName || '-'}</div><div class="sub">${bestDcUnit ? fmtBRL(bestDcUnit.revenue) : 'sem dados DC'}</div></div>
+    <div class="card ac-context-card"><div class="ac-title"><strong>AC · acompanhamento separado</strong><span>Não entra nas médias de performance DC.</span></div><div class="ac-mini"><b>${acdc.acCharges}</b><span>recargas AC</span></div><div class="ac-mini"><b>${fmtKWh(acdc.acEnergy)}</b><span>energia AC</span></div><div class="ac-mini"><b>${fmtBRL(acCleanStats.avgTicket)}</b><span>ticket médio AC</span></div></div>
   `;
 
   renderVisualSummary('ubyVisualSummary', allUbyCharges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceUbyCharges });

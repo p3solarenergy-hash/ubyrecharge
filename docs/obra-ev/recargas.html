@@ -215,6 +215,19 @@
     .compact-kpis .card::after { content:""; position:absolute; right:-28px; bottom:-38px; width:108px; height:108px; border-radius:50%; background:rgba(87,183,255,.075); pointer-events:none; }
     .compact-kpis .card > * { position:relative; z-index:1; }
 .compact-kpis .card .value { font-size:26px; }
+    .dc-kpi-heading { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:2px 2px 0; color:#BFEAD8; font-family:var(--ui-font); font-weight:900; font-size:15px; }
+    .dc-kpi-heading small { color:var(--p3-muted); font-family:inherit; font-size:11px; font-weight:600; }
+    .dc-metric-card { border-color:rgba(87,183,255,.44)!important; background:linear-gradient(135deg,rgba(20,54,84,.96),var(--surface-bg))!important; }
+    .dc-metric-card::before { height:4px!important; background:#57B7FF!important; }
+    .dc-metric-card .label { color:#BFEAD8; }
+    .dc-metric-card .value { color:#57B7FF; }
+    .ac-context-card { grid-column:1 / -1; display:grid; grid-template-columns:minmax(220px,1.15fr) repeat(3,minmax(130px,.8fr)); gap:12px; align-items:center; min-height:0!important; padding:14px 16px!important; opacity:.86; border-color:rgba(143,163,154,.34)!important; background:rgba(13,27,46,.72)!important; }
+    .ac-context-card::before { background:#7E91A6!important; opacity:.55!important; }
+    .ac-context-card .ac-title { display:grid; gap:3px; }
+    .ac-context-card .ac-title strong { color:#C4D1D8; font-size:14px; }
+    .ac-context-card .ac-title span, .ac-context-card .ac-mini span { color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .ac-context-card .ac-mini { display:grid; gap:3px; }
+    .ac-context-card .ac-mini b { color:#D6E0E5; font-size:16px; }
 .metric-card { display:flex; flex-direction:column; }
 .metric-card .metric-period-trend { align-self:flex-start; display:inline-flex; align-items:center; gap:5px; min-width:0; max-width:100%; margin-top:auto; padding:4px 6px; border-radius:7px; font-size:9px; line-height:1.1; font-weight:900; }
 .metric-card .metric-period-trend > span:last-child { display:grid; gap:1px; min-width:0; }
@@ -725,6 +738,7 @@
 
     @media (max-width:1180px) {
       .kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .ac-context-card { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .section-3, .section-2 { grid-template-columns:1fr; }
       .acc-grid { grid-template-columns:1fr; }
       .general-split { grid-template-columns:1fr; }
@@ -809,6 +823,8 @@
       .file-chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
 
       .kpis { margin-top:14px; gap:10px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .dc-kpi-heading, .ac-context-card { grid-column:1 / -1; }
+      .ac-context-card { grid-template-columns:1fr 1fr; }
       .finance-overview-grid { grid-template-columns:1fr; }
       .kpis .card, .card { border-radius:10px; padding:14px; min-height:auto; }
       .label { font-size:10px; letter-spacing:.55px; }
