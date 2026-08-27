@@ -124,6 +124,10 @@ const FINANCE_RULE_BASIS = [
   ['per_charge', 'Por recarga'],
   ['one_off', 'Avulso no ciclo']
 ];
+const FINANCE_REVENUE_SCOPE = [
+  ['operational', 'Operacional / complementar'],
+  ['non_operational', 'Nao operacional / fechamento mensal']
+];
 const appData = window.UBY_APP_DATA || {};
 let currentWorkId = new URLSearchParams(location.search).get('obra') || localStorage.getItem('uby-recargas-current-work') || 'rio';
 let currentWorkName = '';
@@ -2811,6 +2815,7 @@ function normalizeFinanceRules(settings = {}, kind = 'cost') {
       enabled: stored ? stored.enabled !== false : legacyValue > 0,
       basis: FINANCE_RULE_BASIS.some(([basis]) => basis === stored?.basis) ? stored.basis : 'fixed',
       value: Number(stored?.value ?? legacyValue ?? 0) || 0,
+      scope: kind === 'revenue' && (stored?.scope === 'non_operational' || (!stored && id === 'advertising')) ? 'non_operational' : 'operational',
       custom: false
     };
   });
@@ -2823,6 +2828,7 @@ function normalizeFinanceRules(settings = {}, kind = 'cost') {
       enabled: rule?.enabled !== false,
       basis: FINANCE_RULE_BASIS.some(([basis]) => basis === rule?.basis) ? rule.basis : 'fixed',
       value: Number(rule?.value || 0),
+      scope: kind === 'revenue' && rule?.scope === 'non_operational' ? 'non_operational' : 'operational',
       custom: true
     });
   });
@@ -2838,6 +2844,7 @@ function financeRulesFromInputs(kind = 'cost') {
     enabled: !!row.querySelector('[data-rule-field="enabled"]')?.checked,
     basis: row.querySelector('[data-rule-field="basis"]')?.value || 'fixed',
     value: Number(parseFloat(row.querySelector('[data-rule-field="value"]')?.value) || 0),
+    scope: kind === 'revenue' && row.querySelector('[data-rule-field="scope"]')?.value === 'non_operational' ? 'non_operational' : 'operational',
     custom: row.dataset.custom === 'true'
   })).filter(rule => rule.id);
 }
@@ -2887,6 +2894,10 @@ function financeRuleBasisOptions(selected = 'fixed') {
   return FINANCE_RULE_BASIS.map(([value, label]) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`).join('');
 }
 
+function financeRevenueScopeOptions(selected = 'operational') {
+  return FINANCE_REVENUE_SCOPE.map(([value, label]) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`).join('');
+}
+
 function financeRuleValueHint(basis = 'fixed') {
   return {
     fixed: 'R$ por mes',
@@ -2915,7 +2926,8 @@ function financeRuleSignature(rule) {
     enabled: rule.enabled !== false,
     label: safeText(rule.label),
     basis: rule.basis || 'fixed',
-    value: Number(rule.value || 0)
+    value: Number(rule.value || 0),
+    scope: rule.scope || 'operational'
   });
 }
 
@@ -2982,7 +2994,7 @@ function renderFinanceRuleInputs(containerId, rules = [], kind = 'cost') {
   container.innerHTML = energyRow + rules.map(rule => `
     <tr class="${rule.enabled ? '' : 'rule-disabled'}" data-finance-rule-kind="${kind}" data-rule-id="${escapeAttr(rule.id)}" data-custom="${rule.custom ? 'true' : 'false'}">
       <td class="rule-enabled"><input type="checkbox" data-rule-field="enabled" ${rule.enabled ? 'checked' : ''} onchange="handleFinanceRuleEditorChange()" aria-label="Usar ${escapeAttr(rule.label)}"></td>
-      <td class="rule-name"><input class="ctl-input" data-rule-field="label" value="${escapeAttr(rule.label)}" oninput="handleFinanceRuleEditorChange()" aria-label="Nome do item"></td>
+      <td class="rule-name"><input class="ctl-input" data-rule-field="label" value="${escapeAttr(rule.label)}" oninput="handleFinanceRuleEditorChange()" aria-label="Nome do item">${kind === 'revenue' ? `<select class="ctl-select" data-rule-field="scope" onchange="handleFinanceRuleEditorChange()" aria-label="Classificacao da receita">${financeRevenueScopeOptions(rule.scope)}</select>` : ''}</td>
       <td class="rule-basis"><select class="ctl-select" data-rule-field="basis" onchange="handleFinanceRuleEditorChange()">${financeRuleBasisOptions(rule.basis)}</select></td>
       <td class="rule-value"><input class="ctl-input" data-rule-field="value" type="number" min="0" step="0.01" value="${Number(rule.value || 0)}" oninput="handleFinanceRuleEditorChange()"><small data-rule-value-hint>${financeRuleValueHint(rule.basis)}</small></td>
       <td class="rule-output" data-rule-output="actual">${fmtBRL(0)}</td>
@@ -3005,6 +3017,7 @@ function addFinanceRule(kind = 'cost') {
     enabled: true,
     basis: 'fixed',
     value: 0,
+    scope: kind === 'revenue' ? 'operational' : undefined,
     custom: true
   });
   settings[field] = rules;
@@ -4762,8 +4775,8 @@ function updateFinanceRuleOutputs(result = {}) {
       const planned = row.querySelector('[data-rule-output="planned-kwh"]');
       const actualKWh = row.querySelector('[data-rule-output="actual-kwh"]');
       if (actual) actual.textContent = fmtBRL(item.actual || 0);
-      if (planned) planned.textContent = fmtPerKWh(item.plannedPerKWh);
-      if (actualKWh) actualKWh.textContent = fmtPerKWh(item.actualPerKWh);
+      if (planned) planned.textContent = item.scope === 'non_operational' ? '—' : fmtPerKWh(item.plannedPerKWh);
+      if (actualKWh) actualKWh.textContent = item.scope === 'non_operational' ? '—' : fmtPerKWh(item.actualPerKWh);
     });
   };
   renderDetails('cost', result.costRuleDetails);
@@ -4779,7 +4792,9 @@ function updateFinanceRuleOutputs(result = {}) {
       <tr><td colspan="4">Custos diretos totais</td><td>${fmtBRL(localCost + Number(result.matrizCost || 0))}</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td><td>${fmtPerKWh(result.directCostPerKWh)}</td><td></td><td></td><td></td></tr>`;
   }
   const revenueTotal = document.getElementById('financeRevenueRuleTotals');
-  if (revenueTotal) revenueTotal.innerHTML = `<tr><td colspan="4">Receitas adicionais</td><td>${fmtBRL(result.extraRevenue || 0)}</td><td>${fmtPerKWh(result.plannedExtraRevenuePerKWh)}</td><td>${fmtPerKWh(result.extraRevenuePerKWh)}</td><td></td><td></td><td></td></tr>`;
+  if (revenueTotal) revenueTotal.innerHTML = `
+    <tr><td colspan="4">Receitas operacionais complementares</td><td>${fmtBRL(result.extraRevenue || 0)}</td><td>${fmtPerKWh(result.plannedExtraRevenuePerKWh)}</td><td>${fmtPerKWh(result.extraRevenuePerKWh)}</td><td></td><td></td><td></td></tr>
+    <tr class="finance-matrix-total"><td colspan="4">Marketing / contratos (fechamento mensal; fora das métricas de recarga)</td><td>${fmtBRL(result.marketingRevenue || 0)}</td><td>—</td><td>—</td><td></td><td></td><td></td></tr>`;
 
   const guidance = document.getElementById('financePlanningGuidance');
   if (guidance) {
@@ -4791,6 +4806,20 @@ function updateFinanceRuleOutputs(result = {}) {
 function renderFinanceOperationalResults(result = {}) {
   const container = document.getElementById('financeOperationalResults');
   if (!container) return;
+  if (normalizeOperationModel(result.operationModel) === 'third_party_management') {
+    container.classList.add('finance-result-stages');
+    container.innerHTML = `
+      <section class="finance-result-stage finance-result-stage--actual">
+        <div class="finance-result-stage-head"><h3>Operação parceira · prestação de contas</h3><p>Este ativo não compõe custos, margem, payback ou resultado da matriz UBY.</p></div>
+        <div class="finance-result-stage-grid">
+          <div class="finance-result-card"><span>Faturamento do parceiro</span><strong>${fmtBRL(result.revenue || 0)}</strong><small>referência operacional do ponto</small></div>
+          <div class="finance-result-card"><span>Gestão P3</span><strong>${fmtBRL(result.management || 0)}</strong><small>receita de gestão contratada</small></div>
+          <div class="finance-result-card good is-primary"><span>Receita UBY · royalty</span><strong>${fmtBRL(result.ubyRoyalty || 0)}</strong><small>única receita da UBY neste ativo</small></div>
+          <div class="finance-result-card is-reference"><span>Resultado UBY</span><strong>Não aplicável</strong><small>custos e consumo, inclusive cortesias, pertencem ao parceiro</small></div>
+        </div>
+      </section>`;
+    return;
+  }
   const resultClass = result.operationNet > 0 ? 'good' : (result.operationNet < 0 ? 'bad' : 'warn');
   const marginClass = result.margin >= 20 ? 'good' : (result.margin >= 0 ? 'warn' : 'bad');
   const energyCost = Number(result.energyCost || 0);
@@ -4839,6 +4868,7 @@ function renderFinanceOperationalResults(result = {}) {
         <div class="finance-result-card ${resultClass} is-primary"><span>Resultado operacional real</span><strong>${fmtBRL(result.operationNet || 0)}</strong><small>receitas menos ${fmtBRL(directBaseCost)} de base e ${fmtBRL(distributionCost)} de gestao, plataforma e repasses</small></div>
         <div class="finance-result-card ${resultClass}"><span>Resultado por kWh</span><strong>${fmtPerKWh(result.resultPerKWh)}</strong><small>resultado diluido pela energia vendida</small></div>
         <div class="finance-result-card ${marginClass}"><span>Margem operacional</span><strong>${fmtPct(result.operationMargin || 0)}</strong><small>resultado operacional / receitas totais</small></div>
+        ${Number(result.marketingRevenue || 0) > 0 ? `<div class="finance-result-card good is-primary"><span>Marketing / contratos do mês</span><strong>${fmtBRL(result.marketingRevenue)}</strong><small>registrado no fechamento; fora da ocupação, R$/kWh e projeções de recarga</small></div><div class="finance-result-card good"><span>Resultado financeiro após fechamento</span><strong>${fmtBRL(result.financialResult || 0)}</strong><small>resultado operacional + receitas não operacionais reconhecidas</small></div>` : ''}
       </div>
     </section>
   `;
@@ -4931,6 +4961,15 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const planning = financePlanningContext(charges, mk === 'unknown' ? financeMonthKey() : mk, cfg, options.historyCharges || charges, options.power);
   const costEvaluation = evaluateFinanceRules(cfg.costRules, planning);
   const revenueEvaluation = evaluateFinanceRules(cfg.revenueRules, planning);
+  // Marketing e contratos entram somente no fechamento financeiro. Eles não
+  // representam demanda de recarga e, portanto, não podem alterar R$/kWh,
+  // ocupação, break-even ou qualquer projeção da operação de recargas.
+  const marketingRuleDetails = revenueEvaluation.details.filter(item => item.scope === 'non_operational');
+  const operationalRevenueRuleDetails = revenueEvaluation.details.filter(item => item.scope !== 'non_operational');
+  const marketingRevenue = marketingRuleDetails.reduce((sum, item) => sum + Number(item.actual || 0), 0);
+  const marketingPlanned = marketingRuleDetails.reduce((sum, item) => sum + Number(item.planned || 0), 0);
+  const operationalExtraRevenue = operationalRevenueRuleDetails.reduce((sum, item) => sum + Number(item.actual || 0), 0);
+  const plannedOperationalExtraRevenue = operationalRevenueRuleDetails.reduce((sum, item) => sum + Number(item.planned || 0), 0);
   // Custos compartilhados da matriz chegam jÃ¡ rateados para este carregador.
   // Eles nÃ£o entram em costRules porque a matriz tem vigÃªncia e rateio prÃ³prios.
   const matrizCostItems = (Array.isArray(options.matrizCostItems) ? options.matrizCostItems : [])
@@ -4962,7 +5001,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
   }));
   const localExtraCosts = costEvaluation.actual;
   const extraCosts = localExtraCosts + matrizCost;
-  const extraRevenue = revenueEvaluation.actual;
+  const extraRevenue = operationalExtraRevenue;
   const costs = energyCost + extraCosts + taxes;
   const preAreaNet = revenue + extraRevenue - management - platform - ubyRoyalty - costs;
   const areaEligible = model === 'uby' || model === 'hybrid';
@@ -5040,7 +5079,8 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const paybackMonths = paybackInvestmentValue > 0 && paybackBase > 0 ? paybackInvestmentValue / paybackBase : 0;
   const roiMonthly = paybackInvestmentValue > 0 ? paybackBase / paybackInvestmentValue * 100 : 0;
   const margin = revenue ? ownResult / revenue * 100 : 0;
-  const totalRevenue = revenue + extraRevenue;
+  const totalRevenue = revenue + extraRevenue + marketingRevenue;
+  const financialResult = operationNet + marketingRevenue;
   const totalOperatingCost = energyCost + extraCosts + taxes + management + platform + ubyRoyalty + areaParticipation;
   const matrizCostPerKWh = commercialEnergy > 0 ? matrizCost / commercialEnergy : null;
   const plannedMatrizCostPerKWh = planning.planningKWh > 0 ? matrizCost / planning.planningKWh : null;
@@ -5053,20 +5093,20 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const plannedPlatform = planning.planningRevenue * cfg.platformPct / 100;
   const plannedUbyRoyalty = model === 'third_party_management' ? planning.planningRevenue * cfg.ubyRoyaltyPct / 100 : 0;
   const plannedTaxes = planning.planningRevenue * cfg.taxRatePct / 100;
-  const plannedPreAreaNet = planning.planningRevenue + revenueEvaluation.planned - plannedManagement - plannedPlatform - plannedUbyRoyalty - plannedTaxes - plannedEnergyCost - costEvaluation.planned - matrizCost;
+  const plannedPreAreaNet = planning.planningRevenue + plannedOperationalExtraRevenue - plannedManagement - plannedPlatform - plannedUbyRoyalty - plannedTaxes - plannedEnergyCost - costEvaluation.planned - matrizCost;
   const plannedAreaShareBase = cfg.ownerTransferMode === 'net' ? Math.max(plannedPreAreaNet, 0) : planning.planningRevenue;
   const plannedAreaParticipation = areaEligible ? plannedAreaShareBase * areaSharePct / 100 : 0;
   const plannedDirectCost = plannedEnergyCost + costEvaluation.planned + matrizCost + plannedTaxes + plannedAreaParticipation;
   const plannedTotalCost = plannedDirectCost + plannedManagement + plannedPlatform + plannedUbyRoyalty;
   const plannedDirectCostPerKWh = planning.planningKWh > 0 ? plannedDirectCost / planning.planningKWh : null;
-  const plannedExtraRevenuePerKWh = planning.planningKWh > 0 ? revenueEvaluation.planned / planning.planningKWh : null;
+  const plannedExtraRevenuePerKWh = planning.planningKWh > 0 ? plannedOperationalExtraRevenue / planning.planningKWh : null;
   const managementVariable = planning.salePricePerKWh * cfg.managementPct / 100;
   const platformVariable = planning.salePricePerKWh * cfg.platformPct / 100;
   const areaVariable = areaEligible && cfg.ownerTransferMode !== 'net' ? planning.salePricePerKWh * areaSharePct / 100 : 0;
   const royaltyVariable = model === 'third_party_management' ? planning.salePricePerKWh * cfg.ubyRoyaltyPct / 100 : 0;
   const taxVariable = planning.salePricePerKWh * cfg.taxRatePct / 100;
   const variableCostPerKWh = cfg.energyCostPerKWh + managementVariable + platformVariable + royaltyVariable + taxVariable + areaVariable + financeVariableCostPerKWh(cfg.costRules, planning);
-  const variableRevenuePerKWh = planning.salePricePerKWh + financeVariableCostPerKWh(cfg.revenueRules, planning);
+  const variableRevenuePerKWh = planning.salePricePerKWh + financeVariableCostPerKWh(cfg.revenueRules.filter(rule => rule.scope !== 'non_operational'), planning);
   const economics = window.UBY_FINANCE_ENGINE.unitEconomics({
     energy: commercialEnergy,
     revenue,
@@ -5084,7 +5124,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     variableRevenuePerKWh,
     variableCostPerKWh,
     fixedCosts: financeFixedRuleTotal(cfg.costRules) + matrizCost,
-    fixedRevenue: financeFixedRuleTotal(cfg.revenueRules)
+    fixedRevenue: financeFixedRuleTotal(cfg.revenueRules.filter(rule => rule.scope !== 'non_operational'))
   });
   const { plannedTotalCostPerKWh, resultPerKWh, operationMargin, contributionPerKWh, breakEvenKWh } = economics;
   return {
@@ -5122,6 +5162,9 @@ function financeForCharges(charges, settings = {}, options = {}) {
     plannedMatrizCostPerKWh,
     matrizCostRevenuePct,
     extraRevenue,
+    marketingRevenue,
+    marketingPlanned,
+    financialResult,
     preAreaNet,
     areaEligible,
     areaSharePct,
