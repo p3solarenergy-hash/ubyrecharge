@@ -10689,17 +10689,21 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   const rows = includedRows
     .map(row => aggregateUbyFinanceRow(row, sourceMonths, isMonthView, currentMonth))
     .sort((a, b) => Number(b.finance.operationNet || 0) - Number(a.finance.operationNet || 0));
-  const total = rows.reduce((acc, row) => {
+  const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
+  const ubyOperationRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) !== 'third_party_management');
+  const sumFinance = (items, seed) => items.reduce((acc, row) => {
     Object.keys(acc).forEach(key => { acc[key] += Number(row.finance?.[key] || 0); });
     return acc;
-  }, { revenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, planningKWh:0, plannedTotalCost:0, matrizCost:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  }, seed);
+  const total = sumFinance(ubyOperationRows, { revenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, planningKWh:0, plannedTotalCost:0, matrizCost:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  const partnerRoyalty = partnerRows.reduce((sum, row) => sum + Number(row.finance?.ubyRoyalty || 0), 0);
   const totalCostPerKWh = total.commercialEnergy > 0 ? total.totalOperatingCost / total.commercialEnergy : null;
   const plannedCostPerKWh = total.planningKWh > 0 ? total.plannedTotalCost / total.planningKWh : null;
   const margin = total.totalRevenue > 0 ? total.operationNet / total.totalRevenue * 100 : 0;
   if (periodLabel) periodLabel.textContent = viewLabel || (isMonthView ? monthLabel(currentMonth) : 'Acumulado');
   // Série mensal só é calculada na página financeira dedicada (evita custo
   // extra de recalcular por mês na aba operacional, que não usa isso).
-  const monthlySeries = window.UBY_FINANCE_ONLY ? buildUbyMonthlySeries(includedRows, sourceMonths) : null;
+  const monthlySeries = window.UBY_FINANCE_ONLY ? buildUbyMonthlySeries(ubyOperationRows, sourceMonths) : null;
   if (window.UBY_FINANCE_ONLY) {
     const revenueTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.revenue));
     const costTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.totalOperatingCost, { invert: true }));
@@ -10711,7 +10715,8 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
       ${total.matrizCost > 0 ? `<div class="card kpi-feature"><div class="label">Custos da matriz (rateados)</div><div class="value">${fmtBRL(total.matrizCost)}</div></div>` : ''}
       <div class="card kpi-feature"><div class="label">Custo efetivo por kWh</div><div class="value">${fmtPerKWh(totalCostPerKWh)}</div>${perKWhTrend}</div>
       ${total.courtesyCharges ? `<div class="card kpi-feature"><div class="label">Cortesia de parceiros</div><div class="value">${fmtKWh(total.courtesyEnergy)}</div><div class="sub">${fmtBRL(total.courtesyCostExcluded)} fora do resultado UBY</div></div>` : ''}
-      <div class="card kpi-feature ${total.operationNet >= 0 ? 'occ-green' : 'occ-red'}"><div class="label">Resultado UBY ${fmtPct(margin)}</div><div class="value">${fmtBRL(total.operationNet)}</div>${netTrend}</div>
+      ${partnerRows.length ? `<div class="card kpi-feature"><div class="label">Royalties de parceiros</div><div class="value" style="color:#42DF9A">${fmtBRL(partnerRoyalty)}</div><div class="sub">${partnerRows.length} unidade(s) parceira(s) fora da matriz</div></div>` : ''}
+      <div class="card kpi-feature ${total.operationNet >= 0 ? 'occ-green' : 'occ-red'}"><div class="label">Resultado dos ativos UBY ${fmtPct(margin)}</div><div class="value">${fmtBRL(total.operationNet)}</div>${netTrend}</div>
     `;
   } else {
     summary.innerHTML = `
@@ -10720,7 +10725,8 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
       ${total.matrizCost > 0 ? `<div class="accountability-metric"><b>${fmtBRL(total.matrizCost)}</b><span>Custos da matriz (rateados)</span></div>` : ''}
       <div class="accountability-metric"><b>${fmtPerKWh(totalCostPerKWh)}</b><span>Custo efetivo por kWh</span></div>
       ${total.courtesyCharges ? `<div class="accountability-metric"><b>${fmtKWh(total.courtesyEnergy)}</b><span>Cortesia de parceiros · ${fmtBRL(total.courtesyCostExcluded)} fora do resultado UBY</span></div>` : ''}
-      <div class="accountability-metric"><b>${fmtBRL(total.operationNet)}</b><span>Resultado UBY ${fmtPct(margin)}</span></div>
+      ${partnerRows.length ? `<div class="accountability-metric"><b style="color:#42DF9A">${fmtBRL(partnerRoyalty)}</b><span>Royalties de parceiros · fora da matriz UBY</span></div>` : ''}
+      <div class="accountability-metric"><b>${fmtBRL(total.operationNet)}</b><span>Resultado dos ativos UBY ${fmtPct(margin)}</span></div>
     `;
   }
   renderUbyDistribution(total);
@@ -10735,6 +10741,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   }
   rowsEl.innerHTML = rows.length ? rows.map(row => {
     const finance = row.finance;
+    const isRoyaltyPartner = normalizeOperationModel(finance.operationModel) === 'third_party_management';
     const resultClass = finance.operationNet >= 0 ? 'result-positive' : 'result-negative';
     const stationName = row.stationName || row.station || '';
     // Na página financeira dedicada (sem a parte operacional) não existem as
@@ -10744,12 +10751,12 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
     const openAction = window.UBY_FINANCE_ONLY
       ? `location.href='recargas.html?obra=${encodeURIComponent(row.workId)}&openReport=financeiro&station=${encodeURIComponent(stationName)}'`
       : `openWorkReport('${escapeAttr(row.workId)}','financeiro','${escapeAttr(stationName)}')`;
-    return `<div class="uby-finance-row">
-      <div><strong>${escapeHtml(stationName || row.workName)}</strong><span>${escapeHtml(row.workName)} | ${row.financeMonths.length} periodo(s) calculado(s)${finance.courtesyCharges ? ` | ${fmtKWh(finance.courtesyEnergy)} de cortesia fora do resultado UBY` : ''}</span></div>
-      <div class="uby-finance-cell"><b>${fmtBRL(finance.revenue)}</b><em>faturamento</em></div>
-      <div class="uby-finance-cell"><b>${fmtBRL(finance.totalOperatingCost)}</b><em>custos totais</em></div>
-      <div class="uby-finance-cell"><b>${fmtPerKWh(finance.totalCostPerKWh)}</b><em>custo atual</em></div>
-      <div class="uby-finance-cell ${resultClass}"><b>${fmtBRL(finance.operationNet)}</b><em>resultado | ${fmtPct(finance.operationMargin)}</em></div>
+    return `<div class="uby-finance-row${isRoyaltyPartner ? ' uby-finance-row--partner' : ''}">
+      <div>${isRoyaltyPartner ? '<span class="uby-partner-pill">◆ Parceiro UBY · somente royalties</span>' : ''}<strong>${escapeHtml(stationName || row.workName)}</strong><span>${escapeHtml(row.workName)} | ${row.financeMonths.length} periodo(s) calculado(s)${finance.courtesyCharges ? ` | ${fmtKWh(finance.courtesyEnergy)} de cortesia fora do resultado UBY` : ''}</span></div>
+      <div class="uby-finance-cell"><b>${fmtBRL(finance.revenue)}</b><em>${isRoyaltyPartner ? 'faturamento do parceiro' : 'faturamento'}</em></div>
+      <div class="uby-finance-cell"><b>${fmtBRL(finance.management)}</b><em>${isRoyaltyPartner ? 'gestão P3' : 'custos totais'}</em></div>
+      <div class="uby-finance-cell${isRoyaltyPartner ? ' uby-finance-cell--royalty' : ''}"><b>${isRoyaltyPartner ? fmtBRL(finance.ubyRoyalty) : fmtPerKWh(finance.totalCostPerKWh)}</b><em>${isRoyaltyPartner ? 'receita UBY · royalty' : 'custo atual'}</em></div>
+      <div class="uby-finance-cell ${resultClass}"><b>${isRoyaltyPartner ? 'Fora da matriz' : fmtBRL(finance.operationNet)}</b><em>${isRoyaltyPartner ? 'sem custo ou resultado UBY' : `resultado | ${fmtPct(finance.operationMargin)}`}</em></div>
       <div class="unit-actions"><button class="btn-open" type="button" onclick="${openAction}">Abrir financeiro</button></div>
     </div>`;
   }).join('') : '<div class="note">Nenhum carregador UBY marcado para o periodo.</div>';
