@@ -199,6 +199,8 @@ function openStationLayoutConfiguration(workId, stationName) {
   document.getElementById('stationLayoutOpenTime').value = config.openTime || '08:00';
   document.getElementById('stationLayoutCloseTime').value = config.closeTime || '22:00';
   document.getElementById('stationLayoutReferenceTariff').value = Number(config.referenceTariffPerKwh || 0) || '';
+  document.getElementById('stationLayoutCourtesyTreatment').value = config.courtesyTreatment || 'operational';
+  document.getElementById('stationLayoutCourtesyResponsible').value = config.courtesyResponsible || '';
   document.getElementById('stationLayoutCourtesyUsers').value = (config.courtesyUsers || []).join('\n');
   const openDays = new Set((config.openDays || [0,1,2,3,4,5,6]).map(Number));
   document.querySelectorAll('.station-open-day').forEach(input => { input.checked = openDays.has(Number(input.value)); });
@@ -225,6 +227,9 @@ async function saveStationLayoutConfiguration() {
     closeTime: document.getElementById('stationLayoutCloseTime').value || '22:00',
     openDays,
     referenceTariffPerKwh: Math.max(0, Number(document.getElementById('stationLayoutReferenceTariff').value) || 0),
+    courtesyTreatment: ['operational', 'partner_absorbed', 'uby_absorbed'].includes(document.getElementById('stationLayoutCourtesyTreatment').value)
+      ? document.getElementById('stationLayoutCourtesyTreatment').value : 'operational',
+    courtesyResponsible: safeText(document.getElementById('stationLayoutCourtesyResponsible').value).trim(),
     courtesyUsers: safeText(document.getElementById('stationLayoutCourtesyUsers').value)
       .split(/[\n,;]/)
       .map(value => value.trim())
@@ -4375,7 +4380,7 @@ function renderFinanceiro(applySaved = true) {
   updateFinanceModelVisibility(settings.operationModel);
   const charges = chargesForMonth(mk);
   const result = financeForCharges(charges, settings, { monthKey: mk, matrizCostItems: currentMatrizItems(mk) });
-  const { revenue, energy, acRevenue, dcRevenue, management, platform, ubyRoyalty, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, partnerInvestorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin, p3InvestmentValue, partnerInvestmentValue } = result;
+  const { revenue, energy, courtesyCharges, courtesyEnergy, courtesyEnergyCost, courtesyCostExcluded, courtesyTreatment, courtesyResponsible, acRevenue, dcRevenue, management, platform, ubyRoyalty, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, partnerInvestorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin, p3InvestmentValue, partnerInvestmentValue } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
   const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
   const p3TakePct = revenue ? p3Gross / revenue * 100 : 0;
@@ -4388,12 +4393,13 @@ function renderFinanceiro(applySaved = true) {
   updateFinanceCommandSummary(result, charges, clients);
 
   document.getElementById('financeHeroMeta').innerHTML =
-    `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}`;
+    `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}${courtesyCharges ? `<br><span style="color:#FFD66B">${courtesyCharges} cortesia(s): ${fmtKWh(courtesyEnergy)}</span>` : ''}`;
   document.getElementById('financeFormula').innerHTML =
     `<strong>${operationModelLabel(settings.operationModel)}</strong><br>P3: gestao ${settings.managementPct}%${hasUbyRoyalty ? ` | UBY: royalty de marca ${settings.ubyRoyaltyPct}%` : ''}. App/plataforma de terceiros ${settings.platformPct}%.<br>Meta ocupacao: ${fmtPct(target.targetOccPct)} | real ${fmtPct(target.realOccPct)}<br><strong style="color:#57B7FF">Payback: ${formatPaybackMonths(paybackMonths)}</strong>`;
 
   document.getElementById('financeKpis').innerHTML = [
     `<div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>`,
+    courtesyCharges ? `<div class="card"><div class="label">Beneficio do parceiro</div><div class="value">${fmtKWh(courtesyEnergy)}</div><div class="sub">${courtesyCostExcluded ? `${fmtBRL(courtesyCostExcluded)} absorvido por ${escapeHtml(courtesyResponsible || 'parceiro local')}` : 'registrado sem alterar o resultado'}</div></div>` : '',
     `<div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao${hasP3Society ? ' + sociedades' : ''}</div></div>`,
     hasUbyRoyalty ? `<div class="card"><div class="label">Royalty UBY</div><div class="value">${fmtBRL(ubyRoyalty)}</div><div class="sub">${settings.ubyRoyaltyPct}% pela utilizacao da marca</div></div>` : '',
     isUbyModel ? `<div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos energia, custos e P3</div></div>` : '',
@@ -4411,6 +4417,7 @@ function renderFinanceiro(applySaved = true) {
     `<tr><td>Receita total</td><td>${fmtBRL(revenue)}</td></tr>`,
     `<tr><td>Receita AC</td><td>${fmtBRL(acRevenue)}</td></tr>`,
     `<tr><td>Receita DC</td><td>${fmtBRL(dcRevenue)}</td></tr>`,
+    courtesyCharges ? `<tr><td>Cortesia ${courtesyResponsible ? `— ${escapeHtml(courtesyResponsible)}` : 'do parceiro'}</td><td>${fmtKWh(courtesyEnergy)}${courtesyCostExcluded ? ` · ${fmtBRL(courtesyCostExcluded)} fora do resultado UBY` : ''}</td></tr>` : '',
     `<tr><td>Gestao P3 (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>`,
     hasUbyRoyalty ? `<tr><td>Royalty de marca UBY (${settings.ubyRoyaltyPct}%)</td><td>${fmtBRL(ubyRoyalty)}</td></tr>` : '',
     `<tr><td>App/plataforma terceiros (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>`,
@@ -4438,6 +4445,7 @@ function renderFinanceiro(applySaved = true) {
     hasUbyRoyalty ? `<tr><td>Royalty de marca UBY</td><td>${fmtBRL(ubyRoyalty)}</td></tr>` : '',
     `<tr><td>App/plataforma terceiros</td><td>${fmtBRL(platform)}</td></tr>`,
     `<tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>`,
+    courtesyCharges ? `<tr><td>Energia de cortesia (memória)</td><td>${fmtKWh(courtesyEnergy)} · ${fmtBRL(courtesyEnergyCost)}${courtesyTreatment === 'partner_absorbed' ? ' — absorvida pelo parceiro, fora do resultado UBY' : ''}</td></tr>` : '',
     result.areaEligible ? `<tr><td>Participacao do parceiro da area</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
     `<tr><td>Custos operacionais cadastrados</td><td>${fmtBRL(extraCosts)}</td></tr>`,
     `<tr><td>Custo operacional total</td><td>${fmtBRL(result.totalOperatingCost)}</td></tr>`,
@@ -4805,7 +4813,8 @@ function renderFinanceOperationalResults(result = {}) {
     <section class="finance-result-stage">
       <div class="finance-result-stage-head"><h3>1. Custos base da operacao</h3><p>Energia, custos da unidade e rateio da matriz.</p></div>
       <div class="finance-result-stage-grid">
-        <div class="finance-result-card"><span>Energia eletrica</span><strong>${fmtBRL(energyCost)}</strong><small>${fmtPerKWh(result.energyRate || 0)} aplicado aos ${fmtKWh(result.energy || 0)} vendidos</small></div>
+        <div class="finance-result-card"><span>Energia eletrica comercial</span><strong>${fmtBRL(energyCost)}</strong><small>${fmtPerKWh(result.energyRate || 0)} aplicado aos ${fmtKWh(result.commercialEnergy || result.energy || 0)} comercialmente elegíveis</small></div>
+        ${result.courtesyCharges ? `<div class="finance-result-card is-reference"><span>Benefício do parceiro</span><strong>${fmtKWh(result.courtesyEnergy)}</strong><small>${fmtBRL(result.courtesyEnergyCost)} de energia de cortesia${result.courtesyCostExcluded ? ' fora do resultado UBY' : ''}</small></div>` : ''}
         <div class="finance-result-card"><span>Custos da unidade</span><strong>${fmtBRL(localCosts)}</strong><small>itens operacionais exclusivos deste carregador</small></div>
         <div class="finance-result-card"><span>Custos da matriz UBY</span><strong>${fmtBRL(matrixCost)}</strong><small>${fmtPerKWh(result.matrizCostPerKWh)} do custo por kWh | ${fmtPct(result.matrizCostRevenuePct || 0)} da receita</small><small>${escapeHtml(matrizSub)}</small></div>
         <div class="finance-result-card is-reference"><span>Base planejada por kWh</span><strong>${fmtPerKWh(result.plannedDirectCostPerKWh)}</strong><small>energia, unidade e matriz sobre ${fmtKWh(result.planning?.planningKWh || 0)} planejados</small></div>
@@ -4824,7 +4833,7 @@ function renderFinanceOperationalResults(result = {}) {
     <section class="finance-result-stage finance-result-stage--actual">
       <div class="finance-result-stage-head"><h3>3. Resultado real da competencia</h3><p>Leitura final sobre as vendas efetivamente registradas no periodo.</p></div>
       <div class="finance-result-stage-grid">
-        <div class="finance-result-card is-primary"><span>Custo efetivo real por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>${fmtBRL(result.totalOperatingCost || 0)} de custo total, diluido pelos ${fmtKWh(result.energy || 0)} realmente vendidos</small></div>
+        <div class="finance-result-card is-primary"><span>Custo efetivo real por kWh</span><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong><small>${fmtBRL(result.totalOperatingCost || 0)} de custo total, diluído pelos ${fmtKWh(result.commercialEnergy || result.energy || 0)} comercialmente elegíveis</small></div>
         <div class="finance-result-card"><span>Preco medio vendido</span><strong>${fmtPerKWh(result.planning?.salePricePerKWh || 0)}</strong><small>referencia para comparar com o custo efetivo</small></div>
         <div class="finance-result-card warn"><span>Ponto de equilibrio</span><strong>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</strong><small>${result.contributionPerKWh > 0 ? `${fmtPerKWh(result.contributionPerKWh)} de contribuicao` : 'preco de venda nao cobre os custos variaveis'}</small></div>
         <div class="finance-result-card ${resultClass} is-primary"><span>Resultado operacional real</span><strong>${fmtBRL(result.operationNet || 0)}</strong><small>receitas menos ${fmtBRL(directBaseCost)} de base e ${fmtBRL(distributionCost)} de gestao, plataforma e repasses</small></div>
@@ -4904,6 +4913,10 @@ function financeForCharges(charges, settings = {}, options = {}) {
   cfg.revenueRules = normalizeFinanceRules({ ...settings, revenueItems: cfg.revenueItems }, 'revenue');
   const revenue = charges.reduce((sum, c) => sum + c.revenue, 0);
   const energy = charges.reduce((sum, c) => sum + c.energyKWh, 0);
+  const stationName = options.stationName || currentStationReportName || charges[0]?.station || currentWorkName;
+  const courtesyConfig = options.courtesyConfig || stationAvailabilityFor(options.workId || currentWorkId, stationName, options.workName || currentWorkName);
+  const courtesy = courtesyFinanceBreakdown(charges, courtesyConfig, cfg.energyCostPerKWh);
+  const commercialEnergy = courtesy.treatment === 'partner_absorbed' ? courtesy.commercialEnergy : energy;
   const acRevenue = charges.filter(c => chargerKind(c) === 'ac').reduce((sum, c) => sum + c.revenue, 0);
   const dcRevenue = charges.filter(c => chargerKind(c) === 'dc').reduce((sum, c) => sum + c.revenue, 0);
   const unknownRevenue = Math.max(revenue - acRevenue - dcRevenue, 0);
@@ -4913,7 +4926,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const platform = revenue * cfg.platformPct / 100;
   const ubyRoyalty = model === 'third_party_management' ? revenue * cfg.ubyRoyaltyPct / 100 : 0;
   const taxes = revenue * cfg.taxRatePct / 100;
-  const energyCost = energy * cfg.energyCostPerKWh;
+  const energyCost = commercialEnergy * cfg.energyCostPerKWh;
   const mk = options.monthKey || chargeMonthKey(charges[0] || {}) || financeMonthKey();
   const planning = financePlanningContext(charges, mk === 'unknown' ? financeMonthKey() : mk, cfg, options.historyCharges || charges, options.power);
   const costEvaluation = evaluateFinanceRules(cfg.costRules, planning);
@@ -5029,12 +5042,12 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const margin = revenue ? ownResult / revenue * 100 : 0;
   const totalRevenue = revenue + extraRevenue;
   const totalOperatingCost = energyCost + extraCosts + taxes + management + platform + ubyRoyalty + areaParticipation;
-  const matrizCostPerKWh = energy > 0 ? matrizCost / energy : null;
+  const matrizCostPerKWh = commercialEnergy > 0 ? matrizCost / commercialEnergy : null;
   const plannedMatrizCostPerKWh = planning.planningKWh > 0 ? matrizCost / planning.planningKWh : null;
   const matrizCostRevenuePct = revenue > 0 ? matrizCost / revenue * 100 : 0;
-  const directCostPerKWh = energy > 0 ? (energyCost + extraCosts + taxes + areaParticipation) / energy : null;
-  const totalCostPerKWh = energy > 0 ? totalOperatingCost / energy : null;
-  const extraRevenuePerKWh = energy > 0 ? extraRevenue / energy : null;
+  const directCostPerKWh = commercialEnergy > 0 ? (energyCost + extraCosts + taxes + areaParticipation) / commercialEnergy : null;
+  const totalCostPerKWh = commercialEnergy > 0 ? totalOperatingCost / commercialEnergy : null;
+  const extraRevenuePerKWh = commercialEnergy > 0 ? extraRevenue / commercialEnergy : null;
   const plannedEnergyCost = planning.planningKWh * cfg.energyCostPerKWh;
   const plannedManagement = planning.planningRevenue * cfg.managementPct / 100;
   const plannedPlatform = planning.planningRevenue * cfg.platformPct / 100;
@@ -5055,7 +5068,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const variableCostPerKWh = cfg.energyCostPerKWh + managementVariable + platformVariable + royaltyVariable + taxVariable + areaVariable + financeVariableCostPerKWh(cfg.costRules, planning);
   const variableRevenuePerKWh = planning.salePricePerKWh + financeVariableCostPerKWh(cfg.revenueRules, planning);
   const economics = window.UBY_FINANCE_ENGINE.unitEconomics({
-    energy,
+    energy: commercialEnergy,
     revenue,
     extraRevenue,
     energyCost,
@@ -5078,6 +5091,15 @@ function financeForCharges(charges, settings = {}, options = {}) {
     operationModel: model,
     revenue,
     energy,
+    commercialEnergy,
+    courtesyCharges: courtesy.charges,
+    courtesyEnergy: courtesy.energy,
+    courtesyRevenue: courtesy.revenue,
+    courtesyEnergyCost: courtesy.energyCost,
+    courtesyCostExcluded: courtesy.excludedFromUby,
+    courtesyTreatment: courtesy.treatment,
+    courtesyResponsible: courtesy.responsible,
+    physicalOperationNet: operationNet - courtesy.excludedFromUby,
     acRevenue,
     dcRevenue,
     management,
@@ -5898,7 +5920,7 @@ function generalFinanceByUnit(unitData) {
       const settings = financeSettingsForUbyRow(unit, mk);
       const matrixRow = matrizRowForUnit(unit, unitData, mk);
       const matrizCostItems = matrixRow ? matrizCostItemsForRow(matrixRow, mk, unitData) : [];
-      const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId), matrizCostItems });
+      const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId), matrizCostItems, workId: unit.workId, workName: unit.workName, stationName: unit.stationName || unit.station, courtesyConfig: stationAvailabilityFor(unit.workId, unit.stationName || unit.station, unit.workName) });
       return { monthKey: mk, result };
     });
     const total = monthly.reduce((acc, { result }) => {
@@ -5913,6 +5935,7 @@ function generalFinanceByUnit(unitData) {
       return acc;
     }, {});
     total.margin = total.revenue ? total.ownResult / total.revenue * 100 : 0;
+    total.totalCostPerKWh = total.commercialEnergy > 0 ? total.totalOperatingCost / total.commercialEnergy : null;
     total.paybackMonths = total.paybackInvestmentValue > 0 && total.paybackBase > 0 ? total.paybackInvestmentValue / total.paybackBase : 0;
     total.roiMonthly = total.paybackInvestmentValue > 0 ? total.paybackBase / total.paybackInvestmentValue * 100 : 0;
     total.operationModel = monthly.at(-1)?.result?.operationModel || 'uby';
@@ -6082,6 +6105,7 @@ function renderGeneralFinance(unitData) {
     <div class="card"><div class="label">Receita P3 total</div><div class="value">${fmtBRL(total.p3Gross || 0)}</div><div class="sub">gestao + sociedades</div></div>
     <div class="card"><div class="label">Sociedades P3</div><div class="value">${fmtBRL(total.p3SocietyProfit || 0)}</div><div class="sub">fora da UBY quando configurado</div></div>
     <div class="card"><div class="label">Royalties UBY</div><div class="value">${fmtBRL(total.ubyRoyalty || 0)}</div><div class="sub">marca em ativos de terceiros</div></div>
+    ${total.courtesyCharges ? `<div class="card"><div class="label">Cortesia de parceiros</div><div class="value">${fmtKWh(total.courtesyEnergy || 0)}</div><div class="sub">${fmtBRL(total.courtesyCostExcluded || 0)} fora do resultado UBY</div></div>` : ''}
     <div class="card"><div class="label">Resultado UBY e royalties</div><div class="value">${fmtBRL(total.ubyNet || 0)}</div><div class="sub">ativos UBY + uso de marca</div></div>
     <div class="card"><div class="label">Retencao S.A.</div><div class="value">${fmtBRL(total.saRetention || 0)}</div><div class="sub">retencao estatutaria</div></div>
     <div class="card"><div class="label">Investidores</div><div class="value">${fmtBRL(total.investorDistribution || 0)}</div><div class="sub">repasses por cotas</div></div>
@@ -6093,6 +6117,7 @@ function renderGeneralFinance(unitData) {
     <tr><td>Receitas extras</td><td>${fmtBRL(total.extraRevenue || 0)}</td></tr>
     <tr><td>App e plataforma de terceiros</td><td>${fmtBRL(total.platform || 0)}</td></tr>
     <tr><td>Royalty de marca UBY</td><td>${fmtBRL(total.ubyRoyalty || 0)}</td></tr>
+    ${total.courtesyCharges ? `<tr><td>Uso de cortesia de parceiros (memória)</td><td>${fmtKWh(total.courtesyEnergy || 0)} · ${fmtBRL(total.courtesyCostExcluded || 0)} fora do resultado UBY</td></tr>` : ''}
     <tr><td>Demais custos configurados</td><td>${fmtBRL(total.costs || 0)}</td></tr>
     <tr><td>Participacao dos parceiros de area</td><td>${fmtBRL(total.areaParticipation || 0)}</td></tr>
     <tr class="finance-total-row"><td>Custo operacional total</td><td>${fmtBRL(total.totalOperatingCost || 0)}</td></tr>
@@ -6326,6 +6351,26 @@ function isCourtesyCharge(charge = {}, config = {}) {
   return (config.courtesyUsers || []).some(person =>
     courtesyIdentityCandidates(person).some(key => candidates.has(key))
   );
+}
+
+function courtesyFinanceBreakdown(charges = [], config = {}, energyCostPerKWh = 0) {
+  const valid = charges.filter(isExecutedCharge);
+  const courtesy = valid.filter(charge => isCourtesyCharge(charge, config));
+  const courtesyEnergy = courtesy.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const courtesyRevenue = courtesy.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+  const treatment = ['operational', 'partner_absorbed', 'uby_absorbed'].includes(config.courtesyTreatment)
+    ? config.courtesyTreatment : 'operational';
+  const energyCost = courtesyEnergy * Math.max(0, Number(energyCostPerKWh || 0));
+  return {
+    treatment,
+    responsible: safeText(config.courtesyResponsible || '').trim(),
+    charges: courtesy.length,
+    energy: courtesyEnergy,
+    revenue: courtesyRevenue,
+    energyCost,
+    excludedFromUby: treatment === 'partner_absorbed' ? energyCost : 0,
+    commercialEnergy: Math.max(charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0) - courtesyEnergy, 0)
+  };
 }
 
 function commercialOccupancyStats(charges = [], bounds = null) {
@@ -10459,17 +10504,17 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
     const settings = financeSettingsForUbyRow(row, mk);
     const matrizCostItems = matrizCostItemsForRow(row, mk);
     matrizCostTotal += matrizCostItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems });
+    return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems, workId: row.workId, workName: row.workName, stationName: row.stationName || row.station, courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
   });
   const totals = results.reduce((acc, result) => {
-    ['revenue','extraRevenue','totalRevenue','energy','energyCost','extraCosts','management','platform','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
+    ['revenue','extraRevenue','totalRevenue','energy','commercialEnergy','courtesyCharges','courtesyEnergy','courtesyEnergyCost','courtesyCostExcluded','energyCost','extraCosts','management','platform','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
       acc[key] += Number(result[key] || 0);
     });
     acc.planningKWh += Number(result.planning?.planningKWh || 0);
     return acc;
-  }, { revenue:0, extraRevenue:0, totalRevenue:0, energy:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  }, { revenue:0, extraRevenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
   totals.matrizCost = matrizCostTotal;
-  totals.totalCostPerKWh = totals.energy > 0 ? totals.totalOperatingCost / totals.energy : null;
+  totals.totalCostPerKWh = totals.commercialEnergy > 0 ? totals.totalOperatingCost / totals.commercialEnergy : null;
   totals.plannedTotalCostPerKWh = totals.planningKWh > 0 ? totals.plannedTotalCost / totals.planningKWh : null;
   totals.resultPerKWh = totals.energy > 0 ? totals.operationNet / totals.energy : null;
   totals.operationMargin = totals.totalRevenue > 0 ? totals.operationNet / totals.totalRevenue * 100 : 0;
@@ -10482,7 +10527,7 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
 // já que uma evolução mensal não faz sentido presa a 1 mês só.
 function buildUbyMonthlySeries(includedRows = [], sourceMonths = []) {
   const byMonth = new Map(sourceMonths.map(mk => [mk, {
-    mk, label: monthLabel(mk), revenue: 0, totalOperatingCost: 0, operationNet: 0, matrizCost: 0, energy: 0
+    mk, label: monthLabel(mk), revenue: 0, totalOperatingCost: 0, operationNet: 0, matrizCost: 0, energy: 0, commercialEnergy: 0
   }]));
   includedRows.forEach(row => {
     const months = ubyFinanceMonthsForRow(row, sourceMonths, false, '');
@@ -10493,11 +10538,12 @@ function buildUbyMonthlySeries(includedRows = [], sourceMonths = []) {
       const settings = financeSettingsForUbyRow(row, mk);
       const matrizCostItems = matrizCostItemsForRow(row, mk);
       bucket.matrizCost += matrizCostItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-      const result = financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems });
+      const result = financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems, workId: row.workId, workName: row.workName, stationName: row.stationName || row.station, courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
       bucket.revenue += Number(result.revenue || 0);
       bucket.totalOperatingCost += Number(result.totalOperatingCost || 0);
       bucket.operationNet += Number(result.operationNet || 0);
       bucket.energy += Number(result.energy || 0);
+      bucket.commercialEnergy += Number(result.commercialEnergy || result.energy || 0);
     });
   });
   return sourceMonths.map(mk => byMonth.get(mk));
@@ -10646,8 +10692,8 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   const total = rows.reduce((acc, row) => {
     Object.keys(acc).forEach(key => { acc[key] += Number(row.finance?.[key] || 0); });
     return acc;
-  }, { revenue:0, totalRevenue:0, energy:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, planningKWh:0, plannedTotalCost:0, matrizCost:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
-  const totalCostPerKWh = total.energy > 0 ? total.totalOperatingCost / total.energy : null;
+  }, { revenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, planningKWh:0, plannedTotalCost:0, matrizCost:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  const totalCostPerKWh = total.commercialEnergy > 0 ? total.totalOperatingCost / total.commercialEnergy : null;
   const plannedCostPerKWh = total.planningKWh > 0 ? total.plannedTotalCost / total.planningKWh : null;
   const margin = total.totalRevenue > 0 ? total.operationNet / total.totalRevenue * 100 : 0;
   if (periodLabel) periodLabel.textContent = viewLabel || (isMonthView ? monthLabel(currentMonth) : 'Acumulado');
@@ -10657,13 +10703,14 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   if (window.UBY_FINANCE_ONLY) {
     const revenueTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.revenue));
     const costTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.totalOperatingCost, { invert: true }));
-    const perKWhTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.energy > 0 ? m.totalOperatingCost / m.energy : null, { invert: true }));
+    const perKWhTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.commercialEnergy > 0 ? m.totalOperatingCost / m.commercialEnergy : null, { invert: true }));
     const netTrend = ubyKpiTrendBadge(ubyKpiTrendFromSeries(monthlySeries, m => m.operationNet));
     summary.innerHTML = `
       <div class="card kpi-feature revenue-card"><div class="label">Faturamento recargas</div><div class="value">${fmtBRL(total.revenue)}</div>${revenueTrend}</div>
       <div class="card kpi-feature"><div class="label">Custos operacionais${total.matrizCost > 0 ? ' (inclui matriz)' : ''}</div><div class="value">${fmtBRL(total.totalOperatingCost)}</div>${costTrend}</div>
       ${total.matrizCost > 0 ? `<div class="card kpi-feature"><div class="label">Custos da matriz (rateados)</div><div class="value">${fmtBRL(total.matrizCost)}</div></div>` : ''}
       <div class="card kpi-feature"><div class="label">Custo efetivo por kWh</div><div class="value">${fmtPerKWh(totalCostPerKWh)}</div>${perKWhTrend}</div>
+      ${total.courtesyCharges ? `<div class="card kpi-feature"><div class="label">Cortesia de parceiros</div><div class="value">${fmtKWh(total.courtesyEnergy)}</div><div class="sub">${fmtBRL(total.courtesyCostExcluded)} fora do resultado UBY</div></div>` : ''}
       <div class="card kpi-feature ${total.operationNet >= 0 ? 'occ-green' : 'occ-red'}"><div class="label">Resultado UBY ${fmtPct(margin)}</div><div class="value">${fmtBRL(total.operationNet)}</div>${netTrend}</div>
     `;
   } else {
@@ -10672,6 +10719,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
       <div class="accountability-metric"><b>${fmtBRL(total.totalOperatingCost)}</b><span>Custos operacionais${total.matrizCost > 0 ? ' (inclui matriz)' : ''}</span></div>
       ${total.matrizCost > 0 ? `<div class="accountability-metric"><b>${fmtBRL(total.matrizCost)}</b><span>Custos da matriz (rateados)</span></div>` : ''}
       <div class="accountability-metric"><b>${fmtPerKWh(totalCostPerKWh)}</b><span>Custo efetivo por kWh</span></div>
+      ${total.courtesyCharges ? `<div class="accountability-metric"><b>${fmtKWh(total.courtesyEnergy)}</b><span>Cortesia de parceiros · ${fmtBRL(total.courtesyCostExcluded)} fora do resultado UBY</span></div>` : ''}
       <div class="accountability-metric"><b>${fmtBRL(total.operationNet)}</b><span>Resultado UBY ${fmtPct(margin)}</span></div>
     `;
   }
@@ -10697,7 +10745,7 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
       ? `location.href='recargas.html?obra=${encodeURIComponent(row.workId)}&openReport=financeiro&station=${encodeURIComponent(stationName)}'`
       : `openWorkReport('${escapeAttr(row.workId)}','financeiro','${escapeAttr(stationName)}')`;
     return `<div class="uby-finance-row">
-      <div><strong>${escapeHtml(stationName || row.workName)}</strong><span>${escapeHtml(row.workName)} | ${row.financeMonths.length} periodo(s) calculado(s)</span></div>
+      <div><strong>${escapeHtml(stationName || row.workName)}</strong><span>${escapeHtml(row.workName)} | ${row.financeMonths.length} periodo(s) calculado(s)${finance.courtesyCharges ? ` | ${fmtKWh(finance.courtesyEnergy)} de cortesia fora do resultado UBY` : ''}</span></div>
       <div class="uby-finance-cell"><b>${fmtBRL(finance.revenue)}</b><em>faturamento</em></div>
       <div class="uby-finance-cell"><b>${fmtBRL(finance.totalOperatingCost)}</b><em>custos totais</em></div>
       <div class="uby-finance-cell"><b>${fmtPerKWh(finance.totalCostPerKWh)}</b><em>custo atual</em></div>

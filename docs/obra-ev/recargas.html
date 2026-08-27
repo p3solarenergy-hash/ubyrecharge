@@ -2098,6 +2098,14 @@
         </div>
         <div class="station-layout-divider">Regra comercial de cortesia (opcional)</div>
         <label class="station-layout-field">Tarifa comercial de referencia (R$/kWh)<input id="stationLayoutReferenceTariff" type="number" min="0" step="0.01" placeholder="Ex.: 1,79"></label>
+        <label class="station-layout-field">Tratamento financeiro da cortesia
+          <select id="stationLayoutCourtesyTreatment">
+            <option value="operational">Apenas informar uso de cortesia</option>
+            <option value="partner_absorbed">Custo absorvido pelo parceiro local</option>
+            <option value="uby_absorbed">Custo absorvido pela UBY</option>
+          </select>
+        </label>
+        <label class="station-layout-field wide">Responsável pelo benefício<input id="stationLayoutCourtesyResponsible" type="text" placeholder="Ex.: Dono do Posto Central JK"></label>
         <label class="station-layout-field wide">Pessoas com recarga cortesia<textarea id="stationLayoutCourtesyUsers" placeholder="Um nome, e-mail ou telefone por linha. Ex.: Dono do posto"></textarea></label>
       </div>
     </div>
