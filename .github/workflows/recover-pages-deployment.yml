@@ -1,0 +1,27 @@
+name: Recover GitHub Pages deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      pages_deployment_id:
+        description: 'SHA or ID of the stuck Pages deployment to cancel'
+        required: true
+        default: '18cb27ae041d90860130135675ba33d979d70bbe'
+
+permissions:
+  pages: write
+
+jobs:
+  cancel-stuck-pages-deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel the stuck GitHub Pages deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_DEPLOYMENT_ID: ${{ inputs.pages_deployment_id }}
+        run: |
+          curl --fail-with-body --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/deployments/${PAGES_DEPLOYMENT_ID}/cancel"
