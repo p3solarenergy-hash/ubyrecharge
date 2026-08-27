@@ -2682,6 +2682,7 @@ function defaultFinanceSettings() {
     p3DcEquityPct: 0,
     platformPct: 0,
     ubyRoyaltyPct: 0,
+    taxRatePct: 0,
     energyCostPerKWh: 0,
     investmentValue: 0,
     investorQuotaPct: 100,
@@ -2794,6 +2795,7 @@ function currentFinanceSettingsFromInputs() {
     p3DcEquityPct: numberInputValue('financeP3DcEquityPct', 0),
     platformPct: numberInputValue('financePlatformPct', 0),
     ubyRoyaltyPct: numberInputValue('financeUbyRoyaltyPct', 0),
+    taxRatePct: numberInputValue('financeTaxRatePct', 0),
     energyCostPerKWh,
     investmentValue: numberInputValue('financeInvestmentValue', 0),
     investorQuotaPct: numberInputValue('financeInvestorQuotaPct', 100),
@@ -3122,6 +3124,7 @@ function applyFinanceSettingsToInputs(settings = {}) {
     financeP3DcEquityPct: merged.p3DcEquityPct,
     financePlatformPct: merged.platformPct,
     financeUbyRoyaltyPct: merged.ubyRoyaltyPct,
+    financeTaxRatePct: merged.taxRatePct,
     financeEnergyCost: merged.energyCostPerKWh,
     financeInvestmentValue: merged.investmentValue,
     financeInvestorQuotaPct: merged.investorQuotaPct,
@@ -4846,6 +4849,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const management = revenue * cfg.managementPct / 100;
   const platform = revenue * cfg.platformPct / 100;
   const ubyRoyalty = model === 'third_party_management' ? revenue * cfg.ubyRoyaltyPct / 100 : 0;
+  const taxes = revenue * cfg.taxRatePct / 100;
   const energyCost = energy * cfg.energyCostPerKWh;
   const mk = options.monthKey || chargeMonthKey(charges[0] || {}) || financeMonthKey();
   const planning = financePlanningContext(charges, mk === 'unknown' ? financeMonthKey() : mk, cfg, options.historyCharges || charges, options.power);
@@ -4883,7 +4887,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const localExtraCosts = costEvaluation.actual;
   const extraCosts = localExtraCosts + matrizCost;
   const extraRevenue = revenueEvaluation.actual;
-  const costs = energyCost + extraCosts;
+  const costs = energyCost + extraCosts + taxes;
   const preAreaNet = revenue + extraRevenue - management - platform - ubyRoyalty - costs;
   const areaEligible = model === 'uby' || model === 'hybrid';
   const areaSharePct = cfg.ownerTransferMode === 'net' ? Number(cfg.ownerNetProfitSharePct || 0) : Number(cfg.ownerRevenueSharePct || 0);
@@ -4961,21 +4965,22 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const roiMonthly = paybackInvestmentValue > 0 ? paybackBase / paybackInvestmentValue * 100 : 0;
   const margin = revenue ? ownResult / revenue * 100 : 0;
   const totalRevenue = revenue + extraRevenue;
-  const totalOperatingCost = energyCost + extraCosts + management + platform + ubyRoyalty + areaParticipation;
+  const totalOperatingCost = energyCost + extraCosts + taxes + management + platform + ubyRoyalty + areaParticipation;
   const matrizCostPerKWh = energy > 0 ? matrizCost / energy : null;
   const plannedMatrizCostPerKWh = planning.planningKWh > 0 ? matrizCost / planning.planningKWh : null;
   const matrizCostRevenuePct = revenue > 0 ? matrizCost / revenue * 100 : 0;
-  const directCostPerKWh = energy > 0 ? (energyCost + extraCosts + areaParticipation) / energy : null;
+  const directCostPerKWh = energy > 0 ? (energyCost + extraCosts + taxes + areaParticipation) / energy : null;
   const totalCostPerKWh = energy > 0 ? totalOperatingCost / energy : null;
   const extraRevenuePerKWh = energy > 0 ? extraRevenue / energy : null;
   const plannedEnergyCost = planning.planningKWh * cfg.energyCostPerKWh;
   const plannedManagement = planning.planningRevenue * cfg.managementPct / 100;
   const plannedPlatform = planning.planningRevenue * cfg.platformPct / 100;
   const plannedUbyRoyalty = model === 'third_party_management' ? planning.planningRevenue * cfg.ubyRoyaltyPct / 100 : 0;
-  const plannedPreAreaNet = planning.planningRevenue + revenueEvaluation.planned - plannedManagement - plannedPlatform - plannedUbyRoyalty - plannedEnergyCost - costEvaluation.planned - matrizCost;
+  const plannedTaxes = planning.planningRevenue * cfg.taxRatePct / 100;
+  const plannedPreAreaNet = planning.planningRevenue + revenueEvaluation.planned - plannedManagement - plannedPlatform - plannedUbyRoyalty - plannedTaxes - plannedEnergyCost - costEvaluation.planned - matrizCost;
   const plannedAreaShareBase = cfg.ownerTransferMode === 'net' ? Math.max(plannedPreAreaNet, 0) : planning.planningRevenue;
   const plannedAreaParticipation = areaEligible ? plannedAreaShareBase * areaSharePct / 100 : 0;
-  const plannedDirectCost = plannedEnergyCost + costEvaluation.planned + matrizCost + plannedAreaParticipation;
+  const plannedDirectCost = plannedEnergyCost + costEvaluation.planned + matrizCost + plannedTaxes + plannedAreaParticipation;
   const plannedTotalCost = plannedDirectCost + plannedManagement + plannedPlatform + plannedUbyRoyalty;
   const plannedDirectCostPerKWh = planning.planningKWh > 0 ? plannedDirectCost / planning.planningKWh : null;
   const plannedExtraRevenuePerKWh = planning.planningKWh > 0 ? revenueEvaluation.planned / planning.planningKWh : null;
@@ -4983,19 +4988,20 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const platformVariable = planning.salePricePerKWh * cfg.platformPct / 100;
   const areaVariable = areaEligible && cfg.ownerTransferMode !== 'net' ? planning.salePricePerKWh * areaSharePct / 100 : 0;
   const royaltyVariable = model === 'third_party_management' ? planning.salePricePerKWh * cfg.ubyRoyaltyPct / 100 : 0;
-  const variableCostPerKWh = cfg.energyCostPerKWh + managementVariable + platformVariable + royaltyVariable + areaVariable + financeVariableCostPerKWh(cfg.costRules, planning);
+  const taxVariable = planning.salePricePerKWh * cfg.taxRatePct / 100;
+  const variableCostPerKWh = cfg.energyCostPerKWh + managementVariable + platformVariable + royaltyVariable + taxVariable + areaVariable + financeVariableCostPerKWh(cfg.costRules, planning);
   const variableRevenuePerKWh = planning.salePricePerKWh + financeVariableCostPerKWh(cfg.revenueRules, planning);
   const economics = window.UBY_FINANCE_ENGINE.unitEconomics({
     energy,
     revenue,
     extraRevenue,
     energyCost,
-    extraCosts: extraCosts + areaParticipation + ubyRoyalty,
+    extraCosts: extraCosts + taxes + areaParticipation + ubyRoyalty,
     management,
     platform,
     planningKWh: planning.planningKWh,
     plannedEnergyCost,
-    plannedExtraCosts: costEvaluation.planned + matrizCost + plannedAreaParticipation + plannedUbyRoyalty,
+    plannedExtraCosts: costEvaluation.planned + matrizCost + plannedTaxes + plannedAreaParticipation + plannedUbyRoyalty,
     plannedManagement,
     plannedPlatform,
     plannedUbyRoyalty,
@@ -5021,6 +5027,8 @@ function financeForCharges(charges, settings = {}, options = {}) {
     ownResult,
     energyCost,
     energyRate: Number(cfg.energyCostPerKWh || 0),
+    taxes,
+    taxRatePct: Number(cfg.taxRatePct || 0),
     extraCosts,
     localExtraCosts,
     matrizCost,
@@ -5037,7 +5045,13 @@ function financeForCharges(charges, settings = {}, options = {}) {
     plannedAreaParticipation,
     costRules: cfg.costRules,
     revenueRules: cfg.revenueRules,
-    costRuleDetails: [...costEvaluation.details, ...matrizCostDetails],
+    costRuleDetails: [...costEvaluation.details, {
+      id: 'tax-rate', label: 'Impostos sobre faturamento', enabled: Number(cfg.taxRatePct || 0) > 0,
+      basis: 'revenue_pct', value: Number(cfg.taxRatePct || 0), actual: taxes, planned: plannedTaxes,
+      actualPerKWh: energy > 0 ? taxes / energy : null,
+      plannedPerKWh: planning.planningKWh > 0 ? plannedTaxes / planning.planningKWh : null,
+      displayRule: `${Number(cfg.taxRatePct || 0).toFixed(2).replace('.', ',')}% do faturamento`
+    }, ...matrizCostDetails],
     revenueRuleDetails: revenueEvaluation.details,
     costs,
     totalRevenue,
@@ -5510,8 +5524,20 @@ function matrizWeight(row, target, item, mk) {
   if (item.allocation === 'revenue') return charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
   return 1;
 }
+// Somente ativos da UBY participam da matriz. O parceiro com gestão P3 e
+// royalty UBY continua no painel operacional, mas não absorve custos da matriz
+// nem compõe a distribuição de investidores UBY.
+function matrizEligibleRow(row, mk = financeMonthKey()) {
+  if (!row?.included) return false;
+  const settings = financeSettingsForUbyRow(row, mk);
+  return ['uby', 'hybrid'].includes(normalizeOperationModel(settings?.operationModel));
+}
+function matrizEligibleRows(unitData = getGeneralUnitData(), mk = financeMonthKey()) {
+  return getUbyChargerRows(unitData).filter(row => matrizEligibleRow(row, mk));
+}
 function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
-  const rows = getUbyChargerRows(unitData).filter(candidate => candidate.included);
+  if (!matrizEligibleRow(row, mk)) return [];
+  const rows = matrizEligibleRows(unitData, mk);
   return loadMatrizCosts().filter(item => matrizApplies(item, mk)).flatMap(item => {
     const targets = (item.targets || [])
       .filter(target => !target.startMonth || target.startMonth <= mk)
@@ -5548,9 +5574,9 @@ function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
     return amount > 0 ? [{ id: item.id, label: item.name, amount, cashAmount: cashShare, coverageMonths: matrizCoverageMonths(item), rule: `${coverage} | ${matrizMethodLabel(item.allocation)} | ${weighted.length} destino(s)` }] : [];
   });
 }
-function matrizRowForUnit(unit = {}, unitData = getGeneralUnitData()) {
-  const candidates = getUbyChargerRows(unitData)
-    .filter(row => row.included && String(row.workId || '') === String(unit.workId || ''));
+function matrizRowForUnit(unit = {}, unitData = getGeneralUnitData(), mk = financeMonthKey()) {
+  const candidates = matrizEligibleRows(unitData, mk)
+    .filter(row => String(row.workId || '') === String(unit.workId || ''));
   if (!candidates.length) return null;
   const station = safeText(unit.stationName || unit.station || unit.workName || '');
   const direct = candidates.find(row => normalizeStationForCompare(row.station || row.stationName || '') === normalizeStationForCompare(station));
@@ -5559,7 +5585,7 @@ function matrizRowForUnit(unit = {}, unitData = getGeneralUnitData()) {
   return matched || (candidates.length === 1 ? candidates[0] : null);
 }
 function currentMatrizItems(mk = financeMonthKey()) {
-  const current = matrizRowForUnit({ workId: currentWorkId, stationName: currentStationReportName || '' });
+  const current = matrizRowForUnit({ workId: currentWorkId, stationName: currentStationReportName || '' }, getGeneralUnitData(), mk);
   return current ? matrizCostItemsForRow(current, mk) : [];
 }
 function resetMatrizCostForm() {
@@ -5577,7 +5603,7 @@ function addMatrizCost() {
   const name = safeText(matrizInput('matrizNewName')?.value || '').trim();
   const amount = Math.max(0, Number(matrizInput('matrizNewValue')?.value || 0));
   if (!name || !amount) { setMatrizFeedback('Informe o nome e o valor de cada parcela ou competencia.', true); return; }
-  const targetRows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
+  const targetRows = matrizEligibleRows(getGeneralUnitData(), financeMonthKey());
   const allTargets = targetRows.map(matrizScopeKey);
   const targetIds = matrizSelectedTargets().length ? matrizSelectedTargets() : allTargets;
   if (!targetIds.length) { setMatrizFeedback('Selecione pelo menos um carregador de destino.', true); return; }
@@ -5611,7 +5637,7 @@ function editMatrizCost(id) {
   const values = { matrizNewName:item.name, matrizCostCategory:item.category, matrizCostSupplier:item.supplier, matrizCostKind:item.costKind, matrizNewValue:item.amount, matrizCostInstallments:item.installments, matrizCostCoverageMonths:matrizCoverageMonths(item), matrizCostStartMonth:item.startMonth, matrizCostEndMonth:item.endMonth, matrizCostDueDay:item.dueDay, matrizCostMethod:item.allocation, matrizCostDocument:item.documentRef, matrizCostNotes:item.notes, matrizCostCustomShares:item.targets.map(target => target.share || 0).join(', ') };
   Object.entries(values).forEach(([idValue, value]) => { const el = matrizInput(idValue); if (el) el.value = value ?? ''; });
   const targets = matrizInput('matrizCostTargets'); if (targets) {
-    const rows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
+    const rows = matrizEligibleRows(getGeneralUnitData(), financeMonthKey());
     [...targets.options].forEach(option => {
       const row = matrizResolveTargetRow(option.value, rows);
       option.selected = item.targets.some(target => matrizRowsMatch(matrizResolveTargetRow(target, rows), row));
@@ -5695,7 +5721,8 @@ function renderMatrizCosts(unitData) {
   ensureMatrizCostEditor();
   const listEl = matrizInput('matrizCostList'); if (!listEl) return;
   const mk = financeMonthKey() || getMonths().at(-1) || '';
-  const rows = getUbyChargerRows(unitData).filter(row => row.included);
+  const allIncludedRows = getUbyChargerRows(unitData).filter(row => row.included);
+  const rows = matrizEligibleRows(unitData, mk);
   const costs = loadMatrizCosts();
   const planned = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + matrizCompetencyAmount(item), 0);
   const monthEl = matrizInput('matrizMonthLabel'); if (monthEl) monthEl.textContent = mk ? `competencia ${monthLabel(mk)} | cadastro salvo separadamente das recargas` : 'selecione a competencia';
@@ -5715,7 +5742,7 @@ function renderMatrizCosts(unitData) {
   const targets = matrizInput('matrizCostTargets');
   if (targets && !matrizEditingId) targets.innerHTML = rows.map(row => `<option value="${escapeAttr(matrizScopeKey(row))}" selected>${escapeHtml(row.station || row.workName)} | ${escapeHtml(row.workName)}</option>`).join('');
   const rateio = matrizInput('matrizRateio'); if (rateio) rateio.textContent = rows.length ? `Destinos ativos: ${rows.map(row => row.station || row.workName).join(' | ')}.` : '';
-  renderMatrizMonthlyDre(rows, mk);
+  renderMatrizMonthlyDre(allIncludedRows, mk);
   renderMatrizDocuments(mk);
 }
 
@@ -5806,7 +5833,7 @@ function generalFinanceByUnit(unitData) {
       // da obra fazia o geral voltar para o modelo padrao e ignorar a escolha
       // salva para Sabara, Central JK e qualquer outra estacao individual.
       const settings = financeSettingsForUbyRow(unit, mk);
-      const matrixRow = matrizRowForUnit(unit, unitData);
+      const matrixRow = matrizRowForUnit(unit, unitData, mk);
       const matrizCostItems = matrixRow ? matrizCostItemsForRow(matrixRow, mk, unitData) : [];
       const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId), matrizCostItems });
       return { monthKey: mk, result };
@@ -10417,12 +10444,14 @@ function buildUbyMonthlySeries(includedRows = [], sourceMonths = []) {
 function renderCostTree(rows, matrizTotal) {
   const el = document.getElementById('costTree');
   if (!el) return;
-  if (!rows || !rows.length) { el.innerHTML = ''; return; }
-  const n = rows.length;
+  const matrixRows = (rows || []).filter(row => matrizEligibleRow(row, financeMonthKey()));
+  const partnerRows = (rows || []).filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
+  if (!matrixRows.length && !partnerRows.length) { el.innerHTML = ''; return; }
+  const n = matrixRows.length;
   const line = (label, value, cls) =>
     `<div class="tree-line ${cls || ''}"><span>${label}</span><b>${value}</b></div>`;
   el.innerHTML = `
-    <div class="cost-tree">
+    ${matrixRows.length ? `<div class="cost-tree">
       <div class="tree-root-wrap">
         <div class="tree-node root">
           <div class="tn-tag">◆ Matriz UBY</div>
@@ -10432,7 +10461,7 @@ function renderCostTree(rows, matrizTotal) {
         </div>
       </div>
       <div class="tree-branches">
-        ${rows.map(r => {
+        ${matrixRows.map(r => {
           const f = r.finance || {};
           const ops = Number(f.management || 0) + Math.max(0, Number(f.extraCosts || 0) - Number(f.matrizCost || 0));
           const matrizShare = Number(f.matrizCost || 0);
@@ -10454,7 +10483,15 @@ function renderCostTree(rows, matrizTotal) {
           </div>`;
         }).join('')}
       </div>
-    </div>`;
+    </div>` : ''}
+    ${partnerRows.length ? `<section class="card" style="margin-top:18px;border-color:#1f6e63;background:linear-gradient(135deg,rgba(19,92,77,.18),rgba(11,28,50,.96))">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap"><div><div class="tn-tag" style="color:#42df9a">◆ Operação parceira</div><h3 style="margin:4px 0">Gestão P3 + royalty UBY — fora da matriz</h3></div><span class="sub">não recebe custos nem distribuição de cotas da matriz UBY</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:14px">${partnerRows.map(r => {
+        const f = r.finance || {};
+        const result = Number(f.partnerShare ?? f.operationNet ?? 0);
+        return `<div class="tree-node charger" style="min-height:0"><div class="tn-title">${escapeHtml(r.stationName || r.station || r.workName)}</div><div class="tn-workname">${escapeHtml(r.workName || '')}</div>${line('Faturamento', fmtBRL(Number(f.revenue || 0)), 'in')}${line('− Gestão P3', fmtBRL(Number(f.management || 0)), 'out')}${line('− Royalty UBY', fmtBRL(Number(f.ubyRoyalty || 0)), 'out')}${line('− Impostos', fmtBRL(Number(f.taxes || 0)), 'out')}${line('= Resultado do parceiro', fmtBRL(result), 'total ' + (result >= 0 ? 'pos' : 'neg'))}<div class="tn-sub" style="margin-top:8px">P3: ${fmtBRL(Number(f.p3OperationalResult || 0))} · UBY (royalty): ${fmtBRL(Number(f.ubyRoyalty || 0))}</div></div>`;
+      }).join('')}</div>
+    </section>` : ''}`;
 }
 
 function renderUbyDistribution(total) {
