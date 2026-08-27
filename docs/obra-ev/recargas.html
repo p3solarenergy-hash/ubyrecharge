@@ -138,6 +138,8 @@
     .usage-grid canvas { height:230px !important; max-height:240px; }
     .pie-card canvas { min-height:260px; max-height:300px; }
     canvas { width:100%; max-height:320px; }
+    /* Comparativo mensal: duas unidades exigem altura previsível e eixos legíveis. */
+    .monthly-comparison-chart { height:300px !important; max-height:300px !important; }
     .coupon-summary { display:grid; gap:8px; margin-top:12px; }
     .coupon-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(4,auto); gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--p3-border); color:var(--p3-muted); font-size:11px; }
     .coupon-row strong { color:var(--p3-text); font-size:12px; overflow-wrap:anywhere; }
@@ -1096,7 +1098,8 @@
       </div>
       <div class="card">
         <h2>Evolucao mensal geral</h2>
-        <canvas id="chartGeneralMonth" aria-label="Evolucao mensal geral"></canvas>
+        <p class="note" style="margin:-4px 0 14px">Barras: receita em R$ (eixo esquerdo) · Linha: energia em kWh (eixo direito).</p>
+        <canvas id="chartGeneralMonth" class="monthly-comparison-chart" aria-label="Evolucao mensal geral"></canvas>
       </div>
     </section>
 
@@ -1403,7 +1406,8 @@
       </div>
       <div class="card">
         <h2>Evolucao mensal UBY</h2>
-        <canvas id="chartUbyMonth" aria-label="Evolucao mensal UBY"></canvas>
+        <p class="note" style="margin:-4px 0 14px">Barras: receita em R$ (eixo esquerdo) · Linha: energia em kWh (eixo direito).</p>
+        <canvas id="chartUbyMonth" class="monthly-comparison-chart" aria-label="Evolucao mensal UBY"></canvas>
       </div>
     </section>
 

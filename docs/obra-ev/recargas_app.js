@@ -2437,6 +2437,69 @@ function fmtBRL(v) {
 }
 function fmtKWh(v) { return (+v).toFixed(2).replace('.', ',') + ' kWh'; }
 function fmtPct(v)  { return (+v).toFixed(2).replace('.', ',') + '%'; }
+function fmtChartMoneyTick(v) {
+  const amount = Number(v) || 0;
+  return amount >= 1000
+    ? `R$ ${(amount / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil`
+    : fmtBRL(amount);
+}
+function fmtChartEnergyTick(v) {
+  return `${(Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kWh`;
+}
+
+function renderMonthlyRevenueEnergyChart(canvasId, monthData, revenueLabel, energyLabel) {
+  destroyChart(canvasId);
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  charts[canvasId] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: monthData.map(item => item.label),
+      datasets: [
+        {
+          type: 'bar', label: revenueLabel, data: monthData.map(item => +item.revenue.toFixed(2)),
+          yAxisID: 'yRevenue', backgroundColor: 'rgba(87,183,255,.34)', borderColor: '#57B7FF',
+          borderWidth: 1.5, borderRadius: 6, maxBarThickness: 58, order: 2
+        },
+        {
+          type: 'line', label: energyLabel, data: monthData.map(item => +item.energy.toFixed(2)),
+          yAxisID: 'yEnergy', borderColor: '#2DBBD3', backgroundColor: '#2DBBD3',
+          borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#0B1524',
+          pointBorderWidth: 2, tension: .28, fill: false, order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { color: '#B7C7C0', usePointStyle: true, padding: 18 } },
+        tooltip: {
+          callbacks: {
+            label: context => context.dataset.yAxisID === 'yRevenue'
+              ? `${context.dataset.label}: ${fmtBRL(context.parsed.y)}`
+              : `${context.dataset.label}: ${fmtKWh(context.parsed.y)}`
+          }
+        }
+      },
+      scales: {
+        yRevenue: {
+          beginAtZero: true, position: 'left',
+          title: { display: true, text: 'Receita (R$)', color: '#83C7FF', font: { weight: '700' } },
+          ticks: { color: '#83C7FF', maxTicksLimit: 5, callback: fmtChartMoneyTick },
+          grid: { color: '#24364E' }
+        },
+        yEnergy: {
+          beginAtZero: true, position: 'right',
+          title: { display: true, text: 'Energia (kWh)', color: '#63D8E5', font: { weight: '700' } },
+          ticks: { color: '#63D8E5', maxTicksLimit: 5, callback: fmtChartEnergyTick },
+          grid: { drawOnChartArea: false }
+        },
+        x: { ticks: { color: '#B7C7C0' }, grid: { display: false } }
+      }
+    }
+  });
+}
 function fmtDT(d) {
   if (!d) return '—';
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
@@ -10864,30 +10927,7 @@ async function renderUbyOperation() {
       energy: monthCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0)
     };
   });
-  destroyChart('chartUbyMonth');
-  const monthCtx = document.getElementById('chartUbyMonth');
-  if (monthCtx) {
-    charts['chartUbyMonth'] = new Chart(monthCtx, {
-      type: 'line',
-      data: {
-        labels: monthData.map(row => row.label),
-        datasets: [
-          { label: 'Receita UBY', data: monthData.map(row => +row.revenue.toFixed(2)), borderColor: '#57B7FF', backgroundColor: 'rgba(87,183,255,.12)', tension: .35, fill: true, yAxisID: 'y' },
-          { label: 'kWh UBY', data: monthData.map(row => +row.energy.toFixed(2)), borderColor: '#2DBBD3', backgroundColor: 'rgba(45,187,211,.08)', tension: .35, yAxisID: 'y1' }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#8FA39A' } } },
-        scales: {
-          y: { beginAtZero: true, ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } },
-          y1: { beginAtZero: true, position: 'right', ticks: { color: '#8FA39A' }, grid: { drawOnChartArea: false } },
-          x: { ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } }
-        }
-      }
-    });
-  }
+  renderMonthlyRevenueEnergyChart('chartUbyMonth', monthData, 'Receita UBY', 'Energia UBY');
 
   document.getElementById('ubyChargerTable').innerHTML = visibleRows.length ? visibleRows.map(row => `
     <tr>
@@ -11218,29 +11258,7 @@ async function renderGeral() {
       energy: monthCharges.reduce((sum, charge) => sum + charge.energyKWh, 0)
     };
   });
-  destroyChart('chartGeneralMonth');
-  const monthCtx = document.getElementById('chartGeneralMonth');
-  if (monthCtx) {
-    charts['chartGeneralMonth'] = new Chart(monthCtx, {
-      type: 'line',
-      data: {
-        labels: monthData.map(item => item.label),
-        datasets: [
-          { label: 'Receita', data: monthData.map(item => +item.revenue.toFixed(2)), borderColor: '#57B7FF', backgroundColor: 'rgba(87,183,255,.12)', tension: .25, fill: true },
-          { label: 'kWh', data: monthData.map(item => +item.energy.toFixed(2)), borderColor: '#FFD66B', backgroundColor: 'rgba(255,214,107,.10)', tension: .25, fill: true, yAxisID: 'y1' }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { color: '#8FA39A' } } },
-        scales: {
-          y: { beginAtZero: true, ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } },
-          y1: { beginAtZero: true, position: 'right', ticks: { color: '#8FA39A' }, grid: { drawOnChartArea: false } },
-          x: { ticks: { color: '#8FA39A' }, grid: { color: '#24364E' } }
-        }
-      }
-    });
-  }
+  renderMonthlyRevenueEnergyChart('chartGeneralMonth', monthData, 'Receita geral', 'Energia geral');
   markOverviewRendered('geral');
 }
 
