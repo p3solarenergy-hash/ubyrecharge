@@ -10550,12 +10550,15 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
     return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems, workId: row.workId, workName: row.workName, stationName: row.stationName || row.station, courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
   });
   const totals = results.reduce((acc, result) => {
-    ['revenue','extraRevenue','totalRevenue','energy','commercialEnergy','courtesyCharges','courtesyEnergy','courtesyEnergyCost','courtesyCostExcluded','energyCost','extraCosts','management','platform','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
+    ['revenue','extraRevenue','totalRevenue','energy','commercialEnergy','courtesyCharges','courtesyEnergy','courtesyEnergyCost','courtesyCostExcluded','energyCost','extraCosts','management','platform','ubyRoyalty','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
       acc[key] += Number(result[key] || 0);
     });
     acc.planningKWh += Number(result.planning?.planningKWh || 0);
     return acc;
-  }, { revenue:0, extraRevenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, management:0, platform:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  }, { revenue:0, extraRevenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, management:0, platform:0, ubyRoyalty:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  // A visão acumulada precisa manter a titularidade do carregador. Sem isso,
+  // um parceiro com royalty UBY volta a ser apresentado como ativo próprio.
+  totals.operationModel = results.at(-1)?.operationModel || 'uby';
   totals.matrizCost = matrizCostTotal;
   totals.totalCostPerKWh = totals.commercialEnergy > 0 ? totals.totalOperatingCost / totals.commercialEnergy : null;
   totals.plannedTotalCostPerKWh = totals.planningKWh > 0 ? totals.plannedTotalCost / totals.planningKWh : null;
