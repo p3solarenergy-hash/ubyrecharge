@@ -10867,6 +10867,81 @@ function generateNetworkUnifiedReport() {
   printable.document.close();
 }
 
+function ubyExportSheet(XLSX, rows = [], columns = []) {
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  sheet['!cols'] = columns.map(width => ({ wch: width }));
+  if (rows.length) sheet['!autofilter'] = { ref: `A1:${XLSX.utils.encode_col(Math.max(columns.length - 1, 0))}${rows.length}` };
+  return sheet;
+}
+
+async function exportUbyNetworkFinanceXlsx() {
+  const XLSX = await ensureSpreadsheetLibrary();
+  const sourceRows = getGeneralUnitData().filter(row => row.included);
+  const sourceMonths = [...new Set(sourceRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
+  if (!sourceMonths.length) return alert('Não há recargas financeiras carregadas para exportar. Clique em Atualizar e tente novamente.');
+  const selected = networkUnifiedReportModel();
+  const monthly = sourceMonths.map(monthKey => {
+    const rows = sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, true, monthKey));
+    const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
+    const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
+    const fields = ['revenue','extraRevenue','marketingRevenue','energy','energyCost','extraCosts','matrizCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
+    const owned = networkFinanceSum(ownedRows, fields);
+    const royalties = Number(networkFinanceSum(partnerRows, fields).ubyRoyalty || 0);
+    const result = Number(owned.operationNet || 0) + royalties + Number(owned.marketingRevenue || 0);
+    return { monthKey, owned, royalties, result };
+  });
+  const workbook = XLSX.utils.book_new();
+  const policy = selected.policy;
+  const summaryRows = [
+    ['RELATÓRIO FINANCEIRO COMPLETO — REDE UBY'],
+    ['Gerado em', fmtDT(new Date())],
+    ['Competência exibida', selected.period],
+    [],
+    ['INDICADOR', 'VALOR'],
+    ['Faturamento de recargas UBY', Number(selected.owned.revenue || 0)],
+    ['Receitas operacionais complementares', Number(selected.owned.extraRevenue || 0)],
+    ['Royalties de parceiros', Number(selected.royalties || 0)],
+    ['Marketing e contratos', Number(selected.marketing || 0)],
+    ['Energia', Number(selected.owned.energyCost || 0)],
+    ['Custos centralizados da matriz', Number(selected.owned.matrizCost || 0)],
+    ['Impostos', Number(selected.owned.taxes || 0)],
+    ['Gestão, plataforma e participação de área', Number(selected.owned.management || 0) + Number(selected.owned.platform || 0) + Number(selected.owned.areaParticipation || 0)],
+    ['Resultado operacional UBY', Number(selected.operationalResult || 0)],
+    ['Resultado consolidado da rede', Number(selected.result || 0)],
+    ['Resultado distribuível', Number(selected.distributable || 0)],
+    ['Pool dos cotistas', Number(selected.investorPool || 0)],
+    ['Valor por cota', Number(selected.perQuota || 0)],
+    [],
+    ['POLÍTICA DE DISTRIBUIÇÃO', 'VALOR'],
+    ['Rodada', policy.roundLabel],
+    ['Cotas emitidas', Number(policy.totalQuotas || 0)],
+    ['Cotas vendidas', Number(selected.soldQuotas || 0)],
+    ['Percentual dos cotistas', Number(policy.investorPct || 0) / 100],
+    ['Reserva', Number(policy.reservePct || 0) / 100]
+  ];
+  const monthlyRows = [['MÊS', 'FATURAMENTO RECARGAS', 'ENERGIA kWh', 'CUSTO ENERGIA', 'MATRIZ RATEADA', 'IMPOSTOS', 'ROYALTIES', 'MARKETING', 'RESULTADO OPERACIONAL', 'RESULTADO REDE']];
+  monthly.forEach(item => monthlyRows.push([
+    monthLabel(item.monthKey), Number(item.owned.revenue || 0), Number(item.owned.energy || 0), Number(item.owned.energyCost || 0), Number(item.owned.matrizCost || 0), Number(item.owned.taxes || 0), Number(item.royalties || 0), Number(item.owned.marketingRevenue || 0), Number(item.owned.operationNet || 0), Number(item.result || 0)
+  ]));
+  const unitsRows = [['UNIDADE', 'OBRA', 'MODELO', 'PERÍODOS', 'FATURAMENTO', 'ENERGIA kWh', 'CUSTO TOTAL', 'MATRIZ RATEADA', 'IMPOSTOS', 'ROYALTY UBY', 'RESULTADO UBY']];
+  sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, false, '')).forEach(row => {
+    const finance = row.finance || {};
+    unitsRows.push([row.stationName || row.station || row.workName, row.workName || '', operationModelLabel(finance.operationModel), row.financeMonths.length, Number(finance.revenue || 0), Number(finance.energy || 0), Number(finance.totalOperatingCost || 0), Number(finance.matrizCost || 0), Number(finance.taxes || 0), Number(finance.ubyRoyalty || 0), normalizeOperationModel(finance.operationModel) === 'third_party_management' ? Number(finance.ubyRoyalty || 0) : Number(finance.operationNet || 0)]);
+  });
+  const matrixRows = [['CUSTO CENTRALIZADO', 'VALOR MENSAL', 'REGRA / OBSERVAÇÃO']];
+  (matrizCostsState || []).forEach(item => matrixRows.push([item.name || item.label || 'Custo', Number(item.amount ?? item.value ?? 0), item.rule || item.notes || 'Rateado entre ativos elegíveis']));
+  const rechargeRows = [['DATA/HORA', 'MÊS', 'UNIDADE', 'OBRA', 'CLIENTE', 'ENERGIA kWh', 'RECEITA', 'DURAÇÃO', 'STATUS']];
+  sourceRows.forEach(row => (row.charges || []).forEach(charge => rechargeRows.push([
+    charge.startDate instanceof Date ? fmtDT(charge.startDate) : (charge.startStr || charge.startIso || ''), chargeMonthKey(charge), row.stationName || row.station || row.workName, row.workName || '', charge.client || charge.customer || charge.user || '', Number(charge.energyKWh || charge.energy || 0), Number(charge.revenue || charge.amount || 0), charge.duration || '', charge.status || ''
+  ])));
+  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, summaryRows, [42, 22]), 'Resumo e DRE');
+  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, monthlyRows, [16, 20, 16, 17, 17, 13, 15, 15, 22, 20]), 'Histórico mensal');
+  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, unitsRows, [31, 25, 22, 10, 16, 15, 16, 17, 13, 15, 16]), 'Por unidade');
+  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, matrixRows, [34, 18, 42]), 'Custos matriz');
+  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, rechargeRows, [20, 12, 30, 24, 28, 14, 15, 15, 16]), 'Recargas detalhadas');
+  XLSX.writeFile(workbook, `UBY_Rede_Financeiro_Completo_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
 function renderUbyDistribution(total) {
   const el = document.getElementById('ubyDistribution');
   if (!el) return;

@@ -840,6 +840,7 @@
         <select class="ctl-select" id="financeViewMode" onchange="renderFinanceOnly()" aria-label="Escolher mês do relatório financeiro">
           <option value="accumulated" selected>Acumulado</option>
         </select>
+        <button class="btn-recalc" type="button" onclick="exportUbyNetworkFinanceXlsx()">Exportar Excel completo</button>
         <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar</button>
       </div>
       <div id="storageState" style="margin-top:10px;font-size:12px;color:var(--p3-muted)"></div>
@@ -934,6 +935,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260901-finance-month1"></script>
+<script src="recargas_app.js?v=20260901-finance-export1"></script>
 </body>
 </html>
