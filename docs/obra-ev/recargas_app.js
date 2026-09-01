@@ -10741,7 +10741,7 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
     <section class="card" style="border-color:rgba(66,223,154,.36);background:linear-gradient(135deg,rgba(16,72,61,.2),var(--p3-card-soft));margin-top:18px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap">
         <div><div class="tn-tag">◆ Fechamento consolidado</div><h2 style="margin:4px 0">DRE da rede UBY</h2><p class="sub" style="max-width:78ch;margin:0">${escapeHtml(period)}. Consolida somente ativos UBY; royalties entram como receita da marca e marketing somente no fechamento, sem alterar as métricas de recarga.</p></div>
-        <span class="accountability-pill">${ownedRows.length} ativo(s) UBY · ${partnerRows.length} parceiro(s)</span>
+        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><span class="accountability-pill">${ownedRows.length} ativo(s) UBY · ${partnerRows.length} parceiro(s)</span><button class="btn-open" type="button" onclick="generateNetworkUnifiedReport()">Gerar relatório unificado</button></div>
       </div>
       <div style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.85fr);gap:18px;margin-top:18px">
         <div style="overflow:auto"><table><tbody>
@@ -10781,6 +10781,66 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
       </div>
       <div id="networkDreFeedback" class="sub" style="margin-top:8px">Prévia gerencial: confirme documentos, impostos e aprovação do fechamento antes de pagar ou contabilizar distribuição.</div>
     </section>`;
+}
+
+function networkUnifiedReportModel() {
+  const sourceRows = getGeneralUnitData();
+  const sourceMonths = [...new Set(sourceRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
+  const currentMonth = sourceMonths[sourceMonths.length - 1] || '';
+  const isMonthView = (document.getElementById('financeViewMode')?.value || 'accumulated') === 'month' && !!currentMonth;
+  const rows = sourceRows.filter(row => row.included).map(row => aggregateUbyFinanceRow(row, sourceMonths, isMonthView, currentMonth));
+  const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
+  const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
+  const fields = ['revenue','extraRevenue','marketingRevenue','energyCost','extraCosts','matrizCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
+  const owned = networkFinanceSum(ownedRows, fields);
+  const partners = networkFinanceSum(partnerRows, fields);
+  const policy = loadNetworkDistribution();
+  const operationalResult = Number(owned.operationNet || 0);
+  const royalties = Number(partners.ubyRoyalty || 0);
+  const marketing = Number(owned.marketingRevenue || 0);
+  const result = operationalResult + royalties + marketing;
+  const distributable = Math.max(result, 0);
+  const reserve = distributable * Number(policy.reservePct || 0) / 100;
+  const investorPool = (distributable - reserve) * Number(policy.investorPct || 0) / 100;
+  const soldQuotas = Math.min(Number(policy.soldQuotas || 0), Number(policy.totalQuotas || 1));
+  return { rows, ownedRows, partnerRows, owned, partners, policy, operationalResult, royalties, marketing, result, distributable, reserve, investorPool, soldQuotas, perQuota: soldQuotas ? investorPool / soldQuotas : 0, period: isMonthView ? monthLabel(currentMonth) : 'Acumulado' };
+}
+
+function generateNetworkUnifiedReport() {
+  const model = networkUnifiedReportModel();
+  const operationalExtras = Number(model.owned.extraRevenue || 0);
+  const directOperation = Math.max(0, Number(model.owned.extraCosts || 0) - Number(model.owned.matrizCost || 0));
+  const stationRows = model.rows.map(row => {
+    const finance = row.finance || {};
+    const partner = normalizeOperationModel(finance.operationModel) === 'third_party_management';
+    return `<tr><td><strong>${escapeHtml(row.stationName || row.workName)}</strong><br><small>${partner ? 'Parceiro UBY · royalties' : 'Ativo UBY'}</small></td><td>${fmtBRL(finance.revenue || 0)}</td><td>${partner ? fmtBRL(finance.ubyRoyalty || 0) : fmtBRL(finance.totalOperatingCost || 0)}</td><td class="${partner || Number(finance.operationNet || 0) >= 0 ? 'positive' : 'negative'}">${partner ? fmtBRL(finance.ubyRoyalty || 0) : fmtBRL(finance.operationNet || 0)}</td></tr>`;
+  }).join('') || '<tr><td colspan="4">Sem ativos incluídos no período.</td></tr>';
+  const dre = [
+    ['Faturamento de recargas dos ativos UBY', model.owned.revenue],
+    ['Receitas operacionais complementares', operationalExtras],
+    ['Resultado operacional dos ativos UBY', model.operationalResult],
+    ['Royalties de parceiros (fora da matriz operacional)', model.royalties],
+    ['Marketing e contratos reconhecidos no fechamento', model.marketing],
+    ['Resultado consolidado da rede', model.result]
+  ];
+  const costs = [
+    ['Energia', model.owned.energyCost],
+    ['Operação direta por ativo', directOperation],
+    ['Custos centralizados da matriz', model.owned.matrizCost],
+    ['Impostos', model.owned.taxes],
+    ['Gestão, plataforma e participação de área', Number(model.owned.management || 0) + Number(model.owned.platform || 0) + Number(model.owned.areaParticipation || 0)]
+  ];
+  const printable = window.open('', '_blank');
+  if (!printable) return alert('O navegador bloqueou a janela do relatório. Libere pop-ups para gerar o PDF.');
+  printable.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Relatório unificado UBY - ${escapeHtml(model.period)}</title><style>
+    *{box-sizing:border-box} body{font-family:Arial,sans-serif;color:#17283c;margin:32px;background:#fff}.head{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #00b879;padding-bottom:18px}.brand{color:#00885a;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}h1{font-size:27px;margin:5px 0 8px}h2{font-size:17px;margin:28px 0 9px}.sub,small{color:#607287;font-size:12px;line-height:1.45}.badge{border:1px solid #00a86b;border-radius:999px;padding:7px 12px;color:#00794f;font-weight:700;font-size:12px;height:max-content}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}.kpi{border:1px solid #d8e3ef;border-radius:10px;padding:13px;background:#f7fbfa}.kpi b{display:block;color:#087cb7;font-size:20px}.kpi.positive b{color:#008c5a}.kpi span{display:block;font-size:11px;color:#607287;margin-top:5px;text-transform:uppercase}table{width:100%;border-collapse:collapse;margin:8px 0}th{background:#edf5f9;color:#213c55;text-align:left;font-size:12px;padding:10px}td{border-bottom:1px solid #dce6ed;padding:10px;font-size:13px}td:not(:first-child){text-align:right}.total td{font-weight:800;background:#eefaf5}.positive{color:#008c5a;font-weight:800}.negative{color:#c83744;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.note{margin-top:22px;padding:12px;border-left:3px solid #00a86b;background:#f2faf7;color:#456173;font-size:12px;line-height:1.5}@media print{body{margin:16mm}.head{break-inside:avoid}}
+  </style></head><body><div class="head"><div><div class="brand">UBY Recharge · Central UBY</div><h1>Relatório financeiro unificado da rede</h1><div class="sub">Competência: <strong>${escapeHtml(model.period)}</strong><br>Gerado em ${fmtDT(new Date())}</div></div><div class="badge">Prévia de fechamento</div></div>
+  <div class="kpis"><div class="kpi"><b>${fmtBRL(model.owned.revenue || 0)}</b><span>Faturamento de recargas</span></div><div class="kpi"><b>${fmtBRL(model.royalties)}</b><span>Royalties UBY</span></div><div class="kpi ${model.result >= 0 ? 'positive' : ''}"><b>${fmtBRL(model.result)}</b><span>Resultado consolidado</span></div><div class="kpi positive"><b>${fmtBRL(model.perQuota)}</b><span>Distribuição por cota</span></div></div>
+  <div class="grid"><section><h2>Receitas e resultado</h2><table><tbody>${dre.map(([label,value], index) => `<tr class="${index === dre.length - 1 ? 'total' : ''}"><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section><section><h2>Custos reconhecidos</h2><table><tbody>${costs.map(([label,value]) => `<tr><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section></div>
+  <section><h2>Consolidação por carregador e parceiro</h2><table><thead><tr><th>Unidade</th><th>Faturamento</th><th>Custos / repasse</th><th>Resultado UBY</th></tr></thead><tbody>${stationRows}</tbody></table></section>
+  <section><h2>Distribuição de resultados · ${escapeHtml(model.policy.roundLabel)}</h2><table><tbody><tr><td>Resultado distribuível</td><td>${fmtBRL(model.distributable)}</td></tr><tr><td>Reserva (${model.policy.reservePct}%)</td><td>${fmtBRL(model.reserve)}</td></tr><tr class="total"><td>Pool dos cotistas (${model.policy.investorPct}%)</td><td>${fmtBRL(model.investorPool)}</td></tr><tr class="total"><td>Valor por cota (${model.soldQuotas} de ${model.policy.totalQuotas} cotas vendidas)</td><td>${fmtBRL(model.perQuota)}</td></tr></tbody></table></section>
+  <div class="note">Marketing e contratos entram somente no fechamento financeiro; não compõem ocupação, média de recargas, projeção operacional nem faturamento principal de recargas. Parceiros ficam fora da matriz de custos UBY: somente os royalties devidos à UBY são reconhecidos neste relatório. Conferir notas fiscais, impostos e aprovação do fechamento antes de contabilizar ou realizar pagamentos.</div><script>setTimeout(()=>window.print(),350)<\/script></body></html>`);
+  printable.document.close();
 }
 
 function renderUbyDistribution(total) {
