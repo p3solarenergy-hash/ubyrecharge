@@ -5369,17 +5369,22 @@ let matrizCostsLoaded = false;
 let networkDistributionState = null;
 
 function defaultNetworkDistribution() {
-  return { roundLabel: 'Rodada 1', totalQuotas: 10, soldQuotas: 10, investorPct: 100, reservePct: 0 };
+  return { roundLabel: 'Rodada 1', totalQuotas: 10, soldQuotas: 10, investorPct: 100, reservePct: 10, policyVersion: 2, reservePurpose: 'Fundo de Reserva e Expansão' };
 }
 
 function normalizeNetworkDistribution(raw = {}) {
   const base = defaultNetworkDistribution();
+  // A política anterior não tinha versão e usava uma reserva provisória.
+  // A Rodada 1 passa a reter 10% antes da distribuição aos cotistas.
+  const isLegacyPolicy = Number(raw.policyVersion || 0) < base.policyVersion;
   return {
     roundLabel: safeText(raw.roundLabel || base.roundLabel).slice(0, 80) || base.roundLabel,
     totalQuotas: Math.max(1, Math.round(Number(raw.totalQuotas || base.totalQuotas))),
     soldQuotas: Math.max(0, Math.round(Number(raw.soldQuotas ?? base.soldQuotas))),
     investorPct: Math.min(100, Math.max(0, Number(raw.investorPct ?? base.investorPct))),
-    reservePct: Math.min(100, Math.max(0, Number(raw.reservePct ?? base.reservePct)))
+    reservePct: isLegacyPolicy ? base.reservePct : Math.min(100, Math.max(0, Number(raw.reservePct ?? base.reservePct))),
+    policyVersion: base.policyVersion,
+    reservePurpose: base.reservePurpose
   };
 }
 
@@ -5665,7 +5670,13 @@ async function ensureMatrizCostsLoaded() {
         const remote = await window.UBY_SUPABASE.loadFinancialMatrix();
         if (remote && Array.isArray(remote.matrizCosts)) {
           saveMatrizCosts(remote.matrizCosts, { remote: false });
-          if (remote.networkDistribution) saveNetworkDistribution(remote.networkDistribution, { remote: false });
+          if (remote.networkDistribution) {
+            const needsPolicyMigration = Number(remote.networkDistribution.policyVersion || 0) < defaultNetworkDistribution().policyVersion;
+            saveNetworkDistribution(remote.networkDistribution, { remote: false });
+            // Persiste uma única vez a migração da reserva da Rodada 1, sem
+            // alterar os custos centralizados existentes.
+            if (needsPolicyMigration) await persistMatrizCosts();
+          }
         } else if (matrizCostsState.length) {
           // A primeira abertura apos a migracao promove a copia local para a nuvem.
           await persistMatrizCosts();
@@ -10791,9 +10802,9 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
         </tbody></table></div>
         <aside style="display:grid;gap:10px;align-content:start">
           <div class="finance-result-card ${networkResult >= 0 ? 'good' : 'bad'} is-primary"><span>Resultado distribuível</span><strong>${fmtBRL(positiveResult)}</strong><small>${networkResult < 0 ? 'sem distribuição enquanto a rede estiver negativa' : 'base após receitas, custos e fechamentos'}</small></div>
-          <div class="finance-result-card good"><span>Pool dos cotistas</span><strong>${fmtBRL(investorPool)}</strong><small>${policy.investorPct}% após reserva de ${policy.reservePct}%</small></div>
+          <div class="finance-result-card good"><span>Pool dos cotistas</span><strong>${fmtBRL(investorPool)}</strong><small>${policy.investorPct}% após retenção de ${policy.reservePct}%</small></div>
           <div class="finance-result-card is-reference"><span>Valor por cota</span><strong>${fmtBRL(perQuota)}</strong><small>${soldQuotas} de ${policy.totalQuotas} cotas vendidas · ${policy.roundLabel}</small></div>
-          <div class="finance-result-card"><span>Retido na UBY</span><strong>${fmtBRL(ubyRetained)}</strong><small>reserva + parcela não distribuída</small></div>
+          <div class="finance-result-card"><span>Fundo de reserva e expansão</span><strong>${fmtBRL(ubyRetained)}</strong><small>${policy.reservePct}% do lucro + parcela não distribuída</small></div>
         </aside>
       </div>
       <div style="display:grid;grid-template-columns:1.5fr repeat(4,minmax(105px,.6fr)) auto;gap:9px;align-items:end;margin-top:18px;padding-top:16px;border-top:1px solid var(--p3-border)">
@@ -10801,7 +10812,7 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
         <label class="sub">Cotas emitidas<input class="ctl-input" id="networkTotalQuotas" type="number" min="1" step="1" value="${policy.totalQuotas}"></label>
         <label class="sub">Cotas vendidas<input class="ctl-input" id="networkSoldQuotas" type="number" min="0" step="1" value="${soldQuotas}"></label>
         <label class="sub">% cotistas<input class="ctl-input" id="networkInvestorPct" type="number" min="0" max="100" step="0.01" value="${policy.investorPct}"></label>
-        <label class="sub">% reserva<input class="ctl-input" id="networkReservePct" type="number" min="0" max="100" step="0.01" value="${policy.reservePct}"></label>
+        <label class="sub">% fundo reserva/expansão<input class="ctl-input" id="networkReservePct" type="number" min="0" max="100" step="0.01" value="${policy.reservePct}"></label>
         <button class="btn-open" type="button" onclick="saveNetworkDistributionFromInputs()">Salvar política</button>
       </div>
       <div id="networkDreFeedback" class="sub" style="margin-top:8px">Prévia gerencial: confirme documentos, impostos e aprovação do fechamento antes de pagar ou contabilizar distribuição.</div>
@@ -10864,7 +10875,7 @@ function generateNetworkUnifiedReport() {
   <div class="kpis"><div class="kpi"><b>${fmtBRL(model.owned.revenue || 0)}</b><span>Faturamento de recargas</span></div><div class="kpi"><b>${fmtBRL(model.royalties)}</b><span>Royalties UBY</span></div><div class="kpi ${model.result >= 0 ? 'positive' : ''}"><b>${fmtBRL(model.result)}</b><span>Resultado consolidado</span></div><div class="kpi positive"><b>${fmtBRL(model.perQuota)}</b><span>Distribuição por cota</span></div></div>
   <div class="grid"><section><h2>Receitas e resultado</h2><table><tbody>${dre.map(([label,value], index) => `<tr class="${index === dre.length - 1 ? 'total' : ''}"><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section><section><h2>Custos reconhecidos</h2><table><tbody>${costs.map(([label,value]) => `<tr><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section></div>
   <section><h2>Consolidação por carregador e parceiro</h2><table><thead><tr><th>Unidade</th><th>Faturamento</th><th>Custos / repasse</th><th>Resultado UBY</th></tr></thead><tbody>${stationRows}</tbody></table></section>
-  <section><h2>Distribuição de resultados · ${escapeHtml(model.policy.roundLabel)}</h2><table><tbody><tr><td>Resultado distribuível</td><td>${fmtBRL(model.distributable)}</td></tr><tr><td>Reserva (${model.policy.reservePct}%)</td><td>${fmtBRL(model.reserve)}</td></tr><tr class="total"><td>Pool dos cotistas (${model.policy.investorPct}%)</td><td>${fmtBRL(model.investorPool)}</td></tr><tr class="total"><td>Valor por cota (${model.soldQuotas} de ${model.policy.totalQuotas} cotas vendidas)</td><td>${fmtBRL(model.perQuota)}</td></tr></tbody></table></section>
+  <section><h2>Distribuição de resultados · ${escapeHtml(model.policy.roundLabel)}</h2><table><tbody><tr><td>Resultado distribuível</td><td>${fmtBRL(model.distributable)}</td></tr><tr><td>Retenção — Fundo de Reserva e Expansão (${model.policy.reservePct}%)</td><td>${fmtBRL(model.reserve)}</td></tr><tr class="total"><td>Pool dos cotistas (${model.policy.investorPct}%)</td><td>${fmtBRL(model.investorPool)}</td></tr><tr class="total"><td>Valor por cota (${model.soldQuotas} de ${model.policy.totalQuotas} cotas vendidas)</td><td>${fmtBRL(model.perQuota)}</td></tr></tbody></table></section>
   <div class="note">Marketing e contratos entram somente no fechamento financeiro; não compõem ocupação, média de recargas, projeção operacional nem faturamento principal de recargas. Parceiros ficam fora da matriz de custos UBY: somente os royalties devidos à UBY são reconhecidos neste relatório. Conferir notas fiscais, impostos e aprovação do fechamento antes de contabilizar ou realizar pagamentos.</div><script>setTimeout(()=>window.print(),350)<\/script></body></html>`);
   printable.document.close();
 }
@@ -10919,7 +10930,7 @@ async function exportUbyNetworkFinanceXlsx() {
     ['Cotas emitidas', Number(policy.totalQuotas || 0)],
     ['Cotas vendidas', Number(selected.soldQuotas || 0)],
     ['Percentual dos cotistas', Number(policy.investorPct || 0) / 100],
-    ['Reserva', Number(policy.reservePct || 0) / 100]
+    ['Retenção — Fundo de Reserva e Expansão', Number(policy.reservePct || 0) / 100]
   ];
   const monthlyRows = [['MÊS', 'FATURAMENTO RECARGAS', 'ENERGIA kWh', 'CUSTO ENERGIA', 'MATRIZ RATEADA', 'IMPOSTOS', 'ROYALTIES', 'MARKETING', 'RESULTADO OPERACIONAL', 'RESULTADO REDE']];
   monthly.forEach(item => monthlyRows.push([
