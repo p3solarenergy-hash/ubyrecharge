@@ -5368,23 +5368,65 @@ let matrizCostsState = [];
 let matrizCostsLoaded = false;
 let networkDistributionState = null;
 
+function defaultNetworkInvestors() {
+  return [
+    ['Isabela Bufalo', 1, '2026-05'], ['Amanda Bufalo', 1, '2026-05'], ['R.EBP', 2, '2026-05'],
+    ['Willian Jabur', 1, '2026-06'], ['Carlos Eduardo Garcia', 1, '2026-07'],
+    ['Michell Jabur', 1, '2026-08'], ['Gabriel Z.', 1, '2026-08'], ['Renan Sanchez', 2, '2026-09']
+  ].map(([name, quotas, eligibleFrom]) => ({ name, quotas, eligibleFrom, status: 'pendente' }));
+}
+
+function normalizeNetworkInvestors(raw) {
+  const fallback = defaultNetworkInvestors();
+  if (!Array.isArray(raw) || !raw.length) return fallback;
+  return raw.map((item, index) => ({
+    name: safeText(item?.name || fallback[index]?.name || `Cotista ${index + 1}`).slice(0, 120),
+    quotas: Math.max(0, Math.round(Number(item?.quotas ?? fallback[index]?.quotas ?? 0))),
+    eligibleFrom: /^\d{4}-\d{2}$/.test(String(item?.eligibleFrom || '')) ? String(item.eligibleFrom) : (fallback[index]?.eligibleFrom || '2099-12'),
+    status: ['pendente', 'aprovado', 'pago'].includes(item?.status) ? item.status : 'pendente'
+  })).filter(item => item.name && item.quotas > 0);
+}
+
+function normalizeDistributionLedger(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.entries(raw).reduce((ledger, [monthKey, item]) => {
+    if (!/^\d{4}-\d{2}$/.test(monthKey)) return ledger;
+    ledger[monthKey] = {
+      status: ['pendente', 'aprovado', 'pago'].includes(item?.status) ? item.status : 'pendente',
+      updatedAt: item?.updatedAt || '', note: safeText(item?.note || '').slice(0, 300)
+    };
+    return ledger;
+  }, {});
+}
+
 function defaultNetworkDistribution() {
-  return { roundLabel: 'Rodada 1', totalQuotas: 10, soldQuotas: 10, investorPct: 100, reservePct: 10, policyVersion: 2, reservePurpose: 'Fundo de Reserva e Expansão' };
+  return {
+    roundLabel: 'Rodada 1', totalQuotas: 10, soldQuotas: 10, investorPct: 100,
+    legalReservePct: 5, expansionReservePct: 10, policyVersion: 3,
+    legalReservePurpose: 'Reserva legal obrigatória da S.A.',
+    expansionReservePurpose: 'Fundo de reserva e expansão',
+    investors: defaultNetworkInvestors(), paymentLedger: {}
+  };
 }
 
 function normalizeNetworkDistribution(raw = {}) {
   const base = defaultNetworkDistribution();
-  // A política anterior não tinha versão e usava uma reserva provisória.
-  // A Rodada 1 passa a reter 10% antes da distribuição aos cotistas.
-  const isLegacyPolicy = Number(raw.policyVersion || 0) < base.policyVersion;
+  // A versão anterior armazenava apenas reservePct (10%), que agora é o
+  // fundo de expansão. A reserva legal de 5% é adicional e nunca substitui
+  // o fundo de expansão.
+  const legacyExpansionPct = raw.expansionReservePct ?? raw.reservePct ?? base.expansionReservePct;
   return {
     roundLabel: safeText(raw.roundLabel || base.roundLabel).slice(0, 80) || base.roundLabel,
     totalQuotas: Math.max(1, Math.round(Number(raw.totalQuotas || base.totalQuotas))),
     soldQuotas: Math.max(0, Math.round(Number(raw.soldQuotas ?? base.soldQuotas))),
     investorPct: Math.min(100, Math.max(0, Number(raw.investorPct ?? base.investorPct))),
-    reservePct: isLegacyPolicy ? base.reservePct : Math.min(100, Math.max(0, Number(raw.reservePct ?? base.reservePct))),
+    legalReservePct: Math.min(100, Math.max(0, Number(raw.legalReservePct ?? base.legalReservePct))),
+    expansionReservePct: Math.min(100, Math.max(0, Number(legacyExpansionPct))),
     policyVersion: base.policyVersion,
-    reservePurpose: base.reservePurpose
+    legalReservePurpose: base.legalReservePurpose,
+    expansionReservePurpose: base.expansionReservePurpose,
+    investors: normalizeNetworkInvestors(raw.investors),
+    paymentLedger: normalizeDistributionLedger(raw.paymentLedger)
   };
 }
 
@@ -10735,15 +10777,42 @@ function networkFinanceSum(rows = [], fields = []) {
 function saveNetworkDistributionFromInputs() {
   const current = loadNetworkDistribution();
   const next = {
+    ...current,
     roundLabel: document.getElementById('networkRoundLabel')?.value || current.roundLabel,
     totalQuotas: document.getElementById('networkTotalQuotas')?.value,
     soldQuotas: document.getElementById('networkSoldQuotas')?.value,
     investorPct: document.getElementById('networkInvestorPct')?.value,
-    reservePct: document.getElementById('networkReservePct')?.value
+    legalReservePct: document.getElementById('networkLegalReservePct')?.value,
+    expansionReservePct: document.getElementById('networkExpansionReservePct')?.value
   };
   saveNetworkDistribution(next);
   const feedback = document.getElementById('networkDreFeedback');
   if (feedback) feedback.textContent = 'Política da rodada salva e sincronizando com a nuvem.';
+  if (window.UBY_FINANCE_ONLY) renderFinanceOnly(); else renderGeneralFinance(getGeneralUnitData());
+}
+
+function saveNetworkInvestorsFromInputs() {
+  const current = loadNetworkDistribution();
+  const investors = [...document.querySelectorAll('[data-network-investor-row]')].map(row => ({
+    name: row.querySelector('[data-investor-name]')?.value || '',
+    quotas: row.querySelector('[data-investor-quotas]')?.value || 0,
+    eligibleFrom: row.querySelector('[data-investor-start]')?.value || '',
+    status: row.querySelector('[data-investor-status]')?.value || 'pendente'
+  }));
+  const normalized = normalizeNetworkInvestors(investors);
+  const total = normalized.reduce((sum, investor) => sum + investor.quotas, 0);
+  if (total !== Number(current.totalQuotas || 0)) return alert(`As cotas cadastradas somam ${total}. A Rodada 1 precisa fechar em ${current.totalQuotas} cotas antes de salvar.`);
+  saveNetworkDistribution({ ...current, investors: normalized });
+  if (window.UBY_FINANCE_ONLY) renderFinanceOnly(); else renderGeneralFinance(getGeneralUnitData());
+}
+
+function updateNetworkDistributionMonthStatus(monthKey, status) {
+  const current = loadNetworkDistribution();
+  const model = networkInvestorDistributionModel();
+  if (!model.valid) return alert('A distribuição não fecha. Corrija as cotas e os valores antes de aprovar esta competência.');
+  if (!model.months.some(month => month.monthKey === monthKey)) return;
+  const paymentLedger = { ...current.paymentLedger, [monthKey]: { status, updatedAt: new Date().toISOString() } };
+  saveNetworkDistribution({ ...current, paymentLedger });
   if (window.UBY_FINANCE_ONLY) renderFinanceOnly(); else renderGeneralFinance(getGeneralUnitData());
 }
 
@@ -10765,7 +10834,9 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
   const operationalResult = Number(owned.operationNet || 0);
   const networkResult = operationalResult + royalties + marketing;
   const positiveResult = Math.max(networkResult, 0);
-  const reserve = positiveResult * Number(policy.reservePct || 0) / 100;
+  const legalReserve = positiveResult * Number(policy.legalReservePct || 0) / 100;
+  const expansionReserve = positiveResult * Number(policy.expansionReservePct || 0) / 100;
+  const reserve = legalReserve + expansionReserve;
   const afterReserve = positiveResult - reserve;
   const investorPool = afterReserve * Number(policy.investorPct || 0) / 100;
   const ubyRetained = positiveResult - investorPool;
@@ -10802,21 +10873,33 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
         </tbody></table></div>
         <aside style="display:grid;gap:10px;align-content:start">
           <div class="finance-result-card ${networkResult >= 0 ? 'good' : 'bad'} is-primary"><span>Resultado distribuível</span><strong>${fmtBRL(positiveResult)}</strong><small>${networkResult < 0 ? 'sem distribuição enquanto a rede estiver negativa' : 'base após receitas, custos e fechamentos'}</small></div>
-          <div class="finance-result-card good"><span>Pool dos cotistas</span><strong>${fmtBRL(investorPool)}</strong><small>${policy.investorPct}% após retenção de ${policy.reservePct}%</small></div>
-          <div class="finance-result-card is-reference"><span>Valor por cota</span><strong>${fmtBRL(perQuota)}</strong><small>${soldQuotas} de ${policy.totalQuotas} cotas vendidas · ${policy.roundLabel}</small></div>
-          <div class="finance-result-card"><span>Fundo de reserva e expansão</span><strong>${fmtBRL(ubyRetained)}</strong><small>${policy.reservePct}% do lucro + parcela não distribuída</small></div>
+          <div class="finance-result-card good"><span>Pool dos cotistas</span><strong>${fmtBRL(investorPool)}</strong><small>${policy.investorPct}% após reservas de ${policy.legalReservePct}% + ${policy.expansionReservePct}%</small></div>
+          <div class="finance-result-card is-reference"><span>Apuração por aporte</span><strong>Mensal</strong><small>cada competência usa somente as cotas habilitadas; veja o quadro da Rodada 1 abaixo</small></div>
+          <div class="finance-result-card"><span>Reservas retidas na UBY</span><strong>${fmtBRL(ubyRetained)}</strong><small>S.A.: ${fmtBRL(legalReserve)} (${policy.legalReservePct}%) · expansão: ${fmtBRL(expansionReserve)} (${policy.expansionReservePct}%)</small></div>
         </aside>
       </div>
-      <div style="display:grid;grid-template-columns:1.5fr repeat(4,minmax(105px,.6fr)) auto;gap:9px;align-items:end;margin-top:18px;padding-top:16px;border-top:1px solid var(--p3-border)">
+      <div style="display:grid;grid-template-columns:1.5fr repeat(5,minmax(105px,.6fr)) auto;gap:9px;align-items:end;margin-top:18px;padding-top:16px;border-top:1px solid var(--p3-border)">
         <label class="sub">Rodada<input class="ctl-input" id="networkRoundLabel" value="${escapeAttr(policy.roundLabel)}"></label>
         <label class="sub">Cotas emitidas<input class="ctl-input" id="networkTotalQuotas" type="number" min="1" step="1" value="${policy.totalQuotas}"></label>
         <label class="sub">Cotas vendidas<input class="ctl-input" id="networkSoldQuotas" type="number" min="0" step="1" value="${soldQuotas}"></label>
         <label class="sub">% cotistas<input class="ctl-input" id="networkInvestorPct" type="number" min="0" max="100" step="0.01" value="${policy.investorPct}"></label>
-        <label class="sub">% fundo reserva/expansão<input class="ctl-input" id="networkReservePct" type="number" min="0" max="100" step="0.01" value="${policy.reservePct}"></label>
+        <label class="sub">% reserva legal S.A.<input class="ctl-input" id="networkLegalReservePct" type="number" min="0" max="100" step="0.01" value="${policy.legalReservePct}"></label>
+        <label class="sub">% fundo expansão<input class="ctl-input" id="networkExpansionReservePct" type="number" min="0" max="100" step="0.01" value="${policy.expansionReservePct}"></label>
         <button class="btn-open" type="button" onclick="saveNetworkDistributionFromInputs()">Salvar política</button>
       </div>
       <div id="networkDreFeedback" class="sub" style="margin-top:8px">Prévia gerencial: confirme documentos, impostos e aprovação do fechamento antes de pagar ou contabilizar distribuição.</div>
     </section>`;
+  const distribution = networkInvestorDistributionModel();
+  const monthHeaders = distribution.months.map(month => `<th>${escapeHtml(monthLabel(month.monthKey))}</th>`).join('');
+  const monthRows = distribution.months.map(month => `<tr><td>${escapeHtml(monthLabel(month.monthKey))}</td><td>${fmtBRL(month.result)}</td><td>${fmtBRL(month.legalReserve)}</td><td>${fmtBRL(month.expansionReserve)}</td><td>${month.eligibleQuotas}</td><td>${fmtBRL(month.valuePerQuota)}</td><td><select class="ctl-input" style="min-width:110px" onchange="updateNetworkDistributionMonthStatus('${month.monthKey}',this.value)"><option value="pendente" ${month.payment.status === 'pendente' ? 'selected' : ''}>Pendente</option><option value="aprovado" ${month.payment.status === 'aprovado' ? 'selected' : ''}>Aprovado</option><option value="pago" ${month.payment.status === 'pago' ? 'selected' : ''}>Pago</option></select></td></tr>`).join('') || '<tr><td colspan="7">Ainda não há competência financeira a apurar.</td></tr>';
+  const investorRows = distribution.investors.map(investor => `<tr data-network-investor-row><td><input class="ctl-input" data-investor-name value="${escapeAttr(investor.name)}"></td><td><input class="ctl-input" data-investor-quotas type="number" min="1" step="1" value="${investor.quotas}" style="width:66px"></td><td><input class="ctl-input" data-investor-start type="month" value="${escapeAttr(investor.eligibleFrom)}"></td>${investor.allocations.map(value => `<td>${fmtBRL(value)}</td>`).join('')}<td>${fmtBRL(investor.due)}</td><td>${(investor.returnRate * 100).toLocaleString('pt-BR',{maximumFractionDigits:3})}%</td><td>${investor.paybackYears ? `${investor.paybackYears.toLocaleString('pt-BR',{maximumFractionDigits:1})} anos` : 'não disponível'}</td><td><select class="ctl-input" data-investor-status><option value="pendente" ${investor.status === 'pendente' ? 'selected' : ''}>Pendente</option><option value="aprovado" ${investor.status === 'aprovado' ? 'selected' : ''}>Aprovado</option><option value="pago" ${investor.status === 'pago' ? 'selected' : ''}>Pago</option></select></td></tr>`).join('');
+  target.insertAdjacentHTML('beforeend', `
+    <section class="card" style="margin-top:14px"><div class="tn-tag">◆ Rodada 1 · apuração por competência</div><h3 style="margin:4px 0 10px">Distribuição por período de aporte</h3><p class="sub">Cada mês é dividido somente entre as cotas habilitadas no primeiro dia do mês. Não há proporcionalização por dias nem divisão retroativa para quem entrou depois.</p>
+      <div style="overflow:auto"><table><thead><tr><th>Competência</th><th>Resultado</th><th>Reserva legal S.A.</th><th>Fundo expansão</th><th>Cotas habilitadas</th><th>Por cota</th><th>Pagamento</th></tr></thead><tbody>${monthRows}</tbody></table></div>
+      <div style="overflow:auto;margin-top:14px"><table><thead><tr><th>Cotista</th><th>Cotas</th><th>Início</th>${monthHeaders}<th>Total devido</th><th>Retorno acum.</th><th>Payback indicativo</th><th>Situação</th></tr></thead><tbody>${investorRows}</tbody></table></div>
+      <button class="btn-open" type="button" style="margin-top:10px" onclick="saveNetworkInvestorsFromInputs()">Salvar cotistas da Rodada 1</button>
+      <p class="sub" style="margin:10px 0 0">Controles: ${distribution.valid ? '✓' : '⚠'} soma individual ${fmtBRL(distribution.totalAllocated)} · pool por competência ${fmtBRL(distribution.totalPool)}. Uma competência é registrada uma única vez no controle de pagamento; aprovação é bloqueada se a conferência não fechar.</p>
+    </section>`);
 }
 
 function networkUnifiedReportModel(options = {}) {
@@ -10824,6 +10907,8 @@ function networkUnifiedReportModel(options = {}) {
   const sourceMonths = [...new Set(sourceRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const periodSelection = options.accumulated
     ? { monthKey: '', isMonthView: false, label: 'Acumulado da rede' }
+    : options.monthKey
+      ? { monthKey: options.monthKey, isMonthView: true, label: monthLabel(options.monthKey) }
     : selectedFinanceOnlyPeriod(sourceMonths);
   const rows = sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, periodSelection.isMonthView, periodSelection.monthKey));
   const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
@@ -10837,14 +10922,43 @@ function networkUnifiedReportModel(options = {}) {
   const marketing = Number(owned.marketingRevenue || 0);
   const result = operationalResult + royalties + marketing;
   const distributable = Math.max(result, 0);
-  const reserve = distributable * Number(policy.reservePct || 0) / 100;
+  const legalReserve = distributable * Number(policy.legalReservePct || 0) / 100;
+  const expansionReserve = distributable * Number(policy.expansionReservePct || 0) / 100;
+  const reserve = legalReserve + expansionReserve;
   const investorPool = (distributable - reserve) * Number(policy.investorPct || 0) / 100;
   const soldQuotas = Math.min(Number(policy.soldQuotas || 0), Number(policy.totalQuotas || 1));
-  return { rows, ownedRows, partnerRows, owned, partners, policy, operationalResult, royalties, marketing, result, distributable, reserve, investorPool, soldQuotas, perQuota: soldQuotas ? investorPool / soldQuotas : 0, period: periodSelection.label };
+  return { rows, ownedRows, partnerRows, owned, partners, policy, operationalResult, royalties, marketing, result, distributable, legalReserve, expansionReserve, reserve, investorPool, soldQuotas, perQuota: soldQuotas ? investorPool / soldQuotas : 0, period: periodSelection.label };
+}
+
+function networkInvestorDistributionModel() {
+  const accumulated = networkUnifiedReportModel({ accumulated: true });
+  const sourceMonths = [...new Set(accumulated.rows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => /^\d{4}-\d{2}$/.test(key) && key >= '2026-06'))].sort();
+  const investors = normalizeNetworkInvestors(accumulated.policy.investors);
+  const months = sourceMonths.map(monthKey => {
+    const finance = networkUnifiedReportModel({ monthKey });
+    const eligible = investors.filter(investor => investor.eligibleFrom <= monthKey);
+    const eligibleQuotas = eligible.reduce((sum, investor) => sum + investor.quotas, 0);
+    const valuePerQuota = eligibleQuotas && finance.result > 0 ? finance.investorPool / eligibleQuotas : 0;
+    const payment = accumulated.policy.paymentLedger?.[monthKey] || { status: 'pendente' };
+    return { monthKey, result: finance.result, legalReserve: finance.legalReserve, expansionReserve: finance.expansionReserve, investorPool: finance.investorPool, eligibleQuotas, valuePerQuota, payment };
+  });
+  const byInvestor = investors.map(investor => {
+    const allocations = months.map(month => month.monthKey >= investor.eligibleFrom ? month.valuePerQuota * investor.quotas : 0);
+    const due = allocations.reduce((sum, value) => sum + value, 0);
+    const investment = investor.quotas * 80000;
+    const activeMonths = months.filter(month => month.monthKey >= investor.eligibleFrom && month.result > 0).length;
+    const returnRate = investment ? due / investment : 0;
+    const annualized = activeMonths ? returnRate / activeMonths * 12 : 0;
+    return { ...investor, allocations, due, investment, returnRate, annualized, paybackYears: annualized > 0 ? 1 / annualized : null };
+  });
+  const totalAllocated = byInvestor.reduce((sum, investor) => sum + investor.due, 0);
+  const totalPool = months.reduce((sum, month) => sum + month.investorPool, 0);
+  return { investors: byInvestor, months, totalAllocated, totalPool, valid: Math.abs(totalAllocated - totalPool) < 0.02 };
 }
 
 function generateNetworkUnifiedReport() {
   const model = networkUnifiedReportModel({ accumulated: true });
+  const distribution = networkInvestorDistributionModel();
   const operationalExtras = Number(model.owned.extraRevenue || 0);
   const directOperation = Math.max(0, Number(model.owned.extraCosts || 0) - Number(model.owned.matrizCost || 0));
   const stationRows = model.rows.map(row => {
@@ -10872,10 +10986,11 @@ function generateNetworkUnifiedReport() {
   printable.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Relatório unificado UBY - ${escapeHtml(model.period)}</title><style>
     *{box-sizing:border-box} body{font-family:Arial,sans-serif;color:#17283c;margin:32px;background:#fff}.head{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #00b879;padding-bottom:18px}.brand{color:#00885a;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}h1{font-size:27px;margin:5px 0 8px}h2{font-size:17px;margin:28px 0 9px}.sub,small{color:#607287;font-size:12px;line-height:1.45}.badge{border:1px solid #00a86b;border-radius:999px;padding:7px 12px;color:#00794f;font-weight:700;font-size:12px;height:max-content}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}.kpi{border:1px solid #d8e3ef;border-radius:10px;padding:13px;background:#f7fbfa}.kpi b{display:block;color:#087cb7;font-size:20px}.kpi.positive b{color:#008c5a}.kpi span{display:block;font-size:11px;color:#607287;margin-top:5px;text-transform:uppercase}table{width:100%;border-collapse:collapse;margin:8px 0}th{background:#edf5f9;color:#213c55;text-align:left;font-size:12px;padding:10px}td{border-bottom:1px solid #dce6ed;padding:10px;font-size:13px}td:not(:first-child){text-align:right}.total td{font-weight:800;background:#eefaf5}.positive{color:#008c5a;font-weight:800}.negative{color:#c83744;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.note{margin-top:22px;padding:12px;border-left:3px solid #00a86b;background:#f2faf7;color:#456173;font-size:12px;line-height:1.5}@media print{body{margin:16mm}.head{break-inside:avoid}}
   </style></head><body><div class="head"><div><div class="brand">UBY Recharge · Central UBY</div><h1>Relatório financeiro unificado da rede</h1><div class="sub">Competência: <strong>${escapeHtml(model.period)}</strong><br>Gerado em ${fmtDT(new Date())}</div></div><div class="badge">Prévia de fechamento</div></div>
-  <div class="kpis"><div class="kpi"><b>${fmtBRL(model.owned.revenue || 0)}</b><span>Faturamento de recargas</span></div><div class="kpi"><b>${fmtBRL(model.royalties)}</b><span>Royalties UBY</span></div><div class="kpi ${model.result >= 0 ? 'positive' : ''}"><b>${fmtBRL(model.result)}</b><span>Resultado consolidado</span></div><div class="kpi positive"><b>${fmtBRL(model.perQuota)}</b><span>Distribuição por cota</span></div></div>
+  <div class="kpis"><div class="kpi"><b>${fmtBRL(model.owned.revenue || 0)}</b><span>Faturamento de recargas</span></div><div class="kpi"><b>${fmtBRL(model.royalties)}</b><span>Royalties UBY</span></div><div class="kpi ${model.result >= 0 ? 'positive' : ''}"><b>${fmtBRL(model.result)}</b><span>Resultado consolidado</span></div><div class="kpi positive"><b>${fmtBRL(distribution.totalAllocated)}</b><span>Total devido aos cotistas</span></div></div>
   <div class="grid"><section><h2>Receitas e resultado</h2><table><tbody>${dre.map(([label,value], index) => `<tr class="${index === dre.length - 1 ? 'total' : ''}"><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section><section><h2>Custos reconhecidos</h2><table><tbody>${costs.map(([label,value]) => `<tr><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section></div>
   <section><h2>Consolidação por carregador e parceiro</h2><table><thead><tr><th>Unidade</th><th>Faturamento</th><th>Custos / repasse</th><th>Resultado UBY</th></tr></thead><tbody>${stationRows}</tbody></table></section>
-  <section><h2>Distribuição de resultados · ${escapeHtml(model.policy.roundLabel)}</h2><table><tbody><tr><td>Resultado distribuível</td><td>${fmtBRL(model.distributable)}</td></tr><tr><td>Retenção — Fundo de Reserva e Expansão (${model.policy.reservePct}%)</td><td>${fmtBRL(model.reserve)}</td></tr><tr class="total"><td>Pool dos cotistas (${model.policy.investorPct}%)</td><td>${fmtBRL(model.investorPool)}</td></tr><tr class="total"><td>Valor por cota (${model.soldQuotas} de ${model.policy.totalQuotas} cotas vendidas)</td><td>${fmtBRL(model.perQuota)}</td></tr></tbody></table></section>
+  <section><h2>Distribuição de resultados · ${escapeHtml(model.policy.roundLabel)}</h2><table><tbody><tr><td>Resultado distribuível</td><td>${fmtBRL(model.distributable)}</td></tr><tr><td>Retenção — Reserva legal obrigatória da S.A. (${model.policy.legalReservePct}%)</td><td>${fmtBRL(model.legalReserve)}</td></tr><tr><td>Retenção — Fundo de reserva e expansão (${model.policy.expansionReservePct}%)</td><td>${fmtBRL(model.expansionReserve)}</td></tr><tr class="total"><td>Total devido aos cotistas (apurado por competência)</td><td>${fmtBRL(distribution.totalAllocated)}</td></tr></tbody></table></section>
+  <section><h2>Apuração por aporte</h2><table><thead><tr><th>Cotista</th><th>Cotas</th><th>Início</th><th>Total devido</th><th>Situação</th></tr></thead><tbody>${distribution.investors.map(investor => `<tr><td>${escapeHtml(investor.name)}</td><td>${investor.quotas}</td><td>${escapeHtml(monthLabel(investor.eligibleFrom))}</td><td>${fmtBRL(investor.due)}</td><td>${escapeHtml(investor.status)}</td></tr>`).join('')}</tbody></table><div class="sub">Cada competência é dividida apenas entre as cotas habilitadas naquele mês. Conferência: ${distribution.valid ? 'fechada' : 'pendente de ajuste'}.</div></section>
   <div class="note">Marketing e contratos entram somente no fechamento financeiro; não compõem ocupação, média de recargas, projeção operacional nem faturamento principal de recargas. Parceiros ficam fora da matriz de custos UBY: somente os royalties devidos à UBY são reconhecidos neste relatório. Conferir notas fiscais, impostos e aprovação do fechamento antes de contabilizar ou realizar pagamentos.</div><script>setTimeout(()=>window.print(),350)<\/script></body></html>`);
   printable.document.close();
 }
@@ -10905,6 +11020,7 @@ async function exportUbyNetworkFinanceXlsx() {
   });
   const workbook = XLSX.utils.book_new();
   const policy = selected.policy;
+  const distribution = networkInvestorDistributionModel();
   const summaryRows = [
     ['RELATÓRIO FINANCEIRO COMPLETO — REDE UBY'],
     ['Gerado em', fmtDT(new Date())],
@@ -10922,15 +11038,18 @@ async function exportUbyNetworkFinanceXlsx() {
     ['Resultado operacional UBY', Number(selected.operationalResult || 0)],
     ['Resultado consolidado da rede', Number(selected.result || 0)],
     ['Resultado distribuível', Number(selected.distributable || 0)],
+    ['Retenção — Reserva legal obrigatória da S.A.', Number(selected.legalReserve || 0)],
+    ['Retenção — Fundo de reserva e expansão', Number(selected.expansionReserve || 0)],
     ['Pool dos cotistas', Number(selected.investorPool || 0)],
-    ['Valor por cota', Number(selected.perQuota || 0)],
+    ['Total devido aos cotistas (por competência)', Number(distribution.totalAllocated || 0)],
     [],
     ['POLÍTICA DE DISTRIBUIÇÃO', 'VALOR'],
     ['Rodada', policy.roundLabel],
     ['Cotas emitidas', Number(policy.totalQuotas || 0)],
     ['Cotas vendidas', Number(selected.soldQuotas || 0)],
     ['Percentual dos cotistas', Number(policy.investorPct || 0) / 100],
-    ['Retenção — Fundo de Reserva e Expansão', Number(policy.reservePct || 0) / 100]
+    ['Retenção — Reserva legal obrigatória da S.A.', Number(policy.legalReservePct || 0) / 100],
+    ['Retenção — Fundo de reserva e expansão', Number(policy.expansionReservePct || 0) / 100]
   ];
   const monthlyRows = [['MÊS', 'FATURAMENTO RECARGAS', 'ENERGIA kWh', 'CUSTO ENERGIA', 'MATRIZ RATEADA', 'IMPOSTOS', 'ROYALTIES', 'MARKETING', 'RESULTADO OPERACIONAL', 'RESULTADO REDE']];
   monthly.forEach(item => monthlyRows.push([
@@ -10947,10 +11066,16 @@ async function exportUbyNetworkFinanceXlsx() {
   sourceRows.forEach(row => (row.charges || []).forEach(charge => rechargeRows.push([
     charge.startDate instanceof Date ? fmtDT(charge.startDate) : (charge.startStr || charge.startIso || ''), chargeMonthKey(charge), row.stationName || row.station || row.workName, row.workName || '', charge.client || charge.customer || charge.user || '', Number(charge.energyKWh || charge.energy || 0), Number(charge.revenue || charge.amount || 0), charge.duration || '', charge.status || ''
   ])));
+  const distributionRows = [['COMPETÊNCIA', 'RESULTADO', 'RESERVA LEGAL S.A.', 'FUNDO EXPANSÃO', 'POOL COTISTAS', 'COTAS HABILITADAS', 'VALOR POR COTA', 'SITUAÇÃO']];
+  distribution.months.forEach(month => distributionRows.push([monthLabel(month.monthKey), Number(month.result || 0), Number(month.legalReserve || 0), Number(month.expansionReserve || 0), Number(month.investorPool || 0), month.eligibleQuotas, Number(month.valuePerQuota || 0), month.payment.status]));
+  distributionRows.push([]);
+  distributionRows.push(['COTISTA', 'COTAS', 'INÍCIO', ...distribution.months.map(month => monthLabel(month.monthKey)), 'TOTAL DEVIDO', 'APORTE', 'RETORNO ACUMULADO', 'ANUALIZADO SIMPLES', 'PAYBACK INDICATIVO', 'SITUAÇÃO']);
+  distribution.investors.forEach(investor => distributionRows.push([investor.name, investor.quotas, monthLabel(investor.eligibleFrom), ...investor.allocations.map(value => Number(value || 0)), Number(investor.due || 0), Number(investor.investment || 0), Number(investor.returnRate || 0), Number(investor.annualized || 0), investor.paybackYears || '', investor.status]));
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, summaryRows, [42, 22]), 'Resumo e DRE');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, monthlyRows, [16, 20, 16, 17, 17, 13, 15, 15, 22, 20]), 'Histórico mensal');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, unitsRows, [31, 25, 22, 10, 16, 15, 16, 17, 13, 15, 16]), 'Por unidade');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, matrixRows, [34, 18, 42]), 'Custos matriz');
+  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, distributionRows, [28, 12, 16, ...distribution.months.map(() => 16), 18, 18, 18, 20, 20, 14]), 'Distribuição Rodada 1');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, rechargeRows, [20, 12, 30, 24, 28, 14, 15, 15, 16]), 'Recargas detalhadas');
   XLSX.writeFile(workbook, `UBY_Rede_Financeiro_Completo_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
