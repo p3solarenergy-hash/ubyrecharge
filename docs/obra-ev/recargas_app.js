@@ -10808,10 +10808,12 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
     </section>`;
 }
 
-function networkUnifiedReportModel() {
+function networkUnifiedReportModel(options = {}) {
   const sourceRows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
   const sourceMonths = [...new Set(sourceRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
-  const periodSelection = selectedFinanceOnlyPeriod(sourceMonths);
+  const periodSelection = options.accumulated
+    ? { monthKey: '', isMonthView: false, label: 'Acumulado da rede' }
+    : selectedFinanceOnlyPeriod(sourceMonths);
   const rows = sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, periodSelection.isMonthView, periodSelection.monthKey));
   const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
   const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
@@ -10831,7 +10833,7 @@ function networkUnifiedReportModel() {
 }
 
 function generateNetworkUnifiedReport() {
-  const model = networkUnifiedReportModel();
+  const model = networkUnifiedReportModel({ accumulated: true });
   const operationalExtras = Number(model.owned.extraRevenue || 0);
   const directOperation = Math.max(0, Number(model.owned.extraCosts || 0) - Number(model.owned.matrizCost || 0));
   const stationRows = model.rows.map(row => {
@@ -10879,7 +10881,7 @@ async function exportUbyNetworkFinanceXlsx() {
   const sourceRows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
   const sourceMonths = [...new Set(sourceRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   if (!sourceMonths.length) return alert('Não há recargas financeiras carregadas para exportar. Clique em Atualizar e tente novamente.');
-  const selected = networkUnifiedReportModel();
+  const selected = networkUnifiedReportModel({ accumulated: true });
   const monthly = sourceMonths.map(monthKey => {
     const rows = sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, true, monthKey));
     const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
