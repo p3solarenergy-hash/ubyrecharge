@@ -538,16 +538,33 @@
     if (!data) return null;
     return {
       matrizCosts: Array.isArray(data.payload?.matrizCosts) ? data.payload.matrizCosts : [],
+      networkDistribution: data.payload?.networkDistribution && typeof data.payload.networkDistribution === 'object' ? data.payload.networkDistribution : {},
       updatedAt: data.updated_at
     };
   }
 
-  async function saveFinancialMatrix(matrizCosts = []) {
+  async function saveFinancialMatrix(matrizCosts = [], networkDistribution) {
     const sb = client();
     if (!sb) throw new Error("Supabase ainda nao configurado.");
     const user = await currentUser();
     if (!user) throw new Error("Entre no Supabase antes de salvar a matriz financeira.");
-    const payload = { matrizCosts: Array.isArray(matrizCosts) ? matrizCosts : [] };
+    let resolvedDistribution = networkDistribution && typeof networkDistribution === 'object' ? networkDistribution : null;
+    // Clientes com a versão anterior só enviam custos. Preserve a política de
+    // cotas já salva em vez de sobrescrever o JSON compartilhado com vazio.
+    if (!resolvedDistribution) {
+      const { data: existing, error: existingError } = await sb
+        .from("uby_financial_matrix")
+        .select("payload")
+        .eq("id", "shared-costs")
+        .maybeSingle();
+      if (existingError) throw existingError;
+      resolvedDistribution = existing?.payload?.networkDistribution && typeof existing.payload.networkDistribution === 'object'
+        ? existing.payload.networkDistribution : {};
+    }
+    const payload = {
+      matrizCosts: Array.isArray(matrizCosts) ? matrizCosts : [],
+      networkDistribution: resolvedDistribution
+    };
     const { data, error } = await sb
       .from("uby_financial_matrix")
       .upsert({
@@ -563,7 +580,7 @@
       entidadeTipo: "uby_financial_matrix",
       entidadeId: "shared-costs",
       acao: "save_financial_matrix",
-      resumo: { costs: payload.matrizCosts.length }
+      resumo: { costs: payload.matrizCosts.length, quotas: Number(payload.networkDistribution?.totalQuotas || 0) }
     });
     return { cloud: true, updatedAt: data?.updated_at || null };
   }

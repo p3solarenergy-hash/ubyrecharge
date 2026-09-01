@@ -5182,6 +5182,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     }, ...matrizCostDetails],
     revenueRuleDetails: revenueEvaluation.details,
     costs,
+    taxes,
     totalRevenue,
     totalOperatingCost,
     directCostPerKWh,
@@ -5336,8 +5337,43 @@ function renderMatrizCostsLegacy(unitData) {
 // Shared-cost matrix v2. It preserves historical allocations by keeping each
 // selected target and its effective month on the cost record itself.
 const MATRIZ_COSTS_KEY = 'uby-matriz-costs-v2';
+const NETWORK_DISTRIBUTION_KEY = 'uby-network-distribution-v1';
 let matrizCostsState = [];
 let matrizCostsLoaded = false;
+let networkDistributionState = null;
+
+function defaultNetworkDistribution() {
+  return { roundLabel: 'Rodada 1', totalQuotas: 10, soldQuotas: 10, investorPct: 100, reservePct: 0 };
+}
+
+function normalizeNetworkDistribution(raw = {}) {
+  const base = defaultNetworkDistribution();
+  return {
+    roundLabel: safeText(raw.roundLabel || base.roundLabel).slice(0, 80) || base.roundLabel,
+    totalQuotas: Math.max(1, Math.round(Number(raw.totalQuotas || base.totalQuotas))),
+    soldQuotas: Math.max(0, Math.round(Number(raw.soldQuotas ?? base.soldQuotas))),
+    investorPct: Math.min(100, Math.max(0, Number(raw.investorPct ?? base.investorPct))),
+    reservePct: Math.min(100, Math.max(0, Number(raw.reservePct ?? base.reservePct)))
+  };
+}
+
+function loadNetworkDistribution() {
+  if (networkDistributionState) return networkDistributionState;
+  try { networkDistributionState = normalizeNetworkDistribution(JSON.parse(localStorage.getItem(NETWORK_DISTRIBUTION_KEY) || '{}')); }
+  catch (_) { networkDistributionState = defaultNetworkDistribution(); }
+  return networkDistributionState;
+}
+
+function saveNetworkDistribution(settings, options = {}) {
+  networkDistributionState = normalizeNetworkDistribution(settings);
+  try { localStorage.setItem(NETWORK_DISTRIBUTION_KEY, JSON.stringify(networkDistributionState)); } catch (_) {}
+  if (options.remote !== false) persistMatrizCosts().catch(error => {
+    console.warn('[network-distribution-save]', error);
+    const feedback = document.getElementById('networkDreFeedback');
+    if (feedback) feedback.textContent = `Salvo neste navegador; nuvem pendente: ${error?.message || 'erro de sincronização'}.`;
+  });
+  return networkDistributionState;
+}
 let matrizCostsLoadPromise = null;
 let matrizCostsSaveChain = Promise.resolve();
 let matrizEditingId = '';
@@ -5597,11 +5633,13 @@ async function ensureMatrizCostsLoaded() {
   if (matrizCostsLoadPromise) return matrizCostsLoadPromise;
   matrizCostsLoadPromise = (async () => {
     loadMatrizCosts();
+    loadNetworkDistribution();
     try {
       if (window.UBY_SUPABASE?.loadFinancialMatrix) {
         const remote = await window.UBY_SUPABASE.loadFinancialMatrix();
         if (remote && Array.isArray(remote.matrizCosts)) {
           saveMatrizCosts(remote.matrizCosts, { remote: false });
+          if (remote.networkDistribution) saveNetworkDistribution(remote.networkDistribution, { remote: false });
         } else if (matrizCostsState.length) {
           // A primeira abertura apos a migracao promove a copia local para a nuvem.
           await persistMatrizCosts();
@@ -5616,7 +5654,8 @@ async function ensureMatrizCostsLoaded() {
 function persistMatrizCosts() {
   if (!window.UBY_SUPABASE?.saveFinancialMatrix) return Promise.reject(new Error('Sincronizacao da matriz financeira indisponivel.'));
   const snapshot = matrizCostsState.map(matrizNormalizeCost);
-  matrizCostsSaveChain = matrizCostsSaveChain.catch(() => {}).then(() => window.UBY_SUPABASE.saveFinancialMatrix(snapshot));
+  const distribution = loadNetworkDistribution();
+  matrizCostsSaveChain = matrizCostsSaveChain.catch(() => {}).then(() => window.UBY_SUPABASE.saveFinancialMatrix(snapshot, distribution));
   return matrizCostsSaveChain;
 }
 function matrizInput(id) { return document.getElementById(id); }
@@ -6030,6 +6069,7 @@ async function renderFinanceOnly() {
   const isMonthView = (document.getElementById('financeViewMode')?.value || 'accumulated') === 'month' && !!currentMonth;
   const viewLabel = isMonthView ? `Mês atual (${monthLabel(currentMonth)})` : 'Acumulado';
   try { renderUbyFinancialOverview(ubyRows, sourceMonths, isMonthView, currentMonth, viewLabel); } catch (e) { console.error('[fin-uby]', e); }
+  try { renderNetworkDre(ubyRows, sourceMonths, isMonthView, currentMonth); } catch (e) { console.error('[fin-network-dre]', e); }
 }
 
 function financeUnitOutcome(finance = {}) {
@@ -10550,12 +10590,12 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
     return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems, workId: row.workId, workName: row.workName, stationName: row.stationName || row.station, courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
   });
   const totals = results.reduce((acc, result) => {
-    ['revenue','extraRevenue','totalRevenue','energy','commercialEnergy','courtesyCharges','courtesyEnergy','courtesyEnergyCost','courtesyCostExcluded','energyCost','extraCosts','management','platform','ubyRoyalty','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
+    ['revenue','extraRevenue','marketingRevenue','totalRevenue','energy','commercialEnergy','courtesyCharges','courtesyEnergy','courtesyEnergyCost','courtesyCostExcluded','energyCost','extraCosts','taxes','areaParticipation','management','platform','ubyRoyalty','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
       acc[key] += Number(result[key] || 0);
     });
     acc.planningKWh += Number(result.planning?.planningKWh || 0);
     return acc;
-  }, { revenue:0, extraRevenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, management:0, platform:0, ubyRoyalty:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  }, { revenue:0, extraRevenue:0, marketingRevenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, taxes:0, areaParticipation:0, management:0, platform:0, ubyRoyalty:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
   // A visão acumulada precisa manter a titularidade do carregador. Sem isso,
   // um parceiro com royalty UBY volta a ser apresentado como ativo próprio.
   totals.operationModel = results.at(-1)?.operationModel || 'uby';
@@ -10647,6 +10687,100 @@ function renderCostTree(rows, matrizTotal) {
         return `<div class="tree-node charger" style="min-height:0"><div class="tn-title">${escapeHtml(r.stationName || r.station || r.workName)}</div><div class="tn-workname">${escapeHtml(r.workName || '')}</div>${line('Faturamento', fmtBRL(Number(f.revenue || 0)), 'in')}${line('− Gestão P3', fmtBRL(Number(f.management || 0)), 'out')}${line('− Royalty UBY', fmtBRL(Number(f.ubyRoyalty || 0)), 'out')}${line('− Impostos', fmtBRL(Number(f.taxes || 0)), 'out')}${line('= Resultado do parceiro', fmtBRL(result), 'total ' + (result >= 0 ? 'pos' : 'neg'))}<div class="tn-sub" style="margin-top:8px">P3: ${fmtBRL(Number(f.p3OperationalResult || 0))} · UBY (royalty): ${fmtBRL(Number(f.ubyRoyalty || 0))}</div></div>`;
       }).join('')}</div>
     </section>` : ''}`;
+}
+
+function networkFinanceSum(rows = [], fields = []) {
+  return rows.reduce((total, row) => {
+    fields.forEach(field => { total[field] = Number(total[field] || 0) + Number(row.finance?.[field] || 0); });
+    return total;
+  }, Object.fromEntries(fields.map(field => [field, 0])));
+}
+
+function saveNetworkDistributionFromInputs() {
+  const current = loadNetworkDistribution();
+  const next = {
+    roundLabel: document.getElementById('networkRoundLabel')?.value || current.roundLabel,
+    totalQuotas: document.getElementById('networkTotalQuotas')?.value,
+    soldQuotas: document.getElementById('networkSoldQuotas')?.value,
+    investorPct: document.getElementById('networkInvestorPct')?.value,
+    reservePct: document.getElementById('networkReservePct')?.value
+  };
+  saveNetworkDistribution(next);
+  const feedback = document.getElementById('networkDreFeedback');
+  if (feedback) feedback.textContent = 'Política da rodada salva e sincronizando com a nuvem.';
+  if (window.UBY_FINANCE_ONLY) renderFinanceOnly(); else renderGeneralFinance(getGeneralUnitData());
+}
+
+function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true, currentMonth = '') {
+  const target = document.getElementById('networkDre');
+  if (!target) return;
+  const rows = sourceRows.filter(row => row.included)
+    .map(row => aggregateUbyFinanceRow(row, sourceMonths, isMonthView, currentMonth));
+  const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
+  const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
+  const fields = ['revenue','extraRevenue','marketingRevenue','energyCost','extraCosts','matrizCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
+  const owned = networkFinanceSum(ownedRows, fields);
+  const partners = networkFinanceSum(partnerRows, fields);
+  const policy = loadNetworkDistribution();
+  const rechargeRevenue = Number(owned.revenue || 0);
+  const operationalExtras = Number(owned.extraRevenue || 0);
+  const royalties = Number(partners.ubyRoyalty || 0);
+  const marketing = Number(owned.marketingRevenue || 0);
+  const operationalResult = Number(owned.operationNet || 0);
+  const networkResult = operationalResult + royalties + marketing;
+  const positiveResult = Math.max(networkResult, 0);
+  const reserve = positiveResult * Number(policy.reservePct || 0) / 100;
+  const afterReserve = positiveResult - reserve;
+  const investorPool = afterReserve * Number(policy.investorPct || 0) / 100;
+  const ubyRetained = positiveResult - investorPool;
+  const soldQuotas = Math.min(Number(policy.soldQuotas || 0), Number(policy.totalQuotas || 1));
+  const perQuota = soldQuotas > 0 ? investorPool / soldQuotas : 0;
+  const period = isMonthView ? monthLabel(currentMonth) : 'Acumulado';
+  const line = (label, value, cls = '') => `<tr class="${cls}"><td>${label}</td><td style="text-align:right">${value}</td></tr>`;
+  target.innerHTML = `
+    <section class="card" style="border-color:rgba(66,223,154,.36);background:linear-gradient(135deg,rgba(16,72,61,.2),var(--p3-card-soft));margin-top:18px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap">
+        <div><div class="tn-tag">◆ Fechamento consolidado</div><h2 style="margin:4px 0">DRE da rede UBY</h2><p class="sub" style="max-width:78ch;margin:0">${escapeHtml(period)}. Consolida somente ativos UBY; royalties entram como receita da marca e marketing somente no fechamento, sem alterar as métricas de recarga.</p></div>
+        <span class="accountability-pill">${ownedRows.length} ativo(s) UBY · ${partnerRows.length} parceiro(s)</span>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.85fr);gap:18px;margin-top:18px">
+        <div style="overflow:auto"><table><tbody>
+          <tr class="finance-group-row"><th colspan="2">Receitas da rede</th></tr>
+          ${line('Faturamento de recargas dos ativos UBY', fmtBRL(rechargeRevenue))}
+          ${line('Receitas operacionais complementares', fmtBRL(operationalExtras))}
+          ${line('Royalties de parceiros (fora da matriz operacional)', fmtBRL(royalties))}
+          ${line('Marketing e contratos reconhecidos no fechamento', fmtBRL(marketing))}
+          ${line('Receita operacional de recargas', fmtBRL(rechargeRevenue + operationalExtras), 'finance-total-row')}
+          <tr class="finance-group-row"><th colspan="2">Custos já reconhecidos na rede</th></tr>
+          ${line('Energia', fmtBRL(owned.energyCost))}
+          ${line('Operação direta por ativo', fmtBRL(Math.max(0, Number(owned.extraCosts || 0) - Number(owned.matrizCost || 0))))}
+          ${line('Custos centralizados da matriz (rateados)', fmtBRL(owned.matrizCost))}
+          ${line('Impostos', fmtBRL(owned.taxes))}
+          ${line('Gestão, plataforma e participação de área', fmtBRL(Number(owned.management || 0) + Number(owned.platform || 0) + Number(owned.areaParticipation || 0)))}
+          ${line('Resultado operacional dos ativos UBY', fmtBRL(operationalResult), 'finance-total-row')}
+          <tr class="finance-group-row"><th colspan="2">Resultado final da rede</th></tr>
+          ${line('Resultado operacional UBY', fmtBRL(operationalResult))}
+          ${line('+ Royalties UBY', fmtBRL(royalties))}
+          ${line('+ Marketing / contratos no fechamento', fmtBRL(marketing))}
+          ${line('= Resultado consolidado antes da distribuição', fmtBRL(networkResult), 'finance-total-row')}
+        </tbody></table></div>
+        <aside style="display:grid;gap:10px;align-content:start">
+          <div class="finance-result-card ${networkResult >= 0 ? 'good' : 'bad'} is-primary"><span>Resultado distribuível</span><strong>${fmtBRL(positiveResult)}</strong><small>${networkResult < 0 ? 'sem distribuição enquanto a rede estiver negativa' : 'base após receitas, custos e fechamentos'}</small></div>
+          <div class="finance-result-card good"><span>Pool dos cotistas</span><strong>${fmtBRL(investorPool)}</strong><small>${policy.investorPct}% após reserva de ${policy.reservePct}%</small></div>
+          <div class="finance-result-card is-reference"><span>Valor por cota</span><strong>${fmtBRL(perQuota)}</strong><small>${soldQuotas} de ${policy.totalQuotas} cotas vendidas · ${policy.roundLabel}</small></div>
+          <div class="finance-result-card"><span>Retido na UBY</span><strong>${fmtBRL(ubyRetained)}</strong><small>reserva + parcela não distribuída</small></div>
+        </aside>
+      </div>
+      <div style="display:grid;grid-template-columns:1.5fr repeat(4,minmax(105px,.6fr)) auto;gap:9px;align-items:end;margin-top:18px;padding-top:16px;border-top:1px solid var(--p3-border)">
+        <label class="sub">Rodada<input class="ctl-input" id="networkRoundLabel" value="${escapeAttr(policy.roundLabel)}"></label>
+        <label class="sub">Cotas emitidas<input class="ctl-input" id="networkTotalQuotas" type="number" min="1" step="1" value="${policy.totalQuotas}"></label>
+        <label class="sub">Cotas vendidas<input class="ctl-input" id="networkSoldQuotas" type="number" min="0" step="1" value="${soldQuotas}"></label>
+        <label class="sub">% cotistas<input class="ctl-input" id="networkInvestorPct" type="number" min="0" max="100" step="0.01" value="${policy.investorPct}"></label>
+        <label class="sub">% reserva<input class="ctl-input" id="networkReservePct" type="number" min="0" max="100" step="0.01" value="${policy.reservePct}"></label>
+        <button class="btn-open" type="button" onclick="saveNetworkDistributionFromInputs()">Salvar política</button>
+      </div>
+      <div id="networkDreFeedback" class="sub" style="margin-top:8px">Prévia gerencial: confirme documentos, impostos e aprovação do fechamento antes de pagar ou contabilizar distribuição.</div>
+    </section>`;
 }
 
 function renderUbyDistribution(total) {
