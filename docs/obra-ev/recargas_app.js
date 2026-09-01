@@ -3612,6 +3612,32 @@ function selectedOverviewPeriod(sourceMonths = overviewMonthKeys()) {
   };
 }
 
+function syncFinanceOnlyMonthOptions(sourceMonths = []) {
+  const select = document.getElementById('financeViewMode');
+  if (!select) return;
+  const months = [...new Set(sourceMonths || [])].filter(isPlausibleMonthKey).sort();
+  const previous = select.value || 'accumulated';
+  const options = [
+    { value: 'accumulated', label: 'Acumulado' },
+    ...months.slice().reverse().map(monthKey => ({ value: `month:${monthKey}`, label: monthLabel(monthKey) }))
+  ];
+  const signature = options.map(option => `${option.value}:${option.label}`).join('|');
+  if (select.dataset.optionsSignature !== signature) {
+    select.innerHTML = options.map(option => `<option value="${option.value}">${option.label}</option>`).join('');
+    select.dataset.optionsSignature = signature;
+  }
+  select.value = options.some(option => option.value === previous) ? previous : 'accumulated';
+}
+
+function selectedFinanceOnlyPeriod(sourceMonths = []) {
+  const months = [...new Set(sourceMonths || [])].filter(isPlausibleMonthKey).sort();
+  const view = document.getElementById('financeViewMode')?.value || 'accumulated';
+  const requestedMonth = view.startsWith('month:') ? view.slice('month:'.length) : '';
+  const monthKey = months.includes(requestedMonth) ? requestedMonth : '';
+  const isMonthView = !!monthKey;
+  return { monthKey, isMonthView, label: isMonthView ? monthLabel(monthKey) : 'Acumulado' };
+}
+
 function overviewNeedsRender(name) {
   return overviewRenderState[name] !== overviewRenderSignature(name);
 }
@@ -6065,11 +6091,10 @@ async function renderFinanceOnly() {
   }
   const ubyCharges = includedRows.flatMap(r => r.charges || []);
   const sourceMonths = [...new Set(ubyCharges.map(chargeMonthKey).filter(k => k !== 'unknown'))].sort();
-  const currentMonth = sourceMonths[sourceMonths.length - 1] || '';
-  const isMonthView = (document.getElementById('financeViewMode')?.value || 'accumulated') === 'month' && !!currentMonth;
-  const viewLabel = isMonthView ? `Mês atual (${monthLabel(currentMonth)})` : 'Acumulado';
-  try { renderUbyFinancialOverview(ubyRows, sourceMonths, isMonthView, currentMonth, viewLabel); } catch (e) { console.error('[fin-uby]', e); }
-  try { renderNetworkDre(ubyRows, sourceMonths, isMonthView, currentMonth); } catch (e) { console.error('[fin-network-dre]', e); }
+  syncFinanceOnlyMonthOptions(sourceMonths);
+  const period = selectedFinanceOnlyPeriod(sourceMonths);
+  try { renderUbyFinancialOverview(ubyRows, sourceMonths, period.isMonthView, period.monthKey, period.label); } catch (e) { console.error('[fin-uby]', e); }
+  try { renderNetworkDre(ubyRows, sourceMonths, period.isMonthView, period.monthKey); } catch (e) { console.error('[fin-network-dre]', e); }
 }
 
 function financeUnitOutcome(finance = {}) {
@@ -10786,9 +10811,8 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
 function networkUnifiedReportModel() {
   const sourceRows = getGeneralUnitData();
   const sourceMonths = [...new Set(sourceRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
-  const currentMonth = sourceMonths[sourceMonths.length - 1] || '';
-  const isMonthView = (document.getElementById('financeViewMode')?.value || 'accumulated') === 'month' && !!currentMonth;
-  const rows = sourceRows.filter(row => row.included).map(row => aggregateUbyFinanceRow(row, sourceMonths, isMonthView, currentMonth));
+  const periodSelection = selectedFinanceOnlyPeriod(sourceMonths);
+  const rows = sourceRows.filter(row => row.included).map(row => aggregateUbyFinanceRow(row, sourceMonths, periodSelection.isMonthView, periodSelection.monthKey));
   const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
   const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
   const fields = ['revenue','extraRevenue','marketingRevenue','energyCost','extraCosts','matrizCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
@@ -10803,7 +10827,7 @@ function networkUnifiedReportModel() {
   const reserve = distributable * Number(policy.reservePct || 0) / 100;
   const investorPool = (distributable - reserve) * Number(policy.investorPct || 0) / 100;
   const soldQuotas = Math.min(Number(policy.soldQuotas || 0), Number(policy.totalQuotas || 1));
-  return { rows, ownedRows, partnerRows, owned, partners, policy, operationalResult, royalties, marketing, result, distributable, reserve, investorPool, soldQuotas, perQuota: soldQuotas ? investorPool / soldQuotas : 0, period: isMonthView ? monthLabel(currentMonth) : 'Acumulado' };
+  return { rows, ownedRows, partnerRows, owned, partners, policy, operationalResult, royalties, marketing, result, distributable, reserve, investorPool, soldQuotas, perQuota: soldQuotas ? investorPool / soldQuotas : 0, period: periodSelection.label };
 }
 
 function generateNetworkUnifiedReport() {

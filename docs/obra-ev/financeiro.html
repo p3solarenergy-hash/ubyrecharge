@@ -836,10 +836,9 @@
     </div>
     <div class="formula">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <span>Visão:</span>
-        <select class="ctl-select" id="financeViewMode" onchange="renderFinanceOnly()">
+        <span>Competência:</span>
+        <select class="ctl-select" id="financeViewMode" onchange="renderFinanceOnly()" aria-label="Escolher mês do relatório financeiro">
           <option value="accumulated" selected>Acumulado</option>
-          <option value="month">Mês atual</option>
         </select>
         <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar</button>
       </div>
@@ -935,6 +934,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260901-network-report1"></script>
+<script src="recargas_app.js?v=20260901-finance-month1"></script>
 </body>
 </html>
