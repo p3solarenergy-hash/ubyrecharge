@@ -10809,10 +10809,10 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
 }
 
 function networkUnifiedReportModel() {
-  const sourceRows = getGeneralUnitData();
+  const sourceRows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
   const sourceMonths = [...new Set(sourceRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   const periodSelection = selectedFinanceOnlyPeriod(sourceMonths);
-  const rows = sourceRows.filter(row => row.included).map(row => aggregateUbyFinanceRow(row, sourceMonths, periodSelection.isMonthView, periodSelection.monthKey));
+  const rows = sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, periodSelection.isMonthView, periodSelection.monthKey));
   const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
   const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
   const fields = ['revenue','extraRevenue','marketingRevenue','energyCost','extraCosts','matrizCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
@@ -10876,7 +10876,7 @@ function ubyExportSheet(XLSX, rows = [], columns = []) {
 
 async function exportUbyNetworkFinanceXlsx() {
   const XLSX = await ensureSpreadsheetLibrary();
-  const sourceRows = getGeneralUnitData().filter(row => row.included);
+  const sourceRows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
   const sourceMonths = [...new Set(sourceRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   if (!sourceMonths.length) return alert('Não há recargas financeiras carregadas para exportar. Clique em Atualizar e tente novamente.');
   const selected = networkUnifiedReportModel();
