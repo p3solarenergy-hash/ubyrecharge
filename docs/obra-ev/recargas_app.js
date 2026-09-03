@@ -5056,6 +5056,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     .map(item => ({
       id: String(item?.id || `matriz-${Math.random().toString(36).slice(2)}`),
       label: safeText(item?.label || item?.name || 'Custo da matriz'),
+      category: safeText(item?.category || ''),
       amount: Math.max(0, Number(item?.amount || 0)),
       cashAmount: Math.max(0, Number(item?.cashAmount || 0)),
       coverageMonths: Math.max(1, Number(item?.coverageMonths || 1)),
@@ -5063,10 +5064,13 @@ function financeForCharges(charges, settings = {}, options = {}) {
     }))
     .filter(item => item.amount > 0);
   const matrizCost = matrizCostItems.reduce((sum, item) => sum + item.amount, 0);
+  const matrizTaxCost = matrizCostItems
+    .filter(item => /tribut|impost|taxa/i.test(`${item.category || ''} ${item.label || ''}`))
+    .reduce((sum, item) => sum + item.amount, 0);
   const matrizCash = matrizCostItems.reduce((sum, item) => sum + item.cashAmount, 0);
   const matrizCostDetails = matrizCostItems.map(item => ({
     id: `matriz-${item.id}`,
-    label: item.label,
+    label: /tribut|impost|taxa/i.test(`${item.category || ''} ${item.label || ''}`) ? `Tributo centralizado — ${item.label}` : item.label,
     enabled: true,
     basis: 'fixed',
     value: item.amount,
@@ -5237,6 +5241,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     extraCosts,
     localExtraCosts,
     matrizCost,
+    matrizTaxCost,
     matrizCash,
     matrizCostPerKWh,
     plannedMatrizCostPerKWh,
@@ -5254,7 +5259,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     costRules: cfg.costRules,
     revenueRules: cfg.revenueRules,
     costRuleDetails: [...costEvaluation.details, {
-      id: 'tax-rate', label: 'Impostos sobre faturamento', enabled: Number(cfg.taxRatePct || 0) > 0,
+      id: 'tax-rate', label: 'Tributos diretamente atribuiveis ao carregador', enabled: Number(cfg.taxRatePct || 0) > 0,
       basis: 'revenue_pct', value: Number(cfg.taxRatePct || 0), actual: taxes, planned: plannedTaxes,
       actualPerKWh: energy > 0 ? taxes / energy : null,
       plannedPerKWh: planning.planningKWh > 0 ? plannedTaxes / planning.planningKWh : null,
@@ -5871,7 +5876,7 @@ function matrizCostItemsForRow(row, mk, unitData = getGeneralUnitData()) {
     const coverage = item.costKind === 'installment'
       ? `${item.installments} parcela(s) | cobertura ${matrizCoverageMonths(item)} mes(es)`
       : matrizKindLabel(item.costKind);
-    return amount > 0 ? [{ id: item.id, label: item.name, amount, cashAmount: cashShare, coverageMonths: matrizCoverageMonths(item), rule: `${coverage} | ${matrizMethodLabel(item.allocation)} | ${weighted.length} destino(s)` }] : [];
+    return amount > 0 ? [{ id: item.id, label: item.name, category: item.category || 'Outros custos', amount, cashAmount: cashShare, coverageMonths: matrizCoverageMonths(item), rule: `${coverage} | ${matrizMethodLabel(item.allocation)} | ${weighted.length} destino(s)` }] : [];
   });
 }
 function matrizRowForUnit(unit = {}, unitData = getGeneralUnitData(), mk = financeMonthKey()) {
@@ -5973,7 +5978,7 @@ function ensureMatrizCostEditor() {
     <div style="overflow-x:auto"><table><thead><tr><th>Despesa</th><th>Competencia</th><th>Rateio e destinos</th><th style="text-align:right">Valor desta competencia</th><th style="text-align:right">Acao</th></tr></thead><tbody id="matrizCostList"></tbody><tfoot id="matrizCostFoot"></tfoot></table></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:16px">
       <label class="sub">NOME DO CUSTO<input id="matrizNewName" type="text" placeholder="Ex.: Seguro carregadores" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
-      <label class="sub">CATEGORIA<select id="matrizCostCategory" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Seguro</option><option>Locacao / aluguel</option><option>Internet / dados</option><option>Manutencao preventiva</option><option>Manutencao corretiva</option><option>Licenca / plataforma</option><option>Marketing</option><option>Administrativo</option><option>Outros custos</option></select></label>
+      <label class="sub">CATEGORIA<select id="matrizCostCategory" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Seguro</option><option>Locacao / aluguel</option><option>Internet / dados</option><option>Manutencao preventiva</option><option>Manutencao corretiva</option><option>Licenca / plataforma</option><option>Tributos corporativos / centralizados</option><option>Marketing</option><option>Administrativo</option><option>Outros custos</option></select></label>
       <label class="sub">FORNECEDOR OU DOCUMENTO<input id="matrizCostSupplier" type="text" placeholder="Ex.: Seguradora / boleto" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
       <label class="sub">TIPO DE COBRANCA<select id="matrizCostKind" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="recurring">Recorrente mensal</option><option value="installment">Parcelado</option><option value="one_off">Pontual</option></select></label>
       <label class="sub">VALOR DE CADA PARCELA (R$)<input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Ex.: 526,24" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
@@ -5988,7 +5993,7 @@ function ensureMatrizCostEditor() {
       <label class="sub">CARREGADORES DE DESTINO (PODE SELECIONAR MAIS DE UM)<select id="matrizCostTargets" multiple size="5" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:8px;font:inherit"></select></label>
       <div><input id="matrizCostCustomShares" type="text" placeholder="Participacoes: 50, 30, 20" style="width:100%;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><div class="sub" style="margin-top:6px">Use participacao definida somente se quiser percentuais personalizados na mesma ordem dos destinos. Nos outros metodos este campo e ignorado.</div><input id="matrizCostDocument" type="text" placeholder="Referencia do boleto ou documento" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><input id="matrizCostNotes" type="text" placeholder="Observacao" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></div>
     </div>
-    <div class="sub" style="margin-top:12px;max-width:88ch">Para um seguro pago em 4 parcelas que cobre 12 meses, informe <b>4 parcelas</b> e <b>12 meses de cobertura</b>. O resultado e o custo por kWh reconhecem o total contratado dividido pelos 12 meses; o caixa mostra a parcela somente nos quatro meses de pagamento.</div>
+    <div class="sub" style="margin-top:12px;max-width:88ch">Tributos sobre o faturamento de cada carregador devem ser configurados no financeiro daquela unidade. Use <b>Tributos corporativos / centralizados</b> somente para obrigações sem vínculo direto e rateie entre os carregadores beneficiados. Para um seguro pago em 4 parcelas que cobre 12 meses, informe <b>4 parcelas</b> e <b>12 meses de cobertura</b>.</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px"><button id="matrizSaveButton" class="btn-open" type="button" onclick="addMatrizCost()">Adicionar custo</button><button class="btn-open" type="button" onclick="resetMatrizCostForm();renderMatrizCosts(getGeneralUnitData())">Limpar</button><span id="matrizFeedback" class="sub"></span></div>
     <div id="matrizRateio" style="margin-top:18px"></div>
     <section style="margin-top:24px;padding-top:20px;border-top:1px solid var(--p3-border)">
@@ -10750,12 +10755,12 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
     return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems, workId: row.workId, workName: row.workName, stationName: row.stationName || row.station, courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
   });
   const totals = results.reduce((acc, result) => {
-    ['revenue','extraRevenue','marketingRevenue','totalRevenue','energy','commercialEnergy','courtesyCharges','courtesyEnergy','courtesyEnergyCost','courtesyCostExcluded','energyCost','extraCosts','taxes','areaParticipation','management','platform','ubyRoyalty','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
+    ['revenue','extraRevenue','marketingRevenue','totalRevenue','energy','commercialEnergy','courtesyCharges','courtesyEnergy','courtesyEnergyCost','courtesyCostExcluded','energyCost','extraCosts','taxes','matrizTaxCost','areaParticipation','management','platform','ubyRoyalty','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
       acc[key] += Number(result[key] || 0);
     });
     acc.planningKWh += Number(result.planning?.planningKWh || 0);
     return acc;
-  }, { revenue:0, extraRevenue:0, marketingRevenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, taxes:0, areaParticipation:0, management:0, platform:0, ubyRoyalty:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
+  }, { revenue:0, extraRevenue:0, marketingRevenue:0, totalRevenue:0, energy:0, commercialEnergy:0, courtesyCharges:0, courtesyEnergy:0, courtesyEnergyCost:0, courtesyCostExcluded:0, energyCost:0, extraCosts:0, taxes:0, matrizTaxCost:0, areaParticipation:0, management:0, platform:0, ubyRoyalty:0, totalOperatingCost:0, operationNet:0, plannedTotalCost:0, planningKWh:0, ubyNet:0, saRetention:0, investorDistribution:0, ubyRetained:0 });
   // A visão acumulada precisa manter a titularidade do carregador. Sem isso,
   // um parceiro com royalty UBY volta a ser apresentado como ativo próprio.
   totals.operationModel = results.at(-1)?.operationModel || 'uby';
@@ -10905,7 +10910,7 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
     .map(row => aggregateUbyFinanceRow(row, sourceMonths, isMonthView, currentMonth));
   const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
   const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
-  const fields = ['revenue','extraRevenue','marketingRevenue','energyCost','extraCosts','matrizCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
+  const fields = ['revenue','extraRevenue','marketingRevenue','energyCost','extraCosts','matrizCost','matrizTaxCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
   const owned = networkFinanceSum(ownedRows, fields);
   const partners = networkFinanceSum(partnerRows, fields);
   const policy = loadNetworkDistribution();
@@ -10943,8 +10948,9 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
           <tr class="finance-group-row"><th colspan="2">Custos já reconhecidos na rede</th></tr>
           ${line('Energia', fmtBRL(owned.energyCost))}
           ${line('Operação direta por ativo', fmtBRL(Math.max(0, Number(owned.extraCosts || 0) - Number(owned.matrizCost || 0))))}
-          ${line('Custos centralizados da matriz (rateados)', fmtBRL(owned.matrizCost))}
-          ${line('Impostos', fmtBRL(owned.taxes))}
+          ${line('Tributos diretamente atribuíveis aos carregadores', fmtBRL(owned.taxes))}
+          ${line('Tributos corporativos centralizados (dentro do rateio)', fmtBRL(owned.matrizTaxCost))}
+          ${line('Demais custos centralizados da matriz (rateados)', fmtBRL(Math.max(0, Number(owned.matrizCost || 0) - Number(owned.matrizTaxCost || 0))))}
           ${line('Gestão, plataforma e participação de área', fmtBRL(Number(owned.management || 0) + Number(owned.platform || 0) + Number(owned.areaParticipation || 0)))}
           ${line('Resultado operacional dos ativos UBY', fmtBRL(operationalResult), 'finance-total-row')}
           <tr class="finance-group-row"><th colspan="2">Resultado final da rede</th></tr>
@@ -10995,7 +11001,7 @@ function networkUnifiedReportModel(options = {}) {
   const rows = sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, periodSelection.isMonthView, periodSelection.monthKey));
   const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
   const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
-  const fields = ['revenue','extraRevenue','marketingRevenue','energyCost','extraCosts','matrizCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
+  const fields = ['revenue','extraRevenue','marketingRevenue','energyCost','extraCosts','matrizCost','matrizTaxCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
   const owned = networkFinanceSum(ownedRows, fields);
   const partners = networkFinanceSum(partnerRows, fields);
   const policy = loadNetworkDistribution();
@@ -11107,7 +11113,7 @@ async function exportUbyNetworkFinanceXlsx() {
     const rows = sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, true, monthKey));
     const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
     const partnerRows = rows.filter(row => normalizeOperationModel(row.finance?.operationModel) === 'third_party_management');
-    const fields = ['revenue','extraRevenue','marketingRevenue','energy','energyCost','extraCosts','matrizCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
+    const fields = ['revenue','extraRevenue','marketingRevenue','energy','energyCost','extraCosts','matrizCost','matrizTaxCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
     const owned = networkFinanceSum(ownedRows, fields);
     const royalties = Number(networkFinanceSum(partnerRows, fields).ubyRoyalty || 0);
     const result = Number(owned.operationNet || 0) + royalties + Number(owned.marketingRevenue || 0);
@@ -11127,8 +11133,9 @@ async function exportUbyNetworkFinanceXlsx() {
     ['Royalties de parceiros', Number(selected.royalties || 0)],
     ['Marketing e contratos', Number(selected.marketing || 0)],
     ['Energia', Number(selected.owned.energyCost || 0)],
-    ['Custos centralizados da matriz', Number(selected.owned.matrizCost || 0)],
-    ['Impostos', Number(selected.owned.taxes || 0)],
+    ['Tributos diretamente atribuíveis aos carregadores', Number(selected.owned.taxes || 0)],
+    ['Tributos corporativos centralizados (dentro do rateio)', Number(selected.owned.matrizTaxCost || 0)],
+    ['Demais custos centralizados da matriz', Math.max(0, Number(selected.owned.matrizCost || 0) - Number(selected.owned.matrizTaxCost || 0))],
     ['Gestão, plataforma e participação de área', Number(selected.owned.management || 0) + Number(selected.owned.platform || 0) + Number(selected.owned.areaParticipation || 0)],
     ['Resultado operacional UBY', Number(selected.operationalResult || 0)],
     ['Resultado consolidado da rede', Number(selected.result || 0)],
@@ -11146,9 +11153,9 @@ async function exportUbyNetworkFinanceXlsx() {
     ['Retenção — Reserva legal obrigatória da S.A.', Number(policy.legalReservePct || 0) / 100],
     ['Retenção — Fundo de reserva e expansão', Number(policy.expansionReservePct || 0) / 100]
   ];
-  const monthlyRows = [['MÊS', 'FATURAMENTO RECARGAS', 'ENERGIA kWh', 'CUSTO ENERGIA', 'MATRIZ RATEADA', 'IMPOSTOS', 'ROYALTIES', 'MARKETING', 'RESULTADO OPERACIONAL', 'RESULTADO REDE']];
+  const monthlyRows = [['MÊS', 'FATURAMENTO RECARGAS', 'ENERGIA kWh', 'CUSTO ENERGIA', 'MATRIZ RATEADA', 'TRIBUTOS DIRETOS', 'TRIBUTOS CENTRALIZADOS', 'ROYALTIES', 'MARKETING', 'RESULTADO OPERACIONAL', 'RESULTADO REDE']];
   monthly.forEach(item => monthlyRows.push([
-    monthLabel(item.monthKey), Number(item.owned.revenue || 0), Number(item.owned.energy || 0), Number(item.owned.energyCost || 0), Number(item.owned.matrizCost || 0), Number(item.owned.taxes || 0), Number(item.royalties || 0), Number(item.owned.marketingRevenue || 0), Number(item.owned.operationNet || 0), Number(item.result || 0)
+    monthLabel(item.monthKey), Number(item.owned.revenue || 0), Number(item.owned.energy || 0), Number(item.owned.energyCost || 0), Number(item.owned.matrizCost || 0), Number(item.owned.taxes || 0), Number(item.owned.matrizTaxCost || 0), Number(item.royalties || 0), Number(item.owned.marketingRevenue || 0), Number(item.owned.operationNet || 0), Number(item.result || 0)
   ]));
   const unitsRows = [['UNIDADE', 'OBRA', 'MODELO', 'PERÍODOS', 'FATURAMENTO', 'ENERGIA kWh', 'CUSTO TOTAL', 'MATRIZ RATEADA', 'IMPOSTOS', 'ROYALTY UBY', 'RESULTADO UBY']];
   sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, false, '')).forEach(row => {
@@ -11167,7 +11174,7 @@ async function exportUbyNetworkFinanceXlsx() {
   distributionRows.push(['COTISTA', 'COTAS', 'INÍCIO', ...distribution.months.map(month => monthLabel(month.monthKey)), 'TOTAL DEVIDO', 'APORTE', 'RETORNO ACUMULADO', 'ANUALIZADO SIMPLES', 'PAYBACK INDICATIVO', 'SITUAÇÃO']);
   distribution.investors.forEach(investor => distributionRows.push([investor.name, investor.quotas, monthLabel(investor.eligibleFrom), ...investor.allocations.map(value => Number(value || 0)), Number(investor.due || 0), Number(investor.investment || 0), Number(investor.returnRate || 0), Number(investor.annualized || 0), investor.paybackYears || '', investor.status]));
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, summaryRows, [42, 22]), 'Resumo e DRE');
-  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, monthlyRows, [16, 20, 16, 17, 17, 13, 15, 15, 22, 20]), 'Histórico mensal');
+  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, monthlyRows, [16, 20, 16, 17, 17, 17, 20, 15, 15, 22, 20]), 'Histórico mensal');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, unitsRows, [31, 25, 22, 10, 16, 15, 16, 17, 13, 15, 16]), 'Por unidade');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, matrixRows, [34, 18, 42]), 'Custos matriz');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, distributionRows, [28, 12, 16, ...distribution.months.map(() => 16), 18, 18, 18, 20, 20, 14]), 'Distribuição Rodada 1');
