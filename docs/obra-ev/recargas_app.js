@@ -1109,7 +1109,58 @@ function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
   if (normalized.includes('sabara')) {
     return 'SANTAREM EV SABARÁ';
   }
+  // O provedor criou duas obras para o mesmo carregador do Mercado Santarém
+  // ("Jardins" e "Jardins 2"). Elas são uma única estação operacional: os
+  // nomes diferentes continuam preservados nos registros de origem, mas toda
+  // leitura do painel usa esta identidade canônica.
+  if (normalized.includes('santarem') && normalized.includes('jardins')) {
+    return 'SANTAREM EV JARDINS';
+  }
   return raw || workName || 'Estacao';
+}
+
+function isUnifiedJardinsStation(stationName = '') {
+  return normalizeStationForCompare(stationName) === normalizeStationForCompare('SANTAREM EV JARDINS');
+}
+
+function unifiedJardinsRecordForView(primaryRecord = {}, primaryWorkId = '') {
+  const primary = hydratedRechargeRecord(primaryRecord, primaryWorkId);
+  const primaryIsJardins = (primary.charges || []).some(charge => isUnifiedJardinsStation(
+    canonicalStationNameForWork(primaryWorkId, charge.station, primary.workName)
+  )) || isUnifiedJardinsStation(canonicalStationNameForWork(
+    primaryWorkId,
+    primary.summary?.stationName || primary.stationName || primary.workName,
+    primary.workName
+  ));
+  if (!primaryIsJardins) return primary;
+
+  const candidates = Object.entries({ ...localRechargeDb(), ...allRechargeRecords })
+    .map(([workId, record]) => hydratedRechargeRecord(record, workId))
+    .filter(record => record?.workId && isUnifiedJardinsStation(canonicalStationNameForWork(
+      record.workId,
+      record.summary?.stationName || record.stationName || record.charges?.[0]?.station || record.workName,
+      record.workName
+    )));
+  if (!candidates.some(record => String(record.workId) === String(primaryWorkId))) candidates.unshift(primary);
+  if (candidates.length < 2) return primary;
+
+  const charges = dedupeChargesByUniqueKey(candidates.flatMap(record => (record.charges || []).map(charge => ({
+    ...charge,
+    workId: charge.workId || record.workId,
+    workName: charge.workName || record.workName,
+    station: canonicalStationNameForWork(record.workId, charge.station, record.workName)
+  }))));
+  const files = candidates.flatMap(record => record.files || []).filter((file, index, list) =>
+    list.findIndex(candidate => (candidate.fileKey || candidate.name) === (file.fileKey || file.name)) === index
+  );
+  return {
+    ...primary,
+    charges,
+    files,
+    summary: { ...(primary.summary || {}), stationName: 'SANTAREM EV JARDINS' },
+    unifiedSourceWorkIds: [...new Set(candidates.map(record => String(record.workId)))],
+    virtualUnifiedStation: true
+  };
 }
 
 function stationBlockedForWork(workId, stationName) {
@@ -1248,7 +1299,9 @@ async function loadRechargeBase(workId = currentWorkId, options = {}) {
   const initialCandidates = [memory, cached, local].filter(Boolean);
   const initial = initialCandidates.find(recordHasFullRechargeDetails) || initialCandidates[0] || null;
   if (recordHasFullRechargeDetails(initial)) fullRechargeWorkIds.add(targetWorkId);
-  if (initial && (!initial.localCompact || initial.charges?.length)) applyRechargeRecord(initial, cached === initial ? 'cache integral' : 'base local');
+  if (initial && (!initial.localCompact || initial.charges?.length)) {
+    applyRechargeRecord(unifiedJardinsRecordForView(initial, targetWorkId), cached === initial ? 'cache integral' : 'base local');
+  }
   else applyRechargeRecord(null, 'base local');
   if (options.skipCloud && recordHasFullRechargeDetails(initial)) return initial;
   if (!window.UBY_SUPABASE?.loadRechargeBase) {
@@ -1281,8 +1334,9 @@ async function loadRechargeBase(workId = currentWorkId, options = {}) {
       fullRechargeWorkIds.add(targetWorkId);
       window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`work:${targetWorkId}`, merged).catch(() => {});
       markRechargeRecordsDirty();
-      applyRechargeRecord(merged, 'Supabase');
-      return merged;
+      const viewRecord = unifiedJardinsRecordForView(merged, targetWorkId);
+      applyRechargeRecord(viewRecord, 'Supabase');
+      return viewRecord;
     }
     if (expectedRechargeCount(memory || local || {}) > 0) {
       throw new Error('O banco informa recargas existentes, mas nao retornou a base integral.');
@@ -8744,6 +8798,34 @@ function getGeneralStationRows(unitData) {
     });
   });
 
+  // Consolida somente a duplicidade conhecida Jardins/Jardins 2. Outras
+  // estações com o mesmo texto continuam separadas por obra, como antes.
+  const unifiedJardins = stationRows.filter(row => isUnifiedJardinsStation(row.stationName));
+  if (unifiedJardins.length > 1) {
+    const primary = [...unifiedJardins].sort((a, b) =>
+      Number(b.count || 0) - Number(a.count || 0) || Number(b.revenue || 0) - Number(a.revenue || 0)
+    )[0];
+    const charges = dedupeChargesByUniqueKey(unifiedJardins.flatMap(row => row.charges || []).map(charge => ({
+      ...charge,
+      workId: charge.workId || row.workId,
+      workName: charge.workName || row.workName,
+      station: 'SANTAREM EV JARDINS'
+    })));
+    const summary = summarizeGeneralUnit(primary, charges);
+    const files = unifiedJardins.flatMap(row => row.files || []).filter((file, index, list) =>
+      list.findIndex(candidate => (candidate.fileKey || candidate.name) === (file.fileKey || file.name)) === index
+    );
+    const mergedRow = {
+      ...summary,
+      stationName: 'SANTAREM EV JARDINS',
+      stations: ['SANTAREM EV JARDINS'],
+      files,
+      sourceWorkIds: [...new Set(unifiedJardins.map(row => String(row.workId)))],
+      workName: primary.workName
+    };
+    stationRows.splice(0, stationRows.length, ...stationRows.filter(row => !isUnifiedJardinsStation(row.stationName)), mergedRow);
+  }
+
   return stationRows.sort((a, b) => {
     const revenueDiff = (Number(b.revenue) || 0) - (Number(a.revenue) || 0);
     if (Math.abs(revenueDiff) > 0.009) return revenueDiff;
@@ -12758,7 +12840,7 @@ function openGeneralFinanceView() {
   renderGeneralFinance(getGeneralUnitData());
 }
 
-const UBY_APP_VERSION = '20260808-financial-matrix-cloud1';
+const UBY_APP_VERSION = '20260903-unified-jardins1';
 async function __perf(label, fn) {
   const t0 = performance.now();
   try { return await fn(); }
