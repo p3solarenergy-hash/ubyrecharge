@@ -155,6 +155,12 @@ function stationAvailabilityKey(stationName) {
   return normalizeStationForCompare(stationName || 'estacao') || 'estacao';
 }
 
+// Regra visual: nomes de estações são sempre apresentados em caixa alta.
+// O valor original não é alterado, preservando a identificação armazenada.
+function stationDisplayName(value = '') {
+  return safeText(value).toLocaleUpperCase('pt-BR');
+}
+
 function defaultPhysicalLayout(stationName = '', workName = '') {
   const normalized = normalizeStationForCompare(`${stationName} ${workName}`);
   return DEFAULT_STATION_PHYSICAL_LAYOUTS.find(layout => layout.terms.some(term => normalized.includes(normalizeStationForCompare(term)))) || {
@@ -8863,7 +8869,7 @@ function renderGeneralStationOccupancy(rows) {
     const config = stationAvailabilityFor(row.workId, row.stationName, row.workName);
     return `
     <div class="station-schedule-row">
-      <div class="station-occupancy-name"><strong>${row.stationName}</strong><span>${row.workName}</span></div>
+      <div class="station-occupancy-name"><strong>${escapeHtml(stationDisplayName(row.stationName))}</strong><span>${escapeHtml(stationDisplayName(row.workName))}</span></div>
       <div class="station-occupancy-meta">${stationScheduleLabel(config)}</div>
       <button class="btn-open" type="button" onclick="openStationLayoutConfiguration('${escapeAttr(row.workId)}','${escapeAttr(row.stationName)}')">Configurar horario</button>
     </div>
@@ -11067,8 +11073,8 @@ function generateNetworkUnifiedReport() {
     const pct = Math.min(rawPct, 100);
     const partner = normalizeOperationModel(row.finance?.operationModel) === 'third_party_management';
     return {
-      name: row.stationName || row.workName,
-      workName: row.workName || '',
+      name: stationDisplayName(row.stationName || row.workName),
+      workName: stationDisplayName(row.workName || ''),
       pct, rawPct, energy: Number(occupancy.energy || 0), maxKWh: Number(occupancy.maxKWh || 0),
       hours: Number(occupancy.hours || 0), operationStart: occupancy.operationStart, partner
     };
@@ -11078,7 +11084,7 @@ function generateNetworkUnifiedReport() {
   const stationRows = model.rows.map(row => {
     const finance = row.finance || {};
     const partner = normalizeOperationModel(finance.operationModel) === 'third_party_management';
-    return `<tr><td><strong>${escapeHtml(row.stationName || row.workName)}</strong><br><small>${partner ? 'Parceiro UBY · royalties' : 'Ativo UBY'}</small></td><td>${fmtBRL(finance.revenue || 0)}</td><td>${partner ? fmtBRL(finance.ubyRoyalty || 0) : fmtBRL(finance.totalOperatingCost || 0)}</td><td class="${partner || Number(finance.operationNet || 0) >= 0 ? 'positive' : 'negative'}">${partner ? fmtBRL(finance.ubyRoyalty || 0) : fmtBRL(finance.operationNet || 0)}</td></tr>`;
+    return `<tr><td><strong>${escapeHtml(stationDisplayName(row.stationName || row.workName))}</strong><br><small>${partner ? 'Parceiro UBY · royalties' : 'Ativo UBY'}</small></td><td>${fmtBRL(finance.revenue || 0)}</td><td>${partner ? fmtBRL(finance.ubyRoyalty || 0) : fmtBRL(finance.totalOperatingCost || 0)}</td><td class="${partner || Number(finance.operationNet || 0) >= 0 ? 'positive' : 'negative'}">${partner ? fmtBRL(finance.ubyRoyalty || 0) : fmtBRL(finance.operationNet || 0)}</td></tr>`;
   }).join('') || '<tr><td colspan="4">Sem ativos incluídos no período.</td></tr>';
   const dre = [
     ['Faturamento de recargas dos ativos UBY', model.owned.revenue],
