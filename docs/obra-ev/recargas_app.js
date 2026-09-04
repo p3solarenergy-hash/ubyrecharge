@@ -5151,7 +5151,10 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const directPartnerDistribution = model === 'p3_society' || model === 'management_only' || model === 'third_party_management';
   const partnerInvestorDistribution = directPartnerDistribution ? Math.max(partnerShare, 0) : 0;
   const finalDistribution = directPartnerDistribution ? partnerInvestorDistribution : investorDistribution;
-  const ubyRetained = ubyNet - investorDistribution;
+  // Resultado negativo permanece registrado como prejuízo operacional, mas não
+  // gera retenção nem distribuição. "Retido" é uma destinação de lucro, nunca
+  // um saldo negativo a ser apresentado como se fosse retenção da UBY.
+  const ubyRetained = Math.max(ubyNet - investorDistribution, 0);
   const p3OperationalResult = management + p3SocietyProfit;
   const ownResult = ubyNet + p3SocietyProfit;
   const paybackBase = model === 'p3_society' ? p3SocietyProfit : ((model === 'management_only' || model === 'third_party_management') ? p3OperationalResult : ownResult);
@@ -11202,9 +11205,12 @@ function renderUbyDistribution(total) {
   const el = document.getElementById('ubyDistribution');
   if (!el) return;
   const ubyNet = Number(total.ubyNet || 0);
-  const saRet = Number(total.saRetention || 0);
-  const investor = Number(total.investorDistribution || 0);
-  const retained = Number(total.ubyRetained || 0);
+  const hasDistributableProfit = ubyNet > 0;
+  // Mesmo para históricos já calculados pela regra antiga, a tela não pode
+  // mostrar destinações de lucro se o resultado consolidado é prejuízo.
+  const saRet = hasDistributableProfit ? Math.max(0, Number(total.saRetention || 0)) : 0;
+  const investor = hasDistributableProfit ? Math.max(0, Number(total.investorDistribution || 0)) : 0;
+  const retained = hasDistributableProfit ? Math.max(0, Number(total.ubyRetained || 0)) : 0;
   if (ubyNet === 0 && investor === 0 && saRet === 0) { el.innerHTML = ''; return; }
   const quotaPct = (ubyNet - saRet) > 0 ? investor / (ubyNet - saRet) * 100 : 0;
   const card = (label, value, sub, color) =>
@@ -11212,12 +11218,12 @@ function renderUbyDistribution(total) {
   el.innerHTML = `
     <div class="card">
       <h2 style="margin:0 0 4px">Distribuição UBY</h2>
-      <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:70ch">Como o resultado UBY (já com os custos da matriz descontados) se divide entre a retenção estatutária e o repasse aos investidores por cotas.</p>
+      <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:70ch">${hasDistributableProfit ? 'Como o resultado UBY (já com os custos da matriz descontados) se divide entre a retenção estatutária e o repasse aos investidores por cotas.' : 'Esta competência está em prejuízo. O prejuízo permanece no resultado operacional, mas não há retenção, repasse aos cotistas nem valor retido para distribuir.'}</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
         ${card('Resultado UBY', ubyNet, 'após custos e matriz', ubyNet >= 0 ? 'var(--p3-ok)' : 'var(--p3-danger)')}
-        ${card('Retenção S.A.', saRet, 'retenção estatutária', '')}
-        ${card(`Investidores (${fmtPct(quotaPct)})`, investor, 'repasse por cotas', 'var(--p3-primary)')}
-        ${card('UBY retido', retained, 'fica na UBY', '')}
+        ${card('Retenção S.A.', saRet, hasDistributableProfit ? 'retenção estatutária' : 'R$ 0,00 enquanto houver prejuízo', '')}
+        ${card(`Investidores (${fmtPct(quotaPct)})`, investor, hasDistributableProfit ? 'repasse por cotas' : 'sem distribuição enquanto houver prejuízo', 'var(--p3-primary)')}
+        ${card('UBY retido', retained, hasDistributableProfit ? 'fica na UBY' : 'sem retenção enquanto houver prejuízo', '')}
       </div>
     </div>`;
 }
