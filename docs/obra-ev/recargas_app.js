@@ -173,6 +173,7 @@ function stationAvailabilityFor(workId, stationName, workName = '') {
     acPlugs: Number(physical.acPlugs || 0),
     dcChargers: Number(physical.dcChargers || 0),
     dcPlugs: Number(physical.dcPlugs || 0),
+    operationStart: '',
     open24h: true,
     openTime: '08:00',
     closeTime: '22:00',
@@ -199,6 +200,7 @@ function openStationLayoutConfiguration(workId, stationName) {
   document.getElementById('stationLayoutAcPlugs').value = config.acPlugs || 0;
   document.getElementById('stationLayoutDcChargers').value = config.dcChargers || 0;
   document.getElementById('stationLayoutDcPlugs').value = config.dcPlugs || 0;
+  document.getElementById('stationLayoutOperationStart').value = /^\d{4}-\d{2}-\d{2}$/.test(String(config.operationStart || '')) ? config.operationStart : '';
   document.getElementById('stationLayoutOpen24h').checked = config.open24h !== false;
   document.getElementById('stationLayoutOpenTime').value = config.openTime || '08:00';
   document.getElementById('stationLayoutCloseTime').value = config.closeTime || '22:00';
@@ -226,6 +228,7 @@ async function saveStationLayoutConfiguration() {
     acPlugs: Math.max(0, Number(document.getElementById('stationLayoutAcPlugs').value) || 0),
     dcChargers: Math.max(0, Number(document.getElementById('stationLayoutDcChargers').value) || 0),
     dcPlugs: Math.max(0, Number(document.getElementById('stationLayoutDcPlugs').value) || 0),
+    operationStart: /^\d{4}-\d{2}-\d{2}$/.test(document.getElementById('stationLayoutOperationStart').value || '') ? document.getElementById('stationLayoutOperationStart').value : '',
     open24h: document.getElementById('stationLayoutOpen24h').checked,
     openTime: document.getElementById('stationLayoutOpenTime').value || '08:00',
     closeTime: document.getElementById('stationLayoutCloseTime').value || '22:00',
@@ -3791,19 +3794,9 @@ async function rechargeRowsFromFileBuffer(arrayBuffer, isCsvFile) {
 function financeMonthOccupancy(charges = [], mk = '', powerOverride = 0, operationStart = currentWorkOperationStart()) {
   if (!/^\d{4}-\d{2}$/.test(mk)) return { pct: 0, maxKWh: 0, energy: 0, hours: 0 };
   const [year, month] = mk.split('-').map(Number);
-  let start = new Date(year, month - 1, 1, 0, 0, 0);
-  const firstOperation = operationStart && typeof operationStart.getTime === 'function'
-    ? new Date(operationStart)
-    : parseDate(operationStart);
-  if (
-    firstOperation &&
-    !Number.isNaN(firstOperation.getTime()) &&
-    firstOperation.getFullYear() === year &&
-    firstOperation.getMonth() === month - 1
-  ) {
-    start = new Date(year, month - 1, firstOperation.getDate(), 0, 0, 0);
-  }
+  const start = effectiveMonthStart(mk, operationStart);
   const monthAfter = new Date(year, month, 1, 0, 0, 0);
+  if (start >= monthAfter) return { pct: 0, maxKWh: 0, energy: 0, hours: 0, power: Number(powerOverride || 0) };
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const chargeDates = charges.flatMap(charge => [charge.endDate, charge.startDate]).filter(Boolean).map(date => new Date(date)).filter(date => !Number.isNaN(date.getTime()));
@@ -6491,8 +6484,8 @@ function effectiveMonthStart(mk, operationStart = null) {
     ? new Date(operationStart)
     : parseDate(operationStart);
   if (!firstOperation || Number.isNaN(firstOperation.getTime())) return monthStart;
-  if (firstOperation.getFullYear() !== monthStart.getFullYear() || firstOperation.getMonth() !== monthStart.getMonth()) return monthStart;
-  return new Date(firstOperation.getFullYear(), firstOperation.getMonth(), firstOperation.getDate(), 0, 0, 0);
+  const operationDay = new Date(firstOperation.getFullYear(), firstOperation.getMonth(), firstOperation.getDate(), 0, 0, 0);
+  return operationDay > monthStart ? operationDay : monthStart;
 }
 
 function periodWindow(monthCharges, mk, mode = selectedPeriodMode(), operationStart = null) {
@@ -6502,6 +6495,7 @@ function periodWindow(monthCharges, mk, mode = selectedPeriodMode(), operationSt
   let end = mode === 'closed' ? monthEnd : (livePeriodEndForMonth(mk, mode, importedEnd) || importedEnd || monthEnd);
   if (end > monthEnd) end = monthEnd;
   const activeStart = effectiveMonthStart(mk, operationStart || (currentWorkId ? currentWorkOperationStart() : null));
+  if (activeStart >= monthEnd) return { start: activeStart, end: activeStart, hours: 0, mode, monthKey: mk };
   let start = activeStart;
   const days = Number(mode);
   if (Number.isFinite(days) && days > 0) {
@@ -8858,7 +8852,7 @@ function stationOccupancyForMonths(row, monthKeys, mode = 'mtd') {
     hours += stationAvailableHours(config, window.start, window.end);
   });
   const maxKWh = power * hours;
-  return { config, power, energy, hours, maxKWh, pct: maxKWh > 0 ? energy / maxKWh * 100 : 0 };
+  return { config, power, energy, hours, maxKWh, operationStart, pct: maxKWh > 0 ? energy / maxKWh * 100 : 0 };
 }
 
 function renderGeneralStationOccupancy(rows) {
@@ -10073,6 +10067,13 @@ function ubyAreaRowKey(row = {}) {
 }
 
 function operationStartForCharges(charges = [], context = {}) {
+  const workId = String(context.workId || currentWorkId || '');
+  const stationName = context.stationName || context.station || context.workName || currentStationReportName || currentWorkName;
+  const configured = stationAvailabilityFor(workId, stationName, context.workName || currentWorkName).operationStart;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(configured || ''))) {
+    const [year, month, day] = configured.split('-').map(Number);
+    return new Date(year, month - 1, day, 0, 0, 0);
+  }
   const label = normalizeStationForCompare([
     context.stationName,
     context.station,
@@ -11069,7 +11070,7 @@ function generateNetworkUnifiedReport() {
       name: row.stationName || row.workName,
       workName: row.workName || '',
       pct, rawPct, energy: Number(occupancy.energy || 0), maxKWh: Number(occupancy.maxKWh || 0),
-      hours: Number(occupancy.hours || 0), partner
+      hours: Number(occupancy.hours || 0), operationStart: occupancy.operationStart, partner
     };
   }).sort((a, b) => b.rawPct - a.rawPct || a.name.localeCompare(b.name, 'pt-BR'));
   const operationalExtras = Number(model.owned.extraRevenue || 0);
@@ -11103,7 +11104,7 @@ function generateNetworkUnifiedReport() {
     *{box-sizing:border-box} body{font-family:Arial,sans-serif;color:#17283c;margin:32px;background:#fff}.head{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #00b879;padding-bottom:18px}.brand{color:#00885a;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}h1{font-size:27px;margin:5px 0 8px}.sub,small{color:#607287;font-size:12px;line-height:1.45}.badge{border:1px solid #00a86b;border-radius:999px;padding:7px 12px;color:#00794f;font-weight:700;font-size:12px;height:max-content}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}.kpi{border:1px solid #d8e3ef;border-radius:10px;padding:13px;background:#f7fbfa}.kpi b{display:block;color:#087cb7;font-size:20px}.kpi.positive b{color:#008c5a}.kpi span{display:block;font-size:11px;color:#607287;margin-top:5px;text-transform:uppercase}table{width:100%;border-collapse:collapse;margin:8px 0}th{background:#edf5f9;color:#213c55;text-align:left;font-size:12px;padding:10px}td{border-bottom:1px solid #dce6ed;padding:10px;font-size:13px}td:not(:first-child){text-align:right}.total td{font-weight:800;background:#eefaf5}.positive{color:#008c5a;font-weight:800}.negative{color:#c83744;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.occupancy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:12px}.occupancy-card{border:1px solid #d8e3ef;border-radius:12px;padding:13px;background:linear-gradient(145deg,#fff,#f5fbff);break-inside:avoid}.occupancy-top{display:flex;align-items:center;gap:13px}.pie{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;position:relative;flex:0 0 auto;background:conic-gradient(#09a77a calc(var(--pct) * 1%),#e4edf3 0)}.pie::after{content:'';width:53px;height:53px;background:#fff;border-radius:50%;position:absolute}.pie b{z-index:1;font-size:12px;color:#0a7659}.occupancy-name{font-weight:800;font-size:13px;line-height:1.25}.occupancy-meta{font-size:11px;color:#607287;margin-top:8px}.occupancy-bar{height:5px;border-radius:99px;background:#e4edf3;margin-top:10px;overflow:hidden}.occupancy-bar span{display:block;height:100%;background:#00a879;border-radius:inherit}@media print{body{margin:16mm}.head{break-inside:avoid}}
   </style></head><body><div class="head"><div><div class="brand">UBY Recharge · Central UBY</div><h1>Relatório financeiro unificado da rede</h1><div class="sub">Competência: <strong>${escapeHtml(model.period)}</strong><br>Gerado em ${fmtDT(new Date())}</div></div><div class="badge">Prévia de fechamento</div></div>
   <div class="kpis"><div class="kpi"><b>${fmtBRL(model.owned.revenue || 0)}</b><span>Faturamento de recargas</span></div><div class="kpi"><b>${fmtBRL(model.royalties)}</b><span>Royalties UBY</span></div><div class="kpi ${model.result >= 0 ? 'positive' : ''}"><b>${fmtBRL(model.result)}</b><span>${model.periodSelection?.isMonthView ? 'Resultado mensal da rede' : 'Resultado acumulado da rede'}</span></div><div class="kpi positive"><b>${fmtBRL(cotistasAmount)}</b><span>${cotistasLabel}</span></div></div>
-  <section><h2>Ocupação da rede por carregador</h2><div class="sub">Energia entregue em relação à capacidade disponível no período. As operações parceiras aparecem para leitura operacional, mas não alteram a matriz de custos UBY.</div><div class="occupancy-grid">${occupancyCards.map(card => `<article class="occupancy-card"><div class="occupancy-top"><div class="pie" style="--pct:${card.pct.toFixed(2)}"><b>${fmtPct(card.rawPct)}</b></div><div><div class="occupancy-name">${escapeHtml(card.name)}</div><small>${escapeHtml(card.workName)}${card.partner ? ' · Parceiro UBY' : ''}</small></div></div><div class="occupancy-meta">${fmtKWh(card.energy)} entregues de ${fmtKWh(card.maxKWh)} disponíveis · ${card.hours.toFixed(0)} h</div><div class="occupancy-bar"><span style="width:${card.pct.toFixed(2)}%"></span></div></article>`).join('') || '<div class="sub">Sem base de ocupação disponível.</div>'}</div></section>
+  <section><h2>Ocupação da rede por carregador</h2><div class="sub">Energia entregue em relação à capacidade disponível no período. O denominador começa na data real de entrada em operação; se ela ainda não foi cadastrada, usa a primeira recarga importada como referência provisória. As operações parceiras aparecem para leitura operacional, mas não alteram a matriz de custos UBY.</div><div class="occupancy-grid">${occupancyCards.map(card => `<article class="occupancy-card"><div class="occupancy-top"><div class="pie" style="--pct:${card.pct.toFixed(2)}"><b>${fmtPct(card.rawPct)}</b></div><div><div class="occupancy-name">${escapeHtml(card.name)}</div><small>${escapeHtml(card.workName)}${card.partner ? ' · Parceiro UBY' : ''}</small></div></div><div class="occupancy-meta">${fmtKWh(card.energy)} entregues de ${fmtKWh(card.maxKWh)} disponíveis · ${card.hours.toFixed(0)} h${card.operationStart ? ` · operação desde ${escapeHtml(fmtDateOnly(card.operationStart))}` : ''}</div><div class="occupancy-bar"><span style="width:${card.pct.toFixed(2)}%"></span></div></article>`).join('') || '<div class="sub">Sem base de ocupação disponível.</div>'}</div></section>
   <div class="grid"><section><h2>Receitas e resultado</h2><table><tbody>${dre.map(([label,value], index) => `<tr class="${index === dre.length - 1 ? 'total' : ''}"><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section><section><h2>Custos reconhecidos</h2><table><tbody>${costs.map(([label,value]) => `<tr><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section></div>
   <section><h2>Resultado mensal da rede</h2><div class="sub">Histórico por competência: cada linha considera somente as receitas e os custos reconhecidos naquele mês.</div><table><thead><tr><th>Competência</th><th>Recargas UBY</th><th>Royalties</th><th>Marketing</th><th>Resultado operacional</th><th>Resultado da rede</th></tr></thead><tbody>${monthlyResults.map(item => `<tr class="${item.periodSelection?.monthKey === model.periodSelection?.monthKey ? 'total' : ''}"><td>${escapeHtml(item.period)}</td><td>${fmtBRL(item.owned.revenue || 0)}</td><td>${fmtBRL(item.royalties || 0)}</td><td>${fmtBRL(item.marketing || 0)}</td><td>${fmtBRL(item.operationalResult || 0)}</td><td class="${item.result >= 0 ? 'positive' : 'negative'}">${fmtBRL(item.result || 0)}</td></tr>`).join('') || '<tr><td colspan="6">Ainda não há competências financeiras.</td></tr>'}</tbody></table></section>
   <section><h2>Consolidação por carregador e parceiro</h2><table><thead><tr><th>Unidade</th><th>Faturamento</th><th>Custos / repasse</th><th>Resultado UBY</th></tr></thead><tbody>${stationRows}</tbody></table></section>
