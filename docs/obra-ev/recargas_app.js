@@ -10930,6 +10930,7 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
   const soldQuotas = Math.min(Number(policy.soldQuotas || 0), Number(policy.totalQuotas || 1));
   const perQuota = soldQuotas > 0 ? investorPool / soldQuotas : 0;
   const period = isMonthView ? monthLabel(currentMonth) : 'Acumulado';
+  const resultLabel = isMonthView ? `Resultado mensal · ${period}` : 'Resultado acumulado da rede';
   const line = (label, value, cls = '') => `<tr class="${cls}"><td>${label}</td><td style="text-align:right">${value}</td></tr>`;
   target.innerHTML = `
     <section class="card" style="border-color:rgba(66,223,154,.36);background:linear-gradient(135deg,rgba(16,72,61,.2),var(--p3-card-soft));margin-top:18px">
@@ -10951,7 +10952,9 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
           ${line('Tributos diretamente atribuíveis aos carregadores', fmtBRL(owned.taxes))}
           ${line('Tributos corporativos centralizados (dentro do rateio)', fmtBRL(owned.matrizTaxCost))}
           ${line('Demais custos centralizados da matriz (rateados)', fmtBRL(Math.max(0, Number(owned.matrizCost || 0) - Number(owned.matrizTaxCost || 0))))}
-          ${line('Gestão, plataforma e participação de área', fmtBRL(Number(owned.management || 0) + Number(owned.platform || 0) + Number(owned.areaParticipation || 0)))}
+          ${line('Gestão P3', fmtBRL(owned.management))}
+          ${line('App / plataforma', fmtBRL(owned.platform))}
+          ${line('Participação de área', fmtBRL(owned.areaParticipation))}
           ${line('Resultado operacional dos ativos UBY', fmtBRL(operationalResult), 'finance-total-row')}
           <tr class="finance-group-row"><th colspan="2">Resultado final da rede</th></tr>
           ${line('Resultado operacional UBY', fmtBRL(operationalResult))}
@@ -10960,7 +10963,8 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
           ${line('= Resultado consolidado antes da distribuição', fmtBRL(networkResult), 'finance-total-row')}
         </tbody></table></div>
         <aside style="display:grid;gap:10px;align-content:start">
-          <div class="finance-result-card ${networkResult >= 0 ? 'good' : 'bad'} is-primary"><span>Resultado distribuível</span><strong>${fmtBRL(positiveResult)}</strong><small>${networkResult < 0 ? 'sem distribuição enquanto a rede estiver negativa' : 'base após receitas, custos e fechamentos'}</small></div>
+          <div class="finance-result-card ${networkResult >= 0 ? 'good' : 'bad'} is-primary"><span>${resultLabel}</span><strong>${fmtBRL(networkResult)}</strong><small>${isMonthView ? 'resultado da competência selecionada' : 'soma de todas as competências carregadas'}</small></div>
+          <div class="finance-result-card ${networkResult >= 0 ? 'good' : 'bad'}"><span>Base distribuível ${isMonthView ? 'do mês' : 'acumulada'}</span><strong>${fmtBRL(positiveResult)}</strong><small>${networkResult < 0 ? 'sem distribuição enquanto a rede estiver negativa' : 'base após receitas, custos e fechamentos'}</small></div>
           <div class="finance-result-card good"><span>Pool dos cotistas</span><strong>${fmtBRL(investorPool)}</strong><small>${policy.investorPct}% após reservas de ${policy.legalReservePct}% + ${policy.expansionReservePct}%</small></div>
           <div class="finance-result-card is-reference"><span>Apuração por aporte</span><strong>Mensal</strong><small>cada competência usa somente as cotas habilitadas; veja o quadro da Rodada 1 abaixo</small></div>
           <div class="finance-result-card"><span>Reservas retidas na UBY</span><strong>${fmtBRL(ubyRetained)}</strong><small>S.A.: ${fmtBRL(legalReserve)} (${policy.legalReservePct}%) · expansão: ${fmtBRL(expansionReserve)} (${policy.expansionReservePct}%)</small></div>
@@ -11015,7 +11019,7 @@ function networkUnifiedReportModel(options = {}) {
   const reserve = legalReserve + expansionReserve;
   const investorPool = (distributable - reserve) * Number(policy.investorPct || 0) / 100;
   const soldQuotas = Math.min(Number(policy.soldQuotas || 0), Number(policy.totalQuotas || 1));
-  return { rows, ownedRows, partnerRows, owned, partners, policy, operationalResult, royalties, marketing, result, distributable, legalReserve, expansionReserve, reserve, investorPool, soldQuotas, perQuota: soldQuotas ? investorPool / soldQuotas : 0, period: periodSelection.label };
+  return { rows, ownedRows, partnerRows, owned, partners, policy, operationalResult, royalties, marketing, result, distributable, legalReserve, expansionReserve, reserve, investorPool, soldQuotas, perQuota: soldQuotas ? investorPool / soldQuotas : 0, period: periodSelection.label, sourceMonths, periodSelection };
 }
 
 function networkInvestorDistributionModel() {
@@ -11045,8 +11049,14 @@ function networkInvestorDistributionModel() {
 }
 
 function generateNetworkUnifiedReport() {
-  const model = networkUnifiedReportModel({ accumulated: true });
+  const model = networkUnifiedReportModel();
   const distribution = networkInvestorDistributionModel();
+  const selectedSettlement = model.periodSelection?.isMonthView
+    ? distribution.months.find(month => month.monthKey === model.periodSelection.monthKey)
+    : null;
+  const cotistasAmount = selectedSettlement ? Number(selectedSettlement.investorPool || 0) : Number(distribution.totalAllocated || 0);
+  const cotistasLabel = selectedSettlement ? 'Pool dos cotistas da competência' : 'Total devido aos cotistas';
+  const monthlyResults = (model.sourceMonths || []).map(monthKey => networkUnifiedReportModel({ monthKey }));
   const occupancyCards = model.rows.map(row => {
     const occupancy = stationOccupancyForMonths(row, row.financeMonths || [], 'closed');
     const rawPct = Math.max(0, Number(occupancy.pct || 0));
@@ -11077,20 +11087,24 @@ function generateNetworkUnifiedReport() {
   const costs = [
     ['Energia', model.owned.energyCost],
     ['Operação direta por ativo', directOperation],
-    ['Custos centralizados da matriz', model.owned.matrizCost],
-    ['Impostos', model.owned.taxes],
-    ['Gestão, plataforma e participação de área', Number(model.owned.management || 0) + Number(model.owned.platform || 0) + Number(model.owned.areaParticipation || 0)]
+    ['Tributos diretamente atribuíveis aos carregadores', model.owned.taxes],
+    ['Tributos corporativos centralizados (dentro do rateio)', model.owned.matrizTaxCost],
+    ['Demais custos centralizados da matriz', Math.max(0, Number(model.owned.matrizCost || 0) - Number(model.owned.matrizTaxCost || 0))],
+    ['Gestão P3', model.owned.management],
+    ['App / plataforma', model.owned.platform],
+    ['Participação de área', model.owned.areaParticipation]
   ];
   const printable = window.open('', '_blank');
   if (!printable) return alert('O navegador bloqueou a janela do relatório. Libere pop-ups para gerar o PDF.');
   printable.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Relatório unificado UBY - ${escapeHtml(model.period)}</title><style>
     *{box-sizing:border-box} body{font-family:Arial,sans-serif;color:#17283c;margin:32px;background:#fff}.head{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #00b879;padding-bottom:18px}.brand{color:#00885a;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}h1{font-size:27px;margin:5px 0 8px}.sub,small{color:#607287;font-size:12px;line-height:1.45}.badge{border:1px solid #00a86b;border-radius:999px;padding:7px 12px;color:#00794f;font-weight:700;font-size:12px;height:max-content}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}.kpi{border:1px solid #d8e3ef;border-radius:10px;padding:13px;background:#f7fbfa}.kpi b{display:block;color:#087cb7;font-size:20px}.kpi.positive b{color:#008c5a}.kpi span{display:block;font-size:11px;color:#607287;margin-top:5px;text-transform:uppercase}table{width:100%;border-collapse:collapse;margin:8px 0}th{background:#edf5f9;color:#213c55;text-align:left;font-size:12px;padding:10px}td{border-bottom:1px solid #dce6ed;padding:10px;font-size:13px}td:not(:first-child){text-align:right}.total td{font-weight:800;background:#eefaf5}.positive{color:#008c5a;font-weight:800}.negative{color:#c83744;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.occupancy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:12px}.occupancy-card{border:1px solid #d8e3ef;border-radius:12px;padding:13px;background:linear-gradient(145deg,#fff,#f5fbff);break-inside:avoid}.occupancy-top{display:flex;align-items:center;gap:13px}.pie{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;position:relative;flex:0 0 auto;background:conic-gradient(#09a77a calc(var(--pct) * 1%),#e4edf3 0)}.pie::after{content:'';width:53px;height:53px;background:#fff;border-radius:50%;position:absolute}.pie b{z-index:1;font-size:12px;color:#0a7659}.occupancy-name{font-weight:800;font-size:13px;line-height:1.25}.occupancy-meta{font-size:11px;color:#607287;margin-top:8px}.occupancy-bar{height:5px;border-radius:99px;background:#e4edf3;margin-top:10px;overflow:hidden}.occupancy-bar span{display:block;height:100%;background:#00a879;border-radius:inherit}@media print{body{margin:16mm}.head{break-inside:avoid}}
   </style></head><body><div class="head"><div><div class="brand">UBY Recharge · Central UBY</div><h1>Relatório financeiro unificado da rede</h1><div class="sub">Competência: <strong>${escapeHtml(model.period)}</strong><br>Gerado em ${fmtDT(new Date())}</div></div><div class="badge">Prévia de fechamento</div></div>
-  <div class="kpis"><div class="kpi"><b>${fmtBRL(model.owned.revenue || 0)}</b><span>Faturamento de recargas</span></div><div class="kpi"><b>${fmtBRL(model.royalties)}</b><span>Royalties UBY</span></div><div class="kpi ${model.result >= 0 ? 'positive' : ''}"><b>${fmtBRL(model.result)}</b><span>Resultado consolidado</span></div><div class="kpi positive"><b>${fmtBRL(distribution.totalAllocated)}</b><span>Total devido aos cotistas</span></div></div>
+  <div class="kpis"><div class="kpi"><b>${fmtBRL(model.owned.revenue || 0)}</b><span>Faturamento de recargas</span></div><div class="kpi"><b>${fmtBRL(model.royalties)}</b><span>Royalties UBY</span></div><div class="kpi ${model.result >= 0 ? 'positive' : ''}"><b>${fmtBRL(model.result)}</b><span>${model.periodSelection?.isMonthView ? 'Resultado mensal da rede' : 'Resultado acumulado da rede'}</span></div><div class="kpi positive"><b>${fmtBRL(cotistasAmount)}</b><span>${cotistasLabel}</span></div></div>
   <section><h2>Ocupação da rede por carregador</h2><div class="sub">Energia entregue em relação à capacidade disponível no período. As operações parceiras aparecem para leitura operacional, mas não alteram a matriz de custos UBY.</div><div class="occupancy-grid">${occupancyCards.map(card => `<article class="occupancy-card"><div class="occupancy-top"><div class="pie" style="--pct:${card.pct.toFixed(2)}"><b>${fmtPct(card.rawPct)}</b></div><div><div class="occupancy-name">${escapeHtml(card.name)}</div><small>${escapeHtml(card.workName)}${card.partner ? ' · Parceiro UBY' : ''}</small></div></div><div class="occupancy-meta">${fmtKWh(card.energy)} entregues de ${fmtKWh(card.maxKWh)} disponíveis · ${card.hours.toFixed(0)} h</div><div class="occupancy-bar"><span style="width:${card.pct.toFixed(2)}%"></span></div></article>`).join('') || '<div class="sub">Sem base de ocupação disponível.</div>'}</div></section>
   <div class="grid"><section><h2>Receitas e resultado</h2><table><tbody>${dre.map(([label,value], index) => `<tr class="${index === dre.length - 1 ? 'total' : ''}"><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section><section><h2>Custos reconhecidos</h2><table><tbody>${costs.map(([label,value]) => `<tr><td>${escapeHtml(label)}</td><td>${fmtBRL(value || 0)}</td></tr>`).join('')}</tbody></table></section></div>
+  <section><h2>Resultado mensal da rede</h2><div class="sub">Histórico por competência: cada linha considera somente as receitas e os custos reconhecidos naquele mês.</div><table><thead><tr><th>Competência</th><th>Recargas UBY</th><th>Royalties</th><th>Marketing</th><th>Resultado operacional</th><th>Resultado da rede</th></tr></thead><tbody>${monthlyResults.map(item => `<tr class="${item.periodSelection?.monthKey === model.periodSelection?.monthKey ? 'total' : ''}"><td>${escapeHtml(item.period)}</td><td>${fmtBRL(item.owned.revenue || 0)}</td><td>${fmtBRL(item.royalties || 0)}</td><td>${fmtBRL(item.marketing || 0)}</td><td>${fmtBRL(item.operationalResult || 0)}</td><td class="${item.result >= 0 ? 'positive' : 'negative'}">${fmtBRL(item.result || 0)}</td></tr>`).join('') || '<tr><td colspan="6">Ainda não há competências financeiras.</td></tr>'}</tbody></table></section>
   <section><h2>Consolidação por carregador e parceiro</h2><table><thead><tr><th>Unidade</th><th>Faturamento</th><th>Custos / repasse</th><th>Resultado UBY</th></tr></thead><tbody>${stationRows}</tbody></table></section>
-  <section><h2>Distribuição de resultados · ${escapeHtml(model.policy.roundLabel)}</h2><table><tbody><tr><td>Resultado distribuível</td><td>${fmtBRL(model.distributable)}</td></tr><tr><td>Retenção — Reserva legal obrigatória da S.A. (${model.policy.legalReservePct}%)</td><td>${fmtBRL(model.legalReserve)}</td></tr><tr><td>Retenção — Fundo de reserva e expansão (${model.policy.expansionReservePct}%)</td><td>${fmtBRL(model.expansionReserve)}</td></tr><tr class="total"><td>Total devido aos cotistas (apurado por competência)</td><td>${fmtBRL(distribution.totalAllocated)}</td></tr></tbody></table></section>
+  <section><h2>Distribuição de resultados · ${escapeHtml(model.policy.roundLabel)}</h2><table><tbody><tr><td>Resultado distribuível</td><td>${fmtBRL(model.distributable)}</td></tr><tr><td>Retenção — Reserva legal obrigatória da S.A. (${model.policy.legalReservePct}%)</td><td>${fmtBRL(model.legalReserve)}</td></tr><tr><td>Retenção — Fundo de reserva e expansão (${model.policy.expansionReservePct}%)</td><td>${fmtBRL(model.expansionReserve)}</td></tr><tr class="total"><td>${cotistasLabel}</td><td>${fmtBRL(cotistasAmount)}</td></tr></tbody></table></section>
   <section><h2>Apuração por aporte</h2><table><thead><tr><th>Cotista</th><th>Cotas</th><th>Início</th><th>Total devido</th><th>Situação</th></tr></thead><tbody>${distribution.investors.map(investor => `<tr><td>${escapeHtml(investor.name)}</td><td>${investor.quotas}</td><td>${escapeHtml(monthLabel(investor.eligibleFrom))}</td><td>${fmtBRL(investor.due)}</td><td>${escapeHtml(investor.status)}</td></tr>`).join('')}</tbody></table><div class="sub">Cada competência é dividida apenas entre as cotas habilitadas naquele mês. Conferência: ${distribution.valid ? 'fechada' : 'pendente de ajuste'}.</div></section>
   <div class="note">Marketing e contratos entram somente no fechamento financeiro; não compõem ocupação, média de recargas, projeção operacional nem faturamento principal de recargas. Parceiros ficam fora da matriz de custos UBY: somente os royalties devidos à UBY são reconhecidos neste relatório. Conferir notas fiscais, impostos e aprovação do fechamento antes de contabilizar ou realizar pagamentos.</div><script>setTimeout(()=>window.print(),350)<\/script></body></html>`);
   printable.document.close();
@@ -11108,7 +11122,7 @@ async function exportUbyNetworkFinanceXlsx() {
   const sourceRows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
   const sourceMonths = [...new Set(sourceRows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => key !== 'unknown'))].sort();
   if (!sourceMonths.length) return alert('Não há recargas financeiras carregadas para exportar. Clique em Atualizar e tente novamente.');
-  const selected = networkUnifiedReportModel({ accumulated: true });
+  const selected = networkUnifiedReportModel();
   const monthly = sourceMonths.map(monthKey => {
     const rows = sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, true, monthKey));
     const ownedRows = rows.filter(row => ['uby', 'hybrid'].includes(normalizeOperationModel(row.finance?.operationModel)));
@@ -11136,7 +11150,9 @@ async function exportUbyNetworkFinanceXlsx() {
     ['Tributos diretamente atribuíveis aos carregadores', Number(selected.owned.taxes || 0)],
     ['Tributos corporativos centralizados (dentro do rateio)', Number(selected.owned.matrizTaxCost || 0)],
     ['Demais custos centralizados da matriz', Math.max(0, Number(selected.owned.matrizCost || 0) - Number(selected.owned.matrizTaxCost || 0))],
-    ['Gestão, plataforma e participação de área', Number(selected.owned.management || 0) + Number(selected.owned.platform || 0) + Number(selected.owned.areaParticipation || 0)],
+    ['Gestão P3', Number(selected.owned.management || 0)],
+    ['App / plataforma', Number(selected.owned.platform || 0)],
+    ['Participação de área', Number(selected.owned.areaParticipation || 0)],
     ['Resultado operacional UBY', Number(selected.operationalResult || 0)],
     ['Resultado consolidado da rede', Number(selected.result || 0)],
     ['Resultado distribuível', Number(selected.distributable || 0)],
@@ -11153,9 +11169,9 @@ async function exportUbyNetworkFinanceXlsx() {
     ['Retenção — Reserva legal obrigatória da S.A.', Number(policy.legalReservePct || 0) / 100],
     ['Retenção — Fundo de reserva e expansão', Number(policy.expansionReservePct || 0) / 100]
   ];
-  const monthlyRows = [['MÊS', 'FATURAMENTO RECARGAS', 'ENERGIA kWh', 'CUSTO ENERGIA', 'MATRIZ RATEADA', 'TRIBUTOS DIRETOS', 'TRIBUTOS CENTRALIZADOS', 'ROYALTIES', 'MARKETING', 'RESULTADO OPERACIONAL', 'RESULTADO REDE']];
+  const monthlyRows = [['MÊS', 'FATURAMENTO RECARGAS', 'ENERGIA kWh', 'CUSTO ENERGIA', 'MATRIZ RATEADA', 'TRIBUTOS DIRETOS', 'TRIBUTOS CENTRALIZADOS', 'GESTÃO P3', 'APP / PLATAFORMA', 'PARTICIPAÇÃO DE ÁREA', 'ROYALTIES', 'MARKETING', 'RESULTADO OPERACIONAL', 'RESULTADO REDE']];
   monthly.forEach(item => monthlyRows.push([
-    monthLabel(item.monthKey), Number(item.owned.revenue || 0), Number(item.owned.energy || 0), Number(item.owned.energyCost || 0), Number(item.owned.matrizCost || 0), Number(item.owned.taxes || 0), Number(item.owned.matrizTaxCost || 0), Number(item.royalties || 0), Number(item.owned.marketingRevenue || 0), Number(item.owned.operationNet || 0), Number(item.result || 0)
+    monthLabel(item.monthKey), Number(item.owned.revenue || 0), Number(item.owned.energy || 0), Number(item.owned.energyCost || 0), Number(item.owned.matrizCost || 0), Number(item.owned.taxes || 0), Number(item.owned.matrizTaxCost || 0), Number(item.owned.management || 0), Number(item.owned.platform || 0), Number(item.owned.areaParticipation || 0), Number(item.royalties || 0), Number(item.owned.marketingRevenue || 0), Number(item.owned.operationNet || 0), Number(item.result || 0)
   ]));
   const unitsRows = [['UNIDADE', 'OBRA', 'MODELO', 'PERÍODOS', 'FATURAMENTO', 'ENERGIA kWh', 'CUSTO TOTAL', 'MATRIZ RATEADA', 'IMPOSTOS', 'ROYALTY UBY', 'RESULTADO UBY']];
   sourceRows.map(row => aggregateUbyFinanceRow(row, sourceMonths, false, '')).forEach(row => {
@@ -11174,7 +11190,7 @@ async function exportUbyNetworkFinanceXlsx() {
   distributionRows.push(['COTISTA', 'COTAS', 'INÍCIO', ...distribution.months.map(month => monthLabel(month.monthKey)), 'TOTAL DEVIDO', 'APORTE', 'RETORNO ACUMULADO', 'ANUALIZADO SIMPLES', 'PAYBACK INDICATIVO', 'SITUAÇÃO']);
   distribution.investors.forEach(investor => distributionRows.push([investor.name, investor.quotas, monthLabel(investor.eligibleFrom), ...investor.allocations.map(value => Number(value || 0)), Number(investor.due || 0), Number(investor.investment || 0), Number(investor.returnRate || 0), Number(investor.annualized || 0), investor.paybackYears || '', investor.status]));
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, summaryRows, [42, 22]), 'Resumo e DRE');
-  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, monthlyRows, [16, 20, 16, 17, 17, 17, 20, 15, 15, 22, 20]), 'Histórico mensal');
+  XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, monthlyRows, [16, 20, 16, 17, 17, 17, 20, 16, 18, 20, 15, 15, 22, 20]), 'Histórico mensal');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, unitsRows, [31, 25, 22, 10, 16, 15, 16, 17, 13, 15, 16]), 'Por unidade');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, matrixRows, [34, 18, 42]), 'Custos matriz');
   XLSX.utils.book_append_sheet(workbook, ubyExportSheet(XLSX, distributionRows, [28, 12, 16, ...distribution.months.map(() => 16), 18, 18, 18, 20, 20, 14]), 'Distribuição Rodada 1');
