@@ -7984,7 +7984,8 @@ function recurringAbsentClients(charges = [], recentDays = 7, minSessions = 2) {
       item.avgTicket = item.count ? item.revenue / item.count : 0;
       return item;
     })
-    .sort((a, b) => b.count - a.count || b.daysAbsent - a.daysAbsent || b.revenue - a.revenue);
+    // Quem mais faturou historicamente vem primeiro: é a ausência com maior valor em risco.
+    .sort((a, b) => b.revenue - a.revenue || b.count - a.count || b.daysAbsent - a.daysAbsent);
 }
 
 function renderOperationQuality(prefix = 'usage', charges = []) {
@@ -8021,7 +8022,7 @@ function renderAbsentClientAlerts(prefix = 'usage', charges = []) {
   const topLines = absent.slice(0, 8).map(client => `
     <div class="metric-line">
       <strong>${escapeHtml(client.name.split(' ').slice(0, 2).join(' '))}</strong>
-      <span>${client.count} recarga(s), ${fmtKWh(client.energy)}, ticket ${fmtBRL(client.avgTicket)} · última ${fmtDateOnly(client.lastDate)}${client.station ? ` · ${escapeHtml(client.station)}` : ''}</span>
+      <span>histórico ${fmtBRL(client.revenue)} · ${client.count} recarga(s), ${fmtKWh(client.energy)}, ticket ${fmtBRL(client.avgTicket)} · última ${fmtDateOnly(client.lastDate)}${client.station ? ` · ${escapeHtml(client.station)}` : ''}</span>
       <b class="warn">${client.daysAbsent}d</b>
     </div>
   `).join('');
@@ -8031,7 +8032,7 @@ function renderAbsentClientAlerts(prefix = 'usage', charges = []) {
       <div class="metric-mini"><span>Base recorrente Spott</span><strong>${activeRecurring.recurring}</strong><span>${fmtPct(activeRecurring.pct)} dos clientes já voltaram</span></div>
       <div class="metric-mini"><span>Critério</span><strong>2+</strong><span>recargas Spott válidas no histórico</span></div>
     </div>
-    <div class="note">${spottCharges.length ? (absent.length ? 'Lista calculada somente pelas planilhas Spott para evitar falso ausente quando o mesmo cliente aparece com outro cadastro na Move.' : 'Nenhum cliente recorrente da base Spott deixou de aparecer nos últimos 7 dias.') : 'Ainda não há recargas Spott no histórico para calcular ausências.'}</div>
+    <div class="note">${spottCharges.length ? (absent.length ? 'Lista calculada somente pelas planilhas Spott e ordenada por faturamento histórico, para priorizar quem está ausente com maior valor comprovado. Isso evita falso ausente quando o mesmo cliente aparece com outro cadastro na Move.' : 'Nenhum cliente recorrente da base Spott deixou de aparecer nos últimos 7 dias.') : 'Ainda não há recargas Spott no histórico para calcular ausências.'}</div>
     <div class="metric-lines">${topLines || '<div class="metric-line"><strong>OK</strong><span>Clientes recorrentes Spott continuam aparecendo no período recente.</span><b class="good">0</b></div>'}</div>
   `;
 }
@@ -8103,6 +8104,24 @@ function clientStationKey(charge = {}) {
   return `${workId || normalizeStationForCompare(station)}|${normalizeStationForCompare(station)}`;
 }
 
+function clientStationLabel(charge = {}) {
+  return safeText(canonicalStationNameForWork(charge.workId, charge.station, charge.workName) || charge.station || charge.workName || 'ESTAÇÃO').trim().toUpperCase();
+}
+
+function abbreviatedStationLabel(label = '') {
+  const normalized = safeText(label).trim().toUpperCase()
+    .replace(/^UBY\s+RECHARGE\s*-?\s*/, '')
+    .replace(/^POSTO\s+/, '');
+  return normalized.length > 20 ? `${normalized.slice(0, 18).trim()}…` : (normalized || 'ESTAÇÃO');
+}
+
+function uniqueClientStationLabels(charges = [], client = '') {
+  return [...new Set(charges
+    .filter(charge => clientKeyFromCharge(charge) === client)
+    .map(clientStationLabel)
+    .filter(Boolean))];
+}
+
 function firstChargeByClient(charges = [], byStation = false) {
   const first = {};
   charges
@@ -8144,14 +8163,26 @@ function newClientInsights(charges = [], stationHistory = charges, networkHistor
     else if (firstInPeriod(firstStationCharge, client)) newStationExisting.push(firstStationCharge);
     if ((stationsByClient[client]?.size || 0) > 1) multiStation.add(client);
   });
-  const toRow = charge => ({
-    name: charge.userName || charge.userEmail || 'Cliente sem nome',
-    phone: charge.userPhone || '',
-    email: charge.userEmail || '',
-    firstDate: charge.startDate,
-    revenue: Number(charge.revenue || 0),
-    energy: Number(charge.energyKWh || 0)
-  });
+  const toRow = charge => {
+    const client = clientKeyFromCharge(charge);
+    const startedAt = clientStationLabel(charge);
+    const allStations = uniqueClientStationLabels(globalHistory, client);
+    const previousStations = [...new Set(globalHistory
+      .filter(item => clientKeyFromCharge(item) === client && item.startDate && item.startDate < charge.startDate)
+      .map(clientStationLabel)
+      .filter(label => label && label !== startedAt))];
+    return {
+      name: charge.userName || charge.userEmail || 'Cliente sem nome',
+      phone: charge.userPhone || '',
+      email: charge.userEmail || '',
+      firstDate: charge.startDate,
+      revenue: Number(charge.revenue || 0),
+      energy: Number(charge.energyKWh || 0),
+      startedAt,
+      previousStations,
+      allStations
+    };
+  };
   return {
     newNetwork: newNetwork.map(toRow).sort((a, b) => b.firstDate - a.firstDate),
     newStationExisting: newStationExisting.map(toRow).sort((a, b) => b.firstDate - a.firstDate),
@@ -8168,10 +8199,16 @@ function renderNewClients(prefix = 'usage', charges = [], historyCharges = charg
     ...insight.newStationExisting.map(row => ({ ...row, type: 'Novo nesta estacao' }))
   ];
   const withPhone = rows.filter(row => row.phone).length;
+  const stationTrail = row => {
+    const all = row.allStations.map(abbreviatedStationLabel).join(' · ') || abbreviatedStationLabel(row.startedAt);
+    if (row.type === 'Novo na rede UBY') return `Começou na rede: ${abbreviatedStationLabel(row.startedAt)} · usa: ${all}`;
+    const previous = row.previousStations.map(abbreviatedStationLabel).join(' · ') || 'histórico anterior identificado';
+    return `Já usava: ${previous} · começou a usar: ${abbreviatedStationLabel(row.startedAt)} · usa: ${all}`;
+  };
   const topLines = rows.slice(0, 12).map(row => `
     <div class="metric-line">
       <strong>${escapeHtml(row.name)}</strong>
-      <span>${escapeHtml(row.type)}${row.type === 'Novo nesta estacao' ? ' · ja usava a rede' : ''}${row.phone ? ` · Tel: ${escapeHtml(row.phone)}` : ''}</span>
+      <span>${escapeHtml(row.type)} · ${escapeHtml(stationTrail(row))}${row.phone ? ` · Tel: ${escapeHtml(row.phone)}` : ''}</span>
       <b>${fmtDT(row.firstDate)}</b>
     </div>
   `).join('');
@@ -8182,9 +8219,74 @@ function renderNewClients(prefix = 'usage', charges = [], historyCharges = charg
       <div class="metric-mini"><span>Usam mais de uma estacao</span><strong>${insight.multiStation}</strong><span>ativos do periodo</span></div>
       <div class="metric-mini"><span>Com telefone</span><strong>${withPhone}</strong><span>${rows.length ? fmtPct(withPhone / rows.length * 100) : '0,00%'} das entradas</span></div>
     </div>
-    <div class="note">Falhas e sessoes proximas de zero nao entram em aquisicao. “Novo nesta estacao” indica expansao ou migracao de uso, nao aquisicao nova da rede.</div>
+    <div class="note">Falhas e sessões próximas de zero não entram em aquisição. A trilha informa onde já usava, onde começou a usar no período e as estações conhecidas de forma abreviada.</div>
     <div class="metric-lines">${topLines || '<div class="metric-line"><strong>Sem novas entradas</strong><span>Nenhum primeiro uso de rede ou de estacao identificado neste periodo.</span><b>0</b></div>'}</div>
   `;
+}
+
+function monthlyClientCohorts(historyCharges = []) {
+  const byClient = {};
+  historyCharges
+    .filter(isExecutedCharge)
+    .filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()))
+    .slice()
+    .sort((a, b) => a.startDate - b.startDate)
+    .forEach(charge => {
+      const client = clientKeyFromCharge(charge);
+      if (client) (byClient[client] ||= []).push(charge);
+    });
+  const cohorts = {};
+  Object.values(byClient).forEach(clientCharges => {
+    const first = clientCharges[0];
+    const key = monthKey(first.startDate);
+    if (!key || key === 'unknown') return;
+    const cohort = cohorts[key] ||= { key, newClients: 0, recurring: 0, firstRevenue: 0 };
+    cohort.newClients += 1;
+    cohort.firstRevenue += Number(first.revenue || 0);
+    if (clientCharges.some(charge => rechargeUniqueKey(charge) !== rechargeUniqueKey(first) && charge.startDate > first.startDate)) cohort.recurring += 1;
+  });
+  return Object.values(cohorts).sort((a, b) => b.key.localeCompare(a.key));
+}
+
+function renderMonthlyClientCohorts(prefix = 'usage', historyCharges = []) {
+  const el = document.getElementById(`${prefix}ClientCohorts`);
+  if (!el) return;
+  const cohorts = monthlyClientCohorts(historyCharges);
+  if (!cohorts.length) {
+    el.innerHTML = '<div class="note">Ainda não há histórico suficiente para formar as coortes mensais de novos clientes.</div>';
+    return;
+  }
+  el.innerHTML = `<div class="metric-strip">${cohorts.map(cohort => {
+    const rate = cohort.newClients ? cohort.recurring / cohort.newClients * 100 : 0;
+    const pending = cohort.newClients - cohort.recurring;
+    return `<div class="metric-mini ${cohort.recurring ? 'good' : ''}">
+      <span>${escapeHtml(monthLabel(cohort.key))}</span>
+      <strong>${cohort.newClients} novo(s)</strong>
+      <span>${cohort.recurring} viraram recorrentes · ${fmtPct(rate)}</span>
+      <span>${pending} ainda sem retorno · 1ª recarga: ${fmtBRL(cohort.firstRevenue)}</span>
+    </div>`;
+  }).join('')}</div>
+  <div class="note">Coorte mensal: o cliente entra no mês da primeira recarga válida e vira recorrente quando realiza outra recarga em data posterior. Os números usam o histórico salvo, não apenas o filtro atual.</div>`;
+}
+
+function renderNetworkIntelligence(prefix = 'usage', charges = [], historyCharges = charges) {
+  const el = document.getElementById(`${prefix}NetworkIntelligence`);
+  if (!el) return;
+  const rows = dailyOperationalRows(charges, historyCharges);
+  const latest = rows.at(-1);
+  const seven = rangeRevenue(rows, 7, 0);
+  const previous = rangeRevenue(rows, 7, 7);
+  const growth = pctChange(seven.revenue, previous.revenue);
+  const recurrence = clientRecurrenceStats(historyCharges.filter(isExecutedCharge));
+  const absent = recurringAbsentClients(historyCharges.filter(isSpottRecharge), 7, 2);
+  const failures = recentCharges(charges, 7).charges.filter(isFailedCharge).length;
+  const messages = [];
+  if (latest) messages.push({ level: latest.growthPct >= 0 ? 'good' : 'warn', title: 'Ritmo mais recente', text: `${fmtBRL(latest.revenue)} em ${latest.label}; variação de ${latest.growthPct >= 0 ? '+' : ''}${fmtPct(latest.growthPct)} frente ao dia anterior.` });
+  messages.push({ level: growth >= 0 ? 'good' : 'warn', title: 'Tendência de 7 dias', text: `${growth >= 0 ? '+' : ''}${fmtPct(growth)}: ${fmtBRL(seven.revenue)} nos últimos 7 dias versus ${fmtBRL(previous.revenue)} no período anterior.` });
+  messages.push({ level: recurrence.pct >= 30 ? 'good' : 'priority', title: 'Recorrência', text: `${recurrence.recurring} de ${recurrence.total} clientes históricos voltaram (${fmtPct(recurrence.pct)}).` });
+  if (absent.length) messages.push({ level: 'warn', title: 'Recuperação de receita', text: `${absent.length} recorrente(s) Spott estão ausentes há 7+ dias; a lista está priorizada por faturamento histórico.` });
+  if (failures) messages.push({ level: 'warn', title: 'Operação', text: `${failures} falha(s) nos últimos 7 dias exigem checagem antes de campanhas.` });
+  el.innerHTML = `<div class="note">Leitura automática com dados registrados da rede — não inventa previsão e não altera o financeiro.</div><div class="metric-lines">${messages.map(item => `<div class="metric-line"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.text)}</span><b class="${item.level === 'warn' ? 'warn' : item.level === 'good' ? 'good' : ''}">${item.level === 'warn' ? 'Ação' : 'Leitura'}</b></div>`).join('')}</div>`;
 }
 
 function renderDailyOperationalMetrics(prefix = 'usage', charges = [], historyCharges = charges) {
@@ -8529,6 +8631,9 @@ async function renderUsageInsights(charges = [], prefix = 'usage', historyCharge
   renderOperationalHealth(prefix, charges);
   renderNewClients(prefix, charges, historyCharges, options.networkHistory || networkHistoryCharges(historyCharges));
   renderAbsentClientAlerts(prefix, historyCharges);
+  const intelligenceHistory = options.intelligenceHistory || historyCharges;
+  renderMonthlyClientCohorts(prefix, options.cohortHistory || intelligenceHistory);
+  renderNetworkIntelligence(prefix, charges, intelligenceHistory);
   await yieldToBrowser();
   renderOperationalCalendar(prefix, charges, historyCharges, { ...(options.calendar || {}), bounds: weekdayBounds });
   renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
@@ -11558,7 +11663,9 @@ async function renderUbyOperation() {
   scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower },
     weekdayPower: calendarPower,
-    weekdayBounds: { start: firstPeriod, end: lastPeriod }
+    weekdayBounds: { start: firstPeriod, end: lastPeriod },
+    cohortHistory: sourceUbyCharges,
+    intelligenceHistory: sourceUbyCharges
   }));
 
   const chartRows = [...included].sort((a, b) => b.revenue - a.revenue);
