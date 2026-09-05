@@ -8292,13 +8292,16 @@ function renderNetworkIntelligence(prefix = 'usage', charges = [], historyCharge
   const latest = rows.at(-1);
   const seven = rangeRevenue(rows, 7, 0);
   const previous = rangeRevenue(rows, 7, 7);
-  const growth = pctChange(seven.revenue, previous.revenue);
+  const hasPreviousWeek = previous.count > 0 || previous.revenue > 0;
+  const growth = hasPreviousWeek ? pctChange(seven.revenue, previous.revenue) : 0;
   const recurrence = clientRecurrenceStats(historyCharges.filter(isExecutedCharge));
   const absent = recurringAbsentClients(historyCharges.filter(isSpottRecharge), 7, 2);
   const failures = recentCharges(charges, 7).charges.filter(isFailedCharge).length;
   const messages = [];
   if (latest) messages.push({ level: latest.growthPct >= 0 ? 'good' : 'warn', title: 'Ritmo mais recente', text: `${fmtBRL(latest.revenue)} em ${latest.label}; variação de ${latest.growthPct >= 0 ? '+' : ''}${fmtPct(latest.growthPct)} frente ao dia anterior.` });
-  messages.push({ level: growth >= 0 ? 'good' : 'warn', title: 'Tendência de 7 dias', text: `${growth >= 0 ? '+' : ''}${fmtPct(growth)}: ${fmtBRL(seven.revenue)} nos últimos 7 dias versus ${fmtBRL(previous.revenue)} no período anterior.` });
+  messages.push(hasPreviousWeek
+    ? { level: growth >= 0 ? 'good' : 'warn', title: 'Tendência de 7 dias', text: `${growth >= 0 ? '+' : ''}${fmtPct(growth)}: ${fmtBRL(seven.revenue)} nos últimos 7 dias versus ${fmtBRL(previous.revenue)} no período anterior.` }
+    : { level: 'priority', title: 'Tendência de 7 dias', text: `${fmtBRL(seven.revenue)} nos últimos 7 dias. Aguardando o histórico anterior confirmado para comparar, sem exibir variação artificial.` });
   messages.push({ level: recurrence.pct >= 30 ? 'good' : 'priority', title: 'Recorrência', text: `${recurrence.recurring} de ${recurrence.total} clientes históricos voltaram (${fmtPct(recurrence.pct)}).` });
   if (absent.length) messages.push({ level: 'warn', title: 'Recuperação de receita', text: `${absent.length} recorrente(s) Spott estão ausentes há 7+ dias; a lista está priorizada por faturamento histórico.` });
   if (failures) messages.push({ level: 'warn', title: 'Operação', text: `${failures} falha(s) nos últimos 7 dias exigem checagem antes de campanhas.` });
@@ -8459,8 +8462,10 @@ function renderDecisionCockpit(cockpitId, growthId, actionId, unitData = [], cha
   const p3 = rangeRevenue(rows, 3, 3);
   const r7 = rangeRevenue(rows, 7, 0);
   const p7 = rangeRevenue(rows, 7, 7);
-  const growth3 = pctChange(r3.revenue, p3.revenue);
-  const growth7 = pctChange(r7.revenue, p7.revenue);
+  const hasPrevious3 = p3.count > 0 || p3.revenue > 0;
+  const hasPrevious7 = p7.count > 0 || p7.revenue > 0;
+  const growth3 = hasPrevious3 ? pctChange(r3.revenue, p3.revenue) : 0;
+  const growth7 = hasPrevious7 ? pctChange(r7.revenue, p7.revenue) : 0;
   const recurrence = clientRecurrenceStats(charges);
   const failed7 = recentCharges(charges, 7).charges.filter(isFailedCharge).length;
   const unitScores = activeUnits.map(unit => {
@@ -8472,19 +8477,19 @@ function renderDecisionCockpit(cockpitId, growthId, actionId, unitData = [], cha
     const weight = { warn: 2, priority: 1, good: 0 };
     return (weight[b.action.level] || 0) - (weight[a.action.level] || 0) || b.unit.revenue - a.unit.revenue;
   });
-  const growthClass = value => value >= 0 ? 'good' : 'warn';
-  const growthText = value => `${value >= 0 ? '+' : ''}${fmtPct(value)}`;
+  const growthClass = (value, hasComparison = true) => !hasComparison ? 'priority' : (value >= 0 ? 'good' : 'warn');
+  const growthText = (value, hasComparison = true) => hasComparison ? `${value >= 0 ? '+' : ''}${fmtPct(value)}` : 'Sem base anterior';
   const primaryAction = actionPriority[0];
   cockpit.innerHTML = `
-    <div class="decision-card ${growthClass(growth7)}">
+    <div class="decision-card ${growthClass(growth7, hasPrevious7)}">
       <div class="label">Ritmo da rede</div>
-      <strong>${growthText(growth7)} em 7 dias</strong>
-      <p>${fmtBRL(r7.revenue)} nos últimos 7 dias contra ${fmtBRL(p7.revenue)} nos 7 dias anteriores.</p>
+      <strong>${growthText(growth7, hasPrevious7)} em 7 dias</strong>
+      <p>${hasPrevious7 ? `${fmtBRL(r7.revenue)} nos últimos 7 dias contra ${fmtBRL(p7.revenue)} nos 7 dias anteriores.` : `${fmtBRL(r7.revenue)} nos últimos 7 dias. Histórico anterior ainda não confirmado; não há variação artificial.`}</p>
     </div>
-    <div class="decision-card ${growthClass(growth3)}">
+    <div class="decision-card ${growthClass(growth3, hasPrevious3)}">
       <div class="label">Curto prazo</div>
-      <strong>${growthText(growth3)} em 3 dias</strong>
-      <p>${fmtBRL(r3.revenue)} nos últimos 3 dias. Bom para ver reação rápida a campanhas e falhas.</p>
+      <strong>${growthText(growth3, hasPrevious3)} em 3 dias</strong>
+      <p>${hasPrevious3 ? `${fmtBRL(r3.revenue)} nos últimos 3 dias. Bom para ver reação rápida a campanhas e falhas.` : `${fmtBRL(r3.revenue)} nos últimos 3 dias. Sem comparação até o histórico anterior ser confirmado.`}</p>
     </div>
     <div class="decision-card priority">
       <div class="label">Clientes</div>
@@ -11517,9 +11522,12 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
 // re-renderiza a aba quando ele chega. O painel abre já com o mês atual (rápido)
 // e o gráfico de evolução mensal preenche os meses anteriores em seguida.
 function ensureOverviewHistoryThenRerender(tabId, rerender) {
-  if (overviewSessionsFullyHydrated || overviewSessionsHydrationPromise) return;
   if (!window.UBY_SUPABASE?.loadRechargeSessions) return;
-  ensureAllOverviewSessionsLoaded()
+  if (overviewSessionsFullyHydrated) return;
+  // Mesmo se outra aba já iniciou o carregamento, esta aba precisa se
+  // inscrever no término para não continuar mostrando apenas o mês atual.
+  const hydration = overviewSessionsHydrationPromise || ensureAllOverviewSessionsLoaded();
+  hydration
     .then(() => {
       if (document.getElementById(tabId)?.style.display !== 'none') rerender();
     })
@@ -11843,23 +11851,29 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
         await yieldToBrowser();
       }
       if (refreshSequence !== generalRefreshSequence) return;
-      const chargesByWork = new Map(ids.map(id => [id, []]));
-      normalizedRows.forEach(charge => {
-        const id = String(charge.workId || '');
-        if (!chargesByWork.has(id)) chargesByWork.set(id, []);
-        chargesByWork.get(id).push(charge);
-      });
-      const compactRecords = (summaries || []).map(record => ({
-        ...record,
-        charges: chargesByWork.get(String(record.workId || '')) || [],
-        summaryOnly: false,
-        partialDetails: true,
-        normalized: true
-      }));
-      mergeCloudRechargeRecords(compactRecords);
-      window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`general-records:${currentMonthStart.slice(0, 7)}`, compactRecords).catch(() => {});
-      hydratedCount = compactRecords.length;
-      overviewSessionsFullyHydrated = false;
+      // O carregamento rápido traz somente o mês atual. Se o histórico completo
+      // chegou enquanto esta consulta estava em andamento, nunca podemos trocar
+      // a base completa por esse recorte — isso apagaria a comparação com o mês
+      // anterior até o próximo refresh.
+      if (!overviewSessionsFullyHydrated) {
+        const chargesByWork = new Map(ids.map(id => [id, []]));
+        normalizedRows.forEach(charge => {
+          const id = String(charge.workId || '');
+          if (!chargesByWork.has(id)) chargesByWork.set(id, []);
+          chargesByWork.get(id).push(charge);
+        });
+        const compactRecords = (summaries || []).map(record => ({
+          ...record,
+          charges: chargesByWork.get(String(record.workId || '')) || [],
+          summaryOnly: false,
+          partialDetails: true,
+          normalized: true
+        }));
+        mergeCloudRechargeRecords(compactRecords);
+        window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`general-records:${currentMonthStart.slice(0, 7)}`, compactRecords).catch(() => {});
+        hydratedCount = compactRecords.length;
+        overviewSessionsFullyHydrated = false;
+      }
       await yieldToBrowser();
     }
     if (refreshSequence !== generalRefreshSequence) return;
