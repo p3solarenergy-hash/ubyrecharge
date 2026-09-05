@@ -6952,6 +6952,22 @@ function dailyOperationalRows(charges = [], historyCharges = charges) {
   return rows;
 }
 
+// Métricas de curto prazo não podem reiniciar no dia 1. A referência é o
+// último dia do filtro atual, mas as recargas vêm do histórico contínuo para
+// que os 7 dias anteriores atravessem corretamente a virada de mês.
+function continuousOperationalRows(charges = [], historyCharges = charges, days = 14) {
+  const selected = charges.filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()));
+  const history = (historyCharges?.length ? historyCharges : charges)
+    .filter(charge => charge.startDate && !Number.isNaN(charge.startDate.getTime()));
+  if (!selected.length || !history.length) return [];
+  const end = new Date(Math.max(...selected.map(charge => charge.startDate)));
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(end);
+  start.setDate(start.getDate() - (Math.max(14, days) - 1));
+  start.setHours(0, 0, 0, 0);
+  return dailyOperationalRows(history.filter(charge => charge.startDate >= start && charge.startDate <= end), history);
+}
+
 const WEEKDAY_LABELS_BR = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 const WEEKDAY_ORDER_BR = [1, 2, 3, 4, 5, 6, 0];
 
@@ -8272,7 +8288,7 @@ function renderMonthlyClientCohorts(prefix = 'usage', historyCharges = []) {
 function renderNetworkIntelligence(prefix = 'usage', charges = [], historyCharges = charges) {
   const el = document.getElementById(`${prefix}NetworkIntelligence`);
   if (!el) return;
-  const rows = dailyOperationalRows(charges, historyCharges);
+  const rows = continuousOperationalRows(charges, historyCharges, 14);
   const latest = rows.at(-1);
   const seven = rangeRevenue(rows, 7, 0);
   const previous = rangeRevenue(rows, 7, 7);
@@ -8292,7 +8308,7 @@ function renderNetworkIntelligence(prefix = 'usage', charges = [], historyCharge
 function renderDailyOperationalMetrics(prefix = 'usage', charges = [], historyCharges = charges) {
   const el = document.getElementById(`${prefix}DailyMetrics`);
   if (!el) return;
-  const rows = dailyOperationalRows(charges, historyCharges);
+  const rows = continuousOperationalRows(charges, historyCharges, 30);
   if (!rows.length) {
     el.innerHTML = '<div class="note">Sem datas validas para calcular ritmo diario.</div>';
     return;
@@ -8426,7 +8442,7 @@ function actionForUnit(unit = {}, momentum = unitMomentum(unit)) {
   return { level: 'priority', label: 'Manter ritmo', detail: 'Operação estável. Monitorar recorrência e ticket médio.' };
 }
 
-function renderDecisionCockpit(cockpitId, growthId, actionId, unitData = [], charges = [], stationRows = [], emptyMessage = 'Suba as planilhas das unidades para o painel gerar decisao por crescimento, alerta e recorrencia.') {
+function renderDecisionCockpit(cockpitId, growthId, actionId, unitData = [], charges = [], stationRows = [], historyCharges = charges, emptyMessage = 'Suba as planilhas das unidades para o painel gerar decisao por crescimento, alerta e recorrencia.') {
   const cockpit = document.getElementById(cockpitId);
   const growthEl = document.getElementById(growthId);
   const actionEl = document.getElementById(actionId);
@@ -8438,7 +8454,7 @@ function renderDecisionCockpit(cockpitId, growthId, actionId, unitData = [], cha
     actionEl.innerHTML = '<div class="note">Sem alertas enquanto não houver recargas salvas.</div>';
     return;
   }
-  const rows = dailyOperationalRows(charges);
+  const rows = continuousOperationalRows(charges, historyCharges, 14);
   const r3 = rangeRevenue(rows, 3, 0);
   const p3 = rangeRevenue(rows, 3, 3);
   const r7 = rangeRevenue(rows, 7, 0);
@@ -8499,11 +8515,11 @@ function renderDecisionCockpit(cockpitId, growthId, actionId, unitData = [], cha
   `).join('');
 }
 
-function renderGeneralDecisionCockpit(unitData = [], charges = [], stationRows = []) {
-  renderDecisionCockpit('generalDecisionCockpit', 'generalGrowthRank', 'generalActionRank', unitData, charges, stationRows);
+function renderGeneralDecisionCockpit(unitData = [], charges = [], stationRows = [], historyCharges = charges) {
+  renderDecisionCockpit('generalDecisionCockpit', 'generalGrowthRank', 'generalActionRank', unitData, charges, stationRows, historyCharges);
 }
 
-function renderUbyDecisionCockpit(unitData = [], charges = [], stationRows = []) {
+function renderUbyDecisionCockpit(unitData = [], charges = [], stationRows = [], historyCharges = charges) {
   renderDecisionCockpit(
     'ubyDecisionCockpit',
     'ubyGrowthRank',
@@ -8511,6 +8527,7 @@ function renderUbyDecisionCockpit(unitData = [], charges = [], stationRows = [])
     unitData,
     charges,
     stationRows,
+    historyCharges,
     'Marque carregadores UBY ou suba as planilhas das unidades UBY para gerar decisao por crescimento, alerta e recorrencia.'
   );
 }
@@ -11659,7 +11676,7 @@ async function renderUbyOperation() {
   `;
 
   renderVisualSummary('ubyVisualSummary', allUbyCharges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceUbyCharges });
-  renderUbyDecisionCockpit([], allUbyCharges, included);
+  renderUbyDecisionCockpit([], allUbyCharges, included, sourceUbyCharges);
   scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower },
     weekdayPower: calendarPower,
@@ -11989,7 +12006,7 @@ async function renderGeral() {
   `;
   renderVisualSummary('generalVisualSummary', charges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceCharges });
   renderGeneralStationOccupancy(accumulatedStationRows);
-  renderGeneralDecisionCockpit(unitData, charges, stationRows);
+  renderGeneralDecisionCockpit(unitData, charges, stationRows, sourceCharges);
   scheduleOverviewInsights('geral', () => renderUsageInsights(charges, 'usageGeneral', sourceCharges, { calendar: { power: calendarPower }, weekdayPower: calendarPower, weekdayBounds: { start: firstPeriod, end: lastPeriod } }));
 
   const rankingMonthKeys = currentGeneralMonth ? [currentGeneralMonth] : months;
