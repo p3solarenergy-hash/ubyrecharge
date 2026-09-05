@@ -8269,7 +8269,7 @@ function renderMonthlyClientCohorts(prefix = 'usage', historyCharges = []) {
   if (!el) return;
   const cohorts = monthlyClientCohorts(historyCharges);
   if (!cohorts.length) {
-    el.innerHTML = '<div class="note">Ainda não há histórico suficiente para formar as coortes mensais de novos clientes.</div>';
+    el.innerHTML = '<div class="note">Ainda não há histórico suficiente para mostrar novos clientes e recorrência por mês.</div>';
     return;
   }
   el.innerHTML = `<div class="metric-strip">${cohorts.map(cohort => {
@@ -8282,7 +8282,7 @@ function renderMonthlyClientCohorts(prefix = 'usage', historyCharges = []) {
       <span>${pending} ainda sem retorno · 1ª recarga: ${fmtBRL(cohort.firstRevenue)}</span>
     </div>`;
   }).join('')}</div>
-  <div class="note">Coorte mensal: o cliente entra no mês da primeira recarga válida e vira recorrente quando realiza outra recarga em data posterior. Os números usam o histórico salvo, não apenas o filtro atual.</div>`;
+  <div class="note">Leitura mensal: o cliente entra no mês da primeira recarga válida e vira recorrente quando realiza outra recarga em data posterior. Os números usam o histórico salvo, não apenas o filtro atual.</div>`;
 }
 
 function renderNetworkIntelligence(prefix = 'usage', charges = [], historyCharges = charges) {
