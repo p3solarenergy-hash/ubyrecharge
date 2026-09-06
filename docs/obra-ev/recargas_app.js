@@ -1104,6 +1104,19 @@ function isRobertKochCandidateText(value = '') {
     text.includes('liv000199');
 }
 
+function dcStationIdentity(value = '') {
+  const text = normalizeStationForCompare(value);
+  if (!text) return '';
+  if (isRobertKochCandidateText(text)) return 'robert-koch';
+  if (text.includes('central jk') || text.includes('posto central jk')) return 'central-jk';
+  return '';
+}
+
+function dcWorkIdentity(workId = '', workName = '') {
+  if (isRobertKochWorkId(workId) || isRobertKochCandidateText(`${workId} ${workName}`)) return 'robert-koch';
+  return dcStationIdentity(`${workId} ${workName}`);
+}
+
 function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
   const raw = safeText(stationName || fallbackName).trim();
   const normalized = normalizeStationForCompare(raw);
@@ -1173,6 +1186,11 @@ function unifiedJardinsRecordForView(primaryRecord = {}, primaryWorkId = '') {
 }
 
 function stationBlockedForWork(workId, stationName) {
+  const sourceDc = dcStationIdentity(stationName);
+  const targetDc = dcWorkIdentity(workId, workNameById(workId));
+  // Central JK e Robert Koch compartilham o nome UBY Recharge. A coincidência
+  // genérica não pode permitir que uma exportação DC seja salva na outra obra.
+  if (sourceDc || targetDc) return sourceDc !== targetDc;
   const blockedTerms = RECHARGE_STATION_BLOCKLIST_BY_WORK[String(workId || '')] || [];
   if (!blockedTerms.length) return false;
   const stationText = normalizeStationForCompare(stationName);
@@ -1183,6 +1201,9 @@ function stationLooksRelatedToWork(station, workName) {
   const stationText = normalizeStationForCompare(station);
   const workText = normalizeStationForCompare(workName);
   if (!stationText || !workText) return true;
+  const sourceDc = dcStationIdentity(stationText);
+  const targetDc = dcWorkIdentity('', workText);
+  if (sourceDc || targetDc) return !!sourceDc && sourceDc === targetDc;
   if (isRobertKochCandidateText(`${stationText} ${workText}`) && (workText.includes('malassise') || isRobertKochCandidateText(workText))) return true;
   if (stationText.includes('santarem') && workText.includes('santarem')) return true;
   if (stationText.includes('jardins') && (workText.includes('centro') || workText.includes('santarem'))) return true;
@@ -2234,6 +2255,19 @@ function rechargeImportStationProfile(charges = []) {
 
 function confirmRechargeStationMismatch(charges = [], layout = {}, file = {}) {
   const profile = rechargeImportStationProfile(charges);
+  const targetDc = dcWorkIdentity(currentWorkId, currentWorkName);
+  const dcMismatch = profile.filter(item => {
+    const sourceDc = dcStationIdentity(item.station);
+    return (sourceDc || targetDc) && sourceDc !== targetDc;
+  });
+  if (dcMismatch.length) {
+    const found = dcMismatch.map(item => item.station).join(', ');
+    alert(
+      `Importação bloqueada: a planilha DC identifica ${found}, mas o destino selecionado é ${currentWorkName}.\n\n` +
+      'Central JK e Posto Robert Koch são bases independentes. Selecione a obra correspondente e tente novamente.'
+    );
+    return false;
+  }
   const mismatches = profile.filter(item =>
     stationBlockedForWork(currentWorkId, item.station) || !stationLooksRelatedToWork(item.station, currentWorkName)
   );
