@@ -11744,7 +11744,7 @@ async function renderUbyOperation() {
     <div class="unit-card">
       <div><strong>${escapeHtml(unit.stationName || unit.workName)}</strong><span>Obra: ${escapeHtml(unit.workName)} - ${unit.clients} cliente(s)</span></div>
       <div><div class="unit-value">${fmtBRL(unit.revenue)}</div><div class="unit-sub">${unit.count} recargas</div></div>
-      <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">${unit.kind.toUpperCase()} - ${unit.connType || 'sem conector'}</div></div>
+      <div><div class="unit-value">${fmtKWh(unit.energy)}</div><div class="unit-sub">energia entregue no período</div></div>
       ${unitOccupancyMarkup(unit, accessMonthKeys)}
       <div class="unit-actions"><button class="btn-open" onclick="openWorkReport('${escapeAttr(unit.workId)}','mensal','${escapeAttr(unit.stationName)}')">Abrir estacao</button></div>
     </div>
@@ -11778,7 +11778,7 @@ async function renderUbyOperation() {
     <tr>
       <td><input type="checkbox" ${row.included ? 'checked' : ''} onchange="toggleUbyOperation('${escapeAttr(row.workId)}','${escapeAttr(row.key)}',this.checked)"></td>
       <td>${escapeHtml(row.workName)}</td>
-      <td>${escapeHtml(row.station)}<br><span style="color:var(--p3-muted)">${escapeHtml(row.connType || 'Sem conector')}</span></td>
+      <td>${escapeHtml(row.station)}</td>
       <td>${row.kind.toUpperCase()}</td>
       <td>${row.count}</td>
       <td>${row.energy.toFixed(2).replace('.', ',')}</td>
