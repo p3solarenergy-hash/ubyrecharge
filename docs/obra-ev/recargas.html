@@ -234,10 +234,12 @@
     .uby-dashboard-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:20px 2px 10px; color:#BFEAD8; font-family:var(--ui-font); font-size:16px; font-weight:900; }
     .uby-dashboard-heading small { color:var(--p3-muted); font-family:inherit; font-size:11px; font-weight:600; text-align:right; }
     .uby-metrics-dashboard { display:grid; gap:18px; margin:22px 0; }
-    .uby-core-panels, .uby-bottom-panels { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .uby-core-panels { display:grid; grid-template-columns:1fr; gap:18px; }
+    .uby-bottom-panels { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
     .uby-metric-panel { overflow:hidden; border:1px solid var(--surface-border); border-radius:16px; background:linear-gradient(145deg,rgba(15,34,55,.98),rgba(8,20,35,.98)); box-shadow:var(--p3-shadow); }
     .uby-metric-panel.dc { border-color:rgba(87,183,255,.46); }
     .uby-metric-panel.ac { border-color:rgba(255,214,107,.38); background:linear-gradient(145deg,rgba(45,38,21,.48),rgba(10,23,38,.98)); }
+    .uby-metric-panel.ac.secondary { opacity:.82; }
     .uby-metric-panel.partner { border-color:rgba(161,117,255,.42); background:linear-gradient(145deg,rgba(47,28,78,.55),rgba(10,22,38,.98)); }
     .uby-metric-panel.revenue { border-color:rgba(0,232,137,.34); }
     .uby-panel-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:18px 18px 14px; border-bottom:1px solid rgba(126,157,190,.2); }
@@ -256,6 +258,11 @@
     .uby-metric-panel.partner .uby-panel-metric .value { color:#C9AAFF; }
     .uby-metric-panel.revenue .uby-panel-metric .value { color:#00E889; }
     .uby-panel-metric .sub { margin-top:7px; color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .uby-metric-comparison { display:inline-flex; align-items:center; gap:4px; margin-top:8px; padding:3px 6px; border:1px solid rgba(87,183,255,.24); border-radius:6px; color:#8BCBFF; background:rgba(87,183,255,.07); font-size:9px; font-weight:900; line-height:1.1; }
+    .uby-metric-comparison small { color:inherit; font-size:8px; font-weight:700; opacity:.78; }
+    .uby-metric-comparison.positive { color:#81E7B3; border-color:rgba(56,201,111,.28); background:rgba(56,201,111,.08); }
+    .uby-metric-comparison.negative { color:#FFA197; border-color:rgba(230,75,75,.28); background:rgba(230,75,75,.08); }
+    .uby-metric-comparison.neutral { color:var(--p3-muted); }
 .metric-card { display:flex; flex-direction:column; }
 .metric-card .metric-period-trend { align-self:flex-start; display:inline-flex; align-items:center; gap:5px; min-width:0; max-width:100%; margin-top:auto; padding:4px 6px; border-radius:7px; font-size:9px; line-height:1.1; font-weight:900; }
 .metric-card .metric-period-trend > span:last-child { display:grid; gap:1px; min-width:0; }
@@ -286,6 +293,8 @@
     .day-dc-unit-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-top:12px; }
     .day-dc-unit-metrics span { min-width:0; color:#57B7FF; font-size:14px; font-weight:900; white-space:nowrap; }
     .day-dc-unit-metrics small { display:block; margin-bottom:3px; color:var(--p3-muted); font-size:9px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+    /* Compatibilidade durante a atualização de cache: mantém o layout antigo legível. */
+    .day-dc-unit > span { display:inline-block; margin:12px 12px 0 0; color:#57B7FF; font-size:14px; font-weight:900; }
     .uby-panel-comparison { margin:0 17px 16px; padding:10px 11px; border:1px solid rgba(87,183,255,.26); border-radius:9px; background:rgba(87,183,255,.07); color:var(--p3-muted); font-size:11px; line-height:1.35; }
     .uby-panel-comparison strong { color:#BFEAD8; font-size:11px; }
     .uby-panel-comparison .uby-panel-comparison-values { display:flex; flex-wrap:wrap; gap:7px 13px; margin-top:6px; color:#57B7FF; font-weight:800; }
@@ -2191,6 +2200,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260903-unified-jardins1"></script>
+<script src="recargas_app.js?v=20260909-dc-focus2"></script>
 </body>
 </html>

@@ -11770,7 +11770,7 @@ async function renderUbyOperation() {
     const pct = Number(financeSettingsForUbyRow(row, financeScopeMonth).ubyRoyaltyPct || 0);
     return sum + Number(row.revenue || 0) * pct / 100;
   }, 0);
-  const metric = (label, value, sub = '', variant = '') => `<div class="uby-panel-metric ${variant}"><div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+  const metric = (label, value, sub = '', variant = '', comparison = '') => `<div class="uby-panel-metric ${variant}"><div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}${comparison}</div>`;
   // Os painéis principais comparam sempre um mês com o mesmo corte do mês
   // anterior. No acumulado, a referência continua sendo o último mês ativo,
   // para não comparar todo o histórico contra uma janela de tamanho diferente.
@@ -11793,25 +11793,46 @@ async function renderUbyOperation() {
       previous: summaryMetrics(previousCharges)
     };
   };
-  const comparisonValue = (label, current, previous, formatter) => {
+  const comparisonValue = (label, current, previous) => {
     if (!previous && !current) return `${label}: —`;
     if (!previous) return `${label}: nova base`;
     const delta = (current - previous) / Math.abs(previous) * 100;
     return `${label}: ${delta >= 0 ? '+' : ''}${fmtPct(delta)}`;
   };
+  const metricComparison = (current, previous, comparison, options = {}) => {
+    const inverse = !!options.inverse;
+    if (!comparison.hasBase || !Number.isFinite(Number(current)) || !Number.isFinite(Number(previous))) {
+      return '<span class="uby-metric-comparison neutral">• <small>sem base anterior</small></span>';
+    }
+    if (!previous && !current) return '<span class="uby-metric-comparison neutral">• <small>sem movimento</small></span>';
+    if (!previous) return '<span class="uby-metric-comparison positive">↗ nova base <small>vs mês anterior</small></span>';
+    const delta = (current - previous) / Math.abs(previous) * 100;
+    const favorable = inverse ? delta <= 0 : delta >= 0;
+    const arrow = delta > 0 ? '↗' : delta < 0 ? '↘' : '•';
+    return `<span class="uby-metric-comparison ${delta === 0 ? 'neutral' : (favorable ? 'positive' : 'negative')}">${arrow} ${delta >= 0 ? '+' : ''}${fmtPct(delta)} <small>vs mês anterior</small></span>`;
+  };
+  const daysCovered = charges => {
+    const dates = charges.map(charge => charge?.startDate).filter(date => date && !Number.isNaN(date.getTime()));
+    if (!dates.length) return 0;
+    return Math.max(1, Math.round((dateOnly(new Date(Math.max(...dates))) - dateOnly(new Date(Math.min(...dates)))) / 86_400_000) + 1);
+  };
   const panelComparison = comparison => `
     <div class="uby-panel-comparison">
       <strong>Comparativo mensal</strong> · ${comparison.label}
       <div class="uby-panel-comparison-values">
-        <span>${comparison.hasBase ? comparisonValue('Faturamento', comparison.current.revenue, comparison.previous.revenue, fmtBRL) : 'Faturamento: sem base'}</span>
-        <span>${comparison.hasBase ? comparisonValue('Energia', comparison.current.energy, comparison.previous.energy, fmtKWh) : 'Energia: sem base'}</span>
-        <span>${comparison.hasBase ? comparisonValue('Recargas', comparison.current.count, comparison.previous.count, String) : 'Recargas: sem base'}</span>
+        <span>${comparison.hasBase ? comparisonValue('Faturamento', comparison.current.revenue, comparison.previous.revenue) : 'Faturamento: sem base'}</span>
+        <span>${comparison.hasBase ? comparisonValue('Energia', comparison.current.energy, comparison.previous.energy) : 'Energia: sem base'}</span>
+        <span>${comparison.hasBase ? comparisonValue('Recargas', comparison.current.count, comparison.previous.count) : 'Recargas: sem base'}</span>
       </div>
     </div>`;
   const dcMonthlyComparison = monthlyPanelComparison(sourcePrimaryDcCharges);
   const acMonthlyComparison = monthlyPanelComparison(sourceIncluded
     .filter(row => row.kind === 'ac' && isOwnedUbyRow(row))
     .flatMap(row => row.charges));
+  const dcCurrentDaily = dcMonthlyComparison.current.count / daysCovered(dcMonthlyComparison.current.clean?.executed || []) || 0;
+  const dcPreviousDaily = dcMonthlyComparison.previous.count / daysCovered(dcMonthlyComparison.previous.clean?.executed || []) || 0;
+  const acCurrentDaily = acMonthlyComparison.current.count / daysCovered(acMonthlyComparison.current.clean?.executed || []) || 0;
+  const acPreviousDaily = acMonthlyComparison.previous.count / daysCovered(acMonthlyComparison.previous.clean?.executed || []) || 0;
   const firstPeriod = windows.length ? new Date(Math.min(...windows.map(window => window.start).filter(Boolean))) : firstDate;
   const lastPeriod = windows.length ? new Date(Math.max(...windows.map(window => window.end).filter(Boolean))) : lastDate;
   const viewLabel = monthFallbackToAccumulated
@@ -11837,36 +11858,36 @@ async function renderUbyOperation() {
         <header class="uby-panel-head"><div><h2>DC · rede rápida</h2><p>Ativos próprios UBY. Métricas que orientam a operação principal.</p></div><span class="uby-panel-tag">Foco principal</span></header>
         ${panelComparison(dcMonthlyComparison)}
         <div class="uby-panel-metrics">
-          ${metric('Ocupação DC', fmtPct(primaryDcOcc), `${dcCount} carregador(es) próprio(s)`)}
-          ${metric('Faturamento DC', fmtBRL(primaryDcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)), `${primaryDcCharges.length} recarga(s)`)}
-          ${metric('Energia DC', fmtKWh(primaryDcEnergy), 'energia entregue no período')}
-          ${metric('Clientes DC', String(new Set(primaryDcCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size), 'clientes atendidos em DC')}
-          ${metric('R$ médio / recarga', fmtBRL(dcCleanStats.avgTicket), `${dcCleanStats.executed.length} recarga(s) válida(s)`)}
-          ${metric('kWh médio / recarga', `${dcCleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh`, 'somente sessões válidas')}
-          ${metric('Tempo médio', formatRechargeDuration(dcAvgDuration), `${dcValidDurations.length} sessão(ões) com duração`)}
-          ${metric('Média por dia', averageDcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1}), dailyDcBreakdown || 'recargas DC por dia')}
-          ${metric('Falhas DC', String(dcCleanStats.failed.length), `${primaryDcCharges.length ? fmtPct(dcCleanStats.failed.length / primaryDcCharges.length * 100) : '0,00%'} das tentativas`)}
+          ${metric('Ocupação DC', fmtPct(primaryDcOcc), `${dcCount} carregador(es) próprio(s)`, '', metricComparison(dcMonthlyComparison.current.energy, dcMonthlyComparison.previous.energy, dcMonthlyComparison))}
+          ${metric('Faturamento DC', fmtBRL(primaryDcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)), `${primaryDcCharges.length} recarga(s)`, '', metricComparison(dcMonthlyComparison.current.revenue, dcMonthlyComparison.previous.revenue, dcMonthlyComparison))}
+          ${metric('Energia DC', fmtKWh(primaryDcEnergy), 'energia entregue no período', '', metricComparison(dcMonthlyComparison.current.energy, dcMonthlyComparison.previous.energy, dcMonthlyComparison))}
+          ${metric('Clientes DC', String(new Set(primaryDcCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size), 'clientes atendidos em DC', '', metricComparison(dcMonthlyComparison.current.clients, dcMonthlyComparison.previous.clients, dcMonthlyComparison))}
+          ${metric('R$ médio / recarga', fmtBRL(dcCleanStats.avgTicket), `${dcCleanStats.executed.length} recarga(s) válida(s)`, '', metricComparison(dcMonthlyComparison.current.avgTicket, dcMonthlyComparison.previous.avgTicket, dcMonthlyComparison))}
+          ${metric('kWh médio / recarga', `${dcCleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh`, 'somente sessões válidas', '', metricComparison(dcMonthlyComparison.current.avgKwh, dcMonthlyComparison.previous.avgKwh, dcMonthlyComparison))}
+          ${metric('Tempo médio', formatRechargeDuration(dcAvgDuration), `${dcValidDurations.length} sessão(ões) com duração`, '', metricComparison(dcMonthlyComparison.current.avgDuration, dcMonthlyComparison.previous.avgDuration, dcMonthlyComparison))}
+          ${metric('Média por dia', averageDcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1}), dailyDcBreakdown || 'recargas DC por dia', '', metricComparison(dcCurrentDaily, dcPreviousDaily, dcMonthlyComparison))}
+          ${metric('Falhas DC', String(dcCleanStats.failed.length), `${primaryDcCharges.length ? fmtPct(dcCleanStats.failed.length / primaryDcCharges.length * 100) : '0,00%'} das tentativas`, '', metricComparison(dcMonthlyComparison.current.failedCount, dcMonthlyComparison.previous.failedCount, dcMonthlyComparison, { inverse: true }))}
           ${metric('Melhor unidade DC', bestDcUnit?.stationName || '-', bestDcUnit ? fmtBRL(bestDcUnit.revenue) : 'sem dados no período', 'station-name')}
-        </div>
-      </section>
-      <section class="uby-metric-panel ac">
-        <header class="uby-panel-head"><div><h2>AC · acompanhamento separado</h2><p>Ativos próprios UBY. Acompanhamento sem misturar as médias da rede rápida.</p></div><span class="uby-panel-tag">AC</span></header>
-        ${panelComparison(acMonthlyComparison)}
-        <div class="uby-panel-metrics">
-          ${metric('Ocupação AC', fmtPct(primaryAcOcc), `${acCount} carregador(es) próprio(s)`)}
-          ${metric('Faturamento AC', fmtBRL(primaryAcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)), `${primaryAcCharges.length} recarga(s)`)}
-          ${metric('Energia AC', fmtKWh(primaryAcEnergy), 'energia entregue no período')}
-          ${metric('Clientes AC', String(new Set(primaryAcCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size), 'clientes atendidos em AC')}
-          ${metric('R$ médio / recarga', fmtBRL(acCleanStats.avgTicket), `${acCleanStats.executed.length} recarga(s) válida(s)`)}
-          ${metric('kWh médio / recarga', `${acCleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh`, 'somente sessões válidas')}
-          ${metric('Tempo médio', formatRechargeDuration(acAvgDuration), `${acValidDurations.length} sessão(ões) com duração`)}
-          ${metric('Média por dia', averageAcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1}), 'recargas AC por dia')}
-          ${metric('Falhas AC', String(acCleanStats.failed.length), `${primaryAcCharges.length ? fmtPct(acCleanStats.failed.length / primaryAcCharges.length * 100) : '0,00%'} das tentativas`)}
-          ${metric('Participação na rede', totalCharges ? fmtPct(primaryAcCharges.length / totalCharges * 100) : '0,00%', 'recargas AC sobre o consolidado')}
         </div>
       </section>
     </div>
     <div class="uby-bottom-panels">
+      <section class="uby-metric-panel ac secondary">
+        <header class="uby-panel-head"><div><h2>AC · acompanhamento separado</h2><p>Ativos próprios UBY. Acompanhamento sem misturar as médias da rede rápida.</p></div><span class="uby-panel-tag">AC</span></header>
+        ${panelComparison(acMonthlyComparison)}
+        <div class="uby-panel-metrics">
+          ${metric('Ocupação AC', fmtPct(primaryAcOcc), `${acCount} carregador(es) próprio(s)`, '', metricComparison(acMonthlyComparison.current.energy, acMonthlyComparison.previous.energy, acMonthlyComparison))}
+          ${metric('Faturamento AC', fmtBRL(primaryAcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)), `${primaryAcCharges.length} recarga(s)`, '', metricComparison(acMonthlyComparison.current.revenue, acMonthlyComparison.previous.revenue, acMonthlyComparison))}
+          ${metric('Energia AC', fmtKWh(primaryAcEnergy), 'energia entregue no período', '', metricComparison(acMonthlyComparison.current.energy, acMonthlyComparison.previous.energy, acMonthlyComparison))}
+          ${metric('Clientes AC', String(new Set(primaryAcCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size), 'clientes atendidos em AC', '', metricComparison(acMonthlyComparison.current.clients, acMonthlyComparison.previous.clients, acMonthlyComparison))}
+          ${metric('R$ médio / recarga', fmtBRL(acCleanStats.avgTicket), `${acCleanStats.executed.length} recarga(s) válida(s)`, '', metricComparison(acMonthlyComparison.current.avgTicket, acMonthlyComparison.previous.avgTicket, acMonthlyComparison))}
+          ${metric('kWh médio / recarga', `${acCleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh`, 'somente sessões válidas', '', metricComparison(acMonthlyComparison.current.avgKwh, acMonthlyComparison.previous.avgKwh, acMonthlyComparison))}
+          ${metric('Tempo médio', formatRechargeDuration(acAvgDuration), `${acValidDurations.length} sessão(ões) com duração`, '', metricComparison(acMonthlyComparison.current.avgDuration, acMonthlyComparison.previous.avgDuration, acMonthlyComparison))}
+          ${metric('Média por dia', averageAcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1}), 'recargas AC por dia', '', metricComparison(acCurrentDaily, acPreviousDaily, acMonthlyComparison))}
+          ${metric('Falhas AC', String(acCleanStats.failed.length), `${primaryAcCharges.length ? fmtPct(acCleanStats.failed.length / primaryAcCharges.length * 100) : '0,00%'} das tentativas`, '', metricComparison(acMonthlyComparison.current.failedCount, acMonthlyComparison.previous.failedCount, acMonthlyComparison, { inverse: true }))}
+          ${metric('Participação na rede', totalCharges ? fmtPct(primaryAcCharges.length / totalCharges * 100) : '0,00%', 'recargas AC sobre o consolidado')}
+        </div>
+      </section>
       <section class="uby-metric-panel partner">
         <header class="uby-panel-head"><div><h2>Terceiros · royalties</h2><p>Operação acompanhada sem entrar nos custos ou nas métricas principais da matriz UBY.</p></div><span class="uby-panel-tag">Parceiros</span></header>
         <div class="uby-panel-metrics">
