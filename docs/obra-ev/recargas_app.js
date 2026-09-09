@@ -7271,7 +7271,7 @@ function renderDayComparison(prefix = 'usage', charges = [], historyCharges = ch
   const dcMarkup = dcBreakdown.length ? `
     <section class="day-dc-breakdown-card">
       <div class="day-dc-breakdown-head"><strong>DC por carregador</strong><span>${last.label} · operação própria UBY</span></div>
-      <div class="day-dc-breakdown-grid">${dcBreakdown.map(item => `<div class="day-dc-unit"><strong title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</strong><span>${fmtBRL(item.revenue)}</span><span>${item.count} rec.</span><span>${fmtKWh(item.energy)}</span></div>`).join('')}</div>
+      <div class="day-dc-breakdown-grid">${dcBreakdown.map(item => `<div class="day-dc-unit"><strong title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</strong><div class="day-dc-unit-metrics"><span><small>Faturamento</small>${fmtBRL(item.revenue)}</span><span><small>Recargas</small>${item.count}</span><span><small>Energia</small>${fmtKWh(item.energy)}</span></div></div>`).join('')}</div>
     </section>` : '';
   el.innerHTML = metricMarkup + dcMarkup;
 }
@@ -11771,6 +11771,47 @@ async function renderUbyOperation() {
     return sum + Number(row.revenue || 0) * pct / 100;
   }, 0);
   const metric = (label, value, sub = '', variant = '') => `<div class="uby-panel-metric ${variant}"><div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+  // Os painéis principais comparam sempre um mês com o mesmo corte do mês
+  // anterior. No acumulado, a referência continua sendo o último mês ativo,
+  // para não comparar todo o histórico contra uma janela de tamanho diferente.
+  const monthlyPanelComparison = (historyCharges = []) => {
+    const scopeMonth = isMonthView && currentGeneralMonth ? currentGeneralMonth : sourceMonths.at(-1);
+    const scoped = (historyCharges || []).filter(charge => chargeMonthKey(charge) === scopeMonth && isExecutedCharge(charge));
+    const lastScopedDate = scoped.reduce((last, charge) => !last || charge.startDate > last ? charge.startDate : last, null);
+    if (!scopeMonth || !lastScopedDate) return { hasBase: false, label: 'sem base mensal', current: summaryMetrics([]), previous: summaryMetrics([]) };
+    const [year, month] = scopeMonth.split('-').map(Number);
+    const currentStart = new Date(year, month - 1, 1, 0, 0, 0, 0);
+    const previousStart = shiftToPreviousMonth(currentStart);
+    const previousEnd = shiftToPreviousMonth(lastScopedDate);
+    const previousCharges = (historyCharges || []).filter(charge => isExecutedCharge(charge)
+      && charge?.startDate >= previousStart && charge.startDate <= previousEnd);
+    const previousMonthKey = `${previousEnd.getFullYear()}-${String(previousEnd.getMonth() + 1).padStart(2, '0')}`;
+    return {
+      hasBase: previousCharges.length > 0,
+      label: `${monthLabel(scopeMonth)} vs ${monthLabel(previousMonthKey)} (1-${previousEnd.getDate()})`,
+      current: summaryMetrics(scoped),
+      previous: summaryMetrics(previousCharges)
+    };
+  };
+  const comparisonValue = (label, current, previous, formatter) => {
+    if (!previous && !current) return `${label}: —`;
+    if (!previous) return `${label}: nova base`;
+    const delta = (current - previous) / Math.abs(previous) * 100;
+    return `${label}: ${delta >= 0 ? '+' : ''}${fmtPct(delta)}`;
+  };
+  const panelComparison = comparison => `
+    <div class="uby-panel-comparison">
+      <strong>Comparativo mensal</strong> · ${comparison.label}
+      <div class="uby-panel-comparison-values">
+        <span>${comparison.hasBase ? comparisonValue('Faturamento', comparison.current.revenue, comparison.previous.revenue, fmtBRL) : 'Faturamento: sem base'}</span>
+        <span>${comparison.hasBase ? comparisonValue('Energia', comparison.current.energy, comparison.previous.energy, fmtKWh) : 'Energia: sem base'}</span>
+        <span>${comparison.hasBase ? comparisonValue('Recargas', comparison.current.count, comparison.previous.count, String) : 'Recargas: sem base'}</span>
+      </div>
+    </div>`;
+  const dcMonthlyComparison = monthlyPanelComparison(sourcePrimaryDcCharges);
+  const acMonthlyComparison = monthlyPanelComparison(sourceIncluded
+    .filter(row => row.kind === 'ac' && isOwnedUbyRow(row))
+    .flatMap(row => row.charges));
   const firstPeriod = windows.length ? new Date(Math.min(...windows.map(window => window.start).filter(Boolean))) : firstDate;
   const lastPeriod = windows.length ? new Date(Math.max(...windows.map(window => window.end).filter(Boolean))) : lastDate;
   const viewLabel = monthFallbackToAccumulated
@@ -11794,6 +11835,7 @@ async function renderUbyOperation() {
     <div class="uby-core-panels">
       <section class="uby-metric-panel dc">
         <header class="uby-panel-head"><div><h2>DC · rede rápida</h2><p>Ativos próprios UBY. Métricas que orientam a operação principal.</p></div><span class="uby-panel-tag">Foco principal</span></header>
+        ${panelComparison(dcMonthlyComparison)}
         <div class="uby-panel-metrics">
           ${metric('Ocupação DC', fmtPct(primaryDcOcc), `${dcCount} carregador(es) próprio(s)`)}
           ${metric('Faturamento DC', fmtBRL(primaryDcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)), `${primaryDcCharges.length} recarga(s)`)}
@@ -11809,6 +11851,7 @@ async function renderUbyOperation() {
       </section>
       <section class="uby-metric-panel ac">
         <header class="uby-panel-head"><div><h2>AC · acompanhamento separado</h2><p>Ativos próprios UBY. Acompanhamento sem misturar as médias da rede rápida.</p></div><span class="uby-panel-tag">AC</span></header>
+        ${panelComparison(acMonthlyComparison)}
         <div class="uby-panel-metrics">
           ${metric('Ocupação AC', fmtPct(primaryAcOcc), `${acCount} carregador(es) próprio(s)`)}
           ${metric('Faturamento AC', fmtBRL(primaryAcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)), `${primaryAcCharges.length} recarga(s)`)}
@@ -11845,17 +11888,6 @@ async function renderUbyOperation() {
     </div>
   `;
 
-  renderVisualSummary('ubyVisualSummary', allUbyCharges, {
-    occ: { pct: primaryDcOcc, energy: primaryDcEnergy, power: getPower(), hours: 0, maxKWh: primaryDcMaxKWh },
-    historyCharges: sourceUbyCharges,
-    occupancyCharges: primaryDcCharges,
-    occupancyHistoryCharges: sourcePrimaryDcCharges,
-    hideOccupancy: true,
-    occupancyTitle: 'Ocupação DC do período',
-    occupancySub: primaryDcRows.length
-      ? `ativos próprios UBY · ${primaryDcRows.length} carregador(es) DC`
-      : 'sem carregador DC próprio com base no período'
-  });
   renderUbyDecisionCockpit([], allUbyCharges, included, sourceUbyCharges);
   scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     dayComparison: { dcRows: primaryDcRows },

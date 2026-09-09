@@ -276,14 +276,21 @@
     .day-kpi-card small { display:block; color:var(--p3-muted); font-size:11px; line-height:1.35; max-width:58%; }
     .day-kpi-card.is-warning { border-color:rgba(255,214,107,.32); }.day-kpi-card.is-warning::before { background:#FFD66B; }.day-kpi-card.is-warning strong { color:#FFD66B; }
     .day-kpi-card.is-danger { border-color:rgba(230,75,75,.36); }.day-kpi-card.is-danger::before { background:#E64B4B; }.day-kpi-card.is-danger strong { color:#FF7A7A; }
-    .day-dc-breakdown-card { grid-column:1 / -1; border:1px solid rgba(87,183,255,.42); border-radius:12px; background:linear-gradient(135deg,rgba(20,54,84,.94),rgba(10,25,43,.96)); padding:14px 16px; box-shadow:var(--p3-shadow); }
-    .day-dc-breakdown-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px; }
-    .day-dc-breakdown-head strong { color:#BFEAD8; font-family:var(--ui-font); font-size:14px; }
-    .day-dc-breakdown-head span { color:var(--p3-muted); font-size:11px; }
-    .day-dc-breakdown-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; }
-    .day-dc-unit { display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; gap:10px; align-items:center; padding:10px 11px; border-radius:8px; background:rgba(5,16,30,.4); }
-    .day-dc-unit strong { min-width:0; color:var(--p3-text); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .day-dc-unit span { color:#57B7FF; font-size:12px; font-weight:800; white-space:nowrap; }
+    .day-dc-breakdown-card { grid-column:1 / -1; border:1px solid rgba(87,183,255,.42); border-radius:14px; background:linear-gradient(135deg,rgba(20,54,84,.94),rgba(10,25,43,.96)); padding:19px 20px; box-shadow:var(--p3-shadow); }
+    .day-dc-breakdown-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .day-dc-breakdown-head strong { color:#BFEAD8; font-family:var(--ui-font); font-size:17px; }
+    .day-dc-breakdown-head span { color:var(--p3-muted); font-size:12px; }
+    .day-dc-breakdown-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+    .day-dc-unit { min-width:0; padding:14px 15px; border:1px solid rgba(117,169,215,.18); border-radius:10px; background:rgba(5,16,30,.46); }
+    .day-dc-unit > strong { display:block; min-width:0; color:var(--p3-text); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .day-dc-unit-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-top:12px; }
+    .day-dc-unit-metrics span { min-width:0; color:#57B7FF; font-size:14px; font-weight:900; white-space:nowrap; }
+    .day-dc-unit-metrics small { display:block; margin-bottom:3px; color:var(--p3-muted); font-size:9px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+    .uby-panel-comparison { margin:0 17px 16px; padding:10px 11px; border:1px solid rgba(87,183,255,.26); border-radius:9px; background:rgba(87,183,255,.07); color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .uby-panel-comparison strong { color:#BFEAD8; font-size:11px; }
+    .uby-panel-comparison .uby-panel-comparison-values { display:flex; flex-wrap:wrap; gap:7px 13px; margin-top:6px; color:#57B7FF; font-weight:800; }
+    .uby-metric-panel.ac .uby-panel-comparison { border-color:rgba(255,214,107,.25); background:rgba(255,214,107,.06); }
+    .uby-metric-panel.ac .uby-panel-comparison strong, .uby-metric-panel.ac .uby-panel-comparison .uby-panel-comparison-values { color:#FFD66B; }
     .trend-badge { display:inline-flex; align-items:center; gap:5px; flex:0 0 auto; max-width:42%; border-radius:7px; padding:5px 7px; font-size:10px; font-weight:900; margin:0; border:1px solid rgba(255,255,255,.12); line-height:1.1; text-align:left; }
     .trend-badge > span:last-child { display:grid; gap:2px; min-width:0; }.trend-badge strong { display:block; color:inherit; font:inherit; font-size:10px; line-height:1.1; white-space:nowrap; }.trend-badge small { display:block; color:inherit; max-width:none; margin:0; font-size:8px; font-weight:700; line-height:1.1; opacity:.84; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .trend-badge.up { color:#BFEBD6; background:rgba(56,201,111,.14); border-color:rgba(56,201,111,.32); }
@@ -1442,11 +1449,6 @@
 
     <div class="uby-dashboard-heading"><span>Resultado diário da rede</span><small>leitura do último dia com movimento</small></div>
     <section class="day-compare-grid" id="usageUbyDayCompare"></section>
-
-    <section class="uby-overview-section">
-      <div class="uby-dashboard-heading"><span>Resumo geral da rede UBY</span><small>visão operacional consolidada do período selecionado</small></div>
-      <section class="visual-summary" id="ubyVisualSummary"></section>
-    </section>
 
     <section class="uby-metrics-dashboard" id="kpiUby"></section>
 
