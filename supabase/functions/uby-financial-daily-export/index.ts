@@ -24,7 +24,7 @@ function tab(name: string, rows: Record<string, unknown>[]) {
   return { name, values: [headers, ...rows.map(row => headers.map(key => { const value = row[key]; return value == null ? "" : typeof value === "object" ? JSON.stringify(value) : value; }))] };
 }
 function month(charge: any) { const explicit = s(charge._month); if (/^\d{4}-\d{2}$/.test(explicit)) return explicit; const iso = s(charge.startIso || charge.endIso); return /^\d{4}-\d{2}/.test(iso) ? iso.slice(0, 7) : "Sem competência"; }
-function saoPauloIso(value: unknown) { const date = new Date(s(value)); if (Number.isNaN(date.getTime())) return s(value); const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(date); const part = (type: string) => parts.find(item => item.type === type)?.value || "00"; return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}:${part("second")}`; }
+function saoPauloIso(value: unknown) { const date = new Date(s(value)); if (Number.isNaN(date.getTime())) return s(value); const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(date); const part = (type: string) => parts.find(item => item.type === type)?.value || "00"; return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}:${part("second")}-03:00`; }
 function executed(charge: any) { const status = [charge.rawStatus, charge.paymentStatus, charge.paymentType, charge.failureReason].map(s).join(" ").toLowerCase(); const energy = n(charge.energyKWh || charge.energy); const revenue = n(charge.revenue || charge.amount); const durationSeconds = n(charge.durationSeconds); return !/(falha|erro|cancel|recus|negad|expir|timeout|interromp|incomplet|nao conclu|sem sucesso|failed|declin|invalid)/.test(status) && energy > .2 && !(durationSeconds > 0 && durationSeconds < 288 && energy < 1) && (energy > 0 || revenue > 0); }
 function group<T>(items: T[], key: (item: T) => string, init: (item: T) => any, add: (group: any, item: T) => void) { const map = new Map<string, any>(); for (const item of items) { const id = key(item); const row = map.get(id) || init(item); add(row, item); map.set(id, row); } return [...map.values()]; }
 
@@ -33,19 +33,26 @@ Deno.serve(async () => {
     const rawAccount = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON"), spreadsheetId = Deno.env.get("UBY_EXPORT_SPREADSHEET_ID");
     if (!rawAccount || !spreadsheetId) throw new Error("Configuração de exportação ausente.");
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-    const [works, sessions, reports, matrix, documents] = await Promise.all([
+    const sessionColumns = "session_key,obra_id,source_session_id,station_name,source_station,connector_type,started_at,ended_at,month_key,duration_seconds,idle_seconds,energy_kwh,revenue,idle_value,payment_type,payment_status,raw_status,failure_reason,user_name,user_email,user_phone,vehicle_brand,vehicle_model,voucher,rating,review_comment,source_file,source_file_key,raw_data";
+    const [works, reports, matrix, documents] = await Promise.all([
       sb.from("obras").select("id,nome,cliente,local,status_exec,updated_at"),
-      // A tabela normalizada é a fonte operacional do painel UBY. Usá-la aqui
-      // impede que o e-mail diário some uma cópia antiga por obra.
-      sb.from("recharge_sessions").select("session_key,obra_id,source_session_id,station_name,source_station,connector_type,started_at,ended_at,month_key,duration_seconds,idle_seconds,energy_kwh,revenue,idle_value,payment_type,payment_status,raw_status,failure_reason,user_name,user_email,user_phone,vehicle_brand,vehicle_model,voucher,rating,review_comment,source_file,source_file_key,raw_data"),
       sb.from("obra_finance_reports").select("obra_id,station_key,station_name,report_type,period_key,period_start,period_end,status,version,payload,updated_at").is("deleted_at", null),
       sb.from("uby_financial_matrix").select("id,payload,updated_at"),
       sb.from("uby_finance_documents").select("id,scope,work_id,matrix_cost_id,competence_key,supplier,category,document_number,document_type,amount,due_date,status,installment_number,installment_total,file_name,mime_type,file_size,notes,created_at,updated_at"),
     ]);
-    for (const r of [works, sessions, reports, matrix, documents]) if (r.error) throw new Error(r.error.message);
+    for (const r of [works, reports, matrix, documents]) if (r.error) throw new Error(r.error.message);
+    // PostgREST limita cada resposta. Paginar impede que as sessões mais
+    // recentes desapareçam do e-mail quando a rede ultrapassa 1.000 linhas.
+    const sessions: any[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await sb.from("recharge_sessions").select(sessionColumns).order("started_at", { ascending: false, nullsFirst: false }).range(offset, offset + 999);
+      if (error) throw new Error(error.message);
+      sessions.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
     const workNames = new Map((works.data || []).map((work: any) => [work.id, work.nome]));
     const seen = new Set<string>();
-    const all = (sessions.data || []).map((session: any) => {
+    const all = sessions.map((session: any) => {
       const raw = session.raw_data && typeof session.raw_data === "object" ? session.raw_data : {};
       return {
         ...raw,
