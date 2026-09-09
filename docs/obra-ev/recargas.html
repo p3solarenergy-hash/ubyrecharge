@@ -230,6 +230,31 @@
     .ac-context-card .ac-title span, .ac-context-card .ac-mini span { color:var(--p3-muted); font-size:11px; line-height:1.35; }
     .ac-context-card .ac-mini { display:grid; gap:3px; }
     .ac-context-card .ac-mini b { color:#D6E0E5; font-size:16px; }
+    .uby-overview-section { margin:18px 0; }
+    .uby-dashboard-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:20px 2px 10px; color:#BFEAD8; font-family:var(--ui-font); font-size:16px; font-weight:900; }
+    .uby-dashboard-heading small { color:var(--p3-muted); font-family:inherit; font-size:11px; font-weight:600; text-align:right; }
+    .uby-metrics-dashboard { display:grid; gap:18px; margin:22px 0; }
+    .uby-core-panels, .uby-bottom-panels { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .uby-metric-panel { overflow:hidden; border:1px solid var(--surface-border); border-radius:16px; background:linear-gradient(145deg,rgba(15,34,55,.98),rgba(8,20,35,.98)); box-shadow:var(--p3-shadow); }
+    .uby-metric-panel.dc { border-color:rgba(87,183,255,.46); }
+    .uby-metric-panel.ac { border-color:rgba(255,214,107,.38); background:linear-gradient(145deg,rgba(45,38,21,.48),rgba(10,23,38,.98)); }
+    .uby-metric-panel.partner { border-color:rgba(161,117,255,.42); background:linear-gradient(145deg,rgba(47,28,78,.55),rgba(10,22,38,.98)); }
+    .uby-metric-panel.revenue { border-color:rgba(0,232,137,.34); }
+    .uby-panel-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:18px 18px 14px; border-bottom:1px solid rgba(126,157,190,.2); }
+    .uby-panel-head h2 { margin:0; color:var(--p3-text); font-family:var(--ui-font); font-size:19px; line-height:1.15; }
+    .uby-panel-head p { margin:5px 0 0; color:var(--p3-muted); font-size:12px; line-height:1.38; }
+    .uby-panel-tag { flex:0 0 auto; border-radius:999px; padding:5px 9px; color:#57B7FF; border:1px solid rgba(87,183,255,.4); background:rgba(87,183,255,.1); font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
+    .uby-metric-panel.ac .uby-panel-tag { color:#FFD66B; border-color:rgba(255,214,107,.36); background:rgba(255,214,107,.08); }
+    .uby-metric-panel.partner .uby-panel-tag { color:#C9AAFF; border-color:rgba(161,117,255,.4); background:rgba(161,117,255,.09); }
+    .uby-metric-panel.revenue .uby-panel-tag { color:#00E889; border-color:rgba(0,232,137,.34); background:rgba(0,232,137,.08); }
+    .uby-panel-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:rgba(126,157,190,.16); }
+    .uby-panel-metric { min-width:0; min-height:112px; padding:15px 17px; background:rgba(8,20,35,.74); }
+    .uby-panel-metric .label { color:#9FB2C8; font-size:10px; }
+    .uby-panel-metric .value { margin-top:9px; color:#57B7FF; font-family:var(--ui-font); font-size:25px; font-weight:900; line-height:1.05; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+    .uby-metric-panel.ac .uby-panel-metric .value { color:#FFD66B; }
+    .uby-metric-panel.partner .uby-panel-metric .value { color:#C9AAFF; }
+    .uby-metric-panel.revenue .uby-panel-metric .value { color:#00E889; }
+    .uby-panel-metric .sub { margin-top:7px; color:var(--p3-muted); font-size:11px; line-height:1.35; }
 .metric-card { display:flex; flex-direction:column; }
 .metric-card .metric-period-trend { align-self:flex-start; display:inline-flex; align-items:center; gap:5px; min-width:0; max-width:100%; margin-top:auto; padding:4px 6px; border-radius:7px; font-size:9px; line-height:1.1; font-weight:900; }
 .metric-card .metric-period-trend > span:last-child { display:grid; gap:1px; min-width:0; }
@@ -743,6 +768,7 @@
 
     @media (max-width:1180px) {
       .kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .uby-core-panels, .uby-bottom-panels { grid-template-columns:1fr; }
       .ac-context-card { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .section-3, .section-2 { grid-template-columns:1fr; }
       .acc-grid { grid-template-columns:1fr; }
@@ -853,6 +879,11 @@
       .visual-card .visual-footer { align-items:flex-start; flex-direction:column; gap:4px; }
       .visual-card .visual-sub, .visual-card .visual-period-trend { max-width:100%; }
       .day-compare-grid { grid-template-columns:1fr; gap:8px; }
+      .uby-dashboard-heading { align-items:flex-start; flex-direction:column; gap:4px; }
+      .uby-dashboard-heading small { text-align:left; }
+      .uby-panel-head { padding:15px 14px 12px; }
+      .uby-panel-metric { min-height:100px; padding:13px; }
+      .uby-panel-metric .value { font-size:21px; }
       .day-kpi-card { min-height:138px; padding:12px; gap:7px; }
       .day-kpi-card strong { font-size:20px; }
       .day-kpi-card .day-footer { align-items:flex-end; flex-direction:row; gap:8px; }
@@ -1400,11 +1431,15 @@
       <div class="formula" id="ubyHeroFormula">Use o check para incluir ou retirar carregadores especificos da operacao UBY.</div>
     </section>
 
+    <div class="uby-dashboard-heading"><span>Resultado diário da rede</span><small>leitura do último dia com movimento</small></div>
     <section class="day-compare-grid" id="usageUbyDayCompare"></section>
 
-    <section class="visual-summary" id="ubyVisualSummary"></section>
+    <section class="uby-overview-section">
+      <div class="uby-dashboard-heading"><span>Resumo geral da rede UBY</span><small>visão operacional consolidada do período selecionado</small></div>
+      <section class="visual-summary" id="ubyVisualSummary"></section>
+    </section>
 
-    <section class="grid kpis compact-kpis" id="kpiUby"></section>
+    <section class="uby-metrics-dashboard" id="kpiUby"></section>
 
     <section class="section uby-access-section" style="margin-top:18px">
       <div class="card">

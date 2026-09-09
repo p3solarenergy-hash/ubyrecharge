@@ -11646,20 +11646,21 @@ async function renderUbyOperation() {
   // no consolidado, mas nao reduzem a ocupacao que orienta a operacao principal.
   const primaryDcRows = included.filter(row => row.kind === 'dc' && isOwnedUbyRow(row));
   const primaryDcCharges = primaryDcRows.flatMap(row => row.charges);
+  const primaryAcRows = included.filter(row => row.kind === 'ac' && isOwnedUbyRow(row));
+  const primaryAcCharges = primaryAcRows.flatMap(row => row.charges);
   const sourcePrimaryDcCharges = sourceIncluded
     .filter(row => row.kind === 'dc' && isOwnedUbyRow(row))
     .flatMap(row => row.charges);
   const partnerRows = included.filter(row => normalizeOperationModel(financeSettingsForUbyRow(row, financeScopeMonth).operationModel) === 'third_party_management');
+  const partnerCharges = partnerRows.flatMap(row => row.charges);
   const revenue = included.reduce((sum, row) => sum + row.revenue, 0);
   const energy = included.reduce((sum, row) => sum + row.energy, 0);
   const clients = new Set(allUbyCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
   const acdc = generalAcDcStats(allUbyCharges);
-  const dcChargesOnly = allUbyCharges.filter(charge => chargerKind(charge) === 'dc');
-  const acChargesOnly = allUbyCharges.filter(charge => chargerKind(charge) === 'ac');
-  const dcCleanStats = cleanOperationStats(dcChargesOnly);
-  const acCleanStats = cleanOperationStats(acChargesOnly);
-  const dcCount = included.filter(row => row.kind === 'dc').length;
-  const acCount = included.filter(row => row.kind === 'ac').length;
+  const dcCleanStats = cleanOperationStats(primaryDcCharges);
+  const acCleanStats = cleanOperationStats(primaryAcCharges);
+  const dcCount = primaryDcRows.length;
+  const acCount = primaryAcRows.length;
   const totalCharges = allUbyCharges.length;
   const dailyAveragesForRows = rows => rows.map(row => {
     const dates = row.charges.map(charge => charge.startDate).filter(date => date && !Number.isNaN(date.getTime()));
@@ -11669,12 +11670,16 @@ async function renderUbyOperation() {
     return { stationName: row.stationName || row.workName || 'Carregador', dailyAverage: daysWithData ? row.count / daysWithData : 0 };
   });
   const dailyNetworkAverages = dailyAveragesForRows(included);
-  const dailyDcAverages = dailyAveragesForRows(included.filter(row => row.kind === 'dc'));
+  const dailyDcAverages = dailyAveragesForRows(primaryDcRows);
+  const dailyAcAverages = dailyAveragesForRows(primaryAcRows);
   const averageNetworkCharges = dailyNetworkAverages.length
     ? dailyNetworkAverages.reduce((sum, row) => sum + row.dailyAverage, 0) / dailyNetworkAverages.length
     : 0;
   const averageDcCharges = dailyDcAverages.length
     ? dailyDcAverages.reduce((sum, row) => sum + row.dailyAverage, 0) / dailyDcAverages.length
+    : 0;
+  const averageAcCharges = dailyAcAverages.length
+    ? dailyAcAverages.reduce((sum, row) => sum + row.dailyAverage, 0) / dailyAcAverages.length
     : 0;
   const dailyDcBreakdown = dailyDcAverages.slice(0, 3)
     .map(row => `${row.stationName}: ${row.dailyAverage.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/dia`)
@@ -11685,7 +11690,7 @@ async function renderUbyOperation() {
   const dcAvgDuration = dcValidDurations.length
     ? dcValidDurations.reduce((sum, hours) => sum + hours, 0) / dcValidDurations.length
     : 0;
-  const bestDcUnit = included.filter(row => row.kind === 'dc').sort((a, b) => b.revenue - a.revenue)[0];
+  const bestDcUnit = primaryDcRows.slice().sort((a, b) => b.revenue - a.revenue)[0];
   const projectionMonth = isMonthView && currentGeneralMonth ? currentGeneralMonth : (sourceMonths.at(-1) || '');
   const unitForecasts = sourceIncluded
     .map(row => ubyNetworkProjectionForRow(row, projectionMonth))
@@ -11725,6 +11730,30 @@ async function renderUbyOperation() {
   });
   const primaryDcEnergy = primaryDcCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
   const primaryDcOcc = primaryDcMaxKWh > 0 ? primaryDcEnergy / primaryDcMaxKWh * 100 : 0;
+  let primaryAcMaxKWh = 0;
+  primaryAcRows.forEach(row => {
+    const operationStart = operationStartForCharges(row.charges, row);
+    months.forEach(mk => {
+      const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === mk);
+      if (!monthCharges.length) return;
+      const window = periodWindow(monthCharges, mk, 'mtd', operationStart);
+      primaryAcMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window).maxKWh;
+    });
+  });
+  const primaryAcEnergy = primaryAcCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const primaryAcOcc = primaryAcMaxKWh > 0 ? primaryAcEnergy / primaryAcMaxKWh * 100 : 0;
+  const acValidDurations = acCleanStats.executed.map(charge => durToHours(charge.duration)).filter(hours => hours > 0);
+  const acAvgDuration = acValidDurations.length
+    ? acValidDurations.reduce((sum, hours) => sum + hours, 0) / acValidDurations.length
+    : 0;
+  const ownRevenue = primaryDcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+    + primaryAcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
+  const partnerRevenue = partnerRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
+  const partnerRoyaltyEstimate = partnerRows.reduce((sum, row) => {
+    const pct = Number(financeSettingsForUbyRow(row, financeScopeMonth).ubyRoyaltyPct || 0);
+    return sum + Number(row.revenue || 0) * pct / 100;
+  }, 0);
+  const metric = (label, value, sub = '') => `<div class="uby-panel-metric"><div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
   const firstPeriod = windows.length ? new Date(Math.min(...windows.map(window => window.start).filter(Boolean))) : firstDate;
   const lastPeriod = windows.length ? new Date(Math.max(...windows.map(window => window.end).filter(Boolean))) : lastDate;
   const viewLabel = monthFallbackToAccumulated
@@ -11745,20 +11774,58 @@ async function renderUbyOperation() {
     : 'Marque carregadores UBY ou suba planilhas das unidades UBY para iniciar o painel.';
 
   document.getElementById('kpiUby').innerHTML = `
-    <div class="dc-kpi-heading"><span>Indicadores DC · rede rápida</span><small>médias calculadas somente nas recargas DC</small></div>
-    <div class="card dc-metric-card"><div class="label">R$ médio por recarga DC</div><div class="value">${fmtBRL(dcCleanStats.avgTicket)}</div><div class="sub">${dcCleanStats.executed.length} recarga(s) válida(s) DC</div></div>
-    <div class="card dc-metric-card"><div class="label">kWh médio por recarga DC</div><div class="value">${dcCleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh</div><div class="sub">energia das recargas válidas DC</div></div>
-    <div class="card dc-metric-card"><div class="label">Tempo médio de recarga DC</div><div class="value">${formatRechargeDuration(dcAvgDuration)}</div><div class="sub">${dcValidDurations.length} sessão(ões) DC com duração</div></div>
-    <div class="card dc-metric-card"><div class="label">Média de recargas DC por dia</div><div class="value">${averageDcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="sub">média dos ${dcCount} carregador(es) DC${dailyDcBreakdown ? `<br>${dailyDcBreakdown}` : ''}</div></div>
-    <div class="card dc-metric-card"><div class="label">Falhas DC no período</div><div class="value">${dcCleanStats.failed.length}</div><div class="sub">${dcChargesOnly.length ? fmtPct(dcCleanStats.failed.length / dcChargesOnly.length * 100) : '0,00%'} das tentativas DC</div></div>
-    <div class="dc-kpi-heading"><span>Visão consolidada da rede</span><small>totais AC + DC para gestão comercial</small></div>
-    <div class="card"><div class="label">Ocupação consolidada da rede</div><div class="value">${fmtPct(totalOcc)}</div><div class="sub">AC + DC${partnerRows.length ? ' · inclui parceiros para leitura operacional' : ''}</div></div>
-    <div class="card"><div class="label">Projeção de faturamento da rede</div><div class="value">${fmtBRL(networkProjectedRevenue)}</div><div class="sub">${projectionMonth ? `${monthLabel(projectionMonth)} | ${unitForecasts.length} unidade(s), soma das projeções individuais` : 'sem base para projetar'}${unitForecasts.length ? `<br>${fmtKWh(networkProjectedEnergy)} projetados` : ''}</div></div>
-    <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} · ${fmtBRL(acdc.dcRevenue)}</div></div>
-    <div class="card"><div class="label">Carregadores DC</div><div class="value">${dcCount}</div><div class="sub">dos ${included.length} carregadores UBY incluídos</div></div>
-    <div class="card"><div class="label">Média da rede por dia</div><div class="value">${averageNetworkCharges.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="sub">todas as unidades AC + DC</div></div>
-    <div class="card"><div class="label">Melhor unidade DC</div><div class="value" style="font-size:18px;white-space:normal">${bestDcUnit?.stationName || '-'}</div><div class="sub">${bestDcUnit ? fmtBRL(bestDcUnit.revenue) : 'sem dados DC'}</div></div>
-    <div class="card ac-context-card"><div class="ac-title"><strong>AC · acompanhamento separado</strong><span>Não entra nas médias de performance DC.</span></div><div class="ac-mini"><b>${acdc.acCharges}</b><span>recargas AC</span></div><div class="ac-mini"><b>${fmtKWh(acdc.acEnergy)}</b><span>energia AC</span></div><div class="ac-mini"><b>${fmtBRL(acCleanStats.avgTicket)}</b><span>ticket médio AC</span></div></div>
+    <div class="uby-core-panels">
+      <section class="uby-metric-panel dc">
+        <header class="uby-panel-head"><div><h2>DC · rede rápida</h2><p>Ativos próprios UBY. Métricas que orientam a operação principal.</p></div><span class="uby-panel-tag">Foco principal</span></header>
+        <div class="uby-panel-metrics">
+          ${metric('Ocupação DC', fmtPct(primaryDcOcc), `${dcCount} carregador(es) próprio(s)`)}
+          ${metric('Faturamento DC', fmtBRL(primaryDcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)), `${primaryDcCharges.length} recarga(s)`)}
+          ${metric('Energia DC', fmtKWh(primaryDcEnergy), 'energia entregue no período')}
+          ${metric('Clientes DC', String(new Set(primaryDcCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size), 'clientes atendidos em DC')}
+          ${metric('R$ médio / recarga', fmtBRL(dcCleanStats.avgTicket), `${dcCleanStats.executed.length} recarga(s) válida(s)`)}
+          ${metric('kWh médio / recarga', `${dcCleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh`, 'somente sessões válidas')}
+          ${metric('Tempo médio', formatRechargeDuration(dcAvgDuration), `${dcValidDurations.length} sessão(ões) com duração`)}
+          ${metric('Média por dia', averageDcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1}), dailyDcBreakdown || 'recargas DC por dia')}
+          ${metric('Falhas DC', String(dcCleanStats.failed.length), `${primaryDcCharges.length ? fmtPct(dcCleanStats.failed.length / primaryDcCharges.length * 100) : '0,00%'} das tentativas`)}
+          ${metric('Melhor unidade DC', bestDcUnit?.stationName || '-', bestDcUnit ? fmtBRL(bestDcUnit.revenue) : 'sem dados no período')}
+        </div>
+      </section>
+      <section class="uby-metric-panel ac">
+        <header class="uby-panel-head"><div><h2>AC · acompanhamento separado</h2><p>Ativos próprios UBY. Acompanhamento sem misturar as médias da rede rápida.</p></div><span class="uby-panel-tag">AC</span></header>
+        <div class="uby-panel-metrics">
+          ${metric('Ocupação AC', fmtPct(primaryAcOcc), `${acCount} carregador(es) próprio(s)`)}
+          ${metric('Faturamento AC', fmtBRL(primaryAcRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)), `${primaryAcCharges.length} recarga(s)`)}
+          ${metric('Energia AC', fmtKWh(primaryAcEnergy), 'energia entregue no período')}
+          ${metric('Clientes AC', String(new Set(primaryAcCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size), 'clientes atendidos em AC')}
+          ${metric('R$ médio / recarga', fmtBRL(acCleanStats.avgTicket), `${acCleanStats.executed.length} recarga(s) válida(s)`)}
+          ${metric('kWh médio / recarga', `${acCleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh`, 'somente sessões válidas')}
+          ${metric('Tempo médio', formatRechargeDuration(acAvgDuration), `${acValidDurations.length} sessão(ões) com duração`)}
+          ${metric('Média por dia', averageAcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1}), 'recargas AC por dia')}
+          ${metric('Falhas AC', String(acCleanStats.failed.length), `${primaryAcCharges.length ? fmtPct(acCleanStats.failed.length / primaryAcCharges.length * 100) : '0,00%'} das tentativas`)}
+          ${metric('Participação na rede', totalCharges ? fmtPct(primaryAcCharges.length / totalCharges * 100) : '0,00%', 'recargas AC sobre o consolidado')}
+        </div>
+      </section>
+    </div>
+    <div class="uby-bottom-panels">
+      <section class="uby-metric-panel partner">
+        <header class="uby-panel-head"><div><h2>Terceiros · royalties</h2><p>Operação acompanhada sem entrar nos custos ou nas métricas principais da matriz UBY.</p></div><span class="uby-panel-tag">Parceiros</span></header>
+        <div class="uby-panel-metrics">
+          ${metric('Carregadores parceiros', String(partnerRows.length), 'DC e AC sob gestão de terceiros')}
+          ${metric('Recargas de parceiros', String(partnerCharges.length), 'leitura operacional separada')}
+          ${metric('Faturamento gerado', fmtBRL(partnerRevenue), 'base operacional dos parceiros')}
+          ${metric('Royalty UBY estimado', fmtBRL(partnerRoyaltyEstimate), 'pela regra financeira de cada parceiro')}
+        </div>
+      </section>
+      <section class="uby-metric-panel revenue">
+        <header class="uby-panel-head"><div><h2>Faturamentos da rede</h2><p>Leitura consolidada por origem, preservando a diferença entre operação própria e parceiros.</p></div><span class="uby-panel-tag">Consolidado</span></header>
+        <div class="uby-panel-metrics">
+          ${metric('Faturamento próprio UBY', fmtBRL(ownRevenue), 'DC + AC próprios')}
+          ${metric('Faturamento consolidado', fmtBRL(revenue), 'todas as operações visíveis')}
+          ${metric('Ocupação média da rede', fmtPct(totalOcc), `AC + DC${partnerRows.length ? ' · parceiros incluídos para leitura' : ''}`)}
+          ${metric('Projeção da rede', fmtBRL(networkProjectedRevenue), projectionMonth ? `${monthLabel(projectionMonth)} · ${unitForecasts.length} unidade(s)` : 'sem base para projetar')}
+        </div>
+      </section>
+    </div>
   `;
 
   renderVisualSummary('ubyVisualSummary', allUbyCharges, {
