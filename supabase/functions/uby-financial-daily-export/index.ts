@@ -21,7 +21,7 @@ function tab(name: string, rows: Record<string, unknown>[]) {
   return { name, values: [headers, ...rows.map(row => headers.map(key => { const value = row[key]; return value == null ? "" : typeof value === "object" ? JSON.stringify(value) : value; }))] };
 }
 function month(charge: any) { const explicit = s(charge._month); if (/^\d{4}-\d{2}$/.test(explicit)) return explicit; const iso = s(charge.startIso || charge.endIso); return /^\d{4}-\d{2}/.test(iso) ? iso.slice(0, 7) : "Sem competência"; }
-function executed(charge: any) { const status = [charge.rawStatus, charge.paymentStatus, charge.paymentType, charge.failureReason].map(s).join(" ").toLowerCase(); const energy = n(charge.energyKWh || charge.energy); const revenue = n(charge.revenue || charge.amount); return !/(falha|erro|cancel|recus|negad|expir|timeout|interromp|incomplet|nao conclu|sem sucesso|failed|declin|invalid)/.test(status) && energy > .2 && (energy > 0 || revenue > 0); }
+function executed(charge: any) { const status = [charge.rawStatus, charge.paymentStatus, charge.paymentType, charge.failureReason].map(s).join(" ").toLowerCase(); const energy = n(charge.energyKWh || charge.energy); const revenue = n(charge.revenue || charge.amount); const durationSeconds = n(charge.durationSeconds); return !/(falha|erro|cancel|recus|negad|expir|timeout|interromp|incomplet|nao conclu|sem sucesso|failed|declin|invalid)/.test(status) && energy > .2 && !(durationSeconds > 0 && durationSeconds < 288 && energy < 1) && (energy > 0 || revenue > 0); }
 function group<T>(items: T[], key: (item: T) => string, init: (item: T) => any, add: (group: any, item: T) => void) { const map = new Map<string, any>(); for (const item of items) { const id = key(item); const row = map.get(id) || init(item); add(row, item); map.set(id, row); } return [...map.values()]; }
 
 Deno.serve(async () => {
@@ -56,6 +56,7 @@ Deno.serve(async () => {
         startStr: raw.startStr || session.started_at || "",
         endStr: raw.endStr || session.ended_at || "",
         _month: raw._month || s(session.month_key).slice(0, 7),
+        durationSeconds: n(session.duration_seconds),
         energyKWh: n(session.energy_kwh),
         revenue: n(session.revenue),
         userName: raw.userName || session.user_name || "",
