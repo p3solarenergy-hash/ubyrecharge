@@ -6953,9 +6953,15 @@ function firstClientDayMap(charges = []) {
 }
 
 function dailyOperationalRows(charges = [], historyCharges = charges) {
+  // A leitura diária precisa usar a mesma regra de sessão executada do
+  // fechamento/exportação. Falhas continuam aparecendo no contador próprio,
+  // mas não inflam recargas, faturamento, energia ou clientes atendidos.
   const dated = charges.filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()));
   if (!dated.length) return [];
-  const firstClientDay = firstClientDayMap(historyCharges?.length ? historyCharges : charges);
+  const history = (historyCharges?.length ? historyCharges : charges)
+    .filter(c => c.startDate && !Number.isNaN(c.startDate.getTime()))
+    .filter(isExecutedCharge);
+  const firstClientDay = firstClientDayMap(history);
   const byDay = {};
   const bounds = dailySeriesBounds(dated);
   eachDateInRange(bounds.start, bounds.end).forEach(date => {
@@ -6968,13 +6974,14 @@ function dailyOperationalRows(charges = [], historyCharges = charges) {
       const date = dateOnly(charge.startDate);
       byDay[key] = { key, date, label: chargeDayLabel(charge), revenue: 0, energy: 0, count: 0, clients: new Set(), newClients: new Set(), failed: 0 };
     }
+    if (isFailedCharge(charge)) byDay[key].failed += 1;
+    if (!isExecutedCharge(charge)) return;
     const client = clientKeyFromCharge(charge);
     byDay[key].revenue += Number(charge.revenue || 0);
     byDay[key].energy += Number(charge.energyKWh || 0);
     byDay[key].count += 1;
     if (client) byDay[key].clients.add(client);
     if (client && firstClientDay[client] === key) byDay[key].newClients.add(client);
-    if (isFailedCharge(charge)) byDay[key].failed += 1;
   });
   const rows = Object.values(byDay).sort((a, b) => a.date - b.date);
   rows.forEach((row, index) => {
