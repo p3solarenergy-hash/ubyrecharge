@@ -7210,7 +7210,7 @@ function renderVisualSummary(elId, charges = [], options = {}) {
     { title: 'Consumo de energia', value: fmtKWh(energy), sub: 'energia entregue no periodo', badge: periodChangeBadge(energy, previous.energy, comparison.hasPrevious, value => signedNumber(value, ' kWh')), cls: 'warn', img: imgBolt },
     { title: 'Clientes atendidos', value: String(clients), sub: `${current.clean.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, badge: periodChangeBadge(clients, previous.clients, comparison.hasPrevious, signedNumber), cls: '', img: imgBadge },
     { title: 'Total de transacoes', value: String(total), sub: 'recargas no periodo selecionado', badge: periodChangeBadge(total, previous.count, comparison.hasPrevious, signedNumber), cls: 'warn', img: imgBolt }
-  ];
+  ].filter((_, index) => !(options.hideOccupancy && index === 0));
   el.innerHTML = cards.map((card, index) => `
     <div class="visual-card ${index < 2 ? 'feature main' : ''} ${card.cls || ''}" style="--visual-img:${card.img}">
       <div class="visual-title">${card.title}</div>
@@ -11753,7 +11753,7 @@ async function renderUbyOperation() {
     const pct = Number(financeSettingsForUbyRow(row, financeScopeMonth).ubyRoyaltyPct || 0);
     return sum + Number(row.revenue || 0) * pct / 100;
   }, 0);
-  const metric = (label, value, sub = '') => `<div class="uby-panel-metric"><div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+  const metric = (label, value, sub = '', variant = '') => `<div class="uby-panel-metric ${variant}"><div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
   const firstPeriod = windows.length ? new Date(Math.min(...windows.map(window => window.start).filter(Boolean))) : firstDate;
   const lastPeriod = windows.length ? new Date(Math.max(...windows.map(window => window.end).filter(Boolean))) : lastDate;
   const viewLabel = monthFallbackToAccumulated
@@ -11787,7 +11787,7 @@ async function renderUbyOperation() {
           ${metric('Tempo médio', formatRechargeDuration(dcAvgDuration), `${dcValidDurations.length} sessão(ões) com duração`)}
           ${metric('Média por dia', averageDcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1}), dailyDcBreakdown || 'recargas DC por dia')}
           ${metric('Falhas DC', String(dcCleanStats.failed.length), `${primaryDcCharges.length ? fmtPct(dcCleanStats.failed.length / primaryDcCharges.length * 100) : '0,00%'} das tentativas`)}
-          ${metric('Melhor unidade DC', bestDcUnit?.stationName || '-', bestDcUnit ? fmtBRL(bestDcUnit.revenue) : 'sem dados no período')}
+          ${metric('Melhor unidade DC', bestDcUnit?.stationName || '-', bestDcUnit ? fmtBRL(bestDcUnit.revenue) : 'sem dados no período', 'station-name')}
         </div>
       </section>
       <section class="uby-metric-panel ac">
@@ -11833,6 +11833,7 @@ async function renderUbyOperation() {
     historyCharges: sourceUbyCharges,
     occupancyCharges: primaryDcCharges,
     occupancyHistoryCharges: sourcePrimaryDcCharges,
+    hideOccupancy: true,
     occupancyTitle: 'Ocupação DC do período',
     occupancySub: primaryDcRows.length
       ? `ativos próprios UBY · ${primaryDcRows.length} carregador(es) DC`
