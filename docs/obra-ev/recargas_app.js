@@ -11888,24 +11888,26 @@ async function renderUbyOperation() {
           ${metric('Participação na rede', totalCharges ? fmtPct(primaryAcCharges.length / totalCharges * 100) : '0,00%', 'recargas AC sobre o consolidado')}
         </div>
       </section>
-      <section class="uby-metric-panel partner">
-        <header class="uby-panel-head"><div><h2>Terceiros · royalties</h2><p>Operação acompanhada sem entrar nos custos ou nas métricas principais da matriz UBY.</p></div><span class="uby-panel-tag">Parceiros</span></header>
-        <div class="uby-panel-metrics">
-          ${metric('Carregadores parceiros', String(partnerRows.length), 'DC e AC sob gestão de terceiros')}
-          ${metric('Recargas de parceiros', String(partnerCharges.length), 'leitura operacional separada')}
-          ${metric('Faturamento gerado', fmtBRL(partnerRevenue), 'base operacional dos parceiros')}
-          ${metric('Royalty UBY estimado', fmtBRL(partnerRoyaltyEstimate), 'pela regra financeira de cada parceiro')}
-        </div>
-      </section>
-      <section class="uby-metric-panel revenue">
-        <header class="uby-panel-head"><div><h2>Faturamentos da rede</h2><p>Leitura consolidada por origem, preservando a diferença entre operação própria e parceiros.</p></div><span class="uby-panel-tag">Consolidado</span></header>
-        <div class="uby-panel-metrics">
-          ${metric('Faturamento próprio UBY', fmtBRL(ownRevenue), 'DC + AC próprios')}
-          ${metric('Faturamento consolidado', fmtBRL(revenue), 'todas as operações visíveis')}
-          ${metric('Ocupação média da rede', fmtPct(totalOcc), `AC + DC${partnerRows.length ? ' · parceiros incluídos para leitura' : ''}`)}
-          ${metric('Projeção da rede', fmtBRL(networkProjectedRevenue), projectionMonth ? `${monthLabel(projectionMonth)} · ${unitForecasts.length} unidade(s)` : 'sem base para projetar')}
-        </div>
-      </section>
+      <div class="uby-finance-stack">
+        <section class="uby-metric-panel partner">
+          <header class="uby-panel-head"><div><h2>Terceiros · royalties</h2><p>Operação acompanhada sem entrar nos custos ou nas métricas principais da matriz UBY.</p></div><span class="uby-panel-tag">Parceiros</span></header>
+          <div class="uby-panel-metrics">
+            ${metric('Carregadores parceiros', String(partnerRows.length), 'DC e AC sob gestão de terceiros')}
+            ${metric('Recargas de parceiros', String(partnerCharges.length), 'leitura operacional separada')}
+            ${metric('Faturamento gerado', fmtBRL(partnerRevenue), 'base operacional dos parceiros')}
+            ${metric('Royalty UBY estimado', fmtBRL(partnerRoyaltyEstimate), 'pela regra financeira de cada parceiro')}
+          </div>
+        </section>
+        <section class="uby-metric-panel revenue">
+          <header class="uby-panel-head"><div><h2>Faturamentos da rede</h2><p>Leitura consolidada por origem, preservando a diferença entre operação própria e parceiros.</p></div><span class="uby-panel-tag">Consolidado</span></header>
+          <div class="uby-panel-metrics">
+            ${metric('Faturamento próprio UBY', fmtBRL(ownRevenue), 'DC + AC próprios')}
+            ${metric('Faturamento consolidado', fmtBRL(revenue), 'todas as operações visíveis')}
+            ${metric('Ocupação média da rede', fmtPct(totalOcc), `AC + DC${partnerRows.length ? ' · parceiros incluídos para leitura' : ''}`)}
+            ${metric('Projeção da rede', fmtBRL(networkProjectedRevenue), projectionMonth ? `${monthLabel(projectionMonth)} · ${unitForecasts.length} unidade(s)` : 'sem base para projetar')}
+          </div>
+        </section>
+      </div>
     </div>
   `;
 
