@@ -7188,12 +7188,24 @@ function renderVisualSummary(elId, charges = [], options = {}) {
   const comparison = options.showMonthComparison === false
     ? { hasPrevious: false, label: 'sem comparacao', metrics: summaryMetrics([]), occupation: 0 }
     : monthlyEquivalentComparison(charges, options.historyCharges || charges, options.bounds, occ, power);
+  // A ocupacao pode ter um escopo diferente dos demais KPIs. Na Central UBY,
+  // por exemplo, o destaque e dos DC proprios, enquanto faturamento e energia
+  // continuam mostrando a operacao consolidada.
+  const occupancyComparison = options.occupancyCharges
+    ? monthlyEquivalentComparison(
+      options.occupancyCharges,
+      options.occupancyHistoryCharges || options.occupancyCharges,
+      options.bounds,
+      occ,
+      power
+    )
+    : comparison;
   const previous = comparison.metrics;
   const occBand = occupationBand(occ.pct);
   const imgBolt = "url('assets/brand/v2/09_sobre_midnight.png')";
   const imgBadge = "url('assets/brand/v2/09_sobre_midnight.png')";
   const cards = [
-    { title: 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: `faixa ${occBand.label}: ${occBand.range}`, badge: periodChangeBadge(occ.pct, comparison.occupation, comparison.hasPrevious, value => `${value >= 0 ? '+' : '-'}${fmtPct(Math.abs(value))} p.p.`), cls: occBand.className, img: imgBolt },
+    { title: options.occupancyTitle || 'Ocupacao do periodo', value: fmtPct(occ.pct), sub: options.occupancySub || `faixa ${occBand.label}: ${occBand.range}`, badge: periodChangeBadge(occ.pct, occupancyComparison.occupation, occupancyComparison.hasPrevious, value => `${value >= 0 ? '+' : '-'}${fmtPct(Math.abs(value))} p.p.`), cls: occBand.className, img: imgBolt },
     { title: 'Faturamento', value: fmtBRL(revenue), sub: 'acumulado no periodo selecionado', badge: periodChangeBadge(revenue, previous.revenue, comparison.hasPrevious, signedMoney), cls: '', img: imgBadge },
     { title: 'Consumo de energia', value: fmtKWh(energy), sub: 'energia entregue no periodo', badge: periodChangeBadge(energy, previous.energy, comparison.hasPrevious, value => signedNumber(value, ' kWh')), cls: 'warn', img: imgBolt },
     { title: 'Clientes atendidos', value: String(clients), sub: `${current.clean.avgKwh.toFixed(1).replace('.', ',')} kWh/sessao valida`, badge: periodChangeBadge(clients, previous.clients, comparison.hasPrevious, signedNumber), cls: '', img: imgBadge },
@@ -11626,6 +11638,18 @@ async function renderUbyOperation() {
   }
   included.sort((a, b) => b.revenue - a.revenue);
   const allUbyCharges = included.flatMap(row => row.charges);
+  const financeScopeMonth = currentGeneralMonth || sourceMonths.at(-1) || '';
+  const isOwnedUbyRow = row => ['uby', 'hybrid'].includes(
+    normalizeOperationModel(financeSettingsForUbyRow(row, financeScopeMonth).operationModel)
+  );
+  // DC proprio e a leitura principal da rede rapida. AC e parceiros continuam
+  // no consolidado, mas nao reduzem a ocupacao que orienta a operacao principal.
+  const primaryDcRows = included.filter(row => row.kind === 'dc' && isOwnedUbyRow(row));
+  const primaryDcCharges = primaryDcRows.flatMap(row => row.charges);
+  const sourcePrimaryDcCharges = sourceIncluded
+    .filter(row => row.kind === 'dc' && isOwnedUbyRow(row))
+    .flatMap(row => row.charges);
+  const partnerRows = included.filter(row => normalizeOperationModel(financeSettingsForUbyRow(row, financeScopeMonth).operationModel) === 'third_party_management');
   const revenue = included.reduce((sum, row) => sum + row.revenue, 0);
   const energy = included.reduce((sum, row) => sum + row.energy, 0);
   const clients = new Set(allUbyCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
@@ -11689,6 +11713,18 @@ async function renderUbyOperation() {
     });
   });
   const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
+  let primaryDcMaxKWh = 0;
+  primaryDcRows.forEach(row => {
+    const operationStart = operationStartForCharges(row.charges, row);
+    months.forEach(mk => {
+      const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === mk);
+      if (!monthCharges.length) return;
+      const window = periodWindow(monthCharges, mk, 'mtd', operationStart);
+      primaryDcMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window).maxKWh;
+    });
+  });
+  const primaryDcEnergy = primaryDcCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+  const primaryDcOcc = primaryDcMaxKWh > 0 ? primaryDcEnergy / primaryDcMaxKWh * 100 : 0;
   const firstPeriod = windows.length ? new Date(Math.min(...windows.map(window => window.start).filter(Boolean))) : firstDate;
   const lastPeriod = windows.length ? new Date(Math.max(...windows.map(window => window.end).filter(Boolean))) : lastDate;
   const viewLabel = monthFallbackToAccumulated
@@ -11716,6 +11752,7 @@ async function renderUbyOperation() {
     <div class="card dc-metric-card"><div class="label">Média de recargas DC por dia</div><div class="value">${averageDcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1})}</div><div class="sub">média dos ${dcCount} carregador(es) DC${dailyDcBreakdown ? `<br>${dailyDcBreakdown}` : ''}</div></div>
     <div class="card dc-metric-card"><div class="label">Falhas DC no período</div><div class="value">${dcCleanStats.failed.length}</div><div class="sub">${dcChargesOnly.length ? fmtPct(dcCleanStats.failed.length / dcChargesOnly.length * 100) : '0,00%'} das tentativas DC</div></div>
     <div class="dc-kpi-heading"><span>Visão consolidada da rede</span><small>totais AC + DC para gestão comercial</small></div>
+    <div class="card"><div class="label">Ocupação consolidada da rede</div><div class="value">${fmtPct(totalOcc)}</div><div class="sub">AC + DC${partnerRows.length ? ' · inclui parceiros para leitura operacional' : ''}</div></div>
     <div class="card"><div class="label">Projeção de faturamento da rede</div><div class="value">${fmtBRL(networkProjectedRevenue)}</div><div class="sub">${projectionMonth ? `${monthLabel(projectionMonth)} | ${unitForecasts.length} unidade(s), soma das projeções individuais` : 'sem base para projetar'}${unitForecasts.length ? `<br>${fmtKWh(networkProjectedEnergy)} projetados` : ''}</div></div>
     <div class="card"><div class="label">Total DC</div><div class="value">${acdc.dcCharges}</div><div class="sub">${fmtKWh(acdc.dcEnergy)} · ${fmtBRL(acdc.dcRevenue)}</div></div>
     <div class="card"><div class="label">Carregadores DC</div><div class="value">${dcCount}</div><div class="sub">dos ${included.length} carregadores UBY incluídos</div></div>
@@ -11724,7 +11761,16 @@ async function renderUbyOperation() {
     <div class="card ac-context-card"><div class="ac-title"><strong>AC · acompanhamento separado</strong><span>Não entra nas médias de performance DC.</span></div><div class="ac-mini"><b>${acdc.acCharges}</b><span>recargas AC</span></div><div class="ac-mini"><b>${fmtKWh(acdc.acEnergy)}</b><span>energia AC</span></div><div class="ac-mini"><b>${fmtBRL(acCleanStats.avgTicket)}</b><span>ticket médio AC</span></div></div>
   `;
 
-  renderVisualSummary('ubyVisualSummary', allUbyCharges, { occ: { pct: totalOcc, energy, power: getPower(), hours: 0, maxKWh: 0 }, historyCharges: sourceUbyCharges });
+  renderVisualSummary('ubyVisualSummary', allUbyCharges, {
+    occ: { pct: primaryDcOcc, energy: primaryDcEnergy, power: getPower(), hours: 0, maxKWh: primaryDcMaxKWh },
+    historyCharges: sourceUbyCharges,
+    occupancyCharges: primaryDcCharges,
+    occupancyHistoryCharges: sourcePrimaryDcCharges,
+    occupancyTitle: 'Ocupação DC do período',
+    occupancySub: primaryDcRows.length
+      ? `ativos próprios UBY · ${primaryDcRows.length} carregador(es) DC`
+      : 'sem carregador DC próprio com base no período'
+  });
   renderUbyDecisionCockpit([], allUbyCharges, included, sourceUbyCharges);
   scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower },
