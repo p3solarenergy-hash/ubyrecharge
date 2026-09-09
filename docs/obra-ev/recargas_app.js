@@ -7228,7 +7228,7 @@ function renderVisualSummary(elId, charges = [], options = {}) {
   `).join('');
 }
 
-function renderDayComparison(prefix = 'usage', charges = [], historyCharges = charges) {
+function renderDayComparison(prefix = 'usage', charges = [], historyCharges = charges, options = {}) {
   const el = document.getElementById(`${prefix}DayCompare`);
   if (!el) return;
   const rows = dailyOperationalRows(charges, historyCharges);
@@ -7244,7 +7244,7 @@ function renderDayComparison(prefix = 'usage', charges = [], historyCharges = ch
     { label: 'Energia entregue', value: fmtKWh(last.energy), diff: last.energy - previous.energy, formatter: value => signedNumber(value, ' kWh'), sub: `${last.clientCount || 0} cliente(s) no dia`, tone: 'is-warning' },
     { label: 'Falhas do dia', value: String(last.failed || 0), diff: (last.failed || 0) - (previous.failed || 0), formatter: value => signedNumber(value), sub: 'queda em falhas e melhor', tone: (last.failed || 0) > 0 ? 'is-danger' : '' }
   ];
-  el.innerHTML = metrics.map(metric => {
+  const metricMarkup = metrics.map(metric => {
     const trend = trendInfo(metric.diff, metric.formatter);
     const trendClass = metric.label === 'Falhas do dia'
       ? (metric.diff < 0 ? 'up' : (metric.diff > 0 ? 'down' : 'flat'))
@@ -7257,6 +7257,23 @@ function renderDayComparison(prefix = 'usage', charges = [], historyCharges = ch
       </div>
     `;
   }).join('');
+  const dcRows = Array.isArray(options.dcRows) ? options.dcRows : [];
+  const dcBreakdown = dcRows.map(row => {
+    const chargesOnDay = (row.charges || []).filter(charge => charge?.startDate
+      && chargeDayKeyFromDate(charge.startDate) === last.key && isExecutedCharge(charge));
+    return {
+      name: stationDisplayName(row.stationName || row.station || row.workName),
+      count: chargesOnDay.length,
+      revenue: chargesOnDay.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0),
+      energy: chargesOnDay.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0)
+    };
+  });
+  const dcMarkup = dcBreakdown.length ? `
+    <section class="day-dc-breakdown-card">
+      <div class="day-dc-breakdown-head"><strong>DC por carregador</strong><span>${last.label} · operação própria UBY</span></div>
+      <div class="day-dc-breakdown-grid">${dcBreakdown.map(item => `<div class="day-dc-unit"><strong title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</strong><span>${fmtBRL(item.revenue)}</span><span>${item.count} rec.</span><span>${fmtKWh(item.energy)}</span></div>`).join('')}</div>
+    </section>` : '';
+  el.innerHTML = metricMarkup + dcMarkup;
 }
 
 function weekdayReportRows(charges = [], historyCharges = charges) {
@@ -8699,7 +8716,7 @@ async function renderUsageInsights(charges = [], prefix = 'usage', historyCharge
   const weekdayBounds = options.weekdayBounds || options.bounds || null;
   renderSmoothLineChart(`${prefix}RevenueDaily`, daily.labels, daily.revenue, '#57B7FF', ' R$');
   renderBarChart(`${prefix}IdleValueDaily`, daily.labels, daily.idleValue, '#F2A93D', ' R$');
-  renderDayComparison(prefix, charges, historyCharges);
+  renderDayComparison(prefix, charges, historyCharges, options.dayComparison || {});
   renderWeekdayOccupancyReport(`${prefix}WeekdayReport`, charges, weekdayPower, 'Dinamica semanal de ocupacao', weekdayBounds);
   renderDailyOperationalMetrics(prefix, charges, historyCharges);
   await yieldToBrowser();
@@ -11841,6 +11858,7 @@ async function renderUbyOperation() {
   });
   renderUbyDecisionCockpit([], allUbyCharges, included, sourceUbyCharges);
   scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
+    dayComparison: { dcRows: primaryDcRows },
     calendar: { mode: isMonthView ? 'month' : 'dayOfMonthAccumulated', power: calendarPower },
     weekdayPower: calendarPower,
     weekdayBounds: { start: firstPeriod, end: lastPeriod },

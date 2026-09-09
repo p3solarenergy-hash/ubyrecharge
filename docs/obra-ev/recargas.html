@@ -276,6 +276,14 @@
     .day-kpi-card small { display:block; color:var(--p3-muted); font-size:11px; line-height:1.35; max-width:58%; }
     .day-kpi-card.is-warning { border-color:rgba(255,214,107,.32); }.day-kpi-card.is-warning::before { background:#FFD66B; }.day-kpi-card.is-warning strong { color:#FFD66B; }
     .day-kpi-card.is-danger { border-color:rgba(230,75,75,.36); }.day-kpi-card.is-danger::before { background:#E64B4B; }.day-kpi-card.is-danger strong { color:#FF7A7A; }
+    .day-dc-breakdown-card { grid-column:1 / -1; border:1px solid rgba(87,183,255,.42); border-radius:12px; background:linear-gradient(135deg,rgba(20,54,84,.94),rgba(10,25,43,.96)); padding:14px 16px; box-shadow:var(--p3-shadow); }
+    .day-dc-breakdown-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    .day-dc-breakdown-head strong { color:#BFEAD8; font-family:var(--ui-font); font-size:14px; }
+    .day-dc-breakdown-head span { color:var(--p3-muted); font-size:11px; }
+    .day-dc-breakdown-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; }
+    .day-dc-unit { display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; gap:10px; align-items:center; padding:10px 11px; border-radius:8px; background:rgba(5,16,30,.4); }
+    .day-dc-unit strong { min-width:0; color:var(--p3-text); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .day-dc-unit span { color:#57B7FF; font-size:12px; font-weight:800; white-space:nowrap; }
     .trend-badge { display:inline-flex; align-items:center; gap:5px; flex:0 0 auto; max-width:42%; border-radius:7px; padding:5px 7px; font-size:10px; font-weight:900; margin:0; border:1px solid rgba(255,255,255,.12); line-height:1.1; text-align:left; }
     .trend-badge > span:last-child { display:grid; gap:2px; min-width:0; }.trend-badge strong { display:block; color:inherit; font:inherit; font-size:10px; line-height:1.1; white-space:nowrap; }.trend-badge small { display:block; color:inherit; max-width:none; margin:0; font-size:8px; font-weight:700; line-height:1.1; opacity:.84; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .trend-badge.up { color:#BFEBD6; background:rgba(56,201,111,.14); border-color:rgba(56,201,111,.32); }
