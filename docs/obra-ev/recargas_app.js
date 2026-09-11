@@ -3445,12 +3445,12 @@ function ownerAreaReportForSummary(summary, settings = {}, charges = []) {
   const finance = financeForCharges(charges || [], settings);
   const netProfit = charges?.length ? Number(finance.preAreaNet || 0) : Math.max(revenue - energy * energyRate, 0);
   const energyReimbursement = energy * energyRate;
-  const revenueShare = revenue * sharePct / 100;
-  const netProfitShare = Math.max(netProfit, 0) * netProfitSharePct / 100;
-  const selectedShare = transferMode === 'net' ? netProfitShare : revenueShare;
   const selectedSharePct = transferMode === 'net' ? netProfitSharePct : sharePct;
-  const selectedShareBase = transferMode === 'net' ? netProfit : revenue;
-  const selectedShareLabel = transferMode === 'net' ? 'Repasse sobre lucro liquido' : 'Repasse sobre faturamento';
+  const selectedShareBase = charges?.length ? Number(finance.totalRevenue || 0) : revenue;
+  const revenueShare = selectedShareBase * sharePct / 100;
+  const netProfitShare = selectedShareBase * netProfitSharePct / 100;
+  const selectedShare = charges?.length ? Number(finance.areaParticipation || 0) : selectedShareBase * selectedSharePct / 100;
+  const selectedShareLabel = 'Participacao sobre faturamento total';
   return {
     energy,
     revenue,
@@ -3500,8 +3500,8 @@ function renderOwnerAreaReportForCurrentMonth() {
     <tr><td colspan="3"><strong>Mes atual - ${monthLabel(mk)}</strong></td></tr>
     <tr><td>Energia consumida</td><td>${fmtKWh(current.energy)}</td><td>${fmtBRL(current.energyRate)} / kWh</td></tr>
     <tr><td>Reembolso de energia</td><td>${fmtBRL(current.energyReimbursement)}</td><td>kWh x valor definido</td></tr>
-    <tr><td>${current.transferMode === 'net' ? 'Lucro liquido base' : 'Faturamento bruto'}</td><td>${fmtBRL(current.selectedShareBase)}</td><td>${fmtPct(current.selectedSharePct)} de repasse</td></tr>
-    <tr><td>${current.selectedShareLabel}</td><td>${fmtBRL(current.selectedShare)}</td><td>${current.transferMode === 'net' ? 'lucro liquido x percentual' : 'receita x percentual'}</td></tr>
+    <tr><td>Faturamento total</td><td>${fmtBRL(current.selectedShareBase)}</td><td>${fmtPct(current.selectedSharePct)} de participacao</td></tr>
+    <tr><td>${current.selectedShareLabel}</td><td>${fmtBRL(current.selectedShare)}</td><td>faturamento total x percentual</td></tr>
     <tr><td><strong>Total para dono da area</strong></td><td><strong>${fmtBRL(current.ownerTotal)}</strong></td><td>energia + repasse escolhido</td></tr>
     <tr><td colspan="3"><strong>Acumulado da unidade</strong></td></tr>
     <tr><td>Energia acumulada</td><td>${fmtKWh(accumulated.energy)}</td><td>todos os meses salvos</td></tr>
@@ -3879,13 +3879,13 @@ function financeRuleReportItems(result = {}, settings = {}, type = 'cost') {
     actualPerKWh: Number(settings.energyCostPerKWh || 0), plannedPerKWh: Number(settings.energyCostPerKWh || 0)
   });
   items.push({
-    id: 'management', label: 'Gestao P3', rule: `${fmtPct(settings.managementPct || 0)} do faturamento`, amount: Number(result.management || 0),
-    plannedAmount: Number(result.planning?.planningRevenue || 0) * Number(settings.managementPct || 0) / 100,
+    id: 'management', label: 'Gestao P3', rule: `${fmtPct(settings.managementPct || 0)} do faturamento total`, amount: Number(result.management || 0),
+    plannedAmount: Number(result.plannedTotalRevenue || result.planning?.planningRevenue || 0) * Number(settings.managementPct || 0) / 100,
     actualPerKWh: energy > 0 ? Number(result.management || 0) / energy : null,
-    plannedPerKWh: planningKWh > 0 ? Number(result.planning?.planningRevenue || 0) * Number(settings.managementPct || 0) / 100 / planningKWh : null
+    plannedPerKWh: planningKWh > 0 ? Number(result.plannedTotalRevenue || result.planning?.planningRevenue || 0) * Number(settings.managementPct || 0) / 100 / planningKWh : null
   });
   items.push({
-    id: 'platform', label: 'App / plataforma', rule: `${fmtPct(settings.platformPct || 0)} do faturamento`, amount: Number(result.platform || 0),
+    id: 'platform', label: 'App / plataforma', rule: `${fmtPct(settings.platformPct || 0)} das recargas e ociosidade`, amount: Number(result.platform || 0),
     plannedAmount: Number(result.planning?.planningRevenue || 0) * Number(settings.platformPct || 0) / 100,
     actualPerKWh: energy > 0 ? Number(result.platform || 0) / energy : null,
     plannedPerKWh: planningKWh > 0 ? Number(result.planning?.planningRevenue || 0) * Number(settings.platformPct || 0) / 100 / planningKWh : null
@@ -3900,7 +3900,7 @@ function financeRuleReportItems(result = {}, settings = {}, type = 'cost') {
   }
   if (result.areaEligible && (Number(result.areaParticipation || 0) || Number(result.plannedAreaParticipation || 0))) {
     items.push({
-      id: 'area', label: 'Parceiro da area', rule: `${fmtPct(result.areaSharePct || 0)} sobre ${settings.ownerTransferMode === 'net' ? 'lucro liquido' : 'faturamento'}`,
+      id: 'area', label: 'Parceiro da area', rule: `${fmtPct(result.areaSharePct || 0)} sobre o faturamento total`,
       amount: Number(result.areaParticipation || 0), plannedAmount: Number(result.plannedAreaParticipation || 0),
       actualPerKWh: energy > 0 ? Number(result.areaParticipation || 0) / energy : null,
       plannedPerKWh: planningKWh > 0 ? Number(result.plannedAreaParticipation || 0) / planningKWh : null
@@ -4449,21 +4449,21 @@ function generateCurrentFinanceReportLegacy() {
     <div class="metrics"><div class="metric"><b>${fmtBRL(result.totalRevenue)}</b><span>Receitas totais</span></div><div class="metric"><b>${fmtKWh(result.energy)}</b><span>Energia vendida</span></div><div class="metric"><b>${charges.length}</b><span>Recargas</span></div><div class="metric"><b>${clients}</b><span>Clientes</span></div></div>
     <h2>Premissas da competencia</h2><table><tbody>
       <tr><td>Custo de energia</td><td>${fmtBRL(settings.energyCostPerKWh)}/kWh</td><td>Gestao P3</td><td>${fmtPct(settings.managementPct)}</td></tr>
-      <tr><td>App / plataforma</td><td>${fmtPct(settings.platformPct)}</td><td>Meta de ocupacao</td><td>${fmtPct(settings.targetOccPct)}</td></tr>
-      <tr><td>Repasse da area</td><td>${settings.ownerTransferMode === 'net' ? 'Lucro liquido' : 'Faturamento bruto'}</td><td>Percentual da area</td><td>${fmtPct(result.areaSharePct || 0)}</td></tr>
+      <tr><td>App / plataforma</td><td>${fmtPct(settings.platformPct)} sobre recargas/ociosidade</td><td>Meta de ocupacao</td><td>${fmtPct(settings.targetOccPct)}</td></tr>
+      <tr><td>Participacao da area</td><td>Faturamento total</td><td>Percentual da area</td><td>${fmtPct(result.areaSharePct || 0)}</td></tr>
       <tr><td>Base inicial de diluicao</td><td>${fmtKWh(result.planning?.planningKWh || 0)}</td><td>Preco medio vendido</td><td>${fmtPerKWh(result.planning?.salePricePerKWh || 0)}</td></tr>
     </tbody></table>
     <h2>Receitas</h2><table><thead><tr><th>Item</th><th>Regra</th><th>Valor do mes</th><th>R$/kWh</th></tr></thead><tbody>
-      <tr><td>Recargas</td><td>Base importada</td><td>${fmtBRL(result.revenue)}</td><td>${fmtPerKWh(result.energy > 0 ? result.revenue / result.energy : null)}</td></tr>${financeReportRuleRows(result.revenueRuleDetails, 'Sem receitas adicionais')}
+      <tr><td>Recargas e ociosidade</td><td>Base operacional importada</td><td>${fmtBRL(result.chargingRevenue || result.revenue)}</td><td>${fmtPerKWh(result.energy > 0 ? result.revenue / result.energy : null)}</td></tr>${financeReportRuleRows(result.revenueRuleDetails, 'Sem receitas adicionais')}
       <tr><td><strong>Total de receitas</strong></td><td></td><td><strong>${fmtBRL(result.totalRevenue)}</strong></td><td></td></tr>
     </tbody></table>
     <h2>Custos</h2><table><thead><tr><th>Item</th><th>Regra</th><th>Valor do mes</th><th>R$/kWh</th></tr></thead><tbody>
       <tr><td>Energia eletrica</td><td>${fmtBRL(settings.energyCostPerKWh)}/kWh</td><td>${fmtBRL(result.energyCost)}</td><td>${fmtPerKWh(settings.energyCostPerKWh)}</td></tr>${financeReportRuleRows(result.costRuleDetails, 'Sem custos adicionais')}
       <tr><td>Custos da matriz UBY</td><td>Competencia compartilhada</td><td>${fmtBRL(result.matrizCost || 0)}</td><td>${fmtPerKWh(result.matrizCostPerKWh)}</td></tr>
       <tr><td>Parcelas da matriz no caixa</td><td>Pagamento programado</td><td>${fmtBRL(result.matrizCash || 0)}</td><td><small>nao altera a competencia</small></td></tr>
-      <tr><td>Gestao P3</td><td>${fmtPct(settings.managementPct)} do faturamento</td><td>${fmtBRL(result.management)}</td><td>${fmtPerKWh(result.energy > 0 ? result.management / result.energy : null)}</td></tr>
-      <tr><td>App / plataforma</td><td>${fmtPct(settings.platformPct)} do faturamento</td><td>${fmtBRL(result.platform)}</td><td>${fmtPerKWh(result.energy > 0 ? result.platform / result.energy : null)}</td></tr>
-      ${result.areaEligible ? `<tr><td>Participacao da area</td><td>${fmtPct(result.areaSharePct)} sobre ${settings.ownerTransferMode === 'net' ? 'lucro liquido' : 'faturamento'}</td><td>${fmtBRL(result.areaParticipation)}</td><td>${fmtPerKWh(result.energy > 0 ? result.areaParticipation / result.energy : null)}</td></tr>` : ''}
+      <tr><td>Gestao P3</td><td>${fmtPct(settings.managementPct)} do faturamento total</td><td>${fmtBRL(result.management)}</td><td>${fmtPerKWh(result.energy > 0 ? result.management / result.energy : null)}</td></tr>
+      <tr><td>App / plataforma</td><td>${fmtPct(settings.platformPct)} das recargas e ociosidade</td><td>${fmtBRL(result.platform)}</td><td>${fmtPerKWh(result.energy > 0 ? result.platform / result.energy : null)}</td></tr>
+      ${result.areaEligible ? `<tr><td>Participacao da area</td><td>${fmtPct(result.areaSharePct)} sobre o faturamento total</td><td>${fmtBRL(result.areaParticipation)}</td><td>${fmtPerKWh(result.energy > 0 ? result.areaParticipation / result.energy : null)}</td></tr>` : ''}
       <tr><td><strong>Total de custos</strong></td><td></td><td><strong>${fmtBRL(result.totalOperatingCost)}</strong></td><td><strong>${fmtPerKWh(result.totalCostPerKWh)}</strong></td></tr>
     </tbody></table>
     <h2>Resultado e prestacao da area</h2><table><tbody>
@@ -4509,7 +4509,7 @@ function renderFinanceiro(applySaved = true) {
   const { revenue, energy, courtesyCharges, courtesyEnergy, courtesyEnergyCost, courtesyCostExcluded, courtesyTreatment, courtesyResponsible, acRevenue, dcRevenue, management, platform, ubyRoyalty, energyCost, extraCosts, extraRevenue, p3AcEquity, p3DcEquity, p3SocietyProfit, p3Gross, operationNet, ubyNet, saRetention, ubyDistributable, investorDistribution, partnerInvestorDistribution, ubyRetained, partnerShare, ownResult, paybackBase, paybackMonths, roiMonthly, margin, p3InvestmentValue, partnerInvestmentValue } = result;
   const target = targetOccupationMetrics(charges, mk, settings);
   const clients = new Set(charges.map(c => c.userEmail || c.userName).filter(Boolean)).size;
-  const p3TakePct = revenue ? p3Gross / revenue * 100 : 0;
+  const p3TakePct = result.totalRevenue ? p3Gross / result.totalRevenue * 100 : 0;
   const isUbyModel = settings.operationModel === 'uby' || settings.operationModel === 'hybrid';
   const hasP3Society = settings.operationModel === 'p3_society' || settings.operationModel === 'hybrid';
   const isExternalSociety = settings.operationModel === 'p3_society';
@@ -4521,7 +4521,7 @@ function renderFinanceiro(applySaved = true) {
   document.getElementById('financeHeroMeta').innerHTML =
     `Ponto: <strong>${currentWorkName}</strong><br>Mes: <strong>${monthLabel(mk)}</strong><br>${charges.length} recarga(s), ${clients} cliente(s), ${fmtKWh(energy)}${courtesyCharges ? `<br><span style="color:#FFD66B">${courtesyCharges} cortesia(s): ${fmtKWh(courtesyEnergy)}</span>` : ''}`;
   document.getElementById('financeFormula').innerHTML =
-    `<strong>${operationModelLabel(settings.operationModel)}</strong><br>P3: gestao ${settings.managementPct}%${hasUbyRoyalty ? ` | UBY: royalty de marca ${settings.ubyRoyaltyPct}%` : ''}. App/plataforma de terceiros ${settings.platformPct}%.<br>Meta ocupacao: ${fmtPct(target.targetOccPct)} | real ${fmtPct(target.realOccPct)}<br><strong style="color:#57B7FF">Payback: ${formatPaybackMonths(paybackMonths)}</strong>`;
+    `<strong>${operationModelLabel(settings.operationModel)}</strong><br>P3: gestao ${settings.managementPct}% sobre faturamento total${hasUbyRoyalty ? ` | UBY: royalty de marca ${settings.ubyRoyaltyPct}%` : ''}. App/plataforma de terceiros ${settings.platformPct}% somente sobre recargas e ociosidade.<br>Area: ${fmtPct(result.areaSharePct || 0)} sobre faturamento total.<br>Meta ocupacao: ${fmtPct(target.targetOccPct)} | real ${fmtPct(target.realOccPct)}<br><strong style="color:#57B7FF">Payback: ${formatPaybackMonths(paybackMonths)}</strong>`;
 
   document.getElementById('financeKpis').innerHTML = [
     `<div class="card"><div class="label">Receita do mes</div><div class="value">${fmtBRL(revenue)}</div><div class="sub">${charges.length} recarga(s)</div></div>`,
@@ -4540,19 +4540,20 @@ function renderFinanceiro(applySaved = true) {
   ].filter(Boolean).join('');
   document.getElementById('financeDistributionTable').innerHTML = [
     `<tr><td>Modelo da operacao</td><td>${operationModelLabel(settings.operationModel)}</td></tr>`,
-    `<tr><td>Receita total</td><td>${fmtBRL(revenue)}</td></tr>`,
+    `<tr><td>Receitas operacionais (recargas e ociosidade)</td><td>${fmtBRL(result.chargingRevenue || revenue)}</td></tr>`,
     `<tr><td>Receita AC</td><td>${fmtBRL(acRevenue)}</td></tr>`,
     `<tr><td>Receita DC</td><td>${fmtBRL(dcRevenue)}</td></tr>`,
     courtesyCharges ? `<tr><td>Cortesia ${courtesyResponsible ? `— ${escapeHtml(courtesyResponsible)}` : 'do parceiro'}</td><td>${fmtKWh(courtesyEnergy)}${courtesyCostExcluded ? ` · ${fmtBRL(courtesyCostExcluded)} fora do resultado UBY` : ''}</td></tr>` : '',
-    `<tr><td>Gestao P3 (${settings.managementPct}%)</td><td>${fmtBRL(management)}</td></tr>`,
+    `<tr><td>Receitas extras reconhecidas</td><td>${fmtBRL(extraRevenue + Number(result.marketingRevenue || 0))}</td></tr>`,
+    `<tr><td>Faturamento total (base P3 e area)</td><td>${fmtBRL(result.totalRevenue)}</td></tr>`,
+    `<tr><td>Gestao P3 (${settings.managementPct}% sobre faturamento total)</td><td>${fmtBRL(management)}</td></tr>`,
     hasUbyRoyalty ? `<tr><td>Royalty de marca UBY (${settings.ubyRoyaltyPct}%)</td><td>${fmtBRL(ubyRoyalty)}</td></tr>` : '',
-    `<tr><td>App/plataforma terceiros (${settings.platformPct}%)</td><td>${fmtBRL(platform)}</td></tr>`,
-    result.areaEligible ? `<tr><td>Participacao da area (${result.areaSharePct}%)</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
+    `<tr><td>App/plataforma terceiros (${settings.platformPct}% sobre recargas/ociosidade)</td><td>${fmtBRL(platform)}</td></tr>`,
+    result.areaEligible ? `<tr><td>Participacao da area (${result.areaSharePct}% sobre faturamento total)</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em AC (${settings.p3AcEquityPct}%)</td><td>${fmtBRL(p3AcEquity)}</td></tr>` : '',
     settings.operationModel === 'hybrid' ? `<tr><td>Sociedade P3 em DC (${settings.p3DcEquityPct}%)</td><td>${fmtBRL(p3DcEquity)}</td></tr>` : '',
     settings.operationModel === 'p3_society' ? `<tr><td>Resultado P3 na sociedade (${settings.p3SocietyPct}%)</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
     isDirectPartnerModel ? `<tr><td>${(settings.operationModel === 'management_only' || hasUbyRoyalty) ? `Lucro distribuido diretamente ao parceiro ${partnerName}` : `Distribuicao ao socio investidor ${partnerName} (${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}%)`}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
-    `<tr><td>Receitas extras</td><td>${fmtBRL(extraRevenue)}</td></tr>`,
     `<tr><td>Resultado operacional apos custos</td><td>${fmtBRL(operationNet)}</td></tr>`,
     `<tr><td>Percentual P3 bruto</td><td>${fmtPct(p3TakePct)}</td></tr>`,
     `<tr><td>Ocupacao real x objetivo</td><td>${fmtPct(target.realOccPct)} / ${fmtPct(target.targetOccPct)}</td></tr>`,
@@ -4594,7 +4595,7 @@ function renderFinanceiro(applySaved = true) {
   ].filter(Boolean).join('');
   document.getElementById('financeNote').innerHTML =
     isUbyModel
-      ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. O app/plataforma fica separado como servico de terceiros (${fmtBRL(platform)}) e o parceiro da area recebe ${fmtBRL(result.areaParticipation)} conforme a regra cadastrada. A UBY fica com ${fmtBRL(ubyNet)} antes da retencao S.A.; ${fmtBRL(saRetention)} ficam retidos por estatuto e ${fmtBRL(investorDistribution)} sao distribuiveis aos investidores. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
+      ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. A gestao P3 e a participacao da area usam o faturamento total; o app/plataforma (${fmtBRL(platform)}) incide somente nas recargas e ociosidade importadas. A UBY fica com ${fmtBRL(ubyNet)} antes da retencao S.A.; ${fmtBRL(saRetention)} ficam retidos por estatuto e ${fmtBRL(investorDistribution)} sao distribuiveis aos investidores. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
       : settings.operationModel === 'management_only'
         ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} pela gestao. Depois de energia, plataforma e demais custos, o lucro liquido de ${fmtBRL(partnerInvestorDistribution)} e distribuido diretamente para ${partnerName}. Esse pagamento e registrado como distribuicao do parceiro; o payback da P3 continua baseado somente na sua receita de gestao.`
         : hasUbyRoyalty
@@ -4981,7 +4982,7 @@ function renderFinanceOperationalResults(result = {}) {
         <div class="finance-result-card ${resultClass} is-primary"><span>Resultado operacional real</span><strong>${fmtBRL(result.operationNet || 0)}</strong><small>receitas menos ${fmtBRL(directBaseCost)} de base e ${fmtBRL(distributionCost)} de gestao, plataforma e repasses</small></div>
         <div class="finance-result-card ${resultClass}"><span>Resultado por kWh</span><strong>${fmtPerKWh(result.resultPerKWh)}</strong><small>resultado diluido pela energia vendida</small></div>
         <div class="finance-result-card ${marginClass}"><span>Margem operacional</span><strong>${fmtPct(result.operationMargin || 0)}</strong><small>resultado operacional / receitas totais</small></div>
-        ${Number(result.marketingRevenue || 0) > 0 ? `<div class="finance-result-card good is-primary"><span>Marketing / contratos do mês</span><strong>${fmtBRL(result.marketingRevenue)}</strong><small>registrado no fechamento; fora da ocupação, R$/kWh e projeções de recarga</small></div><div class="finance-result-card good"><span>Resultado financeiro após fechamento</span><strong>${fmtBRL(result.financialResult || 0)}</strong><small>resultado operacional + receitas não operacionais reconhecidas</small></div>` : ''}
+        ${Number(result.marketingRevenue || 0) > 0 ? `<div class="finance-result-card good is-primary"><span>Marketing / contratos do mês</span><strong>${fmtBRL(result.marketingRevenue)}</strong><small>fora da ocupação, R$/kWh e projeções; incluído no faturamento total para gestão P3 e área</small></div>` : ''}
       </div>
     </section>
   `;
@@ -5065,8 +5066,11 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const unknownRevenue = Math.max(revenue - acRevenue - dcRevenue, 0);
   const model = normalizeOperationModel(cfg.operationModel);
   cfg.operationModel = model;
-  const management = revenue * cfg.managementPct / 100;
-  const platform = revenue * cfg.platformPct / 100;
+  // A receita importada das plataformas representa exclusivamente a operação de
+  // carregamento (recargas e eventuais cobranças de ociosidade já trazidas no
+  // valor da sessão). A retenção de plataforma incide somente sobre essa base.
+  const chargingRevenue = revenue;
+  const platform = chargingRevenue * cfg.platformPct / 100;
   const ubyRoyalty = model === 'third_party_management' ? revenue * cfg.ubyRoyaltyPct / 100 : 0;
   const taxes = revenue * cfg.taxRatePct / 100;
   const energyCost = commercialEnergy * cfg.energyCostPerKWh;
@@ -5119,11 +5123,18 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const localExtraCosts = costEvaluation.actual;
   const extraCosts = localExtraCosts + matrizCost;
   const extraRevenue = operationalExtraRevenue;
+  // Marketing, mídia, patrocínios e demais receitas não operacionais não
+  // alteram ocupação, ticket ou projeção de recargas. Financeiramente, porém,
+  // compõem o faturamento total sobre o qual incidem gestão P3 e área.
+  const totalRevenue = chargingRevenue + extraRevenue + marketingRevenue;
+  const management = totalRevenue * cfg.managementPct / 100;
   const costs = energyCost + extraCosts + taxes;
-  const preAreaNet = revenue + extraRevenue - management - platform - ubyRoyalty - costs;
+  const preAreaNet = totalRevenue - management - platform - ubyRoyalty - costs;
   const areaEligible = model === 'uby' || model === 'hybrid';
   const areaSharePct = cfg.ownerTransferMode === 'net' ? Number(cfg.ownerNetProfitSharePct || 0) : Number(cfg.ownerRevenueSharePct || 0);
-  const areaShareBase = cfg.ownerTransferMode === 'net' ? Math.max(preAreaNet, 0) : revenue;
+  // A regra vigente é percentual sobre todo o faturamento. Mantemos a escolha
+  // legada apenas para identificar qual percentual já salvo deve ser usado.
+  const areaShareBase = totalRevenue;
   const areaParticipation = areaEligible ? areaShareBase * areaSharePct / 100 : 0;
   const operationNet = preAreaNet - areaParticipation;
   const splitNet = partRevenue => {
@@ -5198,9 +5209,8 @@ function financeForCharges(charges, settings = {}, options = {}) {
     : ((model === 'management_only' || model === 'third_party_management') ? 0 : cfg.investmentValue);
   const paybackMonths = paybackInvestmentValue > 0 && paybackBase > 0 ? paybackInvestmentValue / paybackBase : 0;
   const roiMonthly = paybackInvestmentValue > 0 ? paybackBase / paybackInvestmentValue * 100 : 0;
-  const margin = revenue ? ownResult / revenue * 100 : 0;
-  const totalRevenue = revenue + extraRevenue + marketingRevenue;
-  const financialResult = operationNet + marketingRevenue;
+  const margin = totalRevenue ? ownResult / totalRevenue * 100 : 0;
+  const financialResult = operationNet;
   const totalOperatingCost = energyCost + extraCosts + taxes + management + platform + ubyRoyalty + areaParticipation;
   const matrizCostPerKWh = commercialEnergy > 0 ? matrizCost / commercialEnergy : null;
   const plannedMatrizCostPerKWh = planning.planningKWh > 0 ? matrizCost / planning.planningKWh : null;
@@ -5209,12 +5219,13 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const totalCostPerKWh = commercialEnergy > 0 ? totalOperatingCost / commercialEnergy : null;
   const extraRevenuePerKWh = commercialEnergy > 0 ? extraRevenue / commercialEnergy : null;
   const plannedEnergyCost = planning.planningKWh * cfg.energyCostPerKWh;
-  const plannedManagement = planning.planningRevenue * cfg.managementPct / 100;
+  const plannedTotalRevenue = planning.planningRevenue + plannedOperationalExtraRevenue + marketingPlanned;
+  const plannedManagement = plannedTotalRevenue * cfg.managementPct / 100;
   const plannedPlatform = planning.planningRevenue * cfg.platformPct / 100;
   const plannedUbyRoyalty = model === 'third_party_management' ? planning.planningRevenue * cfg.ubyRoyaltyPct / 100 : 0;
   const plannedTaxes = planning.planningRevenue * cfg.taxRatePct / 100;
-  const plannedPreAreaNet = planning.planningRevenue + plannedOperationalExtraRevenue - plannedManagement - plannedPlatform - plannedUbyRoyalty - plannedTaxes - plannedEnergyCost - costEvaluation.planned - matrizCost;
-  const plannedAreaShareBase = cfg.ownerTransferMode === 'net' ? Math.max(plannedPreAreaNet, 0) : planning.planningRevenue;
+  const plannedPreAreaNet = plannedTotalRevenue - plannedManagement - plannedPlatform - plannedUbyRoyalty - plannedTaxes - plannedEnergyCost - costEvaluation.planned - matrizCost;
+  const plannedAreaShareBase = plannedTotalRevenue;
   const plannedAreaParticipation = areaEligible ? plannedAreaShareBase * areaSharePct / 100 : 0;
   const plannedDirectCost = plannedEnergyCost + costEvaluation.planned + matrizCost + plannedTaxes + plannedAreaParticipation;
   const plannedTotalCost = plannedDirectCost + plannedManagement + plannedPlatform + plannedUbyRoyalty;
@@ -5222,7 +5233,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const plannedExtraRevenuePerKWh = planning.planningKWh > 0 ? plannedOperationalExtraRevenue / planning.planningKWh : null;
   const managementVariable = planning.salePricePerKWh * cfg.managementPct / 100;
   const platformVariable = planning.salePricePerKWh * cfg.platformPct / 100;
-  const areaVariable = areaEligible && cfg.ownerTransferMode !== 'net' ? planning.salePricePerKWh * areaSharePct / 100 : 0;
+  const areaVariable = areaEligible ? planning.salePricePerKWh * areaSharePct / 100 : 0;
   const royaltyVariable = model === 'third_party_management' ? planning.salePricePerKWh * cfg.ubyRoyaltyPct / 100 : 0;
   const taxVariable = planning.salePricePerKWh * cfg.taxRatePct / 100;
   const variableCostPerKWh = cfg.energyCostPerKWh + managementVariable + platformVariable + royaltyVariable + taxVariable + areaVariable + financeVariableCostPerKWh(cfg.costRules, planning);
@@ -5250,6 +5261,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
   return {
     operationModel: model,
     revenue,
+    chargingRevenue,
     energy,
     commercialEnergy,
     courtesyCharges: courtesy.charges,
@@ -11126,7 +11138,7 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
   const royalties = Number(partners.ubyRoyalty || 0);
   const marketing = Number(owned.marketingRevenue || 0);
   const operationalResult = Number(owned.operationNet || 0);
-  const networkResult = operationalResult + royalties + marketing;
+  const networkResult = operationalResult + royalties;
   const positiveResult = Math.max(networkResult, 0);
   const legalReserve = positiveResult * Number(policy.legalReservePct || 0) / 100;
   const expansionReserve = positiveResult * Number(policy.expansionReservePct || 0) / 100;
@@ -11152,21 +11164,20 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
           ${line('Receitas operacionais complementares', fmtBRL(operationalExtras))}
           ${line('Royalties de parceiros (fora da matriz operacional)', fmtBRL(royalties))}
           ${line('Marketing e contratos reconhecidos no fechamento', fmtBRL(marketing))}
-          ${line('Receita operacional de recargas', fmtBRL(rechargeRevenue + operationalExtras), 'finance-total-row')}
+          ${line('Faturamento total (base gestão P3 e área)', fmtBRL(rechargeRevenue + operationalExtras + marketing), 'finance-total-row')}
           <tr class="finance-group-row"><th colspan="2">Custos já reconhecidos na rede</th></tr>
           ${line('Energia', fmtBRL(owned.energyCost))}
           ${line('Operação direta por ativo', fmtBRL(Math.max(0, Number(owned.extraCosts || 0) - Number(owned.matrizCost || 0))))}
           ${line('Tributos diretamente atribuíveis aos carregadores', fmtBRL(owned.taxes))}
           ${line('Tributos corporativos centralizados (dentro do rateio)', fmtBRL(owned.matrizTaxCost))}
           ${line('Demais custos centralizados da matriz (rateados)', fmtBRL(Math.max(0, Number(owned.matrizCost || 0) - Number(owned.matrizTaxCost || 0))))}
-          ${line('Gestão P3', fmtBRL(owned.management))}
-          ${line('App / plataforma', fmtBRL(owned.platform))}
-          ${line('Participação de área', fmtBRL(owned.areaParticipation))}
+          ${line('Gestão P3 (sobre faturamento total)', fmtBRL(owned.management))}
+          ${line('App / plataforma (somente recargas e ociosidade)', fmtBRL(owned.platform))}
+          ${line('Participação de área (sobre faturamento total)', fmtBRL(owned.areaParticipation))}
           ${line('Resultado operacional dos ativos UBY', fmtBRL(operationalResult), 'finance-total-row')}
           <tr class="finance-group-row"><th colspan="2">Resultado final da rede</th></tr>
           ${line('Resultado operacional UBY', fmtBRL(operationalResult))}
           ${line('+ Royalties UBY', fmtBRL(royalties))}
-          ${line('+ Marketing / contratos no fechamento', fmtBRL(marketing))}
           ${line('= Resultado consolidado antes da distribuição', fmtBRL(networkResult), 'finance-total-row')}
         </tbody></table></div>
         <aside style="display:grid;gap:10px;align-content:start">
@@ -11219,7 +11230,7 @@ function networkUnifiedReportModel(options = {}) {
   const operationalResult = Number(owned.operationNet || 0);
   const royalties = Number(partners.ubyRoyalty || 0);
   const marketing = Number(owned.marketingRevenue || 0);
-  const result = operationalResult + royalties + marketing;
+  const result = operationalResult + royalties;
   const distributable = Math.max(result, 0);
   const legalReserve = distributable * Number(policy.legalReservePct || 0) / 100;
   const expansionReserve = distributable * Number(policy.expansionReservePct || 0) / 100;
@@ -11302,9 +11313,10 @@ function generateNetworkUnifiedReport() {
   const dre = [
     ['Faturamento de recargas dos ativos UBY', model.owned.revenue],
     ['Receitas operacionais complementares', operationalExtras],
+    ['Marketing e contratos reconhecidos no fechamento', model.marketing],
+    ['Faturamento total (base gestão P3 e área)', Number(model.owned.revenue || 0) + operationalExtras + model.marketing],
     ['Resultado operacional dos ativos UBY', model.operationalResult],
     ['Royalties de parceiros (fora da matriz operacional)', model.royalties],
-    ['Marketing e contratos reconhecidos no fechamento', model.marketing],
     ['Resultado consolidado da rede', model.result]
   ];
   const costs = [
@@ -11313,9 +11325,9 @@ function generateNetworkUnifiedReport() {
     ['Tributos diretamente atribuíveis aos carregadores', model.owned.taxes],
     ['Tributos corporativos centralizados (dentro do rateio)', model.owned.matrizTaxCost],
     ['Demais custos centralizados da matriz', Math.max(0, Number(model.owned.matrizCost || 0) - Number(model.owned.matrizTaxCost || 0))],
-    ['Gestão P3', model.owned.management],
-    ['App / plataforma', model.owned.platform],
-    ['Participação de área', model.owned.areaParticipation]
+    ['Gestão P3 (sobre faturamento total)', model.owned.management],
+    ['App / plataforma (somente recargas e ociosidade)', model.owned.platform],
+    ['Participação de área (sobre faturamento total)', model.owned.areaParticipation]
   ];
   const printable = window.open('', '_blank');
   if (!printable) return alert('O navegador bloqueou a janela do relatório. Libere pop-ups para gerar o PDF.');
@@ -11353,7 +11365,7 @@ async function exportUbyNetworkFinanceXlsx() {
     const fields = ['revenue','extraRevenue','marketingRevenue','energy','energyCost','extraCosts','matrizCost','matrizTaxCost','taxes','areaParticipation','management','platform','operationNet','ubyRoyalty'];
     const owned = networkFinanceSum(ownedRows, fields);
     const royalties = Number(networkFinanceSum(partnerRows, fields).ubyRoyalty || 0);
-    const result = Number(owned.operationNet || 0) + royalties + Number(owned.marketingRevenue || 0);
+    const result = Number(owned.operationNet || 0) + royalties;
     return { monthKey, owned, royalties, result };
   });
   const workbook = XLSX.utils.book_new();
@@ -11365,7 +11377,7 @@ async function exportUbyNetworkFinanceXlsx() {
     ['Competência exibida', selected.period],
     [],
     ['INDICADOR', 'VALOR'],
-    ['Faturamento de recargas UBY', Number(selected.owned.revenue || 0)],
+    ['Faturamento de recargas e ociosidade UBY', Number(selected.owned.revenue || 0)],
     ['Receitas operacionais complementares', Number(selected.owned.extraRevenue || 0)],
     ['Royalties de parceiros', Number(selected.royalties || 0)],
     ['Marketing e contratos', Number(selected.marketing || 0)],
@@ -11373,9 +11385,9 @@ async function exportUbyNetworkFinanceXlsx() {
     ['Tributos diretamente atribuíveis aos carregadores', Number(selected.owned.taxes || 0)],
     ['Tributos corporativos centralizados (dentro do rateio)', Number(selected.owned.matrizTaxCost || 0)],
     ['Demais custos centralizados da matriz', Math.max(0, Number(selected.owned.matrizCost || 0) - Number(selected.owned.matrizTaxCost || 0))],
-    ['Gestão P3', Number(selected.owned.management || 0)],
-    ['App / plataforma', Number(selected.owned.platform || 0)],
-    ['Participação de área', Number(selected.owned.areaParticipation || 0)],
+    ['Gestão P3 (sobre faturamento total)', Number(selected.owned.management || 0)],
+    ['App / plataforma (somente recargas e ociosidade)', Number(selected.owned.platform || 0)],
+    ['Participação de área (sobre faturamento total)', Number(selected.owned.areaParticipation || 0)],
     ['Resultado operacional UBY', Number(selected.operationalResult || 0)],
     ['Resultado consolidado da rede', Number(selected.result || 0)],
     ['Resultado distribuível', Number(selected.distributable || 0)],
@@ -11392,7 +11404,7 @@ async function exportUbyNetworkFinanceXlsx() {
     ['Retenção — Reserva legal obrigatória da S.A.', Number(policy.legalReservePct || 0) / 100],
     ['Retenção — Fundo de reserva e expansão', Number(policy.expansionReservePct || 0) / 100]
   ];
-  const monthlyRows = [['MÊS', 'FATURAMENTO RECARGAS', 'ENERGIA kWh', 'CUSTO ENERGIA', 'MATRIZ RATEADA', 'TRIBUTOS DIRETOS', 'TRIBUTOS CENTRALIZADOS', 'GESTÃO P3', 'APP / PLATAFORMA', 'PARTICIPAÇÃO DE ÁREA', 'ROYALTIES', 'MARKETING', 'RESULTADO OPERACIONAL', 'RESULTADO REDE']];
+  const monthlyRows = [['MÊS', 'FATURAMENTO RECARGAS/OCIOSIDADE', 'ENERGIA kWh', 'CUSTO ENERGIA', 'MATRIZ RATEADA', 'TRIBUTOS DIRETOS', 'TRIBUTOS CENTRALIZADOS', 'GESTÃO P3 (FAT. TOTAL)', 'APP/PLATAFORMA (RECARGAS/OCIOSIDADE)', 'ÁREA (FAT. TOTAL)', 'ROYALTIES', 'MARKETING', 'RESULTADO OPERACIONAL', 'RESULTADO REDE']];
   monthly.forEach(item => monthlyRows.push([
     monthLabel(item.monthKey), Number(item.owned.revenue || 0), Number(item.owned.energy || 0), Number(item.owned.energyCost || 0), Number(item.owned.matrizCost || 0), Number(item.owned.taxes || 0), Number(item.owned.matrizTaxCost || 0), Number(item.owned.management || 0), Number(item.owned.platform || 0), Number(item.owned.areaParticipation || 0), Number(item.royalties || 0), Number(item.owned.marketingRevenue || 0), Number(item.owned.operationNet || 0), Number(item.result || 0)
   ]));
