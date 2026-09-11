@@ -20,7 +20,7 @@
   .brand-name{font-size:14px;letter-spacing:3px;text-transform:uppercase;opacity:.85}.brand-tag{font-size:11px;opacity:.65;letter-spacing:1px}
   .header h1{font-size:32px;font-weight:700;margin-bottom:8px;position:relative;z-index:1}.subtitle{opacity:.85;font-size:15px;max-width:720px;position:relative;z-index:1}
   .bookmark-hint{position:absolute;top:24px;right:28px;background:rgba(255,255,255,.08);padding:8px 14px;border-radius:20px;font-size:11px;backdrop-filter:blur(6px);z-index:2}.bookmark-hint b{color:#FFE082}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}.stat{background:var(--p3-card);padding:18px;border-radius:12px;border:1px solid var(--p3-border);box-shadow:var(--p3-shadow)}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}.stat{background:var(--p3-card);padding:18px;border-radius:12px;border:1px solid var(--p3-border);box-shadow:var(--p3-shadow)}.stat.alert-stat{border-color:rgba(229,85,69,.7);cursor:pointer}.stat.alert-stat .value{color:var(--p3-danger)}
   .stat .label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--p3-muted);font-weight:600}.stat .value{font-size:28px;font-weight:700;color:var(--p3-primary);margin-top:6px;line-height:1}.unit{font-size:13px;color:var(--p3-muted);font-weight:500;margin-left:4px}.sub{font-size:11px;color:var(--p3-muted);margin-top:6px}
   .toolbar{display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap}.toolbar h2{flex:1;font-size:18px;font-weight:700;color:var(--p3-primary);display:flex;align-items:center;gap:10px}.toolbar h2::before{content:"";width:4px;height:22px;background:var(--p3-accent);border-radius:3px}
   .search{flex:0 0 310px;position:relative}.search input{width:100%;padding:9px 12px 9px 34px;border-radius:8px;border:1px solid var(--p3-border);font-size:13px;background:#13243B;color:var(--p3-text)}.search::before{content:"Buscar";position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:10px;opacity:.55}.search input{padding-left:58px}.search input:focus{outline:none;border-color:var(--p3-accent);box-shadow:0 0 0 3px rgba(45,127,249,.15)}
@@ -155,7 +155,8 @@
   .activity-item .meta{color:var(--p3-primary);font-weight:800;text-transform:uppercase;letter-spacing:.4px;font-size:9px;margin-bottom:4px}
   .operational-board{background:linear-gradient(135deg,rgba(19,56,88,.98),rgba(10,29,48,.98));border:1px solid #2C6D9C;border-radius:14px;padding:20px;margin:0 0 28px;box-shadow:var(--p3-shadow)}
   .operational-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}.operational-head h2{font-size:18px;color:#7FCCFF;margin-bottom:4px}.operational-head .sub{max-width:700px}.operational-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.task-focus{background:rgba(7,20,34,.86);border:1px solid var(--p3-border);border-radius:10px;padding:12px;min-height:156px}.task-focus h3{font-size:12px;color:var(--p3-primary);text-transform:uppercase;letter-spacing:.7px;margin:0 0 9px}.task-focus-item{border-left:3px solid var(--p3-accent);padding:7px 0 7px 9px;border-bottom:1px solid rgba(70,108,139,.34)}.task-focus-item:last-child{border-bottom:0}.task-focus-item.urgent{border-left-color:var(--p3-danger)}.task-focus-item.done{border-left-color:var(--p3-ok)}.task-focus-item strong{display:block;font-size:12px;color:var(--p3-text)}.task-focus-item span{display:block;font-size:10px;color:var(--p3-muted);margin-top:2px}.task-focus-empty{font-size:11px;color:var(--p3-muted);padding:10px 0}
-  @media(max-width:880px){.activity-grid,.operational-columns{grid-template-columns:1fr}.operational-head{flex-direction:column}}
+  .deadline-command{background:linear-gradient(135deg,rgba(99,31,28,.98),rgba(40,20,29,.98));border:1px solid rgba(229,85,69,.7);border-radius:14px;padding:20px;margin:0 0 28px;box-shadow:var(--p3-shadow)}.deadline-command.safe{background:linear-gradient(135deg,rgba(19,56,88,.98),rgba(10,29,48,.98));border-color:#2C6D9C}.deadline-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}.deadline-head h2{font-size:18px;color:#fff;margin-bottom:4px}.deadline-head .sub{max-width:760px}.deadline-columns{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.deadline-card{background:rgba(7,20,34,.82);border:1px solid var(--p3-border);border-radius:10px;padding:12px;min-height:148px}.deadline-card h3{font-size:11px;color:#FFD0CA;text-transform:uppercase;letter-spacing:.7px;margin:0 0 9px}.deadline-command.safe .deadline-card h3{color:#7FCCFF}.deadline-item{border-left:3px solid var(--p3-danger);padding:7px 0 7px 9px;border-bottom:1px solid rgba(255,255,255,.12)}.deadline-item:last-child{border-bottom:0}.deadline-item.warn{border-left-color:var(--p3-warn)}.deadline-item.info{border-left-color:var(--p3-accent)}.deadline-item strong{display:block;font-size:12px;color:var(--p3-text)}.deadline-item span{display:block;font-size:10px;color:var(--p3-muted);margin-top:2px}.deadline-empty{font-size:11px;color:var(--p3-muted);padding:10px 0}.alert-modal{position:fixed;inset:0;background:rgba(2,8,15,.76);z-index:3000;display:none;place-items:center;padding:18px}.alert-modal.open{display:grid}.alert-dialog{width:min(700px,100%);max-height:82vh;overflow:auto;background:#0E1B2D;border:1px solid rgba(229,85,69,.85);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:22px}.alert-dialog h2{color:#FFB3A8;font-size:20px;margin-bottom:6px}.alert-dialog p{font-size:13px;color:var(--p3-muted);margin-bottom:14px}.alert-list{display:grid;gap:8px;margin-bottom:16px}.alert-row{border-left:3px solid var(--p3-danger);background:#0B1524;border-radius:7px;padding:10px}.alert-row strong{display:block;font-size:13px}.alert-row span{display:block;font-size:11px;color:var(--p3-muted);margin-top:3px}.alert-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+  @media(max-width:1100px){.deadline-columns{grid-template-columns:repeat(2,1fr)}}@media(max-width:880px){.activity-grid,.operational-columns,.deadline-columns{grid-template-columns:1fr}.operational-head,.deadline-head{flex-direction:column}}
 
 </style>
 </head>
@@ -195,6 +196,7 @@
     <div class="stat"><div class="label">Progresso medio</div><div class="value" id="statProgresso">54<span class="unit">%</span></div><div class="sub">OK + N/A sobre o total</div></div>
     <div class="stat"><div class="label">Pendencias criticas</div><div class="value" id="statCriticas">9</div><div class="sub">Concessionaria, materiais e eletrica</div></div>
     <div class="stat"><div class="label">Potencia planejada</div><div class="value" id="statKw">270<span class="unit">kW</span></div><div class="sub">Soma das obras cadastradas</div></div>
+    <button class="stat alert-stat" type="button" id="openDeadlineAlerts"><div class="label">Alertas de prazo</div><div class="value" id="statDeadlineAlerts">0</div><div class="sub" id="statDeadlineSub">Nenhuma ação imediata</div></button>
   </div>
 
   <div class="cloud-panel">
@@ -209,6 +211,19 @@
     </div>
   </div>
 
+  <section class="deadline-command safe" id="deadlineCommand" aria-label="Central de prazos e pendências">
+    <div class="deadline-head">
+      <div><h2>Central de prazos e pendências</h2><div class="sub" id="deadlineSummary">Consolidando atrasos, entregas próximas e cadastros sem responsável ou prazo.</div></div>
+      <a class="new-btn" href="../tarefas/?filter=critical">Tratar pendências</a>
+    </div>
+    <div class="deadline-columns">
+      <div class="deadline-card"><h3>Atrasadas</h3><div id="deadlineLate"></div></div>
+      <div class="deadline-card"><h3>Próximas 7 dias</h3><div id="deadlineSoon"></div></div>
+      <div class="deadline-card"><h3>Obras em risco</h3><div id="deadlineWorks"></div></div>
+      <div class="deadline-card"><h3>Cadastro a completar</h3><div id="deadlineHygiene"></div></div>
+    </div>
+  </section>
+
   <section class="operational-board" aria-label="Controle operacional de tarefas">
     <div class="operational-head">
       <div><h2>Controle operacional das obras</h2><div class="sub">Próximos passos, prazos e entregas reunidos em um só lugar. As alterações ficam vinculadas à central compartilhada de tarefas.</div></div>
@@ -220,6 +235,15 @@
       <div class="task-focus"><h3>Concluído nesta semana</h3><div id="tasksDoneWeek"></div></div>
     </div>
   </section>
+
+  <div class="alert-modal" id="deadlineAlertModal" role="dialog" aria-modal="true" aria-labelledby="deadlineAlertTitle">
+    <div class="alert-dialog">
+      <h2 id="deadlineAlertTitle">Atenção: pendências que exigem decisão</h2>
+      <p id="deadlineAlertText"></p>
+      <div class="alert-list" id="deadlineAlertList"></div>
+      <div class="alert-actions"><button class="ghost-btn" type="button" id="dismissDeadlineAlerts">Lembrar amanhã</button><a class="new-btn" href="../tarefas/?filter=critical">Abrir gestão de tarefas</a></div>
+    </div>
+  </div>
 
   <div class="activity-grid">
     <div class="activity-panel">
@@ -349,12 +373,12 @@ function detailKey(id){return "uby-obra-detalhe-"+(id||"rio")}
 function detailStats(detail){const tasks=(detail.phases||[]).flatMap(p=>(p.tasks||[]).map(t=>({...t,phase:p.name})));const total=tasks.length||1;const released=tasks.filter(t=>t.status==="done"||t.status==="na").length;const pct=Math.round(released/total*100);const critical=tasks.filter(t=>["Concessionaria","Orcamentos e contratacoes","Materiais e equipamentos","Obra eletrica"].includes(t.phase)&&["pending","doing"].includes(t.status));return{pct,crit:critical.length,flags:critical.slice(0,3).map(t=>t.title)}}
 function workDetailLink(id){return `gestao_obra_ev_detalhe.html?obra=${encodeURIComponent(String(id||""))}`}
 function obraFromDetail(id,detail){const p=detail.project||{};const qtd=parseInt(p.qtdCarregadores,10)||parseInt((p.equip||"1 x 60").split("x")[0],10)||1;const pot=parseInt(p.potenciaCarregador,10)||parseInt((p.equip||"1 x 60").split("x")[1],10)||60;const ds=detailStats(detail);return{id,nome:p.obraNome||id,cliente:p.cliente||"Cliente",local:p.local||"Local a definir",status:p.statusExec||"Projeto",kind:ds.pct>=100?"ok":ds.crit?"danger":"warn",pct:ds.pct,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,crit:ds.crit,flags:ds.flags.length?ds.flags:(ds.pct===100?["Obra completa"]:["Obra criada"]),link:workDetailLink(id)}}
-function mergeDetailData(obra){try{const detail=JSON.parse(localStorage.getItem(detailKey(obra.id)));if(!detail||!detail.project)return obra;const qtd=parseInt(detail.project.qtdCarregadores,10)||parseInt((detail.project.equip||"1 x 60").split("x")[0],10)||1;const pot=parseInt(detail.project.potenciaCarregador,10)||parseInt((detail.project.equip||"1 x 60").split("x")[1],10)||60;const ds=detailStats(detail);return{...obra,nome:detail.project.obraNome||obra.nome,local:detail.project.local||obra.local,status:detail.project.statusExec||obra.status,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,pct:ds.pct,crit:ds.crit,flags:ds.flags.length?ds.flags:(ds.pct===100?["Obra completa"]:obra.flags)}}catch{return obra}}
+function mergeDetailData(obra){try{const detail=obra?.detail?.project?obra.detail:JSON.parse(localStorage.getItem(detailKey(obra.id)));if(!detail||!detail.project)return obra;const qtd=parseInt(detail.project.qtdCarregadores,10)||parseInt((detail.project.equip||"1 x 60").split("x")[0],10)||1;const pot=parseInt(detail.project.potenciaCarregador,10)||parseInt((detail.project.equip||"1 x 60").split("x")[1],10)||60;const ds=detailStats(detail);return{...obra,nome:detail.project.obraNome||obra.nome,local:detail.project.local||obra.local,status:detail.project.statusExec||obra.status,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,pct:ds.pct,crit:ds.crit,flags:ds.flags.length?ds.flags:(ds.pct===100?["Obra completa"]:obra.flags)}}catch{return obra}}
 function deletedIds(){try{return JSON.parse(localStorage.getItem(deletedKey))||[]}catch{return[]}}
 function effectiveDeletedIds(){return [...new Set(deletedIds().filter(Boolean))]}
 function isArchived(obra){return Boolean(obra?.archived||/arquivad/i.test(obra?.status||obra?.statusExec||""))}
-function detailObras(){const deleted=new Set([...effectiveDeletedIds(),"shopping","prospect-19"]);const items=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||!key.startsWith("uby-obra-detalhe-"))continue;const id=key.replace("uby-obra-detalhe-","");if(deleted.has(id))continue;try{const detail=JSON.parse(localStorage.getItem(key));if(detail&&detail.project&&!isArchived(detail.project)&&!/shopping aurora/i.test(detail.project.obraNome||""))items.push(obraFromDetail(id,detail))}catch{}}return items}
-function normalizeDefaults(saved){const deleted=new Set([...effectiveDeletedIds(),"shopping","prospect-19"]);const activeBase=baseObras.filter(o=>!deleted.has(o.id)&&!isArchived(o));const byId=new Map((saved||[]).filter(o=>!deleted.has(o.id)&&!isArchived(o)&&!/shopping aurora/i.test(o.nome||"")).map(o=>[o.id,o]));activeBase.forEach(base=>{if(!byId.has(base.id))byId.set(base.id,base)});detailObras().forEach(obra=>byId.set(obra.id,{...(byId.get(obra.id)||{}),...obra}));return [...byId.values()].map(o=>o.id==="rio"&&o.pct<100?{...o,...baseObras.find(b=>b.id==="rio")}:o)}
+function detailObras(){const deleted=new Set(effectiveDeletedIds());const items=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||!key.startsWith("uby-obra-detalhe-"))continue;const id=key.replace("uby-obra-detalhe-","");if(deleted.has(id))continue;try{const detail=JSON.parse(localStorage.getItem(key));if(detail&&detail.project&&!isArchived(detail.project))items.push(obraFromDetail(id,detail))}catch{}}return items}
+function normalizeDefaults(saved){const deleted=new Set(effectiveDeletedIds());const activeBase=baseObras.filter(o=>!deleted.has(o.id)&&!isArchived(o));const byId=new Map((saved||[]).filter(o=>!deleted.has(o.id)&&!isArchived(o)).map(o=>[o.id,o]));activeBase.forEach(base=>{if(!byId.has(base.id))byId.set(base.id,base)});detailObras().forEach(obra=>byId.set(obra.id,{...(byId.get(obra.id)||{}),...obra}));return [...byId.values()].map(o=>o.id==="rio"&&o.pct<100?{...o,...baseObras.find(b=>b.id==="rio")}:o)}
 function loadObras(){try{return normalizeDefaults(JSON.parse(localStorage.getItem(obrasKey))).map(mergeDetailData)}catch{return normalizeDefaults([]).map(mergeDetailData)}}
 function saveObras(){localStorage.setItem(obrasKey,JSON.stringify(obras))}
 function sortObras(list){return [...list].sort((a,b)=>(a.pct??0)-(b.pct??0)||a.nome.localeCompare(b.nome))}
