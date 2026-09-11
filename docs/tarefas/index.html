@@ -99,6 +99,7 @@
 const tasksKey="uby-tarefas-v1";
 const backupKey="uby-tarefas-backups-v1";
 const statuses=["Pendente","Em andamento","Aguardando terceiro","Concluida"];
+const taskRoute=new URLSearchParams(location.search);
 const seed=(window.UBY_APP_DATA?.baseTasks||[]).map(task=>({...task,due:addDays(task.dueOffset||0)}));
 let tasks=loadTasks();
 function addDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
@@ -112,7 +113,7 @@ function daysTo(due){if(!due)return 999;const today=new Date();today.setHours(0,
 function dueClass(t){const d=daysTo(t.due);if(t.status==="Concluida")return"due-ok";if(d<0)return"due-danger";if(d<=1)return"due-warn";return"due-ok"}
 function dueText(t){const d=daysTo(t.due);if(!t.due)return"Sem prazo";if(d<0)return`${Math.abs(d)} dia(s) atrasada`;if(d===0)return"Hoje";if(d===1)return"Amanha";return`${d} dias`}
 function priorityClass(p){return p==="Alta"?"high":p==="Media"?"medium":"low"}
-function filtered(){const q=document.getElementById("search").value.toLowerCase();const fs=document.getElementById("filterStatus").value;const fp=document.getElementById("filterPriority").value;return tasks.filter(t=>(!fs||t.status===fs)&&(!fp||t.priority===fp)&&[t.title,t.project,t.owner,t.note].join(" ").toLowerCase().includes(q))}
+function filtered(){const q=document.getElementById("search").value.toLowerCase();const fs=document.getElementById("filterStatus").value;const fp=document.getElementById("filterPriority").value;const critical=taskRoute.get("filter")==="critical";return tasks.filter(t=>(!fs||t.status===fs)&&(!fp||t.priority===fp)&&(!critical||t.status!=="Concluida"&&((t.due&&daysTo(t.due)<=2)||t.priority==="Alta"||!t.due||!t.owner||/sem responsavel/i.test(t.owner)))&&[t.title,t.project,t.owner,t.note].join(" ").toLowerCase().includes(q))}
 async function setStatus(id,status){const t=tasks.find(x=>x.id===id);if(!t)return;const wasCompleted=t.status==="Concluida";t.status=status;if(status==="Concluida"&&!wasCompleted)t.completedAt=new Date().toISOString();if(status!=="Concluida")delete t.completedAt;await saveTasks();render()}
 async function removeTask(id){if(!confirm("Excluir esta tarefa?"))return;tasks=tasks.filter(t=>t.id!==id);localStorage.setItem(tasksKey,JSON.stringify(tasks));try{await window.UBY_STORE?.deleteTask(id);await window.UBY_STORE?.saveTasks(tasks)}catch(err){alert("Tarefa removida localmente, mas nao foi possivel excluir no banco: "+err.message)}render()}
 async function createTask(){const title=document.getElementById("taskTitle").value.trim();if(!title){alert("Informe a tarefa.");return}const status=document.getElementById("taskStatus").value;tasks.unshift({id:"task-"+Date.now(),title,project:document.getElementById("taskProject").value,owner:document.getElementById("taskOwner").value||"Sem responsavel",due:document.getElementById("taskDue").value,priority:document.getElementById("taskPriority").value,status,note:document.getElementById("taskNote").value,createdAt:new Date().toISOString(),...(status==="Concluida"?{completedAt:new Date().toISOString()}: {})});await saveTasks();document.getElementById("newPanel").classList.remove("open");["taskTitle","taskOwner","taskDue","taskNote"].forEach(id=>document.getElementById(id).value="");render()}
@@ -130,7 +131,7 @@ document.getElementById("backupBtn").addEventListener("click",exportBackup);
 document.getElementById("restoreBtn").addEventListener("click",()=>document.getElementById("restoreFile").click());
 document.getElementById("restoreFile").addEventListener("change",e=>importBackup(e.target.files[0]));
 ["search","filterStatus","filterPriority"].forEach(id=>document.getElementById(id).addEventListener("input",render));
-async function initData(){managedBackup("antes de carregar pagina");render();tasks=await window.UBY_STORE.loadTasks(tasks);render()}
+async function initData(){managedBackup("antes de carregar pagina");if(taskRoute.get("filter")==="critical"){document.querySelector(".toolbar h2").textContent="Pendências críticas";document.getElementById("search").placeholder="Filtrando atrasos, prazo próximo e cadastro incompleto"}render();tasks=await window.UBY_STORE.loadTasks(tasks);render()}
 initData();
 </script>
 </body>
