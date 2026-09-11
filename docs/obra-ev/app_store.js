@@ -5,7 +5,7 @@
   const MESSAGE_KEY = "uby-messages-v1";
   const MARKET_KEY = "uby-mercado-v1";
   const DELETED_WORKS_KEY = "uby-obras-dashboard-deleted-v1";
-  const CORE_WORK_IDS = new Set(["rio", "malassise", "prospect-1", "prospect-29"]);
+  const CORE_WORK_IDS = new Set(["rio", "posto-central-jk", "malassise", "prospect-1", "prospect-29"]);
 
   function available() {
     return Boolean(window.UBY_SUPABASE?.configured?.() && window.UBY_SUPABASE?.client?.());
@@ -56,7 +56,7 @@
       nome: row.nome,
       cliente: row.cliente || raw.cliente || row.nome,
       local: row.local || raw.local || "",
-      status: String(row.id) === "malassise" ? "Concluida" : (row.status_exec || raw.status || "Projeto"),
+      status: ["posto-central-jk", "malassise"].includes(String(row.id)) ? "Concluida" : (row.status_exec || raw.status || "Projeto"),
       kind: raw.kind || ((row.criticas || 0) ? "danger" : "warn"),
       pct: Number(row.progresso || 0),
       kw: Number(row.potencia_kw || 0),
