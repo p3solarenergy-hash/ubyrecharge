@@ -5757,6 +5757,18 @@ function matrizNormalizeCost(raw = {}) {
     allocation: ['equal', 'power', 'energy', 'revenue', 'custom'].includes(raw.allocation) ? raw.allocation : 'equal',
     targets: targets.map(target => ({ scope: String(target.scope || ''), workId: String(target.workId || String(target.scope || '').split('::')[0] || ''), station: safeText(target.station || target.stationName || ''), stationKey: normalizeStationForCompare(target.stationKey || target.station || target.stationName || ''), workName: safeText(target.workName || ''), startMonth: String(target.startMonth || raw.startMonth || ''), share: Math.max(0, Number(target.share || 0)) })).filter(target => target.scope || (target.workId && target.stationKey)),
     documentRef: safeText(raw.documentRef || ''), notes: safeText(raw.notes || ''),
+    // Compromissos de caixa por carregador ficam no mesmo cofre sincronizado
+    // da matriz, mas não entram no DRE sem lançamento financeiro explícito.
+    scheduledPayment: raw.scheduledPayment === true,
+    paymentLedger: raw.paymentLedger && typeof raw.paymentLedger === 'object' && !Array.isArray(raw.paymentLedger)
+      ? Object.entries(raw.paymentLedger).reduce((ledger, [monthKeyValue, entry]) => {
+        if (!/^\d{4}-\d{2}$/.test(monthKeyValue)) return ledger;
+        ledger[monthKeyValue] = {
+          status: entry?.status === 'paid' ? 'paid' : 'pending',
+          paidAt: String(entry?.paidAt || ''), updatedAt: String(entry?.updatedAt || '')
+        };
+        return ledger;
+      }, {}) : {},
     // Evita reaplicar migrações automáticas quando o usuário editar o custo.
     accrualVersion: Math.max(0, Number(raw.accrualVersion || 0)), enabled: raw.enabled !== false && raw.ativo !== false,
     createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || new Date().toISOString()
@@ -5856,6 +5868,7 @@ function matrizCompetencyAmount(item = {}) {
   return Math.max(0, Number(item.amount || 0));
 }
 function matrizCashAmount(item = {}, mk = '') {
+  if (item.scheduledPayment) return 0;
   const offset = matrizMonthOffset(item.startMonth || mk, mk);
   if (offset < 0) return 0;
   if (item.costKind === 'one_off') return offset === 0 ? Math.max(0, Number(item.amount || 0)) : 0;
@@ -5863,7 +5876,7 @@ function matrizCashAmount(item = {}, mk = '') {
   return (!item.endMonth || mk <= item.endMonth) ? Math.max(0, Number(item.amount || 0)) : 0;
 }
 function matrizApplies(item, mk) {
-  if (!item?.enabled || !mk) return false;
+  if (!item?.enabled || item.scheduledPayment || !mk) return false;
   const offset = matrizMonthOffset(item.startMonth || mk, mk);
   if (offset < 0 || (item.endMonth && mk > item.endMonth)) return false;
   if (item.costKind === 'one_off') return offset === 0;
@@ -6076,7 +6089,7 @@ function renderMatrizCosts(unitData) {
   const mk = financeMonthKey() || getMonths().at(-1) || '';
   const allIncludedRows = getUbyChargerRows(unitData).filter(row => row.included);
   const rows = matrizEligibleRows(unitData, mk);
-  const costs = loadMatrizCosts();
+  const costs = loadMatrizCosts().filter(item => !item.scheduledPayment);
   const planned = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + matrizCompetencyAmount(item), 0);
   const monthEl = matrizInput('matrizMonthLabel'); if (monthEl) monthEl.textContent = mk ? `competencia ${monthLabel(mk)} | cadastro salvo separadamente das recargas` : 'selecione a competencia';
   listEl.innerHTML = costs.length ? costs.map(item => {
@@ -6126,7 +6139,7 @@ function renderMatrizMonthlyDre(rows = [], activeMonth = '') {
     host.style.marginTop = '18px';
     anchor.insertAdjacentElement('afterend', host);
   }
-  const costs = loadMatrizCosts();
+  const costs = loadMatrizCosts().filter(item => !item.scheduledPayment);
   const chargeMonths = rows.flatMap(row => (row.charges || []).map(chargeMonthKey)).filter(mk => mk !== 'unknown');
   const starts = costs.map(item => item.startMonth).filter(mk => /^\d{4}-\d{2}$/.test(mk));
   // Mantem visiveis todos os meses de cobertura do custo parcelado, inclusive
@@ -6353,6 +6366,7 @@ function renderGeneralFinance(unitData) {
   const best = [...rows].sort((a, b) => financeUnitOutcome(b.finance).value - financeUnitOutcome(a.finance).value)[0];
   renderGeneralFinanceOverview(rows);
   renderUbyFinanceWorkspace(unitData);
+  renderScheduledPayments(unitData);
   const managementByMonth = new Map();
   rows.forEach(row => (row.financeMonths || []).forEach(({ monthKey, result }) => {
     if (!monthKey) return;
@@ -6426,6 +6440,80 @@ function renderGeneralFinance(unitData) {
     return `<tr><td>${monthLabel(item.monthKey)}</td><td>${fmtBRL(item.management)}</td><td>${fmtBRL(item.ubyRoyalty)}</td><td>${fmtBRL(item.p3SocietyProfit)}</td><td>${fmtBRL(p3Total)}</td><td>${item.units.size}</td></tr>`;
   }).join('') : '<tr><td colspan="6" style="color:var(--p3-muted);text-align:center;padding:20px">Sem competencias financeiras registradas</td></tr>';
   markOverviewRendered('financeiroGeral');
+}
+
+function showGeneralFinanceView(view, button) {
+  const payments = view === 'payments';
+  const summary = document.getElementById('generalFinanceSummary');
+  const paymentPanel = document.getElementById('generalFinancePayments');
+  if (summary) summary.style.display = payments ? 'none' : 'block';
+  if (paymentPanel) paymentPanel.style.display = payments ? 'block' : 'none';
+  document.querySelectorAll('[data-general-finance-view]').forEach(item => item.classList.toggle('active', item === button));
+  if (payments) renderScheduledPayments(getGeneralUnitData());
+}
+
+function scheduledPaymentApplies(item, monthKeyValue) {
+  return !!(item?.scheduledPayment && item.enabled && /^\d{4}-\d{2}$/.test(monthKeyValue || '') &&
+    (!item.startMonth || item.startMonth <= monthKeyValue) && (!item.endMonth || item.endMonth >= monthKeyValue));
+}
+function scheduledPaymentDueDate(item, monthKeyValue) {
+  const [year, month] = String(monthKeyValue).split('-').map(Number);
+  const day = Math.min(Math.max(1, Number(item.dueDay || 1)), new Date(year, month, 0).getDate());
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+function scheduledPaymentTarget(item) {
+  const target = item?.targets?.[0] || {};
+  return { workId: String(target.workId || String(target.scope || '').split('::')[0] || ''), station: target.station || '', workName: target.workName || '' };
+}
+function scheduledPaymentStatus(item, monthKeyValue, now = new Date()) {
+  if (item.paymentLedger?.[monthKeyValue]?.status === 'paid') return { key: 'paid', label: 'Pago', className: 'positive' };
+  const due = scheduledPaymentDueDate(item, monthKeyValue);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const nextWeek = new Date(today); nextWeek.setDate(nextWeek.getDate() + 7);
+  if (dueDay < today) return { key: 'overdue', label: 'Vencido', className: 'negative' };
+  if (dueDay.getTime() === today.getTime()) return { key: 'today', label: 'Vence hoje', className: 'warn' };
+  if (dueDay <= nextWeek) return { key: 'soon', label: 'Próximos 7 dias', className: 'warn' };
+  return { key: 'pending', label: 'Programado', className: '' };
+}
+
+function renderScheduledPayments(unitData = getGeneralUnitData()) {
+  const host = document.getElementById('scheduledPaymentsWorkspace');
+  if (!host) return;
+  const selectedMonth = document.getElementById('scheduledPaymentMonth')?.value || monthKey(new Date());
+  const stationRows = getGeneralStationRows(unitData || []);
+  const payments = loadMatrizCosts().filter(item => scheduledPaymentApplies(item, selectedMonth))
+    .sort((a, b) => scheduledPaymentDueDate(a, selectedMonth) - scheduledPaymentDueDate(b, selectedMonth));
+  const totals = payments.reduce((sum, item) => {
+    const status = scheduledPaymentStatus(item, selectedMonth), amount = Number(item.amount || 0);
+    sum.total += amount; if (status.key === 'paid') sum.paid += amount; else sum.pending += amount; if (status.key === 'overdue') sum.overdue += amount;
+    return sum;
+  }, { total: 0, paid: 0, pending: 0, overdue: 0 });
+  const stationOptions = stationRows.map(row => {
+    const scope = `${row.workId}::${normalizeStationForCompare(row.stationName || row.station || row.workName)}`;
+    return `<option value="${escapeAttr(scope)}" data-work-name="${escapeAttr(row.workName || '')}" data-station="${escapeAttr(row.stationName || row.station || row.workName || '')}">${escapeHtml(row.stationName || row.station || row.workName)} | ${escapeHtml(row.workName || '')}</option>`;
+  }).join('');
+  host.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap"><div><h2 style="margin:0">Pagamentos programados por carregador</h2><p class="sub" style="margin:6px 0 0;max-width:78ch">Calendário central de caixa: acompanhe vencimentos de cada ponto, como internet no dia 11, sem abrir obra por obra. Este controle não altera o DRE nem custos já fechados.</p></div><label class="sub">COMPETÊNCIA<input id="scheduledPaymentMonth" type="month" value="${escapeAttr(selectedMonth)}" onchange="renderScheduledPayments(getGeneralUnitData())" style="display:block;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label></div>
+    <div class="kpis" style="margin-top:16px"><div class="card"><div class="label">Programado no mês</div><div class="value">${fmtBRL(totals.total)}</div><div class="sub">${payments.length} compromisso(s)</div></div><div class="card"><div class="label">Em aberto</div><div class="value">${fmtBRL(totals.pending)}</div><div class="sub">aguardando pagamento</div></div><div class="card"><div class="label">Vencido</div><div class="value" style="color:${totals.overdue ? 'var(--p3-danger)' : 'var(--p3-ok)'}">${fmtBRL(totals.overdue)}</div><div class="sub">exige tratamento</div></div><div class="card"><div class="label">Pago</div><div class="value" style="color:var(--p3-ok)">${fmtBRL(totals.paid)}</div><div class="sub">competência selecionada</div></div></div>
+    <div style="overflow-x:auto;margin-top:16px"><table><thead><tr><th>Pagamento</th><th>Carregador / obra</th><th>Vencimento</th><th>Valor</th><th>Situação</th><th style="text-align:right">Ação</th></tr></thead><tbody>${payments.length ? payments.map(item => { const target = scheduledPaymentTarget(item), status = scheduledPaymentStatus(item, selectedMonth), due = scheduledPaymentDueDate(item, selectedMonth).toLocaleDateString('pt-BR'); return `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="sub">${escapeHtml(item.category)}${item.supplier ? ` | ${escapeHtml(item.supplier)}` : ''}</div></td><td>${escapeHtml(target.station || 'Carregador não identificado')}<div class="sub">${escapeHtml(target.workName || '')}</div></td><td>${due}<div class="sub">todo dia ${item.dueDay}</div></td><td class="num" style="text-align:right">${fmtBRL(item.amount)}</td><td><span class="finance-setting-state ${status.className}">${status.label}</span></td><td style="text-align:right">${status.key === 'paid' ? `<button class="btn-recalc" type="button" onclick="setScheduledPaymentStatus('${escapeAttr(item.id)}','${escapeAttr(selectedMonth)}','pending')">Reabrir</button>` : `<button class="btn-open" type="button" onclick="setScheduledPaymentStatus('${escapeAttr(item.id)}','${escapeAttr(selectedMonth)}','paid')">Marcar pago</button>`} <button class="btn-recalc" type="button" onclick="openFinanceUnit('${escapeAttr(target.workId)}','${escapeAttr(target.station)}')">Abrir</button></td></tr>`; }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--p3-muted);padding:18px">Nenhum pagamento programado nesta competência.</td></tr>'}</tbody></table></div>
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--p3-border)"><h3 style="margin:0">Adicionar pagamento recorrente</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:12px"><label class="sub">CARREGADOR<select id="scheduledPaymentTarget" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="">Selecione o carregador</option>${stationOptions}</select></label><label class="sub">PAGAMENTO<input id="scheduledPaymentName" type="text" placeholder="Ex.: Internet do ponto" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label><label class="sub">FORNECEDOR<input id="scheduledPaymentSupplier" type="text" placeholder="Ex.: Operadora" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label><label class="sub">CATEGORIA<select id="scheduledPaymentCategory" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Internet / dados</option><option>Energia</option><option>Locação / aluguel</option><option>Seguro</option><option>Manutenção</option><option>Licença / plataforma</option><option>Outros custos</option></select></label><label class="sub">VALOR MENSAL (R$)<input id="scheduledPaymentAmount" type="number" min="0" step="0.01" placeholder="0,00" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label><label class="sub">DIA DO VENCIMENTO<input id="scheduledPaymentDueDay" type="number" min="1" max="31" value="11" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label><label class="sub">INICIA EM<input id="scheduledPaymentStartMonth" type="month" value="${escapeAttr(selectedMonth)}" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label><label class="sub">TERMINA EM (OPCIONAL)<input id="scheduledPaymentEndMonth" type="month" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label></div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px"><button class="btn-open" type="button" onclick="addScheduledPayment()">Adicionar pagamento programado</button><span id="scheduledPaymentFeedback" class="sub"></span></div></div>`;
+}
+
+function setScheduledPaymentFeedback(message, isError = false) { const el = document.getElementById('scheduledPaymentFeedback'); if (el) { el.textContent = message; el.style.color = isError ? 'var(--p3-danger)' : 'var(--p3-ok)'; } }
+function addScheduledPayment() {
+  const targetEl = document.getElementById('scheduledPaymentTarget'), targetOption = targetEl?.selectedOptions?.[0];
+  const name = safeText(document.getElementById('scheduledPaymentName')?.value || '').trim(), amount = Math.max(0, Number(document.getElementById('scheduledPaymentAmount')?.value || 0));
+  const startMonth = document.getElementById('scheduledPaymentStartMonth')?.value || monthKey(new Date());
+  if (!targetOption?.value || !name || !amount || !/^\d{4}-\d{2}$/.test(startMonth)) { setScheduledPaymentFeedback('Informe carregador, pagamento, valor e mês inicial.', true); return; }
+  const [workId] = String(targetOption.value).split('::');
+  const item = matrizNormalizeCost({ id: `p${Date.now().toString(36)}`, name, amount, scheduledPayment: true, costKind: 'recurring', installments: 1, coverageMonths: 1, category: document.getElementById('scheduledPaymentCategory')?.value || 'Outros custos', supplier: document.getElementById('scheduledPaymentSupplier')?.value || '', startMonth, endMonth: document.getElementById('scheduledPaymentEndMonth')?.value || '', dueDay: document.getElementById('scheduledPaymentDueDay')?.value || 11, allocation: 'equal', paymentLedger: {}, enabled: true, targets: [{ scope: targetOption.value, workId, station: targetOption.dataset.station || '', workName: targetOption.dataset.workName || '', startMonth, share: 100 }] });
+  saveMatrizCosts([...loadMatrizCosts(), item]); renderScheduledPayments(getGeneralUnitData()); setScheduledPaymentFeedback('Pagamento programado salvo e sincronizando com a nuvem.');
+}
+function setScheduledPaymentStatus(id, monthKeyValue, status) {
+  const item = loadMatrizCosts().find(cost => cost.id === id && cost.scheduledPayment); if (!item || !/^\d{4}-\d{2}$/.test(monthKeyValue || '')) return;
+  item.paymentLedger = { ...(item.paymentLedger || {}), [monthKeyValue]: { status: status === 'paid' ? 'paid' : 'pending', paidAt: status === 'paid' ? new Date().toISOString() : '', updatedAt: new Date().toISOString() } }; item.updatedAt = new Date().toISOString();
+  saveMatrizCosts(loadMatrizCosts()); renderScheduledPayments(getGeneralUnitData());
 }
 
 // Mantem a operacao UBY leve: controles de custos compartilhados e leitura

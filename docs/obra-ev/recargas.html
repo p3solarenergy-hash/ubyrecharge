@@ -1653,6 +1653,12 @@
       <div class="formula" id="generalFinanceHeroFormula">A P3 cobra gestao sobre o faturamento; a UBY recebe o resultado operacional dos carregadores e repassa aos investidores conforme cotas.</div>
     </section>
 
+    <div class="finance-flow-nav" style="margin:18px 0 0" aria-label="Visões do financeiro UBY">
+      <button class="btn-recalc active" type="button" data-general-finance-view="summary" onclick="showGeneralFinanceView('summary',this)">Resumo financeiro</button>
+      <button class="btn-recalc" type="button" data-general-finance-view="payments" onclick="showGeneralFinanceView('payments',this)">Pagamentos programados</button>
+    </div>
+
+    <div id="generalFinanceSummary">
     <section class="finance-overview-grid" id="generalFinanceOverview"></section>
 
     <section class="grid kpis" id="kpiGeneralFinance"></section>
@@ -1674,6 +1680,13 @@
         </div>
       </div>
     </section>
+    </div>
+
+    <div id="generalFinancePayments" style="display:none">
+      <section class="section" style="margin-top:18px">
+        <div class="card" id="scheduledPaymentsWorkspace" aria-live="polite"></div>
+      </section>
+    </div>
   </div>
 
   <div id="tabMensal" style="display:none">
