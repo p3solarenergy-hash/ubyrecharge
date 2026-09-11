@@ -6233,6 +6233,10 @@ function countDetailedCharges() {
 async function renderFinanceOnly() {
   await ensureMatrizCostsLoaded();
   const unitData = getGeneralUnitData();
+  // A página Financeiro UBY é a entrada principal usada pelo botão do painel.
+  // Renderiza a agenda antes da DRE para manter os vencimentos acessíveis
+  // mesmo quando ainda não houver recargas no período.
+  renderScheduledPayments(unitData);
   const ubyRows = getUbyChargerRows(unitData);
   const includedRows = ubyRows.filter(r => r.included);
   const nRec = Object.keys(allRechargeRecords || {}).length;
