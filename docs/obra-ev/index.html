@@ -466,5 +466,6 @@ document.getElementById("sendGeneralMessage").addEventListener("click",sendGener
 async function initData(){renderPhases();renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();renderOperationalTasks();try{await window.UBY_ACTIVITY?.refresh?.();await refreshCloudData();await refreshOperationalTasks();renderActivityCenter();}catch(err){setCloudStatus("Banco indisponivel: "+err.message,"danger")}}
 initData();
 </script>
+<script src="obras_pendencias_geral.js?v=20260911-work-command1"></script>
 </body>
 </html>
