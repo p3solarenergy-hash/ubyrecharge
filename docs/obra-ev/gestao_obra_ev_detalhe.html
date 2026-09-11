@@ -408,6 +408,6 @@ window.UBY_ACTIVITY?.refresh?.().then(renderProjectActivity).catch(err=>console.
 // do navegador. Assim fica visivel quando a tela esta usando a base oficial.
 setTimeout(async()=>{const status=document.getElementById("detailCloudStatus");const paint=(message,color)=>{if(status){status.textContent=message;status.style.color=color}};try{const user=await window.UBY_SUPABASE?.currentUser?.();if(!user){paint("Entre para carregar a base compartilhada; nenhuma cópia local será enviada automaticamente.","var(--p3-muted)");return}const cloud=await window.UBY_STORE?.loadDetail?.(obraParam,null);paint(cloud?.project?"Base oficial carregada do Supabase.":"Base online não confirmada; nenhuma cópia vazia será enviada.",cloud?.project?"var(--p3-ok)":"var(--p3-danger)")}catch(err){paint("Base online não confirmada; nenhuma cópia vazia será enviada.","var(--p3-danger)")}},0);
 </script>
-<script src="prospeccao.js?v=20260911-contract-close1"></script></body>
+<script src="prospeccao.js?v=20260911-contract-drive1"></script></body>
 </html>
 

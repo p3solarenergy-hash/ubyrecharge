@@ -21,7 +21,10 @@ function doPost(e) {
     if (body.action === 'upsertWork') return json(upsertWork_(body));
     if (body.action === 'createWorkFromProspect') return json(createWorkFromProspect_(body));
     if (body.action === 'ensureWorkFolder') return json(ensureWorkFolder_(body));
-    if (body.action === 'uploadFile') return json(uploadFile_(body));
+    if (body.action === 'uploadFile') {
+      requireAuthorizedUser_(body);
+      return json(uploadFile_(body));
+    }
     return json({ ok: false, error: 'Acao nao reconhecida: ' + body.action });
   } catch (err) {
     return json({ ok: false, error: String(err && err.message ? err.message : err) });
@@ -65,7 +68,8 @@ function ensureWorkFolder_(body) {
 
 function uploadFile_(body) {
   if (!body.fileName || !body.base64) throw new Error('Arquivo sem nome ou conteudo.');
-  const folder = ensureFolder_(body.workId || slug_(body.workName || 'obra'), body.workName || body.workId || 'obra', body.folderId);
+  const workFolder = ensureFolder_(body.workId || slug_(body.workName || 'obra'), body.workName || body.workId || 'obra', body.folderId);
+  const folder = uploadFolder_(workFolder, body);
   const bytes = Utilities.base64Decode(body.base64);
   const blob = Utilities.newBlob(bytes, body.mimeType || 'application/octet-stream', body.fileName);
   const file = folder.createFile(blob);
@@ -78,11 +82,46 @@ function uploadFile_(body) {
     fileId: file.getId(),
     fileUrl: file.getUrl(),
     folderId: folder.getId(),
+    category: body.category || 'documento',
+    contractType: body.contractType || '',
+    folderPath: folder.getName(),
     createdAt: new Date().toISOString()
   };
   appendRow_(CONFIG.DOCUMENTS_SHEET, row);
   log_('uploadFile', row.workId, row.fileName);
   return { ok: true, fileId: file.getId(), webViewLink: file.getUrl(), folderId: folder.getId() };
+}
+
+function requireAuthorizedUser_(body) {
+  const token = String(body.accessToken || '').trim();
+  const properties = PropertiesService.getScriptProperties();
+  const supabaseUrl = String(properties.getProperty('UBY_SUPABASE_URL') || '').replace(/\/$/, '');
+  const publishableKey = String(properties.getProperty('UBY_SUPABASE_PUBLISHABLE_KEY') || '').trim();
+  if (!token || !supabaseUrl || !publishableKey) {
+    throw new Error('Conector sem autenticacao configurada. Defina UBY_SUPABASE_URL e UBY_SUPABASE_PUBLISHABLE_KEY nas propriedades do script e entre na plataforma UBY.');
+  }
+  const response = UrlFetchApp.fetch(supabaseUrl + '/auth/v1/user', {
+    method: 'get',
+    headers: { apikey: publishableKey, Authorization: 'Bearer ' + token },
+    muteHttpExceptions: true
+  });
+  if (response.getResponseCode() !== 200) throw new Error('Sessao UBY invalida ou expirada. Entre novamente na plataforma.');
+}
+
+function uploadFolder_(workFolder, body) {
+  if (String(body.category || '') !== 'contrato') return workFolder;
+  const contracts = ensureChildFolder_(workFolder, 'Contratos');
+  const contractNames = {
+    concessionaria_copel: 'Concessionaria - Copel',
+    proprietario_area: 'Proprietario da area'
+  };
+  const name = contractNames[String(body.contractType || '')] || 'Outros contratos';
+  return ensureChildFolder_(contracts, name);
+}
+
+function ensureChildFolder_(parent, name) {
+  const existing = parent.getFoldersByName(name);
+  return existing.hasNext() ? existing.next() : parent.createFolder(name);
 }
 
 function readProspects_() {
