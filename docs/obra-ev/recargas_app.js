@@ -9637,6 +9637,19 @@ function mergeClubParticipants(incoming = [], source = 'manual') {
   return rows;
 }
 
+function couponControlPercentFromCode(coupon = '') {
+  const values = [...safeText(coupon).matchAll(/(\d+(?:[.,]\d+)?)\s*%/g)]
+    .map(match => Number(match[1].replace(',', '.')))
+    .filter(value => Number.isFinite(value) && value > 0 && value < 100);
+  return values.length ? values[values.length - 1] / 100 : 0;
+}
+
+function couponControlCalculatedDiscount(finalValue = 0, coupon = '') {
+  const rate = couponControlPercentFromCode(coupon);
+  const paid = Number(finalValue || 0);
+  return rate && paid > 0 ? paid * rate / (1 - rate) : 0;
+}
+
 function clubCouponControlStore() {
   const data = readJson(CLUB_COUPONS_LOCAL_KEY, { rows: [], updatedAt: '', source: '' });
   const legacy = Array.isArray(data);
@@ -9646,9 +9659,11 @@ function clubCouponControlStore() {
   let corrected = false;
   const rows = originalRows.map(row => {
     const dateKey = couponControlDateKey(row?.dateRaw || row?.dateKey || '');
-    if (dateKey && dateKey !== row?.dateKey) {
+    const calculatedDiscount = couponControlCalculatedDiscount(row?.value, row?.coupon);
+    const discount = Number(row?.discount || 0) || calculatedDiscount;
+    if ((dateKey && dateKey !== row?.dateKey) || Math.abs(discount - Number(row?.discount || 0)) > 0.00001) {
       corrected = true;
-      return { ...row, dateKey };
+      return { ...row, dateKey: dateKey || row?.dateKey || '', discount };
     }
     return row;
   });
@@ -9677,26 +9692,27 @@ function couponControlIdentityKey(row = {}) {
     normalizeHeaderName(row.name || ''),
     normalizeClubEmail(row.email || ''),
     normalizePhone(row.phone || ''),
-    normalizeHeaderName(row.partner || ''),
-    Number(row.value || 0).toFixed(2),
-    Number(row.discount || 0).toFixed(2)
+    Number(row.value || 0).toFixed(2)
   ].join('|');
 }
 
 function couponControlRow(row = [], headers = []) {
   const dateRaw = headerValue(row, headers, ['Data', 'Data de uso', 'Data do uso', 'Data da compra', 'Data utilizacao', 'Data utilização']);
+  const coupon = headerValue(row, headers, ['Cupom', 'Codigo', 'Código', 'Voucher', 'Codigo do cupom', 'Código do cupom']);
+  const value = couponControlNumber(headerValue(row, headers, ['Valor Final', 'Valor', 'Valor do beneficio', 'Valor do benefício', 'Valor utilizado', 'Valor da compra', 'Total']));
+  const informedDiscount = couponControlNumber(headerValue(row, headers, ['Desconto', 'Valor do desconto', 'Desconto concedido']));
   const item = {
     dateRaw,
     dateKey: couponControlDateKey(dateRaw),
-    coupon: headerValue(row, headers, ['Cupom', 'Codigo', 'Código', 'Voucher', 'Codigo do cupom', 'Código do cupom']),
+    coupon,
     name: headerValue(row, headers, ['Cliente', 'Nome', 'Nome do cliente', 'Beneficiario', 'Beneficiário', 'Usuario', 'Usuário', 'User']),
     email: normalizeClubEmail(headerValue(row, headers, ['Email', 'E-mail'])),
     phone: normalizePhone(headerValue(row, headers, ['Telefone', 'WhatsApp', 'Whatsapp', 'Celular'])),
     // "Empresa" nos relatórios Spott identifica a UBY, não o parceiro do cupom.
     partner: headerValue(row, headers, ['Parceiro', 'Parceiro comercial', 'Estabelecimento parceiro', 'Loja']),
     energy: couponControlNumber(headerValue(row, headers, ['Energia', 'kWh', 'Kwh'])),
-    value: couponControlNumber(headerValue(row, headers, ['Valor Final', 'Valor', 'Valor do beneficio', 'Valor do benefício', 'Valor utilizado', 'Valor da compra', 'Total'])),
-    discount: couponControlNumber(headerValue(row, headers, ['Desconto', 'Valor do desconto', 'Desconto concedido'])),
+    value,
+    discount: informedDiscount || couponControlCalculatedDiscount(value, coupon),
     status: headerValue(row, headers, ['Status', 'Situacao', 'Situação'])
   };
   item.key = couponControlIdentityKey(item);
@@ -9714,8 +9730,10 @@ function couponControlRowsFromSheet(rows = []) {
 
 function mergeClubCouponControl(incoming = [], source = 'importacao manual') {
   const current = clubCouponControlStore().rows;
-  const byKey = new Map(current.map(row => [row.key || couponControlIdentityKey(row), row]));
-  incoming.forEach(row => byKey.set(row.key || couponControlIdentityKey(row), row));
+  // Recalcula a chave para absorver registros antigos que guardavam desconto/parceiro
+  // na chave e impedir duplicidade quando a mesma planilha for reenviada.
+  const byKey = new Map(current.map(row => [couponControlIdentityKey(row), row]));
+  incoming.forEach(row => byKey.set(couponControlIdentityKey(row), row));
   const rows = [...byKey.values()].sort((a, b) => safeText(b.dateKey).localeCompare(safeText(a.dateKey)) || safeText(a.coupon).localeCompare(safeText(b.coupon), 'pt-BR'));
   writeJson(CLUB_COUPONS_LOCAL_KEY, { rows, updatedAt: new Date().toISOString(), source });
   return rows;
@@ -9793,8 +9811,8 @@ function renderClubCouponControl(selectedMonth = '', monthClientRows = [], parti
     <div class="card"><div class="label">Usos no mês</div><div class="value">${eligible.length}</div><div class="sub">lançamentos da base de cupons</div></div>
     <div class="card"><div class="label">Cruzados com Clube</div><div class="value">${matchedClub}</div><div class="sub">${eligible.length ? fmtPct(matchedClub / eligible.length * 100) : '0,00%'} com cadastro identificado</div></div>
     <div class="card"><div class="label">Valor final com cupom</div><div class="value">${fmtBRL(totalValue)}</div><div class="sub">valor cobrado nos relatórios importados</div></div>
-    <div class="card"><div class="label">Descontos informados</div><div class="value">${fmtBRL(totalDiscount)}</div><div class="sub">concessões na planilha</div></div>
-    <div class="card"><div class="label">Faturamento UBY cruzado</div><div class="value">${fmtBRL(rechargeRevenue)}</div><div class="sub">clientes com recarga no mesmo mês</div></div>`;
+    <div class="card"><div class="label">Descontos calculados</div><div class="value">${fmtBRL(totalDiscount)}</div><div class="sub">reconstituídos pela porcentagem do cupom</div></div>
+    <div class="card"><div class="label">Faturamento UBY dos clientes cruzados</div><div class="value">${fmtBRL(rechargeRevenue)}</div><div class="sub">todas as recargas desses clientes no mês, sem duplicidade</div></div>`;
   const table = document.getElementById('clubCouponTable');
   if (table) {
     const rows = [...groups.values()].sort((a, b) => b.uses - a.uses || b.value - a.value);
@@ -13619,5 +13637,6 @@ if (_importMonthEl) _importMonthEl.value = new Date().toISOString().slice(0, 7);
 document.getElementById('undoLastImportBtn')?.addEventListener('click', undoLastImport);
 document.getElementById('clearSelectedMonthBtn')?.addEventListener('click', clearSelectedMonth);
 document.getElementById('clearRechargeBaseBtn')?.addEventListener('click', clearRechargeBase);
+document.getElementById('openBackupHistoryBtn')?.addEventListener('click', openRechargeBackupHistory);
 initializeRechargePage();
 scheduleLiveOccupationRefresh();
