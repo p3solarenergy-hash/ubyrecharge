@@ -904,7 +904,10 @@
         row.customerKey || row.customer_key || row.email || row.phone ||
         `name:${String(row.name || '').trim().toLowerCase() || `manual-${index}`}`
       ).toLowerCase(),
-      name: row.name || "", email: row.email || null, phone: row.phone || null,
+      // A coluna phone e obrigatoria no banco. Clientes importados sem
+      // telefone continuam validos e devem ser sincronizados com valor vazio,
+      // nunca como null (que abortaria todo o lote de clientes).
+      name: row.name || "", email: row.email || null, phone: String(row.phone || ""),
       complement: row.complement || "", chargers_count: Number(row.chargers || row.chargers_count || 0),
       transactions_count: Number(row.transactions || row.transactions_count || 0),
       energy_kwh: Number(row.energy || row.energy_kwh || 0), charge_time_text: row.chargeTime || row.charge_time_text || "",
