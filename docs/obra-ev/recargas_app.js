@@ -9404,6 +9404,28 @@ async function saveCustomerRegistryCloud(payload) {
   return true;
 }
 
+async function confirmCustomerRegistryCloud(expectedRows = []) {
+  if (!window.UBY_SUPABASE?.loadRechargeCustomers) return null;
+  const firstPage = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500 });
+  if (!firstPage?.available) throw new Error('Entre novamente para confirmar a base oficial na nuvem.');
+  const cloudRows = [...(firstPage.rows || [])];
+  const total = Number(firstPage.count || cloudRows.length);
+  for (let offset = cloudRows.length; offset < total; offset += 500) {
+    const page = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500, offset });
+    if (!page?.available) throw new Error('A conexao com a base de clientes foi interrompida.');
+    cloudRows.push(...(page.rows || []));
+  }
+  const cloudKeys = new Set(cloudRows.map(row => String(row.customer_key || '').toLowerCase()));
+  const missing = consolidateCustomerRegistryRows(expectedRows)
+    .map((row, index) => String(
+      row.customerKey || row.customer_key || row.email || row.phone ||
+      `name:${String(row.name || '').trim().toLowerCase() || `manual-${index}`}`
+    ).toLowerCase())
+    .filter(key => key && !cloudKeys.has(key));
+  if (missing.length) throw new Error(`${missing.length} cliente(s) ainda nao foram confirmados na nuvem.`);
+  return { rows: cloudRows, total: Number(firstPage.count || cloudRows.length) };
+}
+
 async function loadCustomerRegistry() {
   try {
     const local = customerRegistryStore();
@@ -9413,8 +9435,8 @@ async function loadCustomerRegistry() {
     // que o Supabase nao esta configurado ou que a sessao expirou.
     if (!firstPage?.available) return;
 
-    const cloudRows = [...(firstPage.rows || [])];
-    const total = Number(firstPage.count || cloudRows.length);
+    let cloudRows = [...(firstPage.rows || [])];
+    let total = Number(firstPage.count || cloudRows.length);
     for (let offset = cloudRows.length; offset < total; offset += 500) {
       const page = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500, offset });
       if (!page?.available) throw new Error('A conexao com a base de clientes foi interrompida.');
@@ -9432,8 +9454,19 @@ async function loadCustomerRegistry() {
     const localUpdatedAt = Date.parse(local.updatedAt || '') || 0;
     if (local.rows.length && localUpdatedAt >= cloudUpdatedAt) {
       const status = document.getElementById('customerRegistryStatus');
-      if (status && cloudUpdatedAt) status.textContent = 'Base local mais recente preservada; sincronizacao online pendente.';
-      return;
+      try {
+        // A importacao local acabou de produzir uma base mais nova. Ela nao
+        // pode ficar apenas nesta maquina: grava por chave e le novamente o
+        // Supabase antes de tratar essa copia como a base oficial.
+        await saveCustomerRegistryCloud(local);
+        const confirmed = await confirmCustomerRegistryCloud(local.rows);
+        cloudRows = confirmed.rows;
+        total = confirmed.total;
+        if (status) status.textContent = `Base oficial sincronizada na nuvem: ${total} cliente(s).`;
+      } catch (syncErr) {
+        if (status) status.textContent = `Base local preservada; sincronizacao online pendente: ${syncErr.message}`;
+        return;
+      }
     }
 
     if (Array.isArray(cloudRows)) {
@@ -9464,13 +9497,15 @@ async function handleCustomerRegistryFiles(files = []) {
     }
     imported.push(...customerRegistryRowsFromSheet(rows));
   }
-  const payload = mergeCustomerRegistry(imported, files.map(file => file.name).join(', '));
+  const consolidated = consolidateCustomerRegistryRows(imported);
+  const payload = mergeCustomerRegistry(consolidated, files.map(file => file.name).join(', '));
   const status = document.getElementById('customerRegistryStatus');
   try {
     await saveCustomerRegistryCloud(payload);
-    if (status) status.textContent = `${imported.length} registro(s) importado(s) e salvo(s) online.`;
+    const confirmed = await confirmCustomerRegistryCloud(payload.rows);
+    if (status) status.textContent = `${imported.length} linha(s) consolidadas em ${consolidated.length} motorista(s). Base oficial sincronizada: ${confirmed.total} cliente(s).`;
   } catch (err) {
-    if (status) status.textContent = `${imported.length} registro(s) preservado(s) localmente; banco pendente: ${err.message}`;
+    if (status) status.textContent = `${imported.length} linha(s) consolidadas em ${consolidated.length} motorista(s) localmente; banco pendente: ${err.message}`;
   }
   renderCustomerRegistry();
 }
