@@ -9783,7 +9783,7 @@ function renderClubCouponControl(selectedMonth = '', monthClientRows = [], parti
     table.innerHTML = rows.length ? rows.map(group => {
       const revenue = [...group.rechargingClients.values()].reduce((sum, client) => sum + Number(client.revenue || 0), 0);
       return `<tr><td><strong>${escapeHtml(group.coupon)}</strong></td><td>${group.uses}</td><td>${group.clubMatches}</td><td>${group.rechargingClients.size}</td><td>${fmtBRL(group.value)}</td><td>${fmtBRL(group.discount)}</td><td><strong>${fmtBRL(revenue)}</strong></td></tr>`;
-    }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--p3-muted)">Nenhum uso de cupom na competência selecionada.</td></tr>';
+    }).join('') : `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--p3-muted)">Nenhum uso de cupom na competência selecionada.<br><button class="btn-recalc" type="button" style="margin-top:10px" onclick="document.getElementById('clubCouponUpload').click()">Importar planilha de usos</button></td></tr>`;
   }
 }
 
