@@ -137,6 +137,15 @@ let spreadsheetLibraryPromise = null;
 const RECHARGE_STATION_BLOCKLIST_BY_WORK = {
   malassise: ['posto prata', 'prata cambe', 'prata cambé', 'cambe', 'cambé']
 };
+// Obras sincronizadas pela Spott: não há confirmação manual para exceções.
+// O CSV precisa conter somente o Local oficial da obra de destino. Assim uma
+// seleção equivocada nunca consegue gravar dados em outra base.
+const SPOTT_REQUIRED_LOCAL_BY_WORK = Object.freeze({
+  'posto-central-jk': 'UBY RECHARGE - CENTRAL JK',
+  malassise: 'UBY RECHARGE - ROBERT KOCH',
+  'ac-posto-central-jk': 'UBY RECHARGE - CENTRAL JK AC',
+  rio: 'RIO BEACH SPORTS EV'
+});
 // Obras/estações removidas do painel de recargas (não aparecem em nenhuma
 // visão nem entram nos totais). Não apaga dados no Supabase — é só filtro.
 const RECHARGE_WORK_BLOCKLIST_TERMS = ['go grid', 'gogrid'];
@@ -1084,6 +1093,16 @@ function normalizeStationForCompare(value) {
   return normalizeTextForInsight(safeText(value)).replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+function requiredSpottLocalForWork(workId = '') {
+  return SPOTT_REQUIRED_LOCAL_BY_WORK[String(workId || '').trim()] || '';
+}
+
+function hasExactRequiredSpottLocal(workId = '', stationName = '') {
+  const required = requiredSpottLocalForWork(workId);
+  if (!required) return true;
+  return normalizeStationForCompare(stationName) === normalizeStationForCompare(required);
+}
+
 function sameStationName(a, b) {
   const left = normalizeStationForCompare(a);
   const right = normalizeStationForCompare(b);
@@ -1109,12 +1128,16 @@ function dcStationIdentity(value = '') {
   const text = normalizeStationForCompare(value);
   if (!text) return '';
   if (isRobertKochCandidateText(text)) return 'robert-koch';
+  // A Central JK AC é uma base independente. Esta condição precisa vir antes
+  // da Central JK DC porque ambas compartilham a expressão "central jk".
+  if (text.includes('central jk ac') || text.includes('ac posto central jk')) return 'central-jk-ac';
   if (text.includes('central jk') || text.includes('posto central jk')) return 'central-jk';
   return '';
 }
 
 function dcWorkIdentity(workId = '', workName = '') {
   if (isRobertKochWorkId(workId) || isRobertKochCandidateText(`${workId} ${workName}`)) return 'robert-koch';
+  if (String(workId || '').trim().toLowerCase() === 'ac-posto-central-jk') return 'central-jk-ac';
   return dcStationIdentity(`${workId} ${workName}`);
 }
 
@@ -2256,6 +2279,19 @@ function rechargeImportStationProfile(charges = []) {
 
 function confirmRechargeStationMismatch(charges = [], layout = {}, file = {}) {
   const profile = rechargeImportStationProfile(charges);
+  const requiredLocal = requiredSpottLocalForWork(currentWorkId);
+  if (requiredLocal) {
+    const invalidLocals = profile.filter(item => !hasExactRequiredSpottLocal(currentWorkId, item.station));
+    if (invalidLocals.length || !profile.length) {
+      const found = profile.length ? profile.map(item => item.station).join(', ') : 'Local ausente';
+      alert(
+        `Importação bloqueada: esta obra aceita somente o Local Spott "${requiredLocal}".\n\n` +
+        `Destino: ${currentWorkName}\nArquivo: ${file.name || '-'}\nLocal encontrado: ${found}\n\n` +
+        'Nenhuma recarga foi salva. Selecione a obra correspondente e exporte novamente na Spott.'
+      );
+      return false;
+    }
+  }
   const targetDc = dcWorkIdentity(currentWorkId, currentWorkName);
   const dcMismatch = profile.filter(item => {
     const sourceDc = dcStationIdentity(item.station);
