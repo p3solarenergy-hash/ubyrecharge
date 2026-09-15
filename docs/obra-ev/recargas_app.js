@@ -9639,8 +9639,22 @@ function mergeClubParticipants(incoming = [], source = 'manual') {
 
 function clubCouponControlStore() {
   const data = readJson(CLUB_COUPONS_LOCAL_KEY, { rows: [], updatedAt: '', source: '' });
-  if (Array.isArray(data)) return { rows: data, updatedAt: '', source: 'cache antigo' };
-  return { rows: Array.isArray(data?.rows) ? data.rows : [], updatedAt: data?.updatedAt || '', source: data?.source || '' };
+  const legacy = Array.isArray(data);
+  const originalRows = legacy ? data : (Array.isArray(data?.rows) ? data.rows : []);
+  // Corrige bases importadas antes do reconhecimento de "dd/mm/aaaa às hh:mm".
+  // A data original já estava preservada em dateRaw; só faltava gerar a chave mensal.
+  let corrected = false;
+  const rows = originalRows.map(row => {
+    const dateKey = couponControlDateKey(row?.dateRaw || row?.dateKey || '');
+    if (dateKey && dateKey !== row?.dateKey) {
+      corrected = true;
+      return { ...row, dateKey };
+    }
+    return row;
+  });
+  const store = { rows, updatedAt: legacy ? '' : (data?.updatedAt || ''), source: legacy ? 'cache antigo' : (data?.source || '') };
+  if (corrected) writeJson(CLUB_COUPONS_LOCAL_KEY, store);
+  return store;
 }
 
 function couponControlNumber(value = '') {
