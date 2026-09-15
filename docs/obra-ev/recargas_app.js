@@ -9648,7 +9648,9 @@ function couponControlNumber(value = '') {
 }
 
 function couponControlDateKey(value = '') {
-  const date = parseDate(value);
+  // Relatórios Spott usam o formato "14/09/2026 às 17:37". A base de
+  // recargas já entende dia/mês/hora; aqui removemos apenas o conector textual.
+  const date = parseDate(safeText(value).replace(/\s+às\s+/i, ' '));
   if (!date || Number.isNaN(date.getTime())) return '';
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -9673,11 +9675,13 @@ function couponControlRow(row = [], headers = []) {
     dateRaw,
     dateKey: couponControlDateKey(dateRaw),
     coupon: headerValue(row, headers, ['Cupom', 'Codigo', 'Código', 'Voucher', 'Codigo do cupom', 'Código do cupom']),
-    name: headerValue(row, headers, ['Cliente', 'Nome', 'Nome do cliente', 'Beneficiario', 'Beneficiário']),
+    name: headerValue(row, headers, ['Cliente', 'Nome', 'Nome do cliente', 'Beneficiario', 'Beneficiário', 'Usuario', 'Usuário', 'User']),
     email: normalizeClubEmail(headerValue(row, headers, ['Email', 'E-mail'])),
     phone: normalizePhone(headerValue(row, headers, ['Telefone', 'WhatsApp', 'Whatsapp', 'Celular'])),
-    partner: headerValue(row, headers, ['Parceiro', 'Estabelecimento', 'Empresa', 'Loja']),
-    value: couponControlNumber(headerValue(row, headers, ['Valor', 'Valor do beneficio', 'Valor do benefício', 'Valor utilizado', 'Valor da compra', 'Total'])),
+    // "Empresa" nos relatórios Spott identifica a UBY, não o parceiro do cupom.
+    partner: headerValue(row, headers, ['Parceiro', 'Parceiro comercial', 'Estabelecimento parceiro', 'Loja']),
+    energy: couponControlNumber(headerValue(row, headers, ['Energia', 'kWh', 'Kwh'])),
+    value: couponControlNumber(headerValue(row, headers, ['Valor Final', 'Valor', 'Valor do beneficio', 'Valor do benefício', 'Valor utilizado', 'Valor da compra', 'Total'])),
     discount: couponControlNumber(headerValue(row, headers, ['Desconto', 'Valor do desconto', 'Desconto concedido'])),
     status: headerValue(row, headers, ['Status', 'Situacao', 'Situação'])
   };
@@ -9774,7 +9778,7 @@ function renderClubCouponControl(selectedMonth = '', monthClientRows = [], parti
   if (kpis) kpis.innerHTML = `
     <div class="card"><div class="label">Usos no mês</div><div class="value">${eligible.length}</div><div class="sub">lançamentos da base de cupons</div></div>
     <div class="card"><div class="label">Cruzados com Clube</div><div class="value">${matchedClub}</div><div class="sub">${eligible.length ? fmtPct(matchedClub / eligible.length * 100) : '0,00%'} com cadastro identificado</div></div>
-    <div class="card"><div class="label">Benefícios informados</div><div class="value">${fmtBRL(totalValue)}</div><div class="sub">valor externo registrado</div></div>
+    <div class="card"><div class="label">Valor final com cupom</div><div class="value">${fmtBRL(totalValue)}</div><div class="sub">valor cobrado nos relatórios importados</div></div>
     <div class="card"><div class="label">Descontos informados</div><div class="value">${fmtBRL(totalDiscount)}</div><div class="sub">concessões na planilha</div></div>
     <div class="card"><div class="label">Faturamento UBY cruzado</div><div class="value">${fmtBRL(rechargeRevenue)}</div><div class="sub">clientes com recarga no mesmo mês</div></div>`;
   const table = document.getElementById('clubCouponTable');

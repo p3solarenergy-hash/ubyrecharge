@@ -1317,10 +1317,10 @@
           </div>
         </div>
         <section class="kpis" id="clubCouponKpis" style="margin-top:0"></section>
-        <div class="note" style="margin:12px 0 0"><strong>Como alimentar:</strong> importe a planilha de usos recebida do parceiro. Colunas reconhecidas: data, cupom, cliente/nome, e-mail, telefone, parceiro, valor, desconto e status. O cruzamento prioriza e-mail e telefone; nome é usado apenas como alternativa.</div>
+        <div class="note" style="margin:12px 0 0"><strong>Como alimentar:</strong> importe a planilha de usos recebida do parceiro. Relatórios Spott com <em>Data, Usuário, Energia, Valor Final e Cupom</em> são aceitos. O cruzamento prioriza e-mail e telefone; quando o relatório tiver só Usuário, usa o nome como alternativa.</div>
         <div style="overflow-x:auto;margin-top:14px">
           <table>
-            <thead><tr><th>Cupom</th><th>Usos</th><th>Cruzados com Clube</th><th>Com recarga UBY no mês</th><th>Valor de benefícios</th><th>Desconto informado</th><th>Faturamento UBY cruzado</th></tr></thead>
+            <thead><tr><th>Cupom</th><th>Usos</th><th>Cruzados com Clube</th><th>Com recarga UBY no mês</th><th>Valor final com cupom</th><th>Desconto informado</th><th>Faturamento UBY cruzado</th></tr></thead>
             <tbody id="clubCouponTable"></tbody>
           </table>
         </div>
@@ -2241,6 +2241,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260915-coupon-import-cta"></script>
+<script src="recargas_app.js?v=20260915-coupon-spott-csv"></script>
 </body>
 </html>
