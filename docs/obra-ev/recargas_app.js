@@ -65,6 +65,7 @@ const FINANCE_REPORTS_LOCAL_KEY = 'uby-finance-reports-v1';
 const XLSX_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
 const CLUB_PARTNERS_LOCAL_KEY = 'uby-club-partners-v1';
+const CLUB_COUPONS_LOCAL_KEY = 'uby-club-coupon-control-v1';
 const CUSTOMER_REGISTRY_LOCAL_KEY = 'uby-customer-registry-v1';
 const CUSTOMER_REGISTRY_CLOUD_ID = '__customer_registry__';
 const OVERVIEW_PAGE_SIZE = 1000;
@@ -7369,6 +7370,8 @@ function renderDayComparison(prefix = 'usage', charges = [], historyCharges = ch
       && chargeDayKeyFromDate(charge.startDate) === last.key && isExecutedCharge(charge));
     return {
       name: stationDisplayName(row.stationName || row.station || row.workName),
+      workId: String(row.workId || ''),
+      stationName: row.stationName || row.station || row.workName || '',
       count: chargesOnDay.length,
       revenue: chargesOnDay.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0),
       energy: chargesOnDay.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0)
@@ -7377,7 +7380,7 @@ function renderDayComparison(prefix = 'usage', charges = [], historyCharges = ch
   const dcMarkup = dcBreakdown.length ? `
     <section class="day-dc-breakdown-card">
       <div class="day-dc-breakdown-head"><strong>DC por carregador</strong><span>${last.label} · operação própria UBY</span></div>
-      <div class="day-dc-breakdown-grid">${dcBreakdown.map(item => `<div class="day-dc-unit"><strong title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</strong><div class="day-dc-unit-metrics"><span><small>Faturamento</small>${fmtBRL(item.revenue)}</span><span><small>Recargas</small>${item.count}</span><span><small>Energia</small>${fmtKWh(item.energy)}</span></div></div>`).join('')}</div>
+      <div class="day-dc-breakdown-grid">${dcBreakdown.map(item => `<div class="day-dc-unit"><div class="day-dc-unit-head"><strong title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</strong><button class="day-dc-open" type="button" onclick="openWorkReport('${escapeAttr(item.workId)}','mensal','${escapeAttr(item.stationName)}')">Abrir carregador</button></div><div class="day-dc-unit-metrics"><span><small>Faturamento</small>${fmtBRL(item.revenue)}</span><span><small>Recargas</small>${item.count}</span><span><small>Energia</small>${fmtKWh(item.energy)}</span></div></div>`).join('')}</div>
     </section>` : '';
   el.innerHTML = metricMarkup + dcMarkup;
 }
@@ -9634,6 +9637,156 @@ function mergeClubParticipants(incoming = [], source = 'manual') {
   return rows;
 }
 
+function clubCouponControlStore() {
+  const data = readJson(CLUB_COUPONS_LOCAL_KEY, { rows: [], updatedAt: '', source: '' });
+  if (Array.isArray(data)) return { rows: data, updatedAt: '', source: 'cache antigo' };
+  return { rows: Array.isArray(data?.rows) ? data.rows : [], updatedAt: data?.updatedAt || '', source: data?.source || '' };
+}
+
+function couponControlNumber(value = '') {
+  return customerRegistryNumber(value);
+}
+
+function couponControlDateKey(value = '') {
+  const date = parseDate(value);
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function couponControlIdentityKey(row = {}) {
+  const date = couponControlDateKey(row.dateRaw || row.dateKey || '');
+  return [
+    date,
+    normalizeHeaderName(row.coupon || ''),
+    normalizeHeaderName(row.name || ''),
+    normalizeClubEmail(row.email || ''),
+    normalizePhone(row.phone || ''),
+    normalizeHeaderName(row.partner || ''),
+    Number(row.value || 0).toFixed(2),
+    Number(row.discount || 0).toFixed(2)
+  ].join('|');
+}
+
+function couponControlRow(row = [], headers = []) {
+  const dateRaw = headerValue(row, headers, ['Data', 'Data de uso', 'Data do uso', 'Data da compra', 'Data utilizacao', 'Data utilização']);
+  const item = {
+    dateRaw,
+    dateKey: couponControlDateKey(dateRaw),
+    coupon: headerValue(row, headers, ['Cupom', 'Codigo', 'Código', 'Voucher', 'Codigo do cupom', 'Código do cupom']),
+    name: headerValue(row, headers, ['Cliente', 'Nome', 'Nome do cliente', 'Beneficiario', 'Beneficiário']),
+    email: normalizeClubEmail(headerValue(row, headers, ['Email', 'E-mail'])),
+    phone: normalizePhone(headerValue(row, headers, ['Telefone', 'WhatsApp', 'Whatsapp', 'Celular'])),
+    partner: headerValue(row, headers, ['Parceiro', 'Estabelecimento', 'Empresa', 'Loja']),
+    value: couponControlNumber(headerValue(row, headers, ['Valor', 'Valor do beneficio', 'Valor do benefício', 'Valor utilizado', 'Valor da compra', 'Total'])),
+    discount: couponControlNumber(headerValue(row, headers, ['Desconto', 'Valor do desconto', 'Desconto concedido'])),
+    status: headerValue(row, headers, ['Status', 'Situacao', 'Situação'])
+  };
+  item.key = couponControlIdentityKey(item);
+  return item;
+}
+
+function couponControlRowsFromSheet(rows = []) {
+  const headerIndex = rows.findIndex(row => Array.isArray(row) && row.some(cell => /cupom|codigo|código|voucher/i.test(safeText(cell))));
+  const index = headerIndex >= 0 ? headerIndex : 0;
+  const headers = rows[index] || [];
+  return rows.slice(index + 1).filter(rowHasData)
+    .map(row => couponControlRow(row, headers))
+    .filter(row => row.coupon || row.name || row.email || row.phone);
+}
+
+function mergeClubCouponControl(incoming = [], source = 'importacao manual') {
+  const current = clubCouponControlStore().rows;
+  const byKey = new Map(current.map(row => [row.key || couponControlIdentityKey(row), row]));
+  incoming.forEach(row => byKey.set(row.key || couponControlIdentityKey(row), row));
+  const rows = [...byKey.values()].sort((a, b) => safeText(b.dateKey).localeCompare(safeText(a.dateKey)) || safeText(a.coupon).localeCompare(safeText(b.coupon), 'pt-BR'));
+  writeJson(CLUB_COUPONS_LOCAL_KEY, { rows, updatedAt: new Date().toISOString(), source });
+  return rows;
+}
+
+async function handleClubCouponFiles(files = []) {
+  if (!files.length) return;
+  const imported = [];
+  try {
+    const needsSpreadsheetLibrary = [...files].some(file => !/\.csv$/i.test(file.name));
+    const XLSX = needsSpreadsheetLibrary ? await ensureSpreadsheetLibrary() : null;
+    for (const file of files) {
+      const buffer = await file.arrayBuffer();
+      let rows = [];
+      if (/\.csv$/i.test(file.name)) {
+        rows = parseCsvRows(new TextDecoder('utf-8').decode(buffer));
+      } else {
+        const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false, blankrows: false });
+      }
+      imported.push(...couponControlRowsFromSheet(rows));
+    }
+    const rows = mergeClubCouponControl(imported, [...files].map(file => file.name).join(', '));
+    const status = document.getElementById('clubCouponStatus');
+    if (status) status.textContent = `${imported.length} uso(s) lido(s); ${rows.length} registro(s) preservado(s) na base independente de cupons.`;
+    const upload = document.getElementById('clubCouponUpload');
+    if (upload) upload.value = '';
+    renderClub();
+  } catch (err) {
+    const status = document.getElementById('clubCouponStatus');
+    if (status) status.textContent = `Não foi possível importar a planilha de cupons: ${err.message || err}`;
+  }
+}
+
+function renderClubCouponControl(selectedMonth = '', monthClientRows = [], participants = []) {
+  const store = clubCouponControlStore();
+  const eligible = store.rows.filter(row => !selectedMonth || safeText(row.dateKey).startsWith(`${selectedMonth}-`));
+  const participantLookup = clubParticipantLookup(participants);
+  const clientLookup = new Map();
+  monthClientRows.forEach(client => clubParticipantKeys(client).forEach(key => {
+    if (!clientLookup.has(key)) clientLookup.set(key, client);
+  }));
+  const matchedClientKeys = new Set();
+  const groups = new Map();
+  eligible.forEach(row => {
+    const keys = clubParticipantKeys(row);
+    const participant = keys.map(key => participantLookup.get(key)).find(Boolean);
+    const client = keys.map(key => clientLookup.get(key)).find(Boolean);
+    const clientKey = client ? clubParticipantKey(client) : '';
+    if (clientKey) matchedClientKeys.add(clientKey);
+    const coupon = safeText(row.coupon).trim() || 'SEM CÓDIGO';
+    const group = groups.get(coupon) || { coupon, uses: 0, clubMatches: 0, rechargingClients: new Map(), value: 0, discount: 0 };
+    group.uses += 1;
+    group.clubMatches += participant ? 1 : 0;
+    group.value += Number(row.value || 0);
+    group.discount += Number(row.discount || 0);
+    if (client && clientKey) group.rechargingClients.set(clientKey, client);
+    groups.set(coupon, group);
+  });
+  const rechargeRevenue = [...matchedClientKeys].reduce((sum, key) => sum + Number(clientLookup.get(key)?.revenue || 0), 0);
+  const matchedClub = eligible.filter(row => clubParticipantKeys(row).some(key => participantLookup.has(key))).length;
+  const totalValue = eligible.reduce((sum, row) => sum + Number(row.value || 0), 0);
+  const totalDiscount = eligible.reduce((sum, row) => sum + Number(row.discount || 0), 0);
+  const status = document.getElementById('clubCouponStatus');
+  if (status) {
+    const updatedAt = store.updatedAt ? fmtDT(new Date(store.updatedAt)) : 'sem importação ainda';
+    const undated = store.rows.filter(row => !row.dateKey).length;
+    status.textContent = store.rows.length
+      ? `${store.rows.length} registro(s) independente(s). Última atualização: ${updatedAt}. ${selectedMonth ? `Leitura de ${monthLabel(selectedMonth)}.` : ''}${undated ? ` ${undated} sem data não entram no recorte mensal.` : ''}`
+      : 'Base independente: importe quando receber a planilha do parceiro. Ela não é substituída pelas planilhas de faturamento.';
+  }
+  const kpis = document.getElementById('clubCouponKpis');
+  if (kpis) kpis.innerHTML = `
+    <div class="card"><div class="label">Usos no mês</div><div class="value">${eligible.length}</div><div class="sub">lançamentos da base de cupons</div></div>
+    <div class="card"><div class="label">Cruzados com Clube</div><div class="value">${matchedClub}</div><div class="sub">${eligible.length ? fmtPct(matchedClub / eligible.length * 100) : '0,00%'} com cadastro identificado</div></div>
+    <div class="card"><div class="label">Benefícios informados</div><div class="value">${fmtBRL(totalValue)}</div><div class="sub">valor externo registrado</div></div>
+    <div class="card"><div class="label">Descontos informados</div><div class="value">${fmtBRL(totalDiscount)}</div><div class="sub">concessões na planilha</div></div>
+    <div class="card"><div class="label">Faturamento UBY cruzado</div><div class="value">${fmtBRL(rechargeRevenue)}</div><div class="sub">clientes com recarga no mesmo mês</div></div>`;
+  const table = document.getElementById('clubCouponTable');
+  if (table) {
+    const rows = [...groups.values()].sort((a, b) => b.uses - a.uses || b.value - a.value);
+    table.innerHTML = rows.length ? rows.map(group => {
+      const revenue = [...group.rechargingClients.values()].reduce((sum, client) => sum + Number(client.revenue || 0), 0);
+      return `<tr><td><strong>${escapeHtml(group.coupon)}</strong></td><td>${group.uses}</td><td>${group.clubMatches}</td><td>${group.rechargingClients.size}</td><td>${fmtBRL(group.value)}</td><td>${fmtBRL(group.discount)}</td><td><strong>${fmtBRL(revenue)}</strong></td></tr>`;
+    }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--p3-muted)">Nenhum uso de cupom na competência selecionada.</td></tr>';
+  }
+}
+
 function clubFormEndpointUrl() {
   return safeText(window.UBY_CLUBE_FORM_ENDPOINT || localStorage.getItem('uby-club-form-endpoint') || '').trim();
 }
@@ -10167,6 +10320,10 @@ function renderClub() {
   const withPhone = rows.filter(row => row.phone).length;
   const registeredRows = rows.filter(row => row.registered).length;
   const top3 = rows.slice(0, 3);
+
+  // A planilha de cupons é uma fonte externa e independente. Cruzamos somente
+  // para leitura: ela nunca altera receita, pontos ou a base de recargas.
+  renderClubCouponControl(scope.selectedMonth, clubClientRows(monthCharges), participants);
 
   document.getElementById('clubHeroMeta').innerHTML = rows.length
     ? `<strong>${competitionLabel}</strong>: ${rows.length} participante(s) UBY com consumo pago<br>${fmtBRL(totalRevenue)} em faturamento no mês<br>${totalPoints.toLocaleString('pt-BR')} ponto(s) mensais`

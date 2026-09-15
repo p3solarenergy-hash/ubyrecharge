@@ -290,7 +290,10 @@
     .day-dc-breakdown-head span { color:var(--p3-muted); font-size:12px; }
     .day-dc-breakdown-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
     .day-dc-unit { min-width:0; padding:14px 15px; border:1px solid rgba(117,169,215,.18); border-radius:10px; background:rgba(5,16,30,.46); }
-    .day-dc-unit > strong { display:block; min-width:0; color:var(--p3-text); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .day-dc-unit-head { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; }
+    .day-dc-unit > .day-dc-unit-head > strong { display:block; min-width:0; color:var(--p3-text); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .day-dc-open { flex:0 0 auto; border:1px solid rgba(87,183,255,.36); border-radius:7px; background:rgba(87,183,255,.08); color:#8BCBFF; padding:5px 8px; font:800 10px/1 var(--ui-font); cursor:pointer; transition:.18s ease; }
+    .day-dc-open:hover { background:rgba(87,183,255,.18); border-color:rgba(87,183,255,.72); color:#D9EEFF; }
     .day-dc-unit-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-top:12px; }
     .day-dc-unit-metrics span { min-width:0; color:#57B7FF; font-size:14px; font-weight:900; white-space:nowrap; }
     .day-dc-unit-metrics small { display:block; margin-bottom:3px; color:var(--p3-muted); font-size:9px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
@@ -1301,6 +1304,28 @@
 
     <section class="kpis" id="clubKpis"></section>
 
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="club-form-head">
+          <div>
+            <h2>Controle de cupons e benefícios</h2>
+            <div class="club-form-status" id="clubCouponStatus">Base independente: importe quando receber a planilha do parceiro. Ela não é substituída pelas planilhas de faturamento.</div>
+          </div>
+          <div class="controls" style="display:flex">
+            <input class="ctl-input" id="clubCouponUpload" type="file" accept=".csv,.xlsx,.xls" multiple onchange="handleClubCouponFiles(this.files)">
+          </div>
+        </div>
+        <section class="kpis" id="clubCouponKpis" style="margin-top:0"></section>
+        <div class="note" style="margin:12px 0 0">Colunas reconhecidas: data, cupom, cliente/nome, e-mail, telefone, parceiro, valor, desconto e status. O cruzamento prioriza e-mail e telefone; nome é usado apenas como alternativa.</div>
+        <div style="overflow-x:auto;margin-top:14px">
+          <table>
+            <thead><tr><th>Cupom</th><th>Usos</th><th>Cruzados com Clube</th><th>Com recarga UBY no mês</th><th>Valor de benefícios</th><th>Desconto informado</th><th>Faturamento UBY cruzado</th></tr></thead>
+            <tbody id="clubCouponTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section class="club-print-panel" id="clubPrintPanel">
       <div class="club-print-head">
         <div>
@@ -2215,6 +2240,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260911-revenue-bases"></script>
+<script src="recargas_app.js?v=20260914-coupon-control"></script>
 </body>
 </html>
