@@ -9415,13 +9415,27 @@ async function confirmCustomerRegistryCloud(expectedRows = []) {
     if (!page?.available) throw new Error('A conexao com a base de clientes foi interrompida.');
     cloudRows.push(...(page.rows || []));
   }
-  const cloudKeys = new Set(cloudRows.map(row => String(row.customer_key || '').toLowerCase()));
+  // A chave tecnica pode ter sido criada por uma versao anterior usando
+  // telefone em vez de e-mail. Confirme pelo identificador persistido e por
+  // qualquer identidade real do motorista, sem exigir que ambas versoes
+  // tenham escolhido a mesma chave primaria.
+  const cloudKeys = new Set();
+  cloudRows.forEach(row => {
+    const persistedKey = String(row.customer_key || '').toLowerCase();
+    if (persistedKey) cloudKeys.add(persistedKey);
+    customerRegistryIdentityKeys({
+      email: row.email || '', phone: row.phone || '', name: row.name || '',
+      cpf: row.raw_data?.cpf || ''
+    }).forEach(key => cloudKeys.add(key));
+  });
   const missing = consolidateCustomerRegistryRows(expectedRows)
-    .map((row, index) => String(
-      row.customerKey || row.customer_key || row.email || row.phone ||
-      `name:${String(row.name || '').trim().toLowerCase() || `manual-${index}`}`
-    ).toLowerCase())
-    .filter(key => key && !cloudKeys.has(key));
+    .filter(row => {
+      const identities = customerRegistryIdentityKeys(row);
+      const persistedKey = String(
+        row.customerKey || row.customer_key || row.email || row.phone || ''
+      ).toLowerCase();
+      return ![persistedKey, ...identities].filter(Boolean).some(key => cloudKeys.has(key));
+    });
   if (missing.length) throw new Error(`${missing.length} cliente(s) ainda nao foram confirmados na nuvem.`);
   return { rows: cloudRows, total: Number(firstPage.count || cloudRows.length) };
 }
