@@ -56,6 +56,7 @@ let overviewSessionsHydrationPromise = null;
 let fullRechargeWorkIds = new Set();
 let rechargeFullLoadPromises = new Map();
 let operationalPowerSaveInFlight = false;
+let dcComparisonSelection = { period: 'panel', selectedKeys: null };
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -169,6 +170,22 @@ function stationAvailabilityKey(stationName) {
 // O valor original não é alterado, preservando a identificação armazenada.
 function stationDisplayName(value = '') {
   return safeText(value).toLocaleUpperCase('pt-BR');
+}
+
+function dcComparisonRowKey(row = {}) {
+  return `${row.workId || 'obra'}|${row.key || normalizeStationForCompare(row.stationName || row.station || row.workName || '')}`;
+}
+
+function applyDcComparisonControls() {
+  const period = document.getElementById('dcComparisonPeriodSelect')?.value || 'panel';
+  const selectedKeys = new Set([...document.querySelectorAll('.dc-comparison-selector:checked')].map(input => input.value));
+  dcComparisonSelection = { period, selectedKeys };
+  renderUbyOperation();
+}
+
+function setAllDcComparisonSelection(checked) {
+  document.querySelectorAll('.dc-comparison-selector').forEach(input => { input.checked = checked; });
+  applyDcComparisonControls();
 }
 
 function defaultPhysicalLayout(stationName = '', workName = '') {
@@ -12261,8 +12278,25 @@ async function renderUbyOperation() {
   const occBand = occupationBand(totalOcc);
   const occClass = occBand.className;
   const occStatus = `${occBand.label}: ${occBand.range}`;
-  const dcComparisonMonthKeys = isMonthView && currentGeneralMonth ? [currentGeneralMonth] : sourceMonths;
-  const dcComparisonRows = primaryDcRows.map(row => {
+  const dcComparisonSourceRows = sourceIncluded.filter(row => row.kind === 'dc' && isOwnedUbyRow(row));
+  const dcComparisonAvailableKeys = new Set(dcComparisonSourceRows.map(dcComparisonRowKey));
+  if (!(dcComparisonSelection.selectedKeys instanceof Set)) {
+    dcComparisonSelection.selectedKeys = new Set(dcComparisonAvailableKeys);
+  } else {
+    dcComparisonSelection.selectedKeys = new Set([...dcComparisonSelection.selectedKeys].filter(key => dcComparisonAvailableKeys.has(key)));
+  }
+  const dcComparisonPeriod = ['panel', 'accumulated', ...sourceMonths].includes(dcComparisonSelection.period)
+    ? dcComparisonSelection.period : 'panel';
+  const dcComparisonMonthKeys = dcComparisonPeriod === 'panel'
+    ? (isMonthView && currentGeneralMonth ? [currentGeneralMonth] : sourceMonths)
+    : (dcComparisonPeriod === 'accumulated' ? sourceMonths : [dcComparisonPeriod]);
+  const dcComparisonPeriodLabel = dcComparisonPeriod === 'panel'
+    ? viewLabel
+    : (dcComparisonPeriod === 'accumulated' ? 'Acumulado completo' : monthLabel(dcComparisonPeriod));
+  const dcComparisonRows = dcComparisonSourceRows
+    .filter(row => dcComparisonSelection.selectedKeys.has(dcComparisonRowKey(row)))
+    .map(sourceRow => summarizeUbyChargerRow(sourceRow, sourceRow.charges.filter(charge => dcComparisonMonthKeys.includes(chargeMonthKey(charge))))
+    .map(row => {
     const occupancy = stationOccupancyForMonths(row, dcComparisonMonthKeys, 'mtd');
     const clean = cleanOperationStats(row.charges);
     return {
@@ -12271,7 +12305,7 @@ async function renderUbyOperation() {
       failureCount: clean.failed.length,
       avgKwh: row.count ? row.energy / row.count : 0
     };
-  }).sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
+  })).sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
 
   document.getElementById('generalSourceLabel').textContent = totalCharges
     ? `${viewLabel}: ${included.length} carregador(es) UBY ativo(s)`

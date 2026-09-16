@@ -142,6 +142,12 @@
     .monthly-comparison-chart { height:300px !important; max-height:300px !important; }
     .dc-comparison-card { margin-top:18px; }
     .dc-comparison-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+    .dc-comparison-controls { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border:1px solid var(--p3-border); border-radius:10px; background:rgba(8,23,42,.56); }
+    .dc-comparison-controls label { display:flex; align-items:center; gap:8px; color:var(--p3-muted); font-size:12px; font-weight:700; }
+    .dc-comparison-controls select { min-width:190px; }
+    .dc-comparison-selector-list { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .dc-comparison-selector-item { display:inline-flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid var(--p3-border); border-radius:999px; color:var(--p3-text); font-size:11px; cursor:pointer; }
+    .dc-comparison-selector-item input { accent-color:var(--p3-primary); }
     .dc-comparison-charts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:14px; }
     .dc-comparison-chart { min-width:0; border:1px solid var(--p3-border); border-radius:12px; background:rgba(8,23,42,.52); padding:13px; }
     .dc-comparison-chart h3 { margin:0 0 9px; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:var(--p3-text); }
@@ -1508,6 +1514,16 @@
         </div>
         <span id="dcComparisonPeriod" style="color:var(--p3-muted);font-size:12px"></span>
       </div>
+      <div class="dc-comparison-controls">
+        <label>Período
+          <select id="dcComparisonPeriodSelect" onchange="applyDcComparisonControls()"></select>
+        </label>
+        <div class="dc-comparison-selector-list" id="dcComparisonSelectorList"></div>
+        <div style="display:flex;gap:7px">
+          <button class="btn-recalc" type="button" onclick="setAllDcComparisonSelection(true)">Todos</button>
+          <button class="btn-danger" type="button" onclick="setAllDcComparisonSelection(false)">Limpar</button>
+        </div>
+      </div>
       <div class="dc-comparison-charts">
         <div class="dc-comparison-chart"><h3>Faturamento</h3><canvas id="chartDcComparisonRevenue" aria-label="Comparativo de faturamento dos carregadores DC"></canvas></div>
         <div class="dc-comparison-chart"><h3>Ocupação</h3><canvas id="chartDcComparisonOccupancy" aria-label="Comparativo de ocupação dos carregadores DC"></canvas></div>
@@ -2276,6 +2292,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260916-usage-lines-coupons"></script>
+<script src="recargas_app.js?v=20260916-usage-lines-coupons-dc-controls"></script>
 </body>
 </html>
