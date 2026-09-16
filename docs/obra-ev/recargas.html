@@ -140,6 +140,14 @@
     canvas { width:100%; max-height:320px; }
     /* Comparativo mensal: duas unidades exigem altura previsível e eixos legíveis. */
     .monthly-comparison-chart { height:300px !important; max-height:300px !important; }
+    .dc-comparison-card { margin-top:18px; }
+    .dc-comparison-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+    .dc-comparison-charts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:14px; }
+    .dc-comparison-chart { min-width:0; border:1px solid var(--p3-border); border-radius:12px; background:rgba(8,23,42,.52); padding:13px; }
+    .dc-comparison-chart h3 { margin:0 0 9px; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:var(--p3-text); }
+    .dc-comparison-chart canvas { height:220px !important; max-height:220px !important; }
+    .dc-comparison-table-wrap { overflow-x:auto; margin-top:16px; border:1px solid var(--p3-border); border-radius:12px; }
+    .dc-comparison-table { min-width:920px; margin:0; }
     .coupon-summary { display:grid; gap:8px; margin-top:12px; }
     .coupon-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(4,auto); gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--p3-border); color:var(--p3-muted); font-size:11px; }
     .coupon-row strong { color:var(--p3-text); font-size:12px; overflow-wrap:anywhere; }
@@ -801,6 +809,7 @@
       .uby-finance-stack { grid-template-rows:auto; }
       .ac-context-card { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .section-3, .section-2 { grid-template-columns:1fr; }
+      .dc-comparison-charts { grid-template-columns:1fr; }
       .acc-grid { grid-template-columns:1fr; }
       .general-split { grid-template-columns:1fr; }
       .metric-strip { grid-template-columns:1fr; }
@@ -1488,6 +1497,27 @@
     <section class="day-compare-grid" id="usageUbyDayCompare"></section>
 
     <section class="uby-metrics-dashboard" id="kpiUby"></section>
+
+    <section class="card dc-comparison-card" aria-labelledby="dcComparisonTitle">
+      <div class="dc-comparison-head">
+        <div>
+          <h2 id="dcComparisonTitle" style="margin:0">Comparativo DC por carregador</h2>
+          <p class="note" style="margin:6px 0 0">Leitura da operação própria UBY. Compare desempenho e ocupação sem misturar AC ou parceiros.</p>
+        </div>
+        <span id="dcComparisonPeriod" style="color:var(--p3-muted);font-size:12px"></span>
+      </div>
+      <div class="dc-comparison-charts">
+        <div class="dc-comparison-chart"><h3>Faturamento</h3><canvas id="chartDcComparisonRevenue" aria-label="Comparativo de faturamento dos carregadores DC"></canvas></div>
+        <div class="dc-comparison-chart"><h3>Ocupação</h3><canvas id="chartDcComparisonOccupancy" aria-label="Comparativo de ocupação dos carregadores DC"></canvas></div>
+        <div class="dc-comparison-chart"><h3>Energia entregue</h3><canvas id="chartDcComparisonEnergy" aria-label="Comparativo de energia entregue dos carregadores DC"></canvas></div>
+      </div>
+      <div class="dc-comparison-table-wrap">
+        <table class="dc-comparison-table">
+          <thead><tr><th>Carregador DC</th><th>Faturamento</th><th>Ocupação</th><th>Energia</th><th>Recargas</th><th>Clientes</th><th>Ticket médio</th><th>kWh / recarga</th><th>Falhas</th></tr></thead>
+          <tbody id="dcComparisonTable"></tbody>
+        </table>
+      </div>
+    </section>
 
     <section class="section uby-access-section" style="margin-top:18px">
       <div class="card">
@@ -2241,6 +2271,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260915-customer-confirmation2"></script>
+<script src="recargas_app.js?v=20260916-dc-comparison"></script>
 </body>
 </html>

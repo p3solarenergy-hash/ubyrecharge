@@ -12226,6 +12226,17 @@ async function renderUbyOperation() {
   const occBand = occupationBand(totalOcc);
   const occClass = occBand.className;
   const occStatus = `${occBand.label}: ${occBand.range}`;
+  const dcComparisonMonthKeys = isMonthView && currentGeneralMonth ? [currentGeneralMonth] : sourceMonths;
+  const dcComparisonRows = primaryDcRows.map(row => {
+    const occupancy = stationOccupancyForMonths(row, dcComparisonMonthKeys, 'mtd');
+    const clean = cleanOperationStats(row.charges);
+    return {
+      ...row,
+      occupancyPct: occupancy.pct,
+      failureCount: clean.failed.length,
+      avgKwh: row.count ? row.energy / row.count : 0
+    };
+  }).sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
 
   document.getElementById('generalSourceLabel').textContent = totalCharges
     ? `${viewLabel}: ${included.length} carregador(es) UBY ativo(s)`
@@ -12296,6 +12307,23 @@ async function renderUbyOperation() {
     </div>
   `;
 
+  const dcComparisonPeriod = document.getElementById('dcComparisonPeriod');
+  const dcComparisonTable = document.getElementById('dcComparisonTable');
+  if (dcComparisonPeriod) dcComparisonPeriod.textContent = `${viewLabel} · ${dcComparisonRows.length} carregador(es) DC`;
+  if (dcComparisonTable) dcComparisonTable.innerHTML = dcComparisonRows.length ? dcComparisonRows.map(row => `
+    <tr>
+      <td><strong>${escapeHtml(row.stationName || row.workName || 'Carregador DC')}</strong><br><span style="color:var(--p3-muted);font-size:11px">${escapeHtml(row.workName || '')}</span></td>
+      <td>${fmtBRL(row.revenue)}</td>
+      <td>${fmtPct(row.occupancyPct)}</td>
+      <td>${fmtKWh(row.energy)}</td>
+      <td>${row.count}</td>
+      <td>${row.clients}</td>
+      <td>${fmtBRL(row.avgTicket)}</td>
+      <td>${fmtKWh(row.avgKwh)}</td>
+      <td>${row.failureCount}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:18px">Sem recargas DC próprias no período selecionado.</td></tr>';
+
   renderUbyDecisionCockpit([], allUbyCharges, included, sourceUbyCharges);
   scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
     dayComparison: { dcRows: primaryDcRows },
@@ -12317,6 +12345,13 @@ async function renderUbyOperation() {
   });
   renderBarChart('chartUbyRevenueUnit', chartLabels, chartRows.map(row => row.revenue), '#57B7FF', ' R$');
   renderBarChart('chartUbyEnergyUnit', chartLabels, chartRows.map(row => row.energy), '#2DBBD3', ' kWh');
+  const dcComparisonLabels = dcComparisonRows.map(row => {
+    const label = stationDisplayName(row.stationName || row.workName || 'DC');
+    return label.length > 22 ? `${label.slice(0, 22)}...` : label;
+  });
+  renderBarChart('chartDcComparisonRevenue', dcComparisonLabels, dcComparisonRows.map(row => row.revenue), '#57B7FF', ' R$');
+  renderBarChart('chartDcComparisonOccupancy', dcComparisonLabels, dcComparisonRows.map(row => row.occupancyPct), '#00E99A', ' %');
+  renderBarChart('chartDcComparisonEnergy', dcComparisonLabels, dcComparisonRows.map(row => row.energy), '#FFD25A', ' kWh');
 
   const accessMonthKeys = isMonthView && currentGeneralMonth ? [currentGeneralMonth] : sourceMonths;
   document.getElementById('ubyUnitRank').innerHTML = accessRows.length ? accessRows.slice(0, 12).map(unit => `
