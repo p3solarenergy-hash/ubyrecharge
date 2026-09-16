@@ -6903,6 +6903,42 @@ function renderSmoothLineChart(id, labels, values, color = '#57B7FF', unit = '')
   });
 }
 
+function renderComparisonLineChart(id, labels, series, unit = '') {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const palette = ['#57B7FF', '#00E99A', '#FFD25A', '#B99BFF', '#FF8D7A'];
+  charts[id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: (series || []).map((item, index) => ({
+        label: item.label,
+        data: (item.values || []).map(value => +Number(value || 0).toFixed(2)),
+        borderColor: palette[index % palette.length],
+        backgroundColor: `${palette[index % palette.length]}18`,
+        pointBackgroundColor: palette[index % palette.length],
+        pointBorderColor: '#0E1B2D',
+        pointBorderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        borderWidth: 3,
+        tension: .28,
+        fill: false
+      }))
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { color: '#C7D8D0', boxWidth: 12, font: { size: 11, weight: '600' } } } },
+      scales: {
+        y: { beginAtZero: true, ticks: { color: '#8FA39A', callback: value => unit ? `${value}${unit}` : value }, grid: { color: '#24364E' } },
+        x: { ticks: { color: '#8FA39A', maxRotation: 0, autoSkip: true, maxTicksLimit: 16, font: { size: 10 } }, grid: { color: '#24364E' } }
+      }
+    }
+  });
+}
+
 function renderPieChart(id, labels, values) {
   destroyChart(id);
   const ctx = document.getElementById(id);
@@ -12352,6 +12388,23 @@ async function renderUbyOperation() {
   renderBarChart('chartDcComparisonRevenue', dcComparisonLabels, dcComparisonRows.map(row => row.revenue), '#57B7FF', ' R$');
   renderBarChart('chartDcComparisonOccupancy', dcComparisonLabels, dcComparisonRows.map(row => row.occupancyPct), '#00E99A', ' %');
   renderBarChart('chartDcComparisonEnergy', dcComparisonLabels, dcComparisonRows.map(row => row.energy), '#FFD25A', ' kWh');
+  const dcDailyKeys = [...new Set(dcComparisonRows.flatMap(row => row.charges
+    .filter(charge => isExecutedCharge(charge) && charge.startDate && !Number.isNaN(charge.startDate.getTime()))
+    .map(charge => dateKeyLocal(charge.startDate))
+  ))].sort();
+  const dcDailyLabels = dcDailyKeys.map(key => `${key.slice(8, 10)}/${key.slice(5, 7)}`);
+  const dcDailySeries = dcComparisonRows.map(row => {
+    const revenueByDay = new Map();
+    row.charges.filter(charge => isExecutedCharge(charge) && charge.startDate && !Number.isNaN(charge.startDate.getTime())).forEach(charge => {
+      const key = dateKeyLocal(charge.startDate);
+      revenueByDay.set(key, Number(revenueByDay.get(key) || 0) + Number(charge.revenue || 0));
+    });
+    return {
+      label: stationDisplayName(row.stationName || row.workName || 'Carregador DC'),
+      values: dcDailyKeys.map(key => revenueByDay.get(key) || 0)
+    };
+  });
+  renderComparisonLineChart('chartDcComparisonDailyRevenue', dcDailyLabels, dcDailySeries, ' R$');
 
   const accessMonthKeys = isMonthView && currentGeneralMonth ? [currentGeneralMonth] : sourceMonths;
   document.getElementById('ubyUnitRank').innerHTML = accessRows.length ? accessRows.slice(0, 12).map(unit => `

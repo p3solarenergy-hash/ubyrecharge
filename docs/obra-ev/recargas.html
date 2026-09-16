@@ -148,6 +148,9 @@
     .dc-comparison-chart canvas { height:220px !important; max-height:220px !important; }
     .dc-comparison-table-wrap { overflow-x:auto; margin-top:16px; border:1px solid var(--p3-border); border-radius:12px; }
     .dc-comparison-table { min-width:920px; margin:0; }
+    .dc-daily-comparison { margin-top:16px; border:1px solid var(--p3-border); border-radius:12px; background:rgba(8,23,42,.52); padding:16px; }
+    .dc-daily-comparison h3 { margin:0; font-size:14px; color:var(--p3-text); }
+    .dc-daily-comparison canvas { height:300px !important; max-height:300px !important; margin-top:10px; }
     .coupon-summary { display:grid; gap:8px; margin-top:12px; }
     .coupon-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(4,auto); gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--p3-border); color:var(--p3-muted); font-size:11px; }
     .coupon-row strong { color:var(--p3-text); font-size:12px; overflow-wrap:anywhere; }
@@ -1517,6 +1520,11 @@
           <tbody id="dcComparisonTable"></tbody>
         </table>
       </div>
+      <div class="dc-daily-comparison">
+        <h3>Faturamento diário por carregador DC</h3>
+        <p class="note" style="margin:8px 0 0">Cada linha representa um carregador DC próprio UBY. Assim, fica visível a evolução diária e a diferença de receita entre eles.</p>
+        <canvas id="chartDcComparisonDailyRevenue" aria-label="Comparativo diário de faturamento entre carregadores DC"></canvas>
+      </div>
     </section>
 
     <section class="section uby-access-section" style="margin-top:18px">
@@ -2271,6 +2279,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260916-dc-comparison"></script>
+<script src="recargas_app.js?v=20260916-dc-daily-comparison"></script>
 </body>
 </html>
