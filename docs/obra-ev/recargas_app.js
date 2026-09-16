@@ -8909,11 +8909,10 @@ async function renderUsageInsights(charges = [], prefix = 'usage', historyCharge
   renderNetworkIntelligence(prefix, charges, intelligenceHistory);
   await yieldToBrowser();
   renderOperationalCalendar(prefix, charges, historyCharges, { ...(options.calendar || {}), bounds: weekdayBounds });
-  renderBarChart(`${prefix}Duration7`, data.labels, data.duration, '#3B32D0', 'h');
-  renderBarChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
-  renderBarChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
+  renderSmoothLineChart(`${prefix}Count7`, data.labels, data.count, '#2D8CE0');
+  renderSmoothLineChart(`${prefix}Energy7`, data.labels, data.energy, '#2DBBD3', ' kWh');
   await yieldToBrowser();
-  renderBarChart(`${prefix}StayBuckets`, data.stayLabels, data.stayValues, '#3B32D0');
+  renderSmoothLineChart(`${prefix}StayBuckets`, data.stayLabels, data.stayValues, '#3B32D0');
   renderCouponDonutChart(`${prefix}Coupons`, data.couponLabels, data.couponValues);
   renderCouponDonutChart(`${prefix}CouponRevenue`, data.couponLabels, data.couponRevenueValues, ' R$');
   renderCouponSummary(`${prefix}CouponSummary`, data.couponDetails);
