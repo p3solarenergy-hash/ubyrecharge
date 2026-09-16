@@ -12295,8 +12295,8 @@ async function renderUbyOperation() {
     : (dcComparisonPeriod === 'accumulated' ? 'Acumulado completo' : monthLabel(dcComparisonPeriod));
   const dcComparisonRows = dcComparisonSourceRows
     .filter(row => dcComparisonSelection.selectedKeys.has(dcComparisonRowKey(row)))
-    .map(sourceRow => summarizeUbyChargerRow(sourceRow, sourceRow.charges.filter(charge => dcComparisonMonthKeys.includes(chargeMonthKey(charge))))
-    .map(row => {
+    .map(sourceRow => {
+    const row = summarizeUbyChargerRow(sourceRow, sourceRow.charges.filter(charge => dcComparisonMonthKeys.includes(chargeMonthKey(charge))));
     const occupancy = stationOccupancyForMonths(row, dcComparisonMonthKeys, 'mtd');
     const clean = cleanOperationStats(row.charges);
     return {
@@ -12305,7 +12305,7 @@ async function renderUbyOperation() {
       failureCount: clean.failed.length,
       avgKwh: row.count ? row.energy / row.count : 0
     };
-  })).sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
+  }).sort((a, b) => b.revenue - a.revenue || String(a.stationName || a.workName).localeCompare(String(b.stationName || b.workName), 'pt-BR'));
 
   document.getElementById('generalSourceLabel').textContent = totalCharges
     ? `${viewLabel}: ${included.length} carregador(es) UBY ativo(s)`
