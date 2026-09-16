@@ -12376,9 +12376,23 @@ async function renderUbyOperation() {
     </div>
   `;
 
-  const dcComparisonPeriod = document.getElementById('dcComparisonPeriod');
+  const dcComparisonPeriodLabelTarget = document.getElementById('dcComparisonPeriod');
   const dcComparisonTable = document.getElementById('dcComparisonTable');
-  if (dcComparisonPeriod) dcComparisonPeriod.textContent = `${viewLabel} · ${dcComparisonRows.length} carregador(es) DC`;
+  const dcComparisonPeriodSelect = document.getElementById('dcComparisonPeriodSelect');
+  const dcComparisonSelectorList = document.getElementById('dcComparisonSelectorList');
+  if (dcComparisonPeriodLabelTarget) dcComparisonPeriodLabelTarget.textContent = `${dcComparisonPeriodLabel} · ${dcComparisonRows.length} de ${dcComparisonSourceRows.length} carregador(es) DC`;
+  if (dcComparisonPeriodSelect) {
+    dcComparisonPeriodSelect.innerHTML = [
+      `<option value="panel">Período do painel (${escapeHtml(viewLabel)})</option>`,
+      '<option value="accumulated">Acumulado completo</option>',
+      ...sourceMonths.slice().reverse().map(month => `<option value="${month}">${escapeHtml(monthLabel(month))}</option>`)
+    ].join('');
+    dcComparisonPeriodSelect.value = dcComparisonPeriod;
+  }
+  if (dcComparisonSelectorList) dcComparisonSelectorList.innerHTML = dcComparisonSourceRows.map(row => {
+    const key = dcComparisonRowKey(row);
+    return `<label class="dc-comparison-selector-item"><input class="dc-comparison-selector" type="checkbox" value="${escapeAttr(key)}" ${dcComparisonSelection.selectedKeys.has(key) ? 'checked' : ''} onchange="applyDcComparisonControls()">${escapeHtml(stationDisplayName(row.stationName || row.workName || 'DC'))}</label>`;
+  }).join('') || '<span style="color:var(--p3-muted);font-size:12px">Nenhum DC próprio disponível.</span>';
   if (dcComparisonTable) dcComparisonTable.innerHTML = dcComparisonRows.length ? dcComparisonRows.map(row => `
     <tr>
       <td><strong>${escapeHtml(row.stationName || row.workName || 'Carregador DC')}</strong><br><span style="color:var(--p3-muted);font-size:11px">${escapeHtml(row.workName || '')}</span></td>
