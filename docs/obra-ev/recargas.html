@@ -87,6 +87,11 @@
     .user-row strong { color:var(--p3-text); text-align:right; }
     .track   { height:20px; background:#1C314A; border-radius:6px; overflow:hidden; }
     .track i { display:block; height:100%; background:linear-gradient(90deg,#2D7FF9,#57B7FF); border-radius:6px; }
+    .client-revenue { min-width:220px; }
+    .client-revenue-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; white-space:nowrap; }
+    .client-revenue-head strong { color:var(--p3-text); }
+    .client-revenue-head small { color:var(--p3-muted); font-size:10px; }
+    .client-revenue .track { height:8px; margin-top:7px; }
 
     /* Chips de pagamento */
     .pay-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px; }
@@ -1841,18 +1846,6 @@
       </div>
     </section>
 
-    <!-- Usuários | Leitura financeira -->
-    <section class="section">
-      <div class="card">
-        <h2>Top usuários — receita</h2>
-        <div class="user-bars" id="userBars"></div>
-      </div>
-      <div class="card">
-        <h2>Leitura financeira</h2>
-        <div class="note" id="financialNote"></div>
-      </div>
-    </section>
-
     <!-- Mensal/acumulado | Base da análise -->
     <section class="section">
       <div class="card">
@@ -1888,10 +1881,11 @@
     <!-- Clientes | Ociosidade -->
     <section class="section">
       <div class="card">
-        <h2>Clientes</h2>
+        <h2>Clientes — receita e utilização</h2>
+        <div class="note" id="financialNote"></div>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Cliente</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>R$/kWh medio</th><th>Última recarga</th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Recargas</th><th>kWh</th><th>Receita / participação</th><th>R$/kWh medio</th><th>Última recarga</th></tr></thead>
             <tbody id="clientsTable"></tbody>
           </table>
         </div>

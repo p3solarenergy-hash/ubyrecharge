@@ -12927,7 +12927,6 @@ async function renderMensal() {
   if (renderSequence !== monthlyRenderSequence) return;
   renderPaymentChart(charges);
   renderUserPieChart(charges);
-  renderUserBars(charges, 'userBars');
   renderFinancialNote(charges);
   await yieldToBrowser();
   if (renderSequence !== monthlyRenderSequence) return;
@@ -13152,15 +13151,19 @@ function renderClientsTable(charges) {
     if (!byUser[key].last || (c.startDate && c.startDate > byUser[key].last))
       byUser[key].last = c.startDate;
   });
-  document.getElementById('clientsTable').innerHTML = Object.entries(byUser)
-    .sort((a,b) => b[1].rev - a[1].rev)
-    .map(([, d]) => {
+  const customers = Object.values(byUser).sort((a, b) => b.rev - a.rev);
+  const totalRevenue = customers.reduce((sum, customer) => sum + customer.rev, 0);
+  const maxRevenue = customers[0]?.rev || 1;
+  document.getElementById('clientsTable').innerHTML = customers
+    .map(d => {
       const avgKwh = d.kwh > 0 ? d.rev / d.kwh : 0;
+      const share = totalRevenue > 0 ? d.rev / totalRevenue * 100 : 0;
+      const relativeBar = Math.max(0, Math.min(100, d.rev / maxRevenue * 100));
       return (
       `<tr>
          <td>${escapeHtml(d.name)}</td><td>${d.n}</td>
          <td>${d.kwh.toFixed(2).replace('.',',')}</td>
-         <td>${fmtBRL(d.rev)}</td>
+         <td><div class="client-revenue"><div class="client-revenue-head"><strong>${fmtBRL(d.rev)}</strong><small>${fmtPct(share)} da receita</small></div><div class="track"><i style="width:${relativeBar.toFixed(1)}%"></i></div></div></td>
          <td>${fmtBRL(avgKwh)}</td>
          <td>${fmtDT(d.last)}</td>
        </tr>`);
