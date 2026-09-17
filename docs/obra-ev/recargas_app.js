@@ -6720,16 +6720,18 @@ function periodModeLabel(mode = selectedPeriodMode(), mk = '') {
   return `ultimos ${mode} dia${String(mode) === '1' ? '' : 's'}`;
 }
 
-function occByInterval(charges, powerOverride, boundsOverride) {
+function occByInterval(charges, powerOverride, boundsOverride, context = {}) {
   const power = Number.isFinite(Number(powerOverride)) ? Number(powerOverride) : getPower();
   const bounds = boundsOverride || periodBounds(charges);
   if (!bounds.start || !bounds.end || !bounds.hours) return { pct: 0, hours: 0, maxKWh: 0, energy: 0, power };
-  const stationName = currentStationReportName || canonicalStationNameForWork(
-    currentWorkId,
-    charges[0]?.station || currentWorkName,
-    currentWorkName
+  const workId = String(context.workId || currentWorkId || '');
+  const workName = context.workName || currentWorkName;
+  const stationName = context.stationName || currentStationReportName || canonicalStationNameForWork(
+    workId,
+    charges[0]?.station || workName,
+    workName
   );
-  const config = stationAvailabilityFor(currentWorkId, stationName, currentWorkName);
+  const config = stationAvailabilityFor(workId, stationName, workName);
   const hours = stationAvailableHours(config, bounds.start, bounds.end);
   const maxKWh = power * hours;
   const energy = charges.reduce((s, c) => s + c.energyKWh, 0);
@@ -12168,7 +12170,7 @@ async function renderUbyOperation() {
       if (!monthCharges.length) return;
       const window = periodWindow(monthCharges, mk, 'mtd', operationStart);
       windows.push(window);
-      totalMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window).maxKWh;
+      totalMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window, row).maxKWh;
     });
   });
   const totalOcc = totalMaxKWh > 0 ? energy / totalMaxKWh * 100 : 0;
@@ -12179,7 +12181,7 @@ async function renderUbyOperation() {
       const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === mk);
       if (!monthCharges.length) return;
       const window = periodWindow(monthCharges, mk, 'mtd', operationStart);
-      primaryDcMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window).maxKWh;
+      primaryDcMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window, row).maxKWh;
     });
   });
   const primaryDcEnergy = primaryDcCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
@@ -12191,7 +12193,7 @@ async function renderUbyOperation() {
       const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === mk);
       if (!monthCharges.length) return;
       const window = periodWindow(monthCharges, mk, 'mtd', operationStart);
-      primaryAcMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window).maxKWh;
+      primaryAcMaxKWh += occByInterval(monthCharges, workPowerById(row.workId), window, row).maxKWh;
     });
   });
   const primaryAcEnergy = primaryAcCharges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
