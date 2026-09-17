@@ -9416,12 +9416,16 @@ function customerRegistryIdentityKeys(row = {}) {
   const phone = normalizePhone(row.phone);
   const cpf = safeText(row.cpf).replace(/\D/g, '');
   const name = normalizeHeaderName(row.name || '');
-  return [
+  const verified = [
     cpf ? `cpf:${cpf}` : '',
     email ? `email:${email}` : '',
-    phone ? `phone:${phone}` : '',
-    name ? `name:${name}` : ''
+    phone ? `phone:${phone}` : ''
   ].filter(Boolean);
+  // Nome sozinho so e usado quando a planilha nao trouxe nenhum identificador
+  // verificavel. Assim duas pessoas com o mesmo nome nao sao fundidas por
+  // engano, mas uma linha totalmente sem contato tambem nao duplica a cada
+  // importacao.
+  return verified.length ? verified : (name ? [`name:${name}`] : []);
 }
 
 function consolidateCustomerRegistryRows(incoming = []) {
@@ -9435,10 +9439,14 @@ function consolidateCustomerRegistryRows(incoming = []) {
     target.phone = target.phone || row.phone || '';
     target.phoneDisplay = target.phoneDisplay || row.phoneDisplay || '';
     target.chargers = Math.max(target.chargers, Number(row.chargers || 0));
-    target.transactions += Number(row.transactions || 0);
-    target.energy += Number(row.energy || 0);
-    target.spent += Number(row.spent || 0);
-    target.durationHours += durToHours(row.chargeTime);
+    // Os arquivos de clientes sao retratos acumulados. A mesma pessoa pode
+    // aparecer em mais de uma linha/arquivo, portanto usar soma aqui dobra
+    // transacoes, energia e faturamento a cada importacao. Mantemos o maior
+    // acumulado observado em vez de criar outro saldo artificial.
+    target.transactions = Math.max(target.transactions, Number(row.transactions || 0));
+    target.energy = Math.max(target.energy, Number(row.energy || 0));
+    target.spent = Math.max(target.spent, Number(row.spent || 0));
+    target.durationHours = Math.max(target.durationHours, durToHours(row.chargeTime));
     (Array.isArray(row.locations) ? row.locations : []).forEach(location => {
       const clean = safeText(location).trim();
       if (clean) target.locations.add(clean);
@@ -9477,15 +9485,23 @@ function consolidateCustomerRegistryRows(incoming = []) {
 function mergeCustomerRegistry(incoming = [], source = 'importacao manual') {
   const current = customerRegistryStore().rows;
   const rows = [...current];
+  const added = [];
+  const retained = [];
   consolidateCustomerRegistryRows(incoming).forEach(next => {
     const keys = new Set(customerRegistryIdentityKeys(next));
     const index = rows.findIndex(existing => customerRegistryIdentityKeys(existing).some(key => keys.has(key)));
-    if (index >= 0) rows[index] = { ...rows[index], ...next };
-    else rows.push(next);
+    // A base atual e historica: uma identidade que ja existe nao pode ter
+    // seus acumulados reimportados, substituidos ou somados. O arquivo novo
+    // so adiciona um cliente quando nao ha nenhuma identidade em comum.
+    if (index >= 0) retained.push(next);
+    else { rows.push(next); added.push(next); }
   });
-  const payload = { rows, updatedAt: new Date().toISOString(), source };
+  const payload = {
+    rows, updatedAt: new Date().toISOString(), source,
+    lastImport: { source, imported: consolidateCustomerRegistryRows(incoming).length, added: added.length, retained: retained.length }
+  };
   writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, payload);
-  return payload;
+  return { payload, added, retained };
 }
 
 async function saveCustomerRegistryCloud(payload) {
@@ -9494,7 +9510,7 @@ async function saveCustomerRegistryCloud(payload) {
   return true;
 }
 
-async function confirmCustomerRegistryCloud(expectedRows = []) {
+async function readCustomerRegistryCloud() {
   if (!window.UBY_SUPABASE?.loadRechargeCustomers) return null;
   const firstPage = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500 });
   if (!firstPage?.available) throw new Error('Entre novamente para confirmar a base oficial na nuvem.');
@@ -9505,6 +9521,23 @@ async function confirmCustomerRegistryCloud(expectedRows = []) {
     if (!page?.available) throw new Error('A conexao com a base de clientes foi interrompida.');
     cloudRows.push(...(page.rows || []));
   }
+  return { rows: cloudRows, total: Number(firstPage.count || cloudRows.length) };
+}
+
+function customerRegistryRowsFromCloud(cloudRows = []) {
+  return cloudRows.map(row => ({
+    customerKey: row.customer_key, name: row.name || '', email: row.email || '', phone: row.phone || '',
+    complement: row.complement || '', cpf: row.raw_data?.cpf || '', phoneDisplay: row.raw_data?.phoneDisplay || row.phone || '',
+    locations: Array.isArray(row.raw_data?.locations) ? row.raw_data.locations : [], chargers: Number(row.chargers_count || 0),
+    transactions: Number(row.transactions_count || 0), energy: Number(row.energy_kwh || 0),
+    chargeTime: row.charge_time_text || '', spent: Number(row.total_spent || 0), source: row.source || 'banco online'
+  }));
+}
+
+async function confirmCustomerRegistryCloud(expectedRows = []) {
+  const official = await readCustomerRegistryCloud();
+  if (!official) return null;
+  const cloudRows = official.rows;
   // A chave tecnica pode ter sido criada por uma versao anterior usando
   // telefone em vez de e-mail. Confirme pelo identificador persistido e por
   // qualquer identidade real do motorista, sem exigir que ambas versoes
@@ -9527,25 +9560,20 @@ async function confirmCustomerRegistryCloud(expectedRows = []) {
       return ![persistedKey, ...identities].filter(Boolean).some(key => cloudKeys.has(key));
     });
   if (missing.length) throw new Error(`${missing.length} cliente(s) ainda nao foram confirmados na nuvem.`);
-  return { rows: cloudRows, total: Number(firstPage.count || cloudRows.length) };
+  return official;
 }
 
 async function loadCustomerRegistry() {
   try {
     const local = customerRegistryStore();
     if (!window.UBY_SUPABASE?.loadRechargeCustomers) return;
-    const firstPage = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500 });
+    const official = await readCustomerRegistryCloud();
     // Nunca substitua a base local por um resultado vazio que apenas indica
     // que o Supabase nao esta configurado ou que a sessao expirou.
-    if (!firstPage?.available) return;
+    if (!official) return;
 
-    let cloudRows = [...(firstPage.rows || [])];
-    let total = Number(firstPage.count || cloudRows.length);
-    for (let offset = cloudRows.length; offset < total; offset += 500) {
-      const page = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500, offset });
-      if (!page?.available) throw new Error('A conexao com a base de clientes foi interrompida.');
-      cloudRows.push(...(page.rows || []));
-    }
+    let cloudRows = official.rows;
+    let total = official.total;
 
     // Uma importacao acaba de atualizar o cache local antes de tentar a
     // sincronizacao online. Nunca deixe uma copia mais antiga da nuvem
@@ -9574,13 +9602,7 @@ async function loadCustomerRegistry() {
     }
 
     if (Array.isArray(cloudRows)) {
-      const rows = cloudRows.map(row => ({
-        customerKey: row.customer_key, name: row.name || '', email: row.email || '', phone: row.phone || '',
-        complement: row.complement || '', cpf: row.raw_data?.cpf || '', phoneDisplay: row.raw_data?.phoneDisplay || row.phone || '',
-        locations: Array.isArray(row.raw_data?.locations) ? row.raw_data.locations : [], chargers: Number(row.chargers_count || 0),
-        transactions: Number(row.transactions_count || 0), energy: Number(row.energy_kwh || 0),
-        chargeTime: row.charge_time_text || '', spent: Number(row.total_spent || 0), source: row.source || 'banco online'
-      }));
+      const rows = customerRegistryRowsFromCloud(cloudRows);
       writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, { rows, total, updatedAt: new Date().toISOString(), source: 'Supabase normalizado' });
     }
   } catch (err) {
@@ -9590,6 +9612,21 @@ async function loadCustomerRegistry() {
 
 async function handleCustomerRegistryFiles(files = []) {
   if (!files.length) return;
+  const status = document.getElementById('customerRegistryStatus');
+  try {
+    // Cada importacao parte da leitura atual da base oficial. Isso protege
+    // contra dois computadores importando planilhas diferentes sem enxergar
+    // a inclusao do outro e e indispensavel para nao gerar duplicatas.
+    const official = await readCustomerRegistryCloud();
+    if (!official) throw new Error('Base oficial indisponivel. Nenhum arquivo foi importado para evitar duplicidade.');
+    writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, {
+      rows: customerRegistryRowsFromCloud(official.rows), total: official.total,
+      updatedAt: new Date().toISOString(), source: 'Supabase conferido antes da importacao'
+    });
+  } catch (err) {
+    if (status) status.textContent = `Importacao nao executada: ${err.message}`;
+    return;
+  }
   const imported = [];
   for (const file of files) {
     const buffer = await file.arrayBuffer();
@@ -9602,14 +9639,16 @@ async function handleCustomerRegistryFiles(files = []) {
     imported.push(...customerRegistryRowsFromSheet(rows));
   }
   const consolidated = consolidateCustomerRegistryRows(imported);
-  const payload = mergeCustomerRegistry(consolidated, files.map(file => file.name).join(', '));
-  const status = document.getElementById('customerRegistryStatus');
+  const merged = mergeCustomerRegistry(consolidated, files.map(file => file.name).join(', '));
   try {
-    await saveCustomerRegistryCloud(payload);
-    const confirmed = await confirmCustomerRegistryCloud(payload.rows);
-    if (status) status.textContent = `${imported.length} linha(s) consolidadas em ${consolidated.length} motorista(s). Base oficial sincronizada: ${confirmed.total} cliente(s).`;
+    // Envia somente identidades novas. Dessa forma o banco nao recebe um
+    // segundo UPSERT para clientes antigos e o historico nunca e regravado
+    // por uma planilha parcial ou por outro computador.
+    if (merged.added.length) await saveCustomerRegistryCloud({ rows: merged.added });
+    const confirmed = await confirmCustomerRegistryCloud(merged.added);
+    if (status) status.textContent = `${imported.length} linha(s) lidas: ${merged.added.length} cliente(s) novo(s), ${merged.retained.length} ja existente(s) preservado(s). Base oficial: ${confirmed.total} cliente(s).`;
   } catch (err) {
-    if (status) status.textContent = `${imported.length} linha(s) consolidadas em ${consolidated.length} motorista(s) localmente; banco pendente: ${err.message}`;
+    if (status) status.textContent = `${imported.length} linha(s) lidas: ${merged.added.length} novo(s), ${merged.retained.length} ja existente(s) preservado(s). Banco pendente: ${err.message}`;
   }
   renderCustomerRegistry();
 }
