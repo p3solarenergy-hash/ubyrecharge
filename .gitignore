@@ -12,3 +12,7 @@ data/*.xlsx
 __pycache__/
 utils/__pycache__/
 pages/__pycache__/
+supabase/functions/.env
+supabase/functions/.env.*
+.env
+.env.*

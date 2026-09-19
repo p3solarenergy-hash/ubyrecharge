@@ -1,0 +1,3 @@
+interface:
+  display_name: "UBY WhatsApp Diário"
+  short_description: "Opera o relatório diário UBY pela API oficial do WhatsApp"

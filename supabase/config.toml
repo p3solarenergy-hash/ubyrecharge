@@ -1,0 +1,5 @@
+# This endpoint receives a server-to-server trigger rather than a user JWT.
+# It verifies x-uby-whatsapp-job-secret inside the handler before it reads
+# metrics or makes any outbound request.
+[functions.uby-whatsapp-daily-report]
+verify_jwt = false
