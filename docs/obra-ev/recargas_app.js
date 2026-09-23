@@ -13043,19 +13043,22 @@ function renderDcConnectorReport(charges = [], window = {}) {
   const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0);
   summary.innerHTML = rows.map(row => {
     const energyShare = totalEnergy > 0 ? row.energy / totalEnergy * 100 : 0;
+    const availability = row.charges.length ? row.executed.length / row.charges.length * 100 : 0;
     return `<div class="connector-summary-item">
       <span>${escapeHtml(row.label)}</span>
       <strong>${fmtKWh(row.energy)}</strong>
-      <small>${row.executed.length} sessão(ões) válida(s) · ${fmtPct(energyShare)} da energia DC</small>
+      <small>${fmtPct(availability)} de disponibilidade real · ${row.executed.length} de ${row.charges.length} tentativas concluídas</small>
     </div>`;
   }).join('');
   table.innerHTML = rows.map(row => {
     const energyShare = totalEnergy > 0 ? row.energy / totalEnergy * 100 : 0;
     const revenueShare = totalRevenue > 0 ? row.revenue / totalRevenue * 100 : 0;
+    const availability = row.charges.length ? row.executed.length / row.charges.length * 100 : 0;
     return `<tr>
       <td><strong>${escapeHtml(row.label)}</strong></td>
       <td>${row.charges.length}</td>
       <td>${row.executed.length}</td>
+      <td><strong>${fmtPct(availability)}</strong><small>${row.executed.length} de ${row.charges.length} tentativas</small></td>
       <td>${fmtKWh(row.energy)}<small>${fmtPct(energyShare)} da energia DC</small></td>
       <td>${fmtBRL(row.revenue)}<small>${fmtPct(revenueShare)} da receita DC</small></td>
       <td>${row.clients}</td>
@@ -13067,6 +13070,7 @@ function renderDcConnectorReport(charges = [], window = {}) {
     const avgKwh = row.executed.length ? row.energy / row.executed.length : 0;
     const avgTicket = row.executed.length ? row.revenue / row.executed.length : 0;
     const failureRate = row.charges.length ? row.failed.length / row.charges.length * 100 : 0;
+    const availability = row.charges.length ? row.executed.length / row.charges.length * 100 : 0;
     const failureList = row.failures.length
       ? row.failures.slice(0, 3).map(([reason, count]) => `<li><strong>${count}×</strong> ${escapeHtml(reason)}</li>`).join('')
       : '<li class="connector-diagnostic-ok">Nenhuma falha sinalizada neste período.</li>';
@@ -13074,10 +13078,12 @@ function renderDcConnectorReport(charges = [], window = {}) {
     return `<article class="connector-diagnostic${selected}">
       <header><div><span>DIAGNÓSTICO DO PLUG</span><h3>${escapeHtml(row.label)}</h3></div><b class="${row.failed.length ? 'connector-failure' : 'connector-success'}">${row.failed.length ? `${row.failed.length} falha(s)` : 'sem falhas'}</b></header>
       <div class="connector-diagnostic-metrics">
+        <div><span>Disponibilidade real</span><strong>${fmtPct(availability)}</strong><small>${row.executed.length} de ${row.charges.length} tentativas viraram recarga</small></div>
         <div><span>Taxa de erro</span><strong>${fmtPct(failureRate)}</strong><small>${row.failed.length} de ${row.charges.length} sessões</small></div>
         <div><span>kWh / sessão válida</span><strong>${fmtKWh(avgKwh)}</strong><small>${row.executed.length} sessão(ões) válida(s)</small></div>
         <div><span>Ticket / sessão válida</span><strong>${fmtBRL(avgTicket)}</strong><small>receita por sessão executada</small></div>
         <div><span>Tempo médio</span><strong>${formatRechargeDuration(row.avgDuration)}</strong><small>sessões com duração</small></div>
+        <div><span>Tentativas no período</span><strong>${row.charges.length}</strong><small>${row.executed.length} concluídas · ${row.charges.length - row.executed.length} não concluídas</small></div>
       </div>
       <div class="connector-diagnostic-context">
         <div><span>HORÁRIO MAIS USADO</span><strong>${escapeHtml(row.preferenceHour)}</strong></div>
