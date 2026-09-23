@@ -12344,6 +12344,9 @@ async function renderUbyOperation() {
     return {
       ...row,
       occupancyPct: occupancy.pct,
+      availabilityPct: clean.total ? clean.executed.length / clean.total * 100 : 0,
+      completedCount: clean.executed.length,
+      attemptCount: clean.total,
       failureCount: clean.failed.length,
       avgKwh: row.count ? row.energy / row.count : 0
     };
@@ -12373,6 +12376,7 @@ async function renderUbyOperation() {
           ${metric('kWh médio / recarga', `${dcCleanStats.avgKwh.toFixed(1).replace('.', ',')} kWh`, 'somente sessões válidas', '', metricComparison(dcMonthlyComparison.current.avgKwh, dcMonthlyComparison.previous.avgKwh, dcMonthlyComparison))}
           ${metric('Tempo médio', formatRechargeDuration(dcAvgDuration), `${dcValidDurations.length} sessão(ões) com duração`, '', metricComparison(dcMonthlyComparison.current.avgDuration, dcMonthlyComparison.previous.avgDuration, dcMonthlyComparison))}
           ${metric('Média por dia', averageDcCharges.toLocaleString('pt-BR',{maximumFractionDigits:1}), dailyDcBreakdown || 'recargas DC por dia', '', metricComparison(dcCurrentDaily, dcPreviousDaily, dcMonthlyComparison))}
+          ${metric('Disponibilidade real DC', primaryDcCharges.length ? fmtPct(dcCleanStats.executed.length / primaryDcCharges.length * 100) : '0,00%', `${dcCleanStats.executed.length} de ${primaryDcCharges.length} tentativas viraram recarga`)}
           ${metric('Falhas DC', String(dcCleanStats.failed.length), `${primaryDcCharges.length ? fmtPct(dcCleanStats.failed.length / primaryDcCharges.length * 100) : '0,00%'} das tentativas`, '', metricComparison(dcMonthlyComparison.current.failedCount, dcMonthlyComparison.previous.failedCount, dcMonthlyComparison, { inverse: true }))}
           ${metric('Melhor unidade DC', bestDcUnit?.stationName || '-', bestDcUnit ? fmtBRL(bestDcUnit.revenue) : 'sem dados no período', 'station-name')}
         </div>
@@ -12440,6 +12444,7 @@ async function renderUbyOperation() {
       <td><strong>${escapeHtml(row.stationName || row.workName || 'Carregador DC')}</strong><br><span style="color:var(--p3-muted);font-size:11px">${escapeHtml(row.workName || '')}</span></td>
       <td>${fmtBRL(row.revenue)}</td>
       <td>${fmtPct(row.occupancyPct)}</td>
+      <td><strong>${fmtPct(row.availabilityPct)}</strong><br><span style="color:var(--p3-muted);font-size:11px">${row.completedCount} de ${row.attemptCount} tentativas</span></td>
       <td>${fmtKWh(row.energy)}</td>
       <td>${row.count}</td>
       <td>${row.clients}</td>
@@ -12447,7 +12452,7 @@ async function renderUbyOperation() {
       <td>${fmtKWh(row.avgKwh)}</td>
       <td>${row.failureCount}</td>
     </tr>
-  `).join('') : '<tr><td colspan="9" style="color:var(--p3-muted);text-align:center;padding:18px">Sem recargas DC próprias no período selecionado.</td></tr>';
+  `).join('') : '<tr><td colspan="10" style="color:var(--p3-muted);text-align:center;padding:18px">Sem recargas DC próprias no período selecionado.</td></tr>';
 
   renderUbyDecisionCockpit([], allUbyCharges, included, sourceUbyCharges);
   scheduleOverviewInsights('uby', () => renderUsageInsights(allUbyCharges, 'usageUby', sourceUbyCharges, {
