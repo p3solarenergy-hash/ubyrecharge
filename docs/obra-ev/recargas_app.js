@@ -12990,6 +12990,13 @@ function applyMonthlyConnectorFilter() {
   renderMensal();
 }
 
+function openMonthlyConnectorDetails(key = '') {
+  monthlyConnectorFilter = key || '__all_dc_connectors__';
+  const select = document.getElementById('monthlyConnectorSelector');
+  if (select) select.value = monthlyConnectorFilter;
+  renderMensal();
+}
+
 function filterMonthlyConnectorCharges(charges = []) {
   if (monthlyConnectorFilter === '__all_dc_connectors__') return charges;
   return charges.filter(charge => chargerKind(charge) === 'dc' && dcConnectorKey(charge) === monthlyConnectorFilter);
@@ -12998,11 +13005,13 @@ function filterMonthlyConnectorCharges(charges = []) {
 function renderDcConnectorReport(charges = [], window = {}) {
   const table = document.getElementById('dcConnectorTable');
   const summary = document.getElementById('dcConnectorSummary');
-  if (!table || !summary) return;
+  const diagnostics = document.getElementById('dcConnectorDiagnostics');
+  if (!table || !summary || !diagnostics) return;
   const groups = dcConnectorGroups(charges);
   if (!groups.length) {
     summary.innerHTML = '<div class="connector-empty">Sem identificacao de conector DC nesta planilha. Quando a exportacao trouxer o campo Plug/Conector, a separacao sera feita automaticamente.</div>';
     table.innerHTML = '';
+    diagnostics.innerHTML = '';
     return;
   }
   const rows = groups.map(group => {
@@ -13011,7 +13020,24 @@ function renderDcConnectorReport(charges = [], window = {}) {
     const revenue = group.charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
     const clients = new Set(group.charges.map(charge => clientKeyFromCharge(charge) || clientIdentityKey(charge.userName || charge.userEmail || '')).filter(Boolean)).size;
     const last = group.charges.map(charge => charge.startDate).filter(Boolean).sort((a, b) => b - a)[0] || null;
-    return { ...group, executed, energy, revenue, clients, last };
+    const failed = group.charges.filter(isFailedCharge);
+    const durationHours = executed.map(charge => durToHours(charge.duration)).filter(hours => hours > 0);
+    const avgDuration = durationHours.length ? durationHours.reduce((sum, hours) => sum + hours, 0) / durationHours.length : 0;
+    const frequency = (list, fallback) => {
+      const counts = new Map();
+      list.forEach(value => { const text = safeText(value).trim(); if (text) counts.set(text, (counts.get(text) || 0) + 1); });
+      return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))[0]?.[0] || fallback;
+    };
+    const preferenceHour = frequency(executed.map(charge => charge.startDate instanceof Date ? `${String(charge.startDate.getHours()).padStart(2, '0')}h` : ''), 'sem horário válido');
+    const paymentPreference = frequency(executed.map(charge => charge.paymentType), 'não informado');
+    const couponPreference = frequency(executed.map(charge => charge.voucher).filter(Boolean), 'sem cupom');
+    const reasons = new Map();
+    failed.forEach(charge => {
+      const reason = safeText(charge.failureReason || charge.rawStatus || charge.paymentStatus || 'Falha sinalizada pela importação').trim();
+      reasons.set(reason, (reasons.get(reason) || 0) + 1);
+    });
+    const failures = [...reasons.entries()].sort((a, b) => b[1] - a[1]);
+    return { ...group, executed, energy, revenue, clients, last, failed, avgDuration, preferenceHour, paymentPreference, couponPreference, failures };
   });
   const totalEnergy = rows.reduce((sum, row) => sum + row.energy, 0);
   const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0);
@@ -13034,7 +13060,32 @@ function renderDcConnectorReport(charges = [], window = {}) {
       <td>${fmtBRL(row.revenue)}<small>${fmtPct(revenueShare)} da receita DC</small></td>
       <td>${row.clients}</td>
       <td>${fmtDT(row.last)}</td>
+      <td><button class="btn-open" type="button" onclick="openMonthlyConnectorDetails('${escapeAttr(row.key)}')">Ver diagnóstico</button></td>
     </tr>`;
+  }).join('');
+  diagnostics.innerHTML = rows.map(row => {
+    const avgKwh = row.executed.length ? row.energy / row.executed.length : 0;
+    const avgTicket = row.executed.length ? row.revenue / row.executed.length : 0;
+    const failureRate = row.charges.length ? row.failed.length / row.charges.length * 100 : 0;
+    const failureList = row.failures.length
+      ? row.failures.slice(0, 3).map(([reason, count]) => `<li><strong>${count}×</strong> ${escapeHtml(reason)}</li>`).join('')
+      : '<li class="connector-diagnostic-ok">Nenhuma falha sinalizada neste período.</li>';
+    const selected = monthlyConnectorFilter === row.key ? ' is-selected' : '';
+    return `<article class="connector-diagnostic${selected}">
+      <header><div><span>DIAGNÓSTICO DO PLUG</span><h3>${escapeHtml(row.label)}</h3></div><b class="${row.failed.length ? 'connector-failure' : 'connector-success'}">${row.failed.length ? `${row.failed.length} falha(s)` : 'sem falhas'}</b></header>
+      <div class="connector-diagnostic-metrics">
+        <div><span>Taxa de erro</span><strong>${fmtPct(failureRate)}</strong><small>${row.failed.length} de ${row.charges.length} sessões</small></div>
+        <div><span>kWh / sessão válida</span><strong>${fmtKWh(avgKwh)}</strong><small>${row.executed.length} sessão(ões) válida(s)</small></div>
+        <div><span>Ticket / sessão válida</span><strong>${fmtBRL(avgTicket)}</strong><small>receita por sessão executada</small></div>
+        <div><span>Tempo médio</span><strong>${formatRechargeDuration(row.avgDuration)}</strong><small>sessões com duração</small></div>
+      </div>
+      <div class="connector-diagnostic-context">
+        <div><span>HORÁRIO MAIS USADO</span><strong>${escapeHtml(row.preferenceHour)}</strong></div>
+        <div><span>FORMA DE PAGAMENTO</span><strong>${escapeHtml(row.paymentPreference)}</strong></div>
+        <div><span>CUPOM MAIS USADO</span><strong>${escapeHtml(row.couponPreference)}</strong></div>
+      </div>
+      <div class="connector-failure-list"><span>MOTIVOS DE FALHA</span><ul>${failureList}</ul></div>
+    </article>`;
   }).join('');
 }
 

@@ -680,6 +680,27 @@
     .connector-summary-item strong { display:block; margin:7px 0 4px; color:var(--p3-primary); font-size:22px; font-variant-numeric:tabular-nums; }
     .connector-empty { grid-column:1/-1; padding:11px 12px; border-left:3px solid var(--p3-warn); border-radius:7px; background:rgba(242,169,61,.10); color:#FFE4A0; font-size:12px; line-height:1.45; }
     .connector-report-table small { display:block; margin-top:3px; color:var(--p3-muted); font-size:10px; white-space:nowrap; }
+    .connector-diagnostics { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; margin-top:16px; }
+    .connector-diagnostic { min-width:0; border:1px solid rgba(87,183,255,.20); border-radius:11px; background:rgba(4,18,35,.40); overflow:hidden; }
+    .connector-diagnostic.is-selected { border-color:rgba(0,237,142,.58); box-shadow:0 0 0 1px rgba(0,237,142,.12) inset; }
+    .connector-diagnostic header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:13px 14px 11px; border-bottom:1px solid rgba(87,183,255,.17); }
+    .connector-diagnostic header span,.connector-diagnostic-context span,.connector-failure-list > span { display:block; color:var(--p3-muted); font-size:9px; font-weight:900; letter-spacing:.07em; }
+    .connector-diagnostic h3 { margin:4px 0 0; color:var(--p3-text); font-size:15px; }
+    .connector-diagnostic header b { padding:4px 7px; border:1px solid; border-radius:999px; font-size:10px; white-space:nowrap; }
+    .connector-success { border-color:rgba(87,217,144,.42); color:#57D990; background:rgba(87,217,144,.08); }
+    .connector-failure { border-color:rgba(255,122,122,.44); color:#FF9A8B; background:rgba(255,122,122,.08); }
+    .connector-diagnostic-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .connector-diagnostic-metrics > div { min-width:0; padding:12px 14px; border-bottom:1px solid rgba(87,183,255,.12); }
+    .connector-diagnostic-metrics > div:nth-child(odd) { border-right:1px solid rgba(87,183,255,.12); }
+    .connector-diagnostic-metrics span,.connector-diagnostic-metrics small { display:block; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .connector-diagnostic-metrics strong { display:block; margin:4px 0; color:#57B7FF; font-size:18px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+    .connector-diagnostic-context { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); padding:12px 14px; gap:10px; border-bottom:1px solid rgba(87,183,255,.12); }
+    .connector-diagnostic-context strong { display:block; margin-top:4px; color:var(--p3-text); font-size:11px; line-height:1.35; overflow-wrap:anywhere; }
+    .connector-failure-list { padding:12px 14px; }
+    .connector-failure-list ul { display:grid; gap:5px; margin:7px 0 0; padding:0; list-style:none; }
+    .connector-failure-list li { color:#F7D0C8; font-size:11px; line-height:1.35; }
+    .connector-failure-list li strong { color:#FF9A8B; }
+    .connector-failure-list .connector-diagnostic-ok { color:#8BD7A8; }
     @media (max-width:720px) { .connector-report-head { display:grid; } .connector-report-select { min-width:0; width:100%; } }
 
     /* ── NOVO: Upload zone ── */
@@ -1805,26 +1826,6 @@
       <div class="formula" id="heroFormula">—</div>
     </section>
 
-    <section class="card connector-report" id="dcConnectorPanel" style="margin-top:18px;display:none">
-      <div class="connector-report-head">
-        <div>
-          <span class="connector-report-kicker">Leitura por plug</span>
-          <h2>Resultado por conector DC</h2>
-          <p id="monthlyConnectorHelp">A separacao usa somente o conector informado na planilha da plataforma.</p>
-        </div>
-        <label class="connector-report-select">Conector
-          <select class="ctl-select" id="monthlyConnectorSelector" onchange="applyMonthlyConnectorFilter()"></select>
-        </label>
-      </div>
-      <div class="connector-summary" id="dcConnectorSummary"></div>
-      <div style="overflow-x:auto;margin-top:14px">
-        <table class="connector-report-table">
-          <thead><tr><th>Conector DC</th><th>Sessões</th><th>Válidas</th><th>Energia entregue</th><th>Faturamento</th><th>Clientes</th><th>Última recarga</th></tr></thead>
-          <tbody id="dcConnectorTable"></tbody>
-        </table>
-      </div>
-    </section>
-
     <section class="day-compare-grid" id="usageDayCompare"></section>
 
     <section class="visual-summary" id="monthlyVisualSummary"></section>
@@ -1959,6 +1960,27 @@
           <tbody id="techTable"></tbody>
         </table>
       </div>
+    </section>
+
+    <section class="card connector-report" id="dcConnectorPanel" style="margin-top:18px;display:none">
+      <div class="connector-report-head">
+        <div>
+          <span class="connector-report-kicker">Leitura por plug</span>
+          <h2>Resultado e diagnóstico por conector DC</h2>
+          <p id="monthlyConnectorHelp">A separação usa somente o conector informado na planilha da plataforma.</p>
+        </div>
+        <label class="connector-report-select">Conector
+          <select class="ctl-select" id="monthlyConnectorSelector" onchange="applyMonthlyConnectorFilter()"></select>
+        </label>
+      </div>
+      <div class="connector-summary" id="dcConnectorSummary"></div>
+      <div style="overflow-x:auto;margin-top:14px">
+        <table class="connector-report-table">
+          <thead><tr><th>Conector DC</th><th>Sessões</th><th>Válidas</th><th>Energia entregue</th><th>Faturamento</th><th>Clientes</th><th>Última recarga</th><th></th></tr></thead>
+          <tbody id="dcConnectorTable"></tbody>
+        </table>
+      </div>
+      <div class="connector-diagnostics" id="dcConnectorDiagnostics"></div>
     </section>
 
   </div><!-- /tabMensal -->
@@ -2321,6 +2343,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="recargas_app.js?v=20260922-dc-connector-report"></script>
+  <script src="recargas_app.js?v=20260922-dc-connector-diagnostics"></script>
 </body>
 </html>
