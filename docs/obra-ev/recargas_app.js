@@ -57,6 +57,7 @@ let fullRechargeWorkIds = new Set();
 let rechargeFullLoadPromises = new Map();
 let operationalPowerSaveInFlight = false;
 let dcComparisonSelection = { period: 'panel', selectedKeys: null };
+let monthlyConnectorFilter = '__all_dc_connectors__';
 
 const COLORS = ['#57B7FF','#246BFE','#FFD66B','#38D4FF','#F2A93D','#8BD7A8','#EF6C6C','#B39DDB'];
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
@@ -12926,6 +12927,117 @@ function scheduleLiveOccupationRefresh() {
 // ══════════════════════════════════════════════════════════
 //  TAB MENSAL
 // ══════════════════════════════════════════════════════════
+function dcConnectorLabel(charge = {}) {
+  const raw = safeText(charge.connType || charge.connectorType || charge.connector || '').trim();
+  if (!raw) return '';
+  const normalized = normalizeStationForCompare(raw).replace(/\s+/g, '');
+  const ccsMatch = normalized.match(/CCS(?:2)?([AB])?\b/);
+  if (ccsMatch?.[1]) return `CCS2 ${ccsMatch[1]}`;
+  // Mantem o identificador fornecido pela plataforma quando ela usa outra
+  // convencao (por exemplo, "Plug 1" ou "DC 60 kW - 2").
+  return raw.toLocaleUpperCase('pt-BR');
+}
+
+function dcConnectorKey(charge = {}) {
+  return normalizeStationForCompare(dcConnectorLabel(charge));
+}
+
+function dcConnectorGroups(charges = []) {
+  const groups = new Map();
+  charges.filter(charge => chargerKind(charge) === 'dc').forEach(charge => {
+    const label = dcConnectorLabel(charge);
+    if (!label) return;
+    const key = dcConnectorKey(charge);
+    if (!groups.has(key)) groups.set(key, { key, label, charges: [] });
+    groups.get(key).charges.push(charge);
+  });
+  return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+}
+
+function hasDcConnectorReading(charges = []) {
+  return dcConnectorGroups(charges).length > 0;
+}
+
+function syncMonthlyConnectorControl(charges = []) {
+  const panel = document.getElementById('dcConnectorPanel');
+  const select = document.getElementById('monthlyConnectorSelector');
+  if (!panel || !select) return;
+  const groups = dcConnectorGroups(charges);
+  const hasDc = charges.some(charge => chargerKind(charge) === 'dc');
+  panel.style.display = hasDc ? '' : 'none';
+  if (!hasDc) {
+    monthlyConnectorFilter = '__all_dc_connectors__';
+    return;
+  }
+  const current = monthlyConnectorFilter;
+  select.innerHTML = [
+    '<option value="__all_dc_connectors__">Todos os conectores DC</option>',
+    ...groups.map(group => `<option value="${escapeHtml(group.key)}">${escapeHtml(group.label)}</option>`)
+  ].join('');
+  monthlyConnectorFilter = groups.some(group => group.key === current) ? current : '__all_dc_connectors__';
+  select.value = monthlyConnectorFilter;
+  select.disabled = !groups.length;
+  const help = document.getElementById('monthlyConnectorHelp');
+  if (help) {
+    help.textContent = groups.length
+      ? `${groups.length} conector(es) identificado(s) na planilha. A selecao filtra o painel mensal, sem alterar a base salva.`
+      : 'A plataforma nao informou o plug em cada sessao desta base. O total do carregador continua correto, mas ainda nao pode ser separado por conector.';
+  }
+}
+
+function applyMonthlyConnectorFilter() {
+  monthlyConnectorFilter = document.getElementById('monthlyConnectorSelector')?.value || '__all_dc_connectors__';
+  renderMensal();
+}
+
+function filterMonthlyConnectorCharges(charges = []) {
+  if (monthlyConnectorFilter === '__all_dc_connectors__') return charges;
+  return charges.filter(charge => chargerKind(charge) === 'dc' && dcConnectorKey(charge) === monthlyConnectorFilter);
+}
+
+function renderDcConnectorReport(charges = [], window = {}) {
+  const table = document.getElementById('dcConnectorTable');
+  const summary = document.getElementById('dcConnectorSummary');
+  if (!table || !summary) return;
+  const groups = dcConnectorGroups(charges);
+  if (!groups.length) {
+    summary.innerHTML = '<div class="connector-empty">Sem identificacao de conector DC nesta planilha. Quando a exportacao trouxer o campo Plug/Conector, a separacao sera feita automaticamente.</div>';
+    table.innerHTML = '';
+    return;
+  }
+  const rows = groups.map(group => {
+    const executed = group.charges.filter(isExecutedCharge);
+    const energy = group.charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
+    const revenue = group.charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
+    const clients = new Set(group.charges.map(charge => clientKeyFromCharge(charge) || clientIdentityKey(charge.userName || charge.userEmail || '')).filter(Boolean)).size;
+    const last = group.charges.map(charge => charge.startDate).filter(Boolean).sort((a, b) => b - a)[0] || null;
+    return { ...group, executed, energy, revenue, clients, last };
+  });
+  const totalEnergy = rows.reduce((sum, row) => sum + row.energy, 0);
+  const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0);
+  summary.innerHTML = rows.map(row => {
+    const energyShare = totalEnergy > 0 ? row.energy / totalEnergy * 100 : 0;
+    return `<div class="connector-summary-item">
+      <span>${escapeHtml(row.label)}</span>
+      <strong>${fmtKWh(row.energy)}</strong>
+      <small>${row.executed.length} sessão(ões) válida(s) · ${fmtPct(energyShare)} da energia DC</small>
+    </div>`;
+  }).join('');
+  table.innerHTML = rows.map(row => {
+    const energyShare = totalEnergy > 0 ? row.energy / totalEnergy * 100 : 0;
+    const revenueShare = totalRevenue > 0 ? row.revenue / totalRevenue * 100 : 0;
+    return `<tr>
+      <td><strong>${escapeHtml(row.label)}</strong></td>
+      <td>${row.charges.length}</td>
+      <td>${row.executed.length}</td>
+      <td>${fmtKWh(row.energy)}<small>${fmtPct(energyShare)} da energia DC</small></td>
+      <td>${fmtBRL(row.revenue)}<small>${fmtPct(revenueShare)} da receita DC</small></td>
+      <td>${row.clients}</td>
+      <td>${fmtDT(row.last)}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function renderMensal() {
   const renderSequence = ++monthlyRenderSequence;
   clearTimeout(monthlyInsightsTimer);
@@ -12943,8 +13055,14 @@ async function renderMensal() {
   }
   if (!mk) return;
   const monthCharges = chargesForMonth(mk);
+  // A janela do periodo pertence ao carregador, nao ao plug selecionado. Assim,
+  // por exemplo, um CCS2 que nao recebeu recarga no ultimo dia nao encurta a
+  // leitura do outro conector nem muda a ocupacao do periodo inteiro.
   const window = periodWindow(monthCharges, mk);
-  const charges = filterChargesByWindow(monthCharges, window);
+  const chargesInWindow = filterChargesByWindow(monthCharges, window);
+  syncMonthlyConnectorControl(chargesInWindow);
+  const charges = filterMonthlyConnectorCharges(chargesInWindow);
+  renderDcConnectorReport(chargesInWindow, window);
   if (!charges.length) {
     renderDayComparison('usage', [], allCharges);
     renderVisualSummary('monthlyVisualSummary', [], { historyCharges: allCharges });

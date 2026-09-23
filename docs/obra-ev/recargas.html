@@ -666,6 +666,21 @@
     .plant-count strong { color:var(--p3-text); font-size:13px; }
     .plant-count small { color:var(--p3-muted); font-size:9px; white-space:nowrap; }
     .unit-table-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .connector-report { border-color:rgba(87,183,255,.42); background:linear-gradient(110deg,rgba(20,55,88,.76),var(--surface-bg) 48%); }
+    .connector-report-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; padding-bottom:13px; border-bottom:1px solid rgba(87,183,255,.22); }
+    .connector-report-kicker { display:block; color:var(--p3-primary); font-size:10px; font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
+    .connector-report h2 { margin:4px 0 0; padding:0; border:0; }
+    .connector-report p { max-width:680px; margin:7px 0 0; color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .connector-report-select { display:grid; gap:6px; min-width:235px; color:var(--p3-muted); font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+    .connector-report-select select { width:100%; }
+    .connector-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:14px; }
+    .connector-summary-item { min-width:0; padding:12px 13px; border:1px solid rgba(87,183,255,.22); border-radius:10px; background:rgba(4,18,35,.46); }
+    .connector-summary-item span,.connector-summary-item small { display:block; color:var(--p3-muted); font-size:11px; line-height:1.35; overflow-wrap:anywhere; }
+    .connector-summary-item span { color:#BFEBD6; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .connector-summary-item strong { display:block; margin:7px 0 4px; color:var(--p3-primary); font-size:22px; font-variant-numeric:tabular-nums; }
+    .connector-empty { grid-column:1/-1; padding:11px 12px; border-left:3px solid var(--p3-warn); border-radius:7px; background:rgba(242,169,61,.10); color:#FFE4A0; font-size:12px; line-height:1.45; }
+    .connector-report-table small { display:block; margin-top:3px; color:var(--p3-muted); font-size:10px; white-space:nowrap; }
+    @media (max-width:720px) { .connector-report-head { display:grid; } .connector-report-select { min-width:0; width:100%; } }
 
     /* ── NOVO: Upload zone ── */
     .upload-zone {
@@ -1790,6 +1805,26 @@
       <div class="formula" id="heroFormula">—</div>
     </section>
 
+    <section class="card connector-report" id="dcConnectorPanel" style="margin-top:18px;display:none">
+      <div class="connector-report-head">
+        <div>
+          <span class="connector-report-kicker">Leitura por plug</span>
+          <h2>Resultado por conector DC</h2>
+          <p id="monthlyConnectorHelp">A separacao usa somente o conector informado na planilha da plataforma.</p>
+        </div>
+        <label class="connector-report-select">Conector
+          <select class="ctl-select" id="monthlyConnectorSelector" onchange="applyMonthlyConnectorFilter()"></select>
+        </label>
+      </div>
+      <div class="connector-summary" id="dcConnectorSummary"></div>
+      <div style="overflow-x:auto;margin-top:14px">
+        <table class="connector-report-table">
+          <thead><tr><th>Conector DC</th><th>Sessões</th><th>Válidas</th><th>Energia entregue</th><th>Faturamento</th><th>Clientes</th><th>Última recarga</th></tr></thead>
+          <tbody id="dcConnectorTable"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="day-compare-grid" id="usageDayCompare"></section>
 
     <section class="visual-summary" id="monthlyVisualSummary"></section>
@@ -2286,6 +2321,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="recargas_app.js?v=20260917-client-import-dedup"></script>
+  <script src="recargas_app.js?v=20260922-dc-connector-report"></script>
 </body>
 </html>
