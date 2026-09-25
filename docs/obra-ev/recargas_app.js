@@ -24,6 +24,7 @@ let monthlyClosings = {};
 let financialSettings = {};
 let stationAvailability = {};
 let financeSaveTimer = null;
+let financeEnergyDraftTimer = null;
 let financePendingSave = null;
 let financeSaveInFlight = Promise.resolve();
 let liveOccupationRefreshTimer = null;
@@ -3255,12 +3256,21 @@ function handleFinanceEnergySettingChange() {
   handleFinanceSettingChange();
 }
 
+function handleFinanceEnergyDraftChange() {
+  updateEnergyCompositionSummary();
+  clearTimeout(financeEnergyDraftTimer);
+  financeEnergyDraftTimer = setTimeout(() => {
+    financeEnergyDraftTimer = null;
+    handleFinanceEnergySettingChange();
+  }, 600);
+}
+
 function updateEnergyCompositionSummary() {
   const summary = document.getElementById('financeEnergyCompositionSummary');
   if (!summary) return;
   const data = window.UBY_FINANCE_ENGINE.calculateEnergyComposition({ mode: document.getElementById('financeEnergyMode')?.value, copelAmount: numberInputValue('financeCopelAmount'), copelKWh: numberInputValue('financeCopelKWh'), creditedKWh: numberInputValue('financeLeaseCreditedKWh'), leaseRatePerKWh: numberInputValue('financeLeaseRate') });
-  ['financeLeaseCreditedKWh','financeLeaseRate','financeLeaseDueDay'].forEach(id => { const input = document.getElementById(id); if (input) input.style.display = data.mode === 'copel_lease' ? '' : 'none'; });
-  summary.textContent = `Copel: ${fmtBRL(data.copelCost)} | Arrendamento: ${fmtBRL(data.leaseCost)} | Energia total: ${fmtBRL(data.totalCost)} | ${fmtBRL(data.costPerKWh)}/kWh`;
+  document.querySelectorAll('[data-energy-lease-field]').forEach(field => { field.hidden = data.mode !== 'copel_lease'; });
+  summary.textContent = `Copel: ${fmtBRL(data.copelCost)} | Arrendamento: ${fmtBRL(data.leaseCost)} | Total de energia no mês: ${fmtBRL(data.totalCost)} | Custo calculado: ${fmtBRL(data.costPerKWh)}/kWh`;
 }
 
 function formatFinanceSettingValue(value, format = '') {
