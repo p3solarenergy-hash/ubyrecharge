@@ -124,4 +124,37 @@ assert.strictEqual(inheritedAugust.sourceMonth, '2026-07');
 assert.strictEqual(inheritedAugust.settings.managementPct, 7);
 assert.strictEqual(inheritedAugust.settings.energyCostPerKWh, 0.92);
 
+// A central financeira deve registrar o custo uma unica vez e revelar a
+// atribuicao deterministica para cada carregador de destino.
+const centralAllocation = engine.allocateCentralCost({
+  amount: 1200,
+  allocation: 'custom',
+  targets: [
+    { id: 'central-jk-dc', weight: 60 },
+    { id: 'robert-koch-dc', weight: 40 }
+  ]
+});
+assert.deepStrictEqual(centralAllocation, [
+  { id: 'central-jk-dc', amount: 720, pct: 60 },
+  { id: 'robert-koch-dc', amount: 480, pct: 40 }
+]);
+
+const equalCentralAllocation = engine.allocateCentralCost({
+  amount: 101,
+  allocation: 'equal',
+  targets: [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+});
+assert.strictEqual(equalCentralAllocation.reduce((sum, item) => sum + item.amount, 0), 101);
+assert.strictEqual(equalCentralAllocation[2].amount, 33.66);
+
+const invalidCustomWeights = engine.allocateCentralCost({
+  amount: 10,
+  allocation: 'custom',
+  targets: [{ id: 'x', weight: 0 }, { id: 'y', weight: -2 }]
+});
+assert.deepStrictEqual(invalidCustomWeights, [
+  { id: 'x', amount: 5, pct: 50 },
+  { id: 'y', amount: 5, pct: 50 }
+]);
+
 console.log('finance engine tests ok');

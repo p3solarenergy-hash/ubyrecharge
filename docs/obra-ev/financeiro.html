@@ -324,6 +324,55 @@
 
     /* Financeiro operacional por carregador */
     .finance-workbench { margin-top:18px; }
+    /* Central financeira: mesma linguagem UBY, com a matriz antes da operação por ponto. */
+    .finance-central-command { border-color:rgba(87,183,255,.34); background:linear-gradient(135deg,rgba(12,38,66,.98),rgba(7,20,37,.98)); }
+    .finance-central-command .finance-central-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .finance-central-command .finance-central-head h2 { margin:0; color:#fff; }
+    .finance-central-command .finance-central-head p { max-width:760px; margin:6px 0 0; color:var(--p3-muted); font-size:12px; line-height:1.5; }
+    .finance-central-tag { display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(0,237,142,.35); border-radius:999px; background:rgba(0,237,142,.08); color:#66EAAF; padding:5px 9px; font-size:10px; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+    .finance-central-tag::before { content:""; width:7px; height:7px; border-radius:50%; background:#00ED8E; box-shadow:0 0 0 3px rgba(0,237,142,.12); }
+    .finance-central-summary { display:grid; grid-template-columns:repeat(5,minmax(130px,1fr)); gap:10px; margin:18px 0 14px; }
+    .finance-central-metric { min-height:96px; padding:13px; border:1px solid rgba(84,180,255,.18); border-radius:11px; background:rgba(6,20,36,.62); }
+    .finance-central-metric span { display:block; color:var(--p3-muted); font-size:9px; font-weight:820; letter-spacing:.06em; }
+    .finance-central-metric strong { display:block; margin-top:8px; color:#57B7FF; font-size:19px; line-height:1.05; }
+    .finance-central-metric small { display:block; margin-top:5px; color:var(--p3-muted); font-size:10px; }
+    .finance-central-metric.good { border-color:rgba(0,237,142,.26); } .finance-central-metric.good strong { color:#57D990; }
+    .finance-central-metric.warn { border-color:rgba(255,214,107,.28); } .finance-central-metric.warn strong { color:#FFD66B; }
+    .finance-central-metric.tax { border-color:rgba(172,137,255,.30); } .finance-central-metric.tax strong { color:#B59AFF; }
+    .finance-central-allocation { display:grid; grid-template-columns:repeat(5,minmax(130px,1fr)); gap:10px; padding:14px; border:1px solid rgba(84,180,255,.22); border-radius:11px; background:rgba(8,25,45,.62); }
+    .finance-central-allocation .sub { display:block; margin:0; font-size:9px; font-weight:820; letter-spacing:.05em; }
+    .finance-central-allocation strong { display:block; margin-top:7px; color:#57B7FF; font-size:18px; }
+    .finance-central-allocation .good { color:#57D990; } .finance-central-allocation .tax { color:#B59AFF; } .finance-central-allocation .warn { color:#FFD66B; }
+    /* Fechamento por competência: densidade do novo modelo, linguagem visual UBY. */
+    .finance-settlement { border-color:rgba(87,183,255,.38); background:linear-gradient(145deg,rgba(13,42,73,.98),rgba(7,21,38,.98)); }
+    .finance-settlement-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+    .finance-settlement-head h2 { margin:5px 0 0; color:#fff; }
+    .finance-settlement-head p { margin:6px 0 0; max-width:760px; }
+    .finance-settlement-status { display:flex; align-items:center; gap:9px; flex-wrap:wrap; border:1px solid rgba(87,183,255,.22); border-radius:9px; padding:8px 10px; background:rgba(6,20,36,.54); color:var(--p3-muted); font-size:11px; }
+    .finance-settlement-status::before { content:""; width:8px; height:8px; border-radius:50%; background:#57B7FF; box-shadow:0 0 0 3px rgba(87,183,255,.12); }
+    .finance-settlement-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; margin:18px 0; }
+    .finance-settlement-kpi { position:relative; min-width:0; min-height:108px; padding:13px; border:1px solid rgba(84,180,255,.17); border-radius:11px; background:rgba(5,18,33,.53); overflow:hidden; }
+    .finance-settlement-kpi::after { content:""; position:absolute; inset:auto 0 0; height:3px; background:rgba(87,183,255,.72); }
+    .finance-settlement-kpi span { display:block; color:var(--p3-muted); font-size:9px; font-weight:850; letter-spacing:.065em; text-transform:uppercase; }
+    .finance-settlement-kpi strong { display:block; margin-top:11px; color:#EAF4FF; font-size:20px; line-height:1.08; overflow-wrap:anywhere; }
+    .finance-settlement-kpi small { display:block; margin-top:6px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .finance-settlement table td:first-child { min-width:360px; }
+    .finance-line-detail { display:block; margin-top:4px; color:var(--p3-muted); font-size:10px; font-weight:500; line-height:1.35; }
+    .finance-cost-value { display:inline-flex; align-items:center; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
+    .finance-cost-share { display:inline-block; padding:3px 6px; border:1px solid rgba(87,183,255,.28); border-radius:999px; background:rgba(87,183,255,.08); color:#9CCEFF; font-size:9px; font-weight:800; line-height:1.2; white-space:nowrap; }
+    .finance-settlement-kpi.result::after { background:#57D990; } .finance-settlement-kpi.result strong { color:#57D990; }
+    .finance-settlement-kpi.reserve::after { background:#B59AFF; }
+    .finance-settlement-kpi.reserve strong { color:#C7B1FF; }
+    .finance-settlement-kpi.attention::after { background:#FFD66B; }
+    .finance-settlement-kpi.attention strong { color:#FFD66B; }
+    .finance-view-nav { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:18px; padding:12px 14px; border:1px solid rgba(84,180,255,.24); border-radius:11px; background:rgba(8,22,39,.88); }
+    .finance-view-nav-copy strong { display:block; font-size:13px; }
+    .finance-view-nav-copy span { display:block; margin-top:3px; color:var(--p3-muted); font-size:11px; }
+    .finance-view-tabs { display:flex; gap:7px; flex-wrap:wrap; }
+    .finance-view-tabs button { border:1px solid var(--surface-border); border-radius:8px; padding:8px 11px; background:var(--surface-bg); color:#BFD8FF; font:inherit; font-size:11px; font-weight:850; cursor:pointer; }
+    .finance-view-tabs button.is-active { border-color:#57D990; background:rgba(87,217,144,.14); color:#57D990; }
+    .finance-view-workspace { min-height:42px; }
+    .finance-view-workspace[hidden] { display:none !important; }
     .finance-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
     .finance-section-head h2 { margin:0; padding:0; border:0; }
     .finance-section-head p { margin:4px 0 0; max-width:760px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
@@ -423,6 +472,19 @@
     .finance-result-card.bad strong { color:#FF7A7A; }
     .finance-result-card small { display:block; margin-top:7px; color:var(--p3-muted); font-size:11px; line-height:1.4; }
     .uby-finance-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:14px 0; }
+    .uby-finance-summary .kpi-feature { grid-column:span 1; min-height:0; padding:13px; }
+    .uby-finance-summary .kpi-feature::before { height:3px; }
+    .uby-finance-summary .kpi-feature .label { font-size:9px; line-height:1.35; }
+    .uby-finance-summary .kpi-feature .value { margin-top:7px; font-size:clamp(22px,2vw,30px); line-height:1.08; }
+    .finance-cost-composition { display:grid; gap:15px; }
+    .finance-cost-track { display:flex; overflow:hidden; height:12px; border:1px solid rgba(87,183,255,.18); border-radius:999px; background:rgba(4,16,30,.8); }
+    .finance-cost-segment { min-width:5px; background:var(--cost-color,#57B7FF); }
+    .finance-cost-list { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; }
+    .finance-cost-item { display:grid; grid-template-columns:9px minmax(0,1fr); gap:8px; align-items:start; min-width:0; padding:10px; border:1px solid rgba(87,183,255,.14); border-radius:9px; background:rgba(8,25,44,.46); }
+    .finance-cost-dot { width:9px; height:9px; margin-top:4px; border-radius:50%; background:var(--cost-color,#57B7FF); box-shadow:0 0 0 3px color-mix(in srgb,var(--cost-color,#57B7FF) 16%,transparent); }
+    .finance-cost-item b { display:block; color:var(--p3-text); font-size:12px; }
+    .finance-cost-item span,.finance-cost-item small { display:block; color:var(--p3-muted); font-size:10px; line-height:1.45; }
+    .finance-cost-item small { margin-top:3px; color:#57B7FF; font-weight:800; }
     .uby-finance-list { display:grid; gap:10px; }
     .uby-finance-row { display:grid; grid-template-columns:minmax(220px,1.2fr) repeat(4,minmax(105px,.55fr)) auto; gap:12px; align-items:center; border:1px solid var(--surface-border); border-radius:12px; background:var(--surface-bg); padding:13px 14px; box-shadow:var(--p3-shadow); }
     .uby-finance-row strong { display:block; color:var(--p3-text); font-size:13px; }
@@ -626,6 +688,9 @@
       .calendar-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
       .kpi-feature { grid-column:span 2; }
       .accountability-grid { grid-template-columns:1fr; }
+      .finance-central-summary,.finance-central-allocation { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .finance-settlement-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .finance-cost-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .finance-command-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .report-library-card { grid-template-columns:minmax(190px,1.4fr) repeat(2,minmax(100px,.7fr)) auto; }
       .report-library-card .report-library-value.optional { display:none; }
@@ -756,6 +821,9 @@
       .finance-month-actions .btn-recalc { flex:1 1 160px; }
       .finance-flow-nav { display:grid; grid-template-columns:1fr 1fr; }
       .finance-flow-nav a { min-width:0; }
+      .finance-central-summary,.finance-central-allocation { grid-template-columns:1fr 1fr; gap:8px; }
+      .finance-settlement-kpis { grid-template-columns:1fr 1fr; gap:8px; }
+      .finance-cost-list { grid-template-columns:1fr; }
       .finance-command-center { position:relative; top:auto; padding:12px; }
       .finance-command-grid { grid-template-columns:1fr 1fr; }
       .finance-command-field:first-child,.finance-command-actions { grid-column:1/-1; }
@@ -832,7 +900,7 @@
         </div>
       </div>
       <h1>Financeiro UBY</h1>
-      <div class="meta">Resultado da operação UBY, custos da matriz e distribuição aos investidores. Página dedicada — sem a parte operacional.</div>
+      <div class="meta">Central financeira UBY: custos corporativos, tributos, reservas e fechamento consolidado, com a operação de cada carregador preservada em sua própria leitura.</div>
     </div>
     <div class="formula">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -847,6 +915,20 @@
     </div>
   </section>
 
+  <section class="finance-view-nav" aria-label="Visões do Financeiro UBY">
+    <div class="finance-view-nav-copy"><strong>Fechamento financeiro por competência</strong><span>Resultado, compromissos, caixa e investidores usam a mesma base, sem duplicar lançamentos.</span></div>
+    <div class="finance-view-tabs" role="tablist" aria-label="Escolher visão financeira">
+      <button type="button" class="is-active" data-finance-view="result" role="tab" aria-selected="true">Resultado</button>
+      <button type="button" data-finance-view="commitments" role="tab" aria-selected="false">Compromissos</button>
+      <button type="button" data-finance-view="cash" role="tab" aria-selected="false">Caixa e documentos</button>
+      <button type="button" data-finance-view="investors" role="tab" aria-selected="false">Investidores</button>
+    </div>
+  </section>
+  <section id="financeView-result" class="finance-view-workspace" aria-live="polite"></section>
+  <section id="financeView-commitments" class="finance-view-workspace" hidden aria-live="polite"></section>
+  <section id="financeView-cash" class="finance-view-workspace" hidden aria-live="polite"></section>
+  <section id="financeView-investors" class="finance-view-workspace" hidden aria-live="polite"></section>
+
   <!-- Agenda central de vencimentos por carregador -->
   <section class="section" style="margin-top:18px;grid-template-columns:1fr">
     <div class="card" id="scheduledPaymentsWorkspace" aria-live="polite"></div>
@@ -855,12 +937,43 @@
   <!-- DRE consolidada e distribuição por cotas -->
   <section id="networkDre" style="margin-top:18px"></section>
 
+  <!-- Central financeira: custos corporativos, impostos e rateios -->
+  <section class="section" style="grid-template-columns:1fr">
+    <div class="card finance-central-command">
+      <div class="finance-central-head">
+        <div>
+          <h2>Central financeira · matriz e compromissos</h2>
+          <p>Cadastre cada compromisso uma única vez, escolha seus destinos e acompanhe o impacto em cada carregador — sem misturar a operação do ponto com a governança corporativa.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="finance-central-tag">Centralizada e auditável</span>
+          <span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span>
+        </div>
+      </div>
+      <div id="matrizCentralSummary" class="finance-central-summary" aria-live="polite"></div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Custo</th><th style="text-align:right">Valor / mês</th><th style="text-align:right">÷ por carregador</th><th style="text-align:right">Ação</th></tr></thead>
+          <tbody id="matrizCostList"></tbody>
+          <tfoot id="matrizCostFoot"></tfoot>
+        </table>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+        <input id="matrizNewName" type="text" placeholder="Nome do custo (ex.: Aluguel matriz)" style="flex:1;min-width:200px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
+        <input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Valor R$/mês" style="width:150px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
+        <button class="btn-open" type="button" onclick="addMatrizCost()">＋ Adicionar custo</button>
+      </div>
+      <div id="matrizFeedback" role="status" style="margin-top:10px;font-size:13px;min-height:18px"></div>
+      <div id="matrizRateio" style="margin-top:18px"></div>
+    </div>
+  </section>
+
   <!-- Resultado por carregador UBY -->
   <section class="section" style="margin-top:18px;grid-template-columns:1fr">
     <div class="accountability-head" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
       <div>
         <h2>Resultado financeiro por carregador UBY</h2>
-        <p style="color:var(--p3-muted);font-size:13px;margin:4px 0 0">Faturamento, custos e resultado de cada carregador — já com a fatia da matriz descontada.</p>
+        <p style="color:var(--p3-muted);font-size:13px;margin:4px 0 0">Leitura operacional de cada carregador: faturamento, custos diretos e sua fatia da matriz. Tributos, reservas e distribuição são fechados na central.</p>
       </div>
       <span class="accountability-pill" id="ubyFinancePeriodLabel">Acumulado</span>
     </div>
@@ -894,37 +1007,9 @@
     <div class="card pie-card">
       <h2 style="margin:0 0 4px">Composição dos custos UBY</h2>
       <p style="color:var(--p3-muted);font-size:13px;margin:0 0 12px;max-width:70ch">De onde vêm os custos totais da operação UBY no período.</p>
-      <canvas id="costCompositionPie"></canvas>
+      <div id="costCompositionSummary" class="finance-cost-composition" aria-live="polite"></div>
     </div>
   </section>
-
-  <!-- Custos da matriz UBY -->
-  <section class="section" style="grid-template-columns:1fr">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
-        <h2 style="margin:0">Custos da matriz UBY</h2>
-        <span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span>
-      </div>
-      <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:70ch">
-        Despesas da matriz UBY que não são de um carregador só (ex.: aluguel da matriz). O total é dividido <strong>igualmente entre os carregadores UBY que tiveram recarga no mês</strong>. Cadastre uma vez — o rateio se ajusta sozinho.
-      </p>
-      <div style="overflow-x:auto">
-        <table>
-          <thead><tr><th>Custo</th><th style="text-align:right">Valor / mês</th><th style="text-align:right">÷ por carregador</th><th style="text-align:right">Ação</th></tr></thead>
-          <tbody id="matrizCostList"></tbody>
-          <tfoot id="matrizCostFoot"></tfoot>
-        </table>
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
-        <input id="matrizNewName" type="text" placeholder="Nome do custo (ex.: Aluguel matriz)" style="flex:1;min-width:200px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
-        <input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Valor R$/mês" style="width:150px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit">
-        <button class="btn-open" type="button" onclick="addMatrizCost()">＋ Adicionar custo</button>
-      </div>
-      <div id="matrizFeedback" role="status" style="margin-top:10px;font-size:13px;min-height:18px"></div>
-      <div id="matrizRateio" style="margin-top:18px"></div>
-    </div>
-  </section>
-
 
 </main>
 
@@ -940,6 +1025,6 @@
 <script src="auth.js"></script>
 <script src="app_data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="recargas_app.js?v=20260911-scheduled-payments2"></script>
+<script src="recargas_app.js?v=20260925-finance-views1"></script>
 </body>
 </html>

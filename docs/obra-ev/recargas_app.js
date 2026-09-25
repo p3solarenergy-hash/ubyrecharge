@@ -1048,6 +1048,105 @@ async function clearCloudRechargeBase() {
   return true;
 }
 
+function rechargeSnapshotMetrics(record = {}) {
+  const charges = Array.isArray(record.charges) ? record.charges : [];
+  const files = Array.isArray(record.files) ? record.files : [];
+  const total = (fields) => charges.reduce((sum, charge) => {
+    const raw = fields.map(field => charge?.[field]).find(value => value !== undefined && value !== null && value !== '');
+    const value = Number(String(raw ?? 0).replace(',', '.'));
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
+  return {
+    files: Number(record.filesCount ?? files.length) || 0,
+    charges: Number(record.chargesCount ?? charges.length) || 0,
+    energy: total(['energyKWh', 'energy', 'kWh', 'kwh']),
+    revenue: total(['revenue', 'valor', 'amount', 'totalValue'])
+  };
+}
+
+function formatBackupDelta(value, format) {
+  const delta = Number(value || 0);
+  const cls = delta > 0.00001 ? 'backup-delta-positive' : delta < -0.00001 ? 'backup-delta-negative' : 'backup-delta-neutral';
+  const sign = delta > 0.00001 ? '+' : '';
+  return `<span class="${cls}">${sign}${format(delta)}</span>`;
+}
+
+function formatSnapshotAction(action = '') {
+  const labels = {
+    before_upsert: 'Antes de salvar',
+    before_restore: 'Base ativa preservada',
+    before_clear: 'Antes de excluir',
+    snapshot_inicial_migracao: 'Snapshot inicial'
+  };
+  return labels[action] || String(action || 'Snapshot');
+}
+
+function snapshotDateLabel(value) {
+  const date = new Date(value || '');
+  return Number.isNaN(date.getTime()) ? 'Data indisponível' : date.toLocaleString('pt-BR');
+}
+
+function renderRechargeBackupHistory(snapshots, activeRecord) {
+  const target = document.getElementById('backupHistoryContent');
+  if (!target) return;
+  if (!snapshots.length) {
+    target.innerHTML = '<div class="backup-history-empty">Ainda não há snapshots para esta obra. O primeiro será criado automaticamente antes da próxima alteração na base.</div>';
+    return;
+  }
+  const active = rechargeSnapshotMetrics(activeRecord || {});
+  const metricCell = (value, current, formatter) => `<strong>${formatter(value)}</strong><small>ativa: ${formatter(current)} · ${formatBackupDelta(value - current, formatter)}</small>`;
+  target.innerHTML = `<div style="overflow:auto"><table class="backup-history-table"><thead><tr><th>Snapshot</th><th>Arquivos</th><th>Recargas</th><th>Energia</th><th>Receita</th><th>Ação</th></tr></thead><tbody>${snapshots.map(snapshot => {
+    const metrics = rechargeSnapshotMetrics(snapshot);
+    const source = snapshot.userEmail ? `por ${escapeHtml(snapshot.userEmail)}` : (snapshot.origin ? escapeHtml(snapshot.origin) : 'origem não informada');
+    return `<tr><td><strong>${escapeHtml(formatSnapshotAction(snapshot.action))}</strong><small>${escapeHtml(snapshotDateLabel(snapshot.createdAt))} · ${source}</small></td><td>${metricCell(metrics.files, active.files, value => `${Math.round(value)}`)}</td><td>${metricCell(metrics.charges, active.charges, value => `${Math.round(value)}`)}</td><td>${metricCell(metrics.energy, active.energy, value => fmtKWh(value))}</td><td>${metricCell(metrics.revenue, active.revenue, value => fmtBRL(value))}</td><td><button class="btn-danger" type="button" onclick="restoreRechargeBackupSnapshot('${escapeAttr(snapshot.id)}')">Restaurar</button></td></tr>`;
+  }).join('')}</tbody></table></div>`;
+}
+
+async function openRechargeBackupHistory() {
+  const dialog = document.getElementById('backupHistoryDialog');
+  const title = document.getElementById('backupHistoryTitle');
+  const target = document.getElementById('backupHistoryContent');
+  if (!dialog || !target) return;
+  const workId = String(currentWorkId || 'malassise');
+  const workName = workNameById(workId, currentWorkName || workId);
+  if (title) title.textContent = `Snapshots de ${workName} (${workId}).`;
+  target.innerHTML = '<div class="backup-history-empty">Consultando snapshots no Supabase…</div>';
+  if (!dialog.open) dialog.showModal();
+  try {
+    if (!window.UBY_SUPABASE?.loadRechargeHistory) throw new Error('Histórico de backups indisponível. Atualize a página.');
+    const [snapshots, active] = await Promise.all([
+      window.UBY_SUPABASE.loadRechargeHistory(workId, { limit: 50 }),
+      window.UBY_SUPABASE.loadRechargeBase(workId)
+    ]);
+    renderRechargeBackupHistory(snapshots, active || {});
+  } catch (err) {
+    target.innerHTML = `<div class="backup-history-empty">Não foi possível consultar o histórico: ${escapeHtml(err.message || err)}.</div>`;
+  }
+}
+
+async function restoreRechargeBackupSnapshot(snapshotId) {
+  const workId = String(currentWorkId || '');
+  const workName = workNameById(workId, currentWorkName || workId);
+  const confirmation = `RESTAURAR ${workId.toUpperCase()}`;
+  const answer = prompt(`Confirmação forte: esta ação trocará a base ativa de ${workName} pelo snapshot escolhido. Antes da troca, a base ativa será arquivada automaticamente.\n\nDigite exatamente: ${confirmation}`);
+  if (answer !== confirmation) {
+    alert('Restauração cancelada. Nenhum dado foi alterado.');
+    return;
+  }
+  try {
+    setStorageState(`Restaurando backup de <strong>${workName}</strong>. A base ativa está sendo preservada antes da troca…`);
+    const result = await window.UBY_SUPABASE?.restoreRechargeHistorySnapshot?.(workId, snapshotId);
+    if (!result?.restored) throw new Error('O Supabase não confirmou a restauração.');
+    await loadRechargeBase(workId, { requireCloud: true });
+    await renderAll();
+    setStorageState(`Backup restaurado para <strong>${workName}</strong>: ${result.files} arquivo(s) e ${result.charges} recarga(s). A base anterior foi preservada como novo snapshot.`);
+    await openRechargeBackupHistory();
+  } catch (err) {
+    setStorageState(`Restauração não concluída: ${err.message || err}. A base ativa não foi removida.`, true);
+    alert(`Restauração não concluída. ${err.message || err}`);
+  }
+}
+
 async function saveRechargeBase(options = {}) {
   if (currentStationReportName) {
     setStorageState(`Visualizacao filtrada por estacao: <strong>${currentStationReportName}</strong>. A base completa nao foi sobrescrita.`, true);
@@ -4666,11 +4765,11 @@ function renderFinanceiro(applySaved = true) {
     courtesyCharges ? `<div class="card"><div class="label">Beneficio do parceiro</div><div class="value">${fmtKWh(courtesyEnergy)}</div><div class="sub">${courtesyCostExcluded ? `${fmtBRL(courtesyCostExcluded)} absorvido por ${escapeHtml(courtesyResponsible || 'parceiro local')}` : 'registrado sem alterar o resultado'}</div></div>` : '',
     `<div class="card"><div class="label">Receita P3</div><div class="value">${fmtBRL(p3Gross)}</div><div class="sub">gestao${hasP3Society ? ' + sociedades' : ''}</div></div>`,
     hasUbyRoyalty ? `<div class="card"><div class="label">Royalty UBY</div><div class="value">${fmtBRL(ubyRoyalty)}</div><div class="sub">${settings.ubyRoyaltyPct}% pela utilizacao da marca</div></div>` : '',
-    isUbyModel ? `<div class="card"><div class="label">Resultado UBY</div><div class="value">${fmtBRL(ubyNet)}</div><div class="sub">apos energia, custos e P3</div></div>` : '',
+    `<div class="card"><div class="label">Resultado operacional</div><div class="value">${fmtBRL(operationNet + Number(result.matrizCost || 0))}</div><div class="sub">antes da atribuição da matriz</div></div>`,
+    Number(result.matrizCost || 0) ? `<div class="card"><div class="label">Matriz atribuída</div><div class="value">− ${fmtBRL(result.matrizCost)}</div><div class="sub">compromissos centralizados deste ponto</div></div>` : '',
+    `<div class="card"><div class="label">Resultado após rateio</div><div class="value">${fmtBRL(operationNet)}</div><div class="sub">operação após custos diretos e matriz</div></div>`,
     hasP3Society ? `<div class="card"><div class="label">Resultado P3 na sociedade</div><div class="value">${fmtBRL(p3SocietyProfit)}</div><div class="sub">${isExternalSociety ? `${settings.p3SocietyPct}% do resultado da parceria` : 'participacao configurada em AC/DC'}</div></div>` : '',
     isDirectPartnerModel ? `<div class="card"><div class="label">${(settings.operationModel === 'management_only' || hasUbyRoyalty) ? `Lucro distribuido ${partnerName}` : `Distribuicao ${partnerName}`}</div><div class="value">${fmtBRL(partnerInvestorDistribution)}</div><div class="sub">${(settings.operationModel === 'management_only' || hasUbyRoyalty) ? 'resultado liquido pago diretamente ao parceiro' : `${Math.max(100 - Number(settings.p3SocietyPct || 0), 0)}% do resultado da parceria`}</div></div>` : '',
-    isUbyModel ? `<div class="card"><div class="label">Retencao S.A.</div><div class="value">${fmtBRL(saRetention)}</div><div class="sub">${settings.saRetentionPct}% do lucro liquido UBY</div></div>` : '',
-    isUbyModel ? `<div class="card"><div class="label">Investidores UBY</div><div class="value">${fmtBRL(investorDistribution)}</div><div class="sub">${settings.investorQuotaPct}% de ${fmtBRL(ubyDistributable)}</div></div>` : '',
     `<div class="card"><div class="label">Payback</div><div class="value">${formatPaybackMonths(paybackMonths)}</div><div class="sub">investimento / resultado proprio</div></div>`,
     `<div class="card"><div class="label">ROI mensal</div><div class="value">${fmtPct(roiMonthly)}</div><div class="bar"><span style="width:${Math.min(Math.max(roiMonthly,0),100).toFixed(1)}%"></span></div><div class="sub">resultado proprio / investimento</div></div>`,
     `<div class="card"><div class="label">Meta ocupacao</div><div class="value">${fmtPct(target.targetOccPct)}</div><div class="sub">real ${fmtPct(target.realOccPct)} | falta ${fmtPct(target.targetOccPct - target.realOccPct)}</div></div>`,
@@ -4712,28 +4811,25 @@ function renderFinanceiro(applySaved = true) {
     `<tr><td>Custo de energia</td><td>${fmtBRL(energyCost)}</td></tr>`,
     courtesyCharges ? `<tr><td>Energia de cortesia (memória)</td><td>${fmtKWh(courtesyEnergy)} · ${fmtBRL(courtesyEnergyCost)}${courtesyTreatment === 'partner_absorbed' ? ' — absorvida pelo parceiro, fora do resultado UBY' : ''}</td></tr>` : '',
     result.areaEligible ? `<tr><td>Participacao do parceiro da area</td><td>${fmtBRL(result.areaParticipation)}</td></tr>` : '',
-    `<tr><td>Custos operacionais cadastrados</td><td>${fmtBRL(extraCosts)}</td></tr>`,
+    `<tr><td>Custos operacionais diretos</td><td>${fmtBRL(Math.max(0, extraCosts - Number(result.matrizCost || 0)))}</td></tr>`,
+    `<tr><td>Atribuição de custos da matriz</td><td>${fmtBRL(result.matrizCost || 0)}</td></tr>`,
     `<tr><td>Custo operacional total</td><td>${fmtBRL(result.totalOperatingCost)}</td></tr>`,
     `<tr><td>Custo base planejado por kWh</td><td>${fmtPerKWh(result.plannedDirectCostPerKWh)}</td></tr>`,
     `<tr><td>Custo total projetado por kWh</td><td>${fmtPerKWh(result.plannedTotalCostPerKWh)}</td></tr>`,
     `<tr><td>Custo efetivo por kWh</td><td>${fmtPerKWh(result.totalCostPerKWh)}</td></tr>`,
     `<tr><td>Ponto de equilibrio</td><td>${Number.isFinite(result.breakEvenKWh) ? fmtKWh(result.breakEvenKWh) : '-'}</td></tr>`,
     hasP3Society ? `<tr><td>Resultado P3 na sociedade</td><td>${fmtBRL(p3SocietyProfit)}</td></tr>` : '',
-    isUbyModel ? `<tr><td>Resultado liquido UBY</td><td>${fmtBRL(ubyNet)}</td></tr>` : '',
-    isUbyModel ? `<tr><td>Retencao obrigatoria S.A.</td><td>${fmtBRL(saRetention)}</td></tr>` : '',
-    isUbyModel ? `<tr><td>Base distribuivel UBY</td><td>${fmtBRL(ubyDistributable)}</td></tr>` : '',
+    isUbyModel ? `<tr><td>Resultado UBY antes da distribuição central</td><td>${fmtBRL(ubyNet)}</td></tr>` : '',
     partnerShare ? `<tr><td>Resultado socio/local</td><td>${fmtBRL(partnerShare)}</td></tr>` : '',
     isDirectPartnerModel ? `<tr><td>${(settings.operationModel === 'management_only' || hasUbyRoyalty) ? `Lucro distribuido diretamente ao parceiro ${partnerName}` : `Distribuicao ao socio investidor ${partnerName}`}</td><td>${fmtBRL(partnerInvestorDistribution)}</td></tr>` : '',
     `<tr><td>Resultado proprio para payback</td><td>${fmtBRL(paybackBase)}</td></tr>`,
     `<tr><td>Resultado proprio total</td><td>${fmtBRL(ownResult)}</td></tr>`,
-    isUbyModel ? `<tr><td>Repasse investidores</td><td>${fmtBRL(investorDistribution)}</td></tr>` : '',
-    isUbyModel ? `<tr><td>Retido UBY</td><td>${fmtBRL(ubyRetained)}</td></tr>` : '',
     `<tr><td>Payback estimado</td><td>${formatPaybackMonths(paybackMonths)}</td></tr>`,
     isUbyModel ? `<tr><td>Margem UBY</td><td>${fmtPct(margin)}</td></tr>` : ''
   ].filter(Boolean).join('');
   document.getElementById('financeNote').innerHTML =
     isUbyModel
-      ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} no mes. A gestao P3 e a participacao da area usam o faturamento total; o app/plataforma (${fmtBRL(platform)}) incide somente nas recargas e ociosidade importadas. A UBY fica com ${fmtBRL(ubyNet)} antes da retencao S.A.; ${fmtBRL(saRetention)} ficam retidos por estatuto e ${fmtBRL(investorDistribution)} sao distribuiveis aos investidores. Meta ate o periodo: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mes completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
+      ? `Este painel mostra a eficiência do ponto: receita, energia, custos diretos e ${fmtBRL(result.matrizCost || 0)} de custos corporativos atribuídos. A apuração de tributos, reserva legal, expansão e distribuição fica centralizada no Financeiro UBY; o relatório consolidado é a fonte oficial para fechamento. Meta até o período: ${fmtKWh(target.targetEnergy)} e ${fmtBRL(target.targetRevenue)}. Meta mês completo: ${fmtKWh(target.fullMonthTargetEnergy)} e ${fmtBRL(target.fullMonthTargetRevenue)}.`
       : settings.operationModel === 'management_only'
         ? `Neste modelo, a P3 recebe ${fmtBRL(p3Gross)} pela gestao. Depois de energia, plataforma e demais custos, o lucro liquido de ${fmtBRL(partnerInvestorDistribution)} e distribuido diretamente para ${partnerName}. Esse pagamento e registrado como distribuicao do parceiro; o payback da P3 continua baseado somente na sua receita de gestao.`
         : hasUbyRoyalty
@@ -5431,6 +5527,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     partnerShare,
     ownResult,
     energyCost,
+    energyComposition,
     energyRate: Number(cfg.energyCostPerKWh || 0),
     taxes,
     taxRatePct: Number(cfg.taxRatePct || 0),
@@ -5452,6 +5549,7 @@ function financeForCharges(charges, settings = {}, options = {}) {
     areaShareBase,
     areaParticipation,
     plannedAreaParticipation,
+    plannedTotalRevenue,
     costRules: cfg.costRules,
     revenueRules: cfg.revenueRules,
     costRuleDetails: [...costEvaluation.details, {
@@ -6253,12 +6351,13 @@ function ensureMatrizCostEditor() {
   const list = matrizInput('matrizCostList');
   const card = list?.closest('.card');
   if (!card) return;
+  card.classList.add('finance-central-command');
   card.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
-      <h2 style="margin:0">Custos da matriz UBY</h2>
-      <span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span>
+    <div class="finance-central-head">
+      <div><h2 style="margin:0">Central financeira · matriz e compromissos</h2><p>Cadastre cada compromisso uma única vez, escolha seus destinos e acompanhe o impacto em cada carregador — sem misturar a operação do ponto com a governança corporativa.</p></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="finance-central-tag">Centralizada e auditável</span><span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span></div>
     </div>
-    <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:78ch">Cadastre despesas compartilhadas uma vez, defina parcelas, carregadores atendidos e a regra de rateio. Os destinos e a vigencia ficam guardados por competencia; adicionar um carregador novo nao reescreve meses anteriores.</p>
+    <div id="matrizCentralSummary" class="finance-central-summary" aria-live="polite"></div>
     <div style="overflow-x:auto"><table><thead><tr><th>Despesa</th><th>Competencia</th><th>Rateio e destinos</th><th style="text-align:right">Valor desta competencia</th><th style="text-align:right">Acao</th></tr></thead><tbody id="matrizCostList"></tbody><tfoot id="matrizCostFoot"></tfoot></table></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:16px">
       <label class="sub">NOME DO CUSTO<input id="matrizNewName" type="text" placeholder="Ex.: Seguro carregadores" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
@@ -6277,9 +6376,9 @@ function ensureMatrizCostEditor() {
       <label class="sub">CARREGADORES DE DESTINO (PODE SELECIONAR MAIS DE UM)<select id="matrizCostTargets" multiple size="5" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:8px;font:inherit"></select></label>
       <div><input id="matrizCostCustomShares" type="text" placeholder="Participacoes: 50, 30, 20" style="width:100%;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><div class="sub" style="margin-top:6px">Use participacao definida somente se quiser percentuais personalizados na mesma ordem dos destinos. Nos outros metodos este campo e ignorado.</div><input id="matrizCostDocument" type="text" placeholder="Referencia do boleto ou documento" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><input id="matrizCostNotes" type="text" placeholder="Observacao" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></div>
     </div>
-    <div class="sub" style="margin-top:12px;max-width:88ch">Tributos sobre o faturamento de cada carregador devem ser configurados no financeiro daquela unidade. Use <b>Tributos corporativos / centralizados</b> somente para obrigações sem vínculo direto e rateie entre os carregadores beneficiados. Para um seguro pago em 4 parcelas que cobre 12 meses, informe <b>4 parcelas</b> e <b>12 meses de cobertura</b>.</div>
+    <div class="sub" style="margin-top:12px;max-width:88ch">Tributos novos devem ser lançados nesta Central Financeira, na categoria <b>Tributos corporativos / centralizados</b>, com competência, documento e destinos definidos. Configurações tributárias antigas de cada carregador permanecem preservadas apenas para leitura histórica. Para um seguro pago em 4 parcelas que cobre 12 meses, informe <b>4 parcelas</b> e <b>12 meses de cobertura</b>.</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px"><button id="matrizSaveButton" class="btn-open" type="button" onclick="addMatrizCost()">Adicionar custo</button><button class="btn-open" type="button" onclick="resetMatrizCostForm();renderMatrizCosts(getGeneralUnitData())">Limpar</button><span id="matrizFeedback" class="sub"></span></div>
-    <div id="matrizRateio" style="margin-top:18px"></div>
+    <div id="matrizRateio" style="margin-top:14px"></div>
     <section style="margin-top:24px;padding-top:20px;border-top:1px solid var(--p3-border)">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><h3 style="margin:0">Boletos e documentos da matriz</h3><span class="sub">PDF ou imagem privada, carregada somente ao abrir</span></div>
       <p class="sub" style="margin:6px 0 14px;max-width:82ch">Use este cadastro para organizar comprovantes, boletos e vencimentos. Vincule ao custo da matriz quando existir; o valor do documento nao soma custo novamente, pois a DRE continua usando a regra financeira cadastrada acima.</p>
@@ -6314,23 +6413,47 @@ function renderMatrizCosts(unitData) {
   const rows = matrizEligibleRows(unitData, mk);
   const costs = loadMatrizCosts().filter(item => !item.scheduledPayment);
   const planned = costs.filter(item => matrizApplies(item, mk)).reduce((sum, item) => sum + matrizCompetencyAmount(item), 0);
+  const matrizAllocated = rows.reduce((sum, row) => sum + matrizCostItemsForRow(row, mk, unitData).reduce((partial, item) => partial + Number(item.amount || 0), 0), 0);
+  const centralTaxes = costs.filter(item => matrizApplies(item, mk) && /tribut|impost|taxa/i.test(`${item.category || ''} ${item.name || ''}`)).reduce((sum, item) => sum + matrizCompetencyAmount(item), 0);
+  const matrizPending = Math.max(planned - matrizAllocated, 0);
   const monthEl = matrizInput('matrizMonthLabel'); if (monthEl) monthEl.textContent = mk ? `competencia ${monthLabel(mk)} | cadastro salvo separadamente das recargas` : 'selecione a competencia';
+  const centralSummary = matrizInput('matrizCentralSummary');
+  if (centralSummary) centralSummary.innerHTML = `
+    <article class="finance-central-metric"><span>COMPROMISSOS ATIVOS</span><strong>${costs.filter(item => matrizApplies(item, mk)).length}</strong><small>nesta competência</small></article>
+    <article class="finance-central-metric"><span>CUSTO CENTRAL</span><strong>${fmtBRL(planned)}</strong><small>reconhecido no mês</small></article>
+    <article class="finance-central-metric good"><span>RATEADO AOS PONTOS</span><strong>${fmtBRL(matrizAllocated)}</strong><small>com destino definido</small></article>
+    <article class="finance-central-metric tax"><span>TRIBUTOS CENTRALIZADOS</span><strong>${fmtBRL(centralTaxes)}</strong><small>incluídos na matriz</small></article>
+    <article class="finance-central-metric ${matrizPending ? 'warn' : 'good'}"><span>PENDENTE DE DESTINO</span><strong>${fmtBRL(matrizPending)}</strong><small>${matrizPending ? 'revise o rateio' : 'rateio completo'}</small></article>`;
   listEl.innerHTML = costs.length ? costs.map(item => {
     const parcel = matrizMonthOffset(item.startMonth, mk) + 1;
     const period = item.costKind === 'installment' ? `parcela ${Math.max(1, parcel)} de ${item.installments} | cobertura ${matrizCoverageMonths(item)} mes(es)` : item.costKind === 'one_off' ? 'lancamento unico' : 'recorrente mensal';
     const activeTargets = item.targets.filter(target => !target.startMonth || target.startMonth <= mk);
     const targetNames = activeTargets.map(target => matrizResolveTargetRow(target, rows)?.station || target.station || '').filter(Boolean);
     const allocations = rows.flatMap(row => matrizCostItemsForRow(row, mk, unitData).filter(cost => cost.id === item.id));
+    const allocationsByUnit = rows.map(row => {
+      const allocation = matrizCostItemsForRow(row, mk, unitData).find(cost => cost.id === item.id);
+      return allocation ? { name: row.station || row.workName, amount: Number(allocation.amount || 0) } : null;
+    }).filter(Boolean);
+    const allocationPreview = allocationsByUnit.map(allocation => `${escapeHtml(allocation.name)}: <b>${fmtBRL(allocation.amount)}</b>`).join(' · ');
     const allocated = allocations.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
     const cashAllocated = allocations.reduce((sum, cost) => sum + Number(cost.cashAmount || 0), 0);
     const competency = matrizCompetencyAmount(item);
     const cash = matrizCashAmount(item, mk);
-    return `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="sub">${escapeHtml(item.category)}${item.supplier ? ` | ${escapeHtml(item.supplier)}` : ''}${item.documentRef ? ` | ${escapeHtml(item.documentRef)}` : ''}</div></td><td>${escapeHtml(period)}<div class="sub">inicio ${item.startMonth ? monthLabel(item.startMonth) : '-'} | venc. dia ${item.dueDay}</div></td><td>${matrizMethodLabel(item.allocation)}<div class="sub">${targetNames.length ? escapeHtml(targetNames.join(' | ')) : `${activeTargets.length} destino(s) sem base ativa`}</div></td><td class="num" style="text-align:right">${matrizApplies(item, mk) ? `competencia: ${fmtBRL(competency)}<div class="sub">caixa: ${fmtBRL(cash)} | rateado: ${fmtBRL(allocated)}${cashAllocated ? ` | caixa rateado: ${fmtBRL(cashAllocated)}` : ''}</div>` : 'fora da competencia'}</td><td style="text-align:right"><button class="btn-open" type="button" onclick="editMatrizCost('${escapeAttr(item.id)}')">Editar</button> <button class="btn-open" type="button" onclick="removeMatrizCost('${escapeAttr(item.id)}')">Desativar</button> <button class="btn-danger" type="button" onclick="deleteMatrizCost('${escapeAttr(item.id)}')">Excluir</button></td></tr>`;
+    return `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="sub">${escapeHtml(item.category)}${item.supplier ? ` | ${escapeHtml(item.supplier)}` : ''}${item.documentRef ? ` | ${escapeHtml(item.documentRef)}` : ''}</div></td><td>${escapeHtml(period)}<div class="sub">inicio ${item.startMonth ? monthLabel(item.startMonth) : '-'} | venc. dia ${item.dueDay}</div></td><td>${matrizMethodLabel(item.allocation)}<div class="sub">${targetNames.length ? escapeHtml(targetNames.join(' | ')) : `${activeTargets.length} destino(s) sem base ativa`}</div>${allocationPreview ? `<div class="sub" style="margin-top:5px;color:var(--p3-text)">${allocationPreview}</div>` : ''}</td><td class="num" style="text-align:right">${matrizApplies(item, mk) ? `competencia: ${fmtBRL(competency)}<div class="sub">caixa: ${fmtBRL(cash)} | rateado: ${fmtBRL(allocated)}${cashAllocated ? ` | caixa rateado: ${fmtBRL(cashAllocated)}` : ''}</div>` : 'fora da competencia'}</td><td style="text-align:right"><button class="btn-open" type="button" onclick="editMatrizCost('${escapeAttr(item.id)}')">Editar</button> <button class="btn-open" type="button" onclick="removeMatrizCost('${escapeAttr(item.id)}')">Desativar</button> <button class="btn-danger" type="button" onclick="deleteMatrizCost('${escapeAttr(item.id)}')">Excluir</button></td></tr>`;
   }).join('') : '<tr><td colspan="5" style="color:var(--p3-muted);text-align:center;padding:16px">Nenhum custo compartilhado cadastrado.</td></tr>';
   const foot = matrizInput('matrizCostFoot'); if (foot) foot.innerHTML = `<tr style="font-weight:700"><td colspan="3">Programado em ${mk ? monthLabel(mk) : '-'}</td><td class="num" style="text-align:right">${fmtBRL(planned)}</td><td></td></tr>`;
   const targets = matrizInput('matrizCostTargets');
   if (targets && !matrizEditingId) targets.innerHTML = rows.map(row => `<option value="${escapeAttr(matrizScopeKey(row))}" selected>${escapeHtml(row.station || row.workName)} | ${escapeHtml(row.workName)}</option>`).join('');
-  const rateio = matrizInput('matrizRateio'); if (rateio) rateio.textContent = rows.length ? `Destinos ativos: ${rows.map(row => row.station || row.workName).join(' | ')}.` : '';
+  const rateio = matrizInput('matrizRateio');
+  if (rateio) {
+    rateio.innerHTML = `<div class="finance-central-allocation">
+      <div><span class="sub">MODELO DE RATEIO</span><strong>${rows.length ? 'Destinos ativos' : 'Sem destinos'}</strong><small class="sub">${rows.length ? rows.map(row => escapeHtml(row.station || row.workName)).join(' · ') : 'Escolha os carregadores atendidos'}</small></div>
+      <div><span class="sub">REGRA</span><strong>Por compromisso</strong><small class="sub">igual, potência, kWh, faturamento ou participação definida</small></div>
+      <div><span class="sub">RESULTADO DO PONTO</span><strong class="good">Operacional + matriz</strong><small class="sub">a atribuição fica separada da eficiência do carregador</small></div>
+      <div><span class="sub">TRIBUTOS</span><strong class="tax">Somente central</strong><small class="sub">novas obrigações entram nesta central</small></div>
+      <div><span class="sub">FECHAMENTO OFICIAL</span><strong class="${matrizPending ? 'warn' : 'good'}">${matrizPending ? 'Revisar destinos' : 'Consolidado pronto'}</strong><small class="sub">DRE da rede, reservas e distribuição</small></div>
+    </div>`;
+  }
   renderMatrizMonthlyDre(allIncludedRows, mk);
   renderMatrizDocuments(mk);
 }
@@ -6453,22 +6576,69 @@ function countDetailedCharges() {
   return Object.values(allRechargeRecords || {}).reduce((sum, record) => sum + (Array.isArray(record?.charges) ? record.charges.length : 0), 0);
 }
 
+let financeOnlyContext = null;
+let activeFinanceView = 'result';
+let financeNavigationBound = false;
+
+function financeViewHost(view) { return document.getElementById(`financeView-${view}`); }
+function moveFinanceSurface(element, view) {
+  const host = financeViewHost(view);
+  if (element && host && element.parentElement !== host) host.appendChild(element);
+}
+function arrangeFinanceViews() {
+  moveFinanceSurface(document.getElementById('networkDre'), 'result');
+  moveFinanceSurface(document.getElementById('ubyFinanceSummary')?.closest('.section'), 'result');
+  moveFinanceSurface(document.getElementById('chartUbyFinanceMonthly')?.closest('.section'), 'result');
+  moveFinanceSurface(document.getElementById('costTree')?.closest('.section'), 'result');
+  moveFinanceSurface(document.getElementById('matrizCostList')?.closest('.section'), 'commitments');
+  moveFinanceSurface(document.getElementById('matrizMonthlyDre'), 'commitments');
+  moveFinanceSurface(document.getElementById('scheduledPaymentsWorkspace')?.closest('.section'), 'cash');
+  moveFinanceSurface(document.getElementById('matrizDocumentsList')?.closest('section'), 'cash');
+  moveFinanceSurface(document.getElementById('networkInvestorCard'), 'investors');
+  moveFinanceSurface(document.getElementById('ubyDistribution')?.closest('.section'), 'investors');
+}
+function bindFinanceNavigation() {
+  if (financeNavigationBound) return;
+  financeNavigationBound = true;
+  document.querySelectorAll('[data-finance-view]').forEach(button => button.addEventListener('click', () => activateFinanceView(button.dataset.financeView)));
+}
+async function activateFinanceView(view = 'result') {
+  const next = ['result', 'commitments', 'cash', 'investors'].includes(view) ? view : 'result';
+  activeFinanceView = next;
+  document.querySelectorAll('[data-finance-view]').forEach(button => {
+    const selected = button.dataset.financeView === next;
+    button.classList.toggle('is-active', selected);
+    button.setAttribute('aria-selected', selected ? 'true' : 'false');
+  });
+  document.querySelectorAll('.finance-view-workspace').forEach(host => { host.hidden = host.id !== `financeView-${next}`; });
+  await renderFinanceView(next);
+}
+async function renderFinanceView(view = activeFinanceView) {
+  const context = financeOnlyContext;
+  if (!context) return;
+  const { unitData, ubyRows, sourceMonths, period } = context;
+  if (view === 'result') {
+    renderUbyFinancialOverview(ubyRows, sourceMonths, period.isMonthView, period.monthKey, period.label);
+    renderNetworkDre(ubyRows, sourceMonths, period.isMonthView, period.monthKey, { includeInvestors: false });
+  } else if (view === 'commitments') {
+    renderMatrizCosts(unitData);
+  } else if (view === 'cash') {
+    renderScheduledPayments(unitData);
+    if (!document.getElementById('matrizDocumentsList')) renderMatrizCosts(unitData);
+  } else if (view === 'investors') {
+    renderNetworkDre(ubyRows, sourceMonths, period.isMonthView, period.monthKey, { includeInvestors: true });
+  }
+  arrangeFinanceViews();
+}
+
 async function renderFinanceOnly() {
   await ensureMatrizCostsLoaded();
   const unitData = getGeneralUnitData();
-  // A página Financeiro UBY é a entrada principal usada pelo botão do painel.
-  // Renderiza a agenda antes da DRE para manter os vencimentos acessíveis
-  // mesmo quando ainda não houver recargas no período.
-  renderScheduledPayments(unitData);
   const ubyRows = getUbyChargerRows(unitData);
   const includedRows = ubyRows.filter(r => r.included);
   const nRec = Object.keys(allRechargeRecords || {}).length;
   const nDetail = countDetailedCharges();
   console.log(`[fin] registros=${nRec} recargasDetalhadas=${nDetail} unidades=${unitData.length} carregadores=${ubyRows.length} carregadoresUBY=${includedRows.length}`);
-  // O cadastro de custos da matriz é independente dos dados de recarga: ele
-  // sempre renderiza, para que a pessoa possa cadastrar custos mesmo antes de
-  // qualquer carregador ter recarga no período (o rateio aparece quando houver).
-  try { renderMatrizCosts(unitData); } catch (e) { console.error('[fin-matriz]', e); }
   if (!includedRows.length) {
     let msg;
     if (nRec === 0) {
@@ -6487,14 +6657,18 @@ async function renderFinanceOnly() {
     if (sumEl) sumEl.innerHTML = `<div class="note" style="padding:16px;color:var(--p3-warn)">${msg} <br><span style="color:var(--p3-muted);font-size:12px">(diagnóstico: registros=${nRec}, recargasDetalhadas=${nDetail}, unidades=${unitData.length}, carregadores=${ubyRows.length}, marcados como UBY=${includedRows.length})</span></div>`;
     const rowsEl = document.getElementById('ubyFinanceRows'); if (rowsEl) rowsEl.innerHTML = '';
     const treeEl = document.getElementById('costTree'); if (treeEl) treeEl.innerHTML = '';
+    financeOnlyContext = { unitData, ubyRows, sourceMonths: [], period: { isMonthView: false, monthKey: '', label: 'Sem dados' } };
+    bindFinanceNavigation();
+    arrangeFinanceViews();
     return;
   }
   const ubyCharges = includedRows.flatMap(r => r.charges || []);
   const sourceMonths = [...new Set(ubyCharges.map(chargeMonthKey).filter(k => k !== 'unknown'))].sort();
   syncFinanceOnlyMonthOptions(sourceMonths);
   const period = selectedFinanceOnlyPeriod(sourceMonths);
-  try { renderUbyFinancialOverview(ubyRows, sourceMonths, period.isMonthView, period.monthKey, period.label); } catch (e) { console.error('[fin-uby]', e); }
-  try { renderNetworkDre(ubyRows, sourceMonths, period.isMonthView, period.monthKey); } catch (e) { console.error('[fin-network-dre]', e); }
+  financeOnlyContext = { unitData, ubyRows, sourceMonths, period };
+  bindFinanceNavigation();
+  try { await activateFinanceView(activeFinanceView); } catch (e) { console.error('[fin-view]', e); }
 }
 
 function financeUnitOutcome(finance = {}) {
@@ -11796,7 +11970,7 @@ function updateNetworkDistributionMonthStatus(monthKey, status) {
   if (window.UBY_FINANCE_ONLY) renderFinanceOnly(); else renderGeneralFinance(getGeneralUnitData());
 }
 
-function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true, currentMonth = '') {
+function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true, currentMonth = '', options = {}) {
   const target = document.getElementById('networkDre');
   if (!target) return;
   const rows = sourceRows.filter(row => row.included)
@@ -11819,48 +11993,53 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
   const reserve = legalReserve + expansionReserve;
   const afterReserve = positiveResult - reserve;
   const investorPool = afterReserve * Number(policy.investorPct || 0) / 100;
-  const ubyRetained = positiveResult - investorPool;
   const soldQuotas = Math.min(Number(policy.soldQuotas || 0), Number(policy.totalQuotas || 1));
   const perQuota = soldQuotas > 0 ? investorPool / soldQuotas : 0;
   const period = isMonthView ? monthLabel(currentMonth) : 'Acumulado';
-  const resultLabel = isMonthView ? `Resultado mensal · ${period}` : 'Resultado acumulado da rede';
-  const line = (label, value, cls = '') => `<tr class="${cls}"><td>${label}</td><td style="text-align:right">${value}</td></tr>`;
+  const networkRevenue = rechargeRevenue + operationalExtras + marketing;
+  const networkMargin = networkRevenue ? networkResult / networkRevenue * 100 : 0;
+  const centralCost = Number(owned.matrizCost || 0);
+  const line = (label, value, cls = '', detail = '') => `<tr class="${cls}"><td><span>${label}</span>${detail ? `<small class="finance-line-detail">${detail}</small>` : ''}</td><td style="text-align:right">${value}</td></tr>`;
+  const costLine = (label, value, detail = '') => {
+    const share = networkRevenue > 0 ? fmtPct(Number(value || 0) / networkRevenue * 100) : '—';
+    return line(label, `<span class="finance-cost-value">${fmtBRL(value)}<small class="finance-cost-share">${share} do faturamento</small></span>`, '', detail);
+  };
   target.innerHTML = `
-    <section class="card" style="border-color:rgba(66,223,154,.36);background:linear-gradient(135deg,rgba(16,72,61,.2),var(--p3-card-soft));margin-top:18px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap">
-        <div><div class="tn-tag">◆ Fechamento consolidado</div><h2 style="margin:4px 0">DRE da rede UBY</h2><p class="sub" style="max-width:78ch;margin:0">${escapeHtml(period)}. Consolida somente ativos UBY; royalties entram como receita da marca e marketing somente no fechamento, sem alterar as métricas de recarga.</p></div>
-        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><span class="accountability-pill">${ownedRows.length} ativo(s) UBY · ${partnerRows.length} parceiro(s)</span><button class="btn-open" type="button" onclick="generateNetworkUnifiedReport()">Gerar relatório unificado</button></div>
+    <section class="card finance-settlement" style="margin-top:18px">
+      <div class="finance-settlement-head">
+        <div><div class="tn-tag">◆ Fechamento financeiro por competência</div><h2>DRE consolidada da rede UBY</h2><p class="sub">${escapeHtml(period)}. Consolida somente ativos UBY; royalties entram como receita da marca e marketing somente no fechamento, sem alterar as métricas de recarga.</p></div>
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap"><span class="finance-settlement-status">Prévia gerencial · dados da plataforma</span><span class="accountability-pill">${ownedRows.length} ativo(s) UBY · ${partnerRows.length} parceiro(s)</span><button class="btn-open" type="button" onclick="generateNetworkUnifiedReport()">Gerar relatório unificado</button></div>
       </div>
-      <div style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.85fr);gap:18px;margin-top:18px">
-        <div style="overflow:auto"><table><tbody>
+      <div class="finance-settlement-kpis">
+        <article class="finance-settlement-kpi"><span>FATURAMENTO POR COMPETÊNCIA</span><strong>${fmtBRL(networkRevenue)}</strong><small>recargas, receitas complementares e marketing</small></article>
+        <article class="finance-settlement-kpi ${networkResult >= 0 ? 'result' : 'attention'}"><span>RESULTADO DA DRE</span><strong>${fmtBRL(networkResult)}</strong><small>antes da distribuição aos cotistas</small></article>
+        <article class="finance-settlement-kpi ${networkResult >= 0 ? 'result' : 'attention'}"><span>MARGEM DE RESULTADO</span><strong>${fmtPct(networkMargin)}</strong><small>resultado da rede ÷ faturamento</small></article>
+        <article class="finance-settlement-kpi"><span>ENERGIA RECONHECIDA</span><strong>${fmtBRL(owned.energyCost)}</strong><small>custo direto da operação</small></article>
+        <article class="finance-settlement-kpi reserve"><span>RATEIO CENTRAL</span><strong>${fmtBRL(centralCost)}</strong><small>custos corporativos atribuídos aos pontos</small></article>
+        <article class="finance-settlement-kpi reserve"><span>RESERVAS E EXPANSÃO</span><strong>${fmtBRL(reserve)}</strong><small>legal ${policy.legalReservePct}% · expansão ${policy.expansionReservePct}%</small></article>
+        <article class="finance-settlement-kpi ${investorPool >= 0 ? 'result' : 'attention'}"><span>POOL DOS COTISTAS</span><strong>${fmtBRL(investorPool)}</strong><small>${policy.investorPct}% após as reservas · ${soldQuotas} cotas habilitadas</small></article>
+      </div>
+      <div style="overflow:auto;margin-top:18px"><table><tbody>
           <tr class="finance-group-row"><th colspan="2">Receitas da rede</th></tr>
           ${line('Faturamento de recargas dos ativos UBY', fmtBRL(rechargeRevenue))}
           ${line('Receitas operacionais complementares', fmtBRL(operationalExtras))}
           ${line('Royalties de parceiros (fora da matriz operacional)', fmtBRL(royalties))}
           ${line('Marketing e contratos reconhecidos no fechamento', fmtBRL(marketing))}
-          ${line('Faturamento total (base gestão P3 e área)', fmtBRL(rechargeRevenue + operationalExtras + marketing), 'finance-total-row')}
+          ${line('Faturamento total (base gestão P3 e área)', fmtBRL(networkRevenue), 'finance-total-row')}
           <tr class="finance-group-row"><th colspan="2">Custos já reconhecidos na rede</th></tr>
-          ${line('Energia', fmtBRL(owned.energyCost))}
-          ${line('Operação direta por ativo', fmtBRL(Math.max(0, Number(owned.extraCosts || 0) - Number(owned.matrizCost || 0))))}
-          ${line('Tributos diretamente atribuíveis aos carregadores', fmtBRL(owned.taxes))}
-          ${line('Tributos corporativos centralizados (dentro do rateio)', fmtBRL(owned.matrizTaxCost))}
-          ${line('Demais custos centralizados da matriz (rateados)', fmtBRL(Math.max(0, Number(owned.matrizCost || 0) - Number(owned.matrizTaxCost || 0))))}
-          ${line('Gestão P3 (sobre faturamento total)', fmtBRL(owned.management))}
-          ${line('App / plataforma (somente recargas e ociosidade)', fmtBRL(owned.platform))}
-          ${line('Participação de área (sobre faturamento total)', fmtBRL(owned.areaParticipation))}
+          ${costLine('Energia', owned.energyCost, 'Fatura de energia vinculada às recargas dos ativos UBY.')}
+          ${costLine('Operação direta por ativo', Math.max(0, Number(owned.extraCosts || 0) - Number(owned.matrizCost || 0)), 'Despesas próprias dos carregadores, sem tributos e sem rateio da matriz.')}
+          ${costLine('Tributos diretamente atribuíveis aos carregadores', owned.taxes, 'Impostos cadastrados na unidade e incidentes sobre sua própria operação.')}
+          ${costLine('Tributos corporativos centralizados', owned.matrizTaxCost, 'Impostos da matriz, distribuídos somente entre os destinos definidos no rateio.')}
+          ${costLine('Demais custos centralizados da matriz', Math.max(0, Number(owned.matrizCost || 0) - Number(owned.matrizTaxCost || 0)), 'Custos compartilhados — como seguro, aluguel ou sistemas — rateados entre os ativos selecionados.')}
+          ${costLine('Gestão P3', owned.management, 'Percentual aplicado sobre o faturamento total conforme o contrato de gestão.')}
+          ${costLine('App / plataforma', owned.platform, 'Custo tecnológico aplicado apenas a recargas e ociosidade; não incide sobre marketing ou royalties.')}
+          ${costLine('Participação de área', owned.areaParticipation, 'Repasse ao parceiro da área, calculado sobre o faturamento total da unidade.')}
           ${line('Resultado operacional dos ativos UBY', fmtBRL(operationalResult), 'finance-total-row')}
           <tr class="finance-group-row"><th colspan="2">Resultado final da rede</th></tr>
           ${line('Resultado operacional UBY', fmtBRL(operationalResult))}
           ${line('+ Royalties UBY', fmtBRL(royalties))}
           ${line('= Resultado consolidado antes da distribuição', fmtBRL(networkResult), 'finance-total-row')}
-        </tbody></table></div>
-        <aside style="display:grid;gap:10px;align-content:start">
-          <div class="finance-result-card ${networkResult >= 0 ? 'good' : 'bad'} is-primary"><span>${resultLabel}</span><strong>${fmtBRL(networkResult)}</strong><small>${isMonthView ? 'resultado da competência selecionada' : 'soma de todas as competências carregadas'}</small></div>
-          <div class="finance-result-card ${networkResult >= 0 ? 'good' : 'bad'}"><span>Base distribuível ${isMonthView ? 'do mês' : 'acumulada'}</span><strong>${fmtBRL(positiveResult)}</strong><small>${networkResult < 0 ? 'sem distribuição enquanto a rede estiver negativa' : 'base após receitas, custos e fechamentos'}</small></div>
-          <div class="finance-result-card good"><span>Pool dos cotistas</span><strong>${fmtBRL(investorPool)}</strong><small>${policy.investorPct}% após reservas de ${policy.legalReservePct}% + ${policy.expansionReservePct}%</small></div>
-          <div class="finance-result-card is-reference"><span>Apuração por aporte</span><strong>Mensal</strong><small>cada competência usa somente as cotas habilitadas; veja o quadro da Rodada 1 abaixo</small></div>
-          <div class="finance-result-card"><span>Reservas retidas na UBY</span><strong>${fmtBRL(ubyRetained)}</strong><small>S.A.: ${fmtBRL(legalReserve)} (${policy.legalReservePct}%) · expansão: ${fmtBRL(expansionReserve)} (${policy.expansionReservePct}%)</small></div>
-        </aside>
       </div>
       <div style="display:grid;grid-template-columns:1.5fr repeat(5,minmax(105px,.6fr)) auto;gap:9px;align-items:end;margin-top:18px;padding-top:16px;border-top:1px solid var(--p3-border)">
         <label class="sub">Rodada<input class="ctl-input" id="networkRoundLabel" value="${escapeAttr(policy.roundLabel)}"></label>
@@ -11873,12 +12052,13 @@ function renderNetworkDre(sourceRows = [], sourceMonths = [], isMonthView = true
       </div>
       <div id="networkDreFeedback" class="sub" style="margin-top:8px">Prévia gerencial: confirme documentos, impostos e aprovação do fechamento antes de pagar ou contabilizar distribuição.</div>
     </section>`;
+  if (options.includeInvestors === false) return;
   const distribution = networkInvestorDistributionModel();
   const monthHeaders = distribution.months.map(month => `<th>${escapeHtml(monthLabel(month.monthKey))}</th>`).join('');
   const monthRows = distribution.months.map(month => `<tr><td>${escapeHtml(monthLabel(month.monthKey))}</td><td>${fmtBRL(month.result)}</td><td>${fmtBRL(month.legalReserve)}</td><td>${fmtBRL(month.expansionReserve)}</td><td>${month.eligibleQuotas}</td><td>${fmtBRL(month.valuePerQuota)}</td><td><select class="ctl-input" style="min-width:110px" onchange="updateNetworkDistributionMonthStatus('${month.monthKey}',this.value)"><option value="pendente" ${month.payment.status === 'pendente' ? 'selected' : ''}>Pendente</option><option value="aprovado" ${month.payment.status === 'aprovado' ? 'selected' : ''}>Aprovado</option><option value="pago" ${month.payment.status === 'pago' ? 'selected' : ''}>Pago</option></select></td></tr>`).join('') || '<tr><td colspan="7">Ainda não há competência financeira a apurar.</td></tr>';
   const investorRows = distribution.investors.map(investor => `<tr data-network-investor-row><td><input class="ctl-input" data-investor-name value="${escapeAttr(investor.name)}"></td><td><input class="ctl-input" data-investor-quotas type="number" min="1" step="1" value="${investor.quotas}" style="width:66px"></td><td><input class="ctl-input" data-investor-start type="month" value="${escapeAttr(investor.eligibleFrom)}"></td>${investor.allocations.map(value => `<td>${fmtBRL(value)}</td>`).join('')}<td>${fmtBRL(investor.due)}</td><td>${(investor.returnRate * 100).toLocaleString('pt-BR',{maximumFractionDigits:3})}%</td><td>${investor.paybackYears ? `${investor.paybackYears.toLocaleString('pt-BR',{maximumFractionDigits:1})} anos` : 'não disponível'}</td><td><select class="ctl-input" data-investor-status><option value="pendente" ${investor.status === 'pendente' ? 'selected' : ''}>Pendente</option><option value="aprovado" ${investor.status === 'aprovado' ? 'selected' : ''}>Aprovado</option><option value="pago" ${investor.status === 'pago' ? 'selected' : ''}>Pago</option></select></td></tr>`).join('');
   target.insertAdjacentHTML('beforeend', `
-    <section class="card" style="margin-top:14px"><div class="tn-tag">◆ Rodada 1 · apuração por competência</div><h3 style="margin:4px 0 10px">Distribuição por período de aporte</h3><p class="sub">Cada mês é dividido somente entre as cotas habilitadas no primeiro dia do mês. Não há proporcionalização por dias nem divisão retroativa para quem entrou depois.</p>
+    <section class="card" id="networkInvestorCard" style="margin-top:14px"><div class="tn-tag">◆ Rodada 1 · apuração por competência</div><h3 style="margin:4px 0 10px">Distribuição por período de aporte</h3><p class="sub">Cada mês é dividido somente entre as cotas habilitadas no primeiro dia do mês. Não há proporcionalização por dias nem divisão retroativa para quem entrou depois.</p>
       <div style="overflow:auto"><table><thead><tr><th>Competência</th><th>Resultado</th><th>Reserva legal S.A.</th><th>Fundo expansão</th><th>Cotas habilitadas</th><th>Por cota</th><th>Pagamento</th></tr></thead><tbody>${monthRows}</tbody></table></div>
       <div style="overflow:auto;margin-top:14px"><table><thead><tr><th>Cotista</th><th>Cotas</th><th>Início</th>${monthHeaders}<th>Total devido</th><th>Retorno acum.</th><th>Payback indicativo</th><th>Situação</th></tr></thead><tbody>${investorRows}</tbody></table></div>
       <button class="btn-open" type="button" style="margin-top:10px" onclick="saveNetworkInvestorsFromInputs()">Salvar cotistas da Rodada 1</button>
@@ -12187,6 +12367,25 @@ function ubyKpiTrendBadge(trend) {
   return trend ? `<div class="kpi-trend ${trend.cls}">${trend.arrow} ${fmtPct(Math.abs(trend.pct))}</div>` : '';
 }
 
+function renderFinanceCostComposition(items = []) {
+  const target = document.getElementById('costCompositionSummary');
+  if (!target) return;
+  const validItems = items
+    .map(item => ({ ...item, value: Math.max(0, Number(item.value || 0)) }))
+    .filter(item => item.value > 0);
+  const total = validItems.reduce((sum, item) => sum + item.value, 0);
+  if (!total) {
+    target.innerHTML = '<div class="note">Ainda não há custos reconhecidos para compor este período.</div>';
+    return;
+  }
+  const segments = validItems.map(item => `<span class="finance-cost-segment" style="--cost-color:${item.color};flex:${item.value} 1 0" title="${escapeAttr(item.label)} · ${fmtBRL(item.value)}"></span>`).join('');
+  const list = validItems.map(item => {
+    const pct = item.value / total * 100;
+    return `<article class="finance-cost-item"><i class="finance-cost-dot" style="--cost-color:${item.color}"></i><div><b>${escapeHtml(item.label)}</b><span>${escapeHtml(item.detail)}</span><small>${fmtBRL(item.value)} · ${fmtPct(pct)}</small></div></article>`;
+  }).join('');
+  target.innerHTML = `<div class="finance-cost-track" aria-label="Composição dos custos">${segments}</div><div class="finance-cost-list">${list}</div>`;
+}
+
 function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthView = true, currentMonth = '', viewLabel = '') {
   const summary = document.getElementById('ubyFinanceSummary');
   const rowsEl = document.getElementById('ubyFinanceRows');
@@ -12240,11 +12439,13 @@ function renderUbyFinancialOverview(sourceRows = [], sourceMonths = [], isMonthV
   if (window.UBY_FINANCE_ONLY) {
     try {
       const opsCost = Math.max(total.extraCosts - total.matrizCost, 0);
-      renderCouponDonutChart('costCompositionPie',
-        ['Energia', 'Gestão / plataforma', 'Operação por carregador', 'Custos da matriz (rateados)'],
-        [total.energyCost, total.management + total.platform, opsCost, total.matrizCost],
-        ' R$');
-    } catch (e) { console.error('[fin-cost-pie]', e); }
+      renderFinanceCostComposition([
+        { label:'Energia', value:total.energyCost, color:'#57B7FF', detail:'faturas de energia vinculadas às recargas' },
+        { label:'Gestão e plataforma', value:total.management + total.platform, color:'#2D7FF9', detail:'gestão P3 e tecnologia da operação' },
+        { label:'Operação por carregador', value:opsCost, color:'#57D990', detail:'despesas próprias dos ativos, sem matriz' },
+        { label:'Custos da matriz rateados', value:total.matrizCost, color:'#B59AFF', detail:'custos compartilhados distribuídos aos destinos' }
+      ]);
+    } catch (e) { console.error('[fin-cost-composition]', e); }
   }
   rowsEl.innerHTML = rows.length ? rows.map(row => {
     const finance = row.finance;
@@ -14245,11 +14446,16 @@ async function initializeRechargePage() {
     console.log('[fin] obras na nuvem:', cloudRechargeWorks.length);
     try { await refreshGeneralRechargeBases(); } catch (e) { console.error('[fin] refresh:', e.message); }
     console.log('[fin] após refresh, registros:', Object.keys(allRechargeRecords || {}).length, '· recargas detalhadas:', countDetailedCharges());
-    try { await ensureAllOverviewSessionsLoaded(); } catch (e) { console.error('[fin] histórico:', e.message); }
-    console.log('[fin] após histórico completo, registros:', Object.keys(allRechargeRecords || {}).length, '· recargas detalhadas:', countDetailedCharges());
     try { await renderFinanceOnly(); } catch (e) { console.error('[fin] render:', e.message, e.stack); }
-    console.log(`[UBY-PERF] BOOT TOTAL (financeiro): ${(performance.now() - bootStart).toFixed(0)} ms`);
+    console.log(`[UBY-PERF] PRIMEIRO PAINT (financeiro): ${(performance.now() - bootStart).toFixed(0)} ms`);
     window.UBY_RECHARGE_RUNTIME?.markReady?.({ finance: true });
+    // O histórico completo é necessário para o acumulado, mas não pode bloquear
+    // a primeira leitura da competência nem tornar a página sem resposta.
+    ensureAllOverviewSessionsLoaded().then(async () => {
+      console.log('[fin] histórico completo em segundo plano:', countDetailedCharges());
+      await renderFinanceOnly();
+      console.log(`[UBY-PERF] HIDRATAÇÃO FINANCEIRA: ${(performance.now() - bootStart).toFixed(0)} ms`);
+    }).catch(e => console.error('[fin] histórico:', e.message));
     return;
   }
   await __perf('loadRechargeWorksFromCloud', () => loadRechargeWorksFromCloud());

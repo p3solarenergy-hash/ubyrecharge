@@ -485,6 +485,43 @@
 
     /* Financeiro operacional por carregador */
     .finance-workbench { margin-top:18px; }
+    .finance-central-command { border-color:rgba(87,183,255,.34); background:linear-gradient(135deg,rgba(12,38,66,.98),rgba(7,20,37,.98)); }
+    .finance-central-command .finance-central-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .finance-central-command .finance-central-head h2 { margin:0; color:#fff; }
+    .finance-central-command .finance-central-head p { max-width:760px; margin:6px 0 0; color:var(--p3-muted); font-size:12px; line-height:1.5; }
+    .finance-central-tag { display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(0,237,142,.35); border-radius:999px; background:rgba(0,237,142,.08); color:#66EAAF; padding:5px 9px; font-size:10px; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+    .finance-central-tag::before { content:""; width:7px; height:7px; border-radius:50%; background:#00ED8E; box-shadow:0 0 0 3px rgba(0,237,142,.12); }
+    .finance-central-summary { display:grid; grid-template-columns:repeat(5,minmax(130px,1fr)); gap:10px; margin:18px 0 14px; }
+    .finance-central-metric { min-height:96px; padding:13px; border:1px solid rgba(84,180,255,.18); border-radius:11px; background:rgba(6,20,36,.62); }
+    .finance-central-metric span { display:block; color:var(--p3-muted); font-size:9px; font-weight:820; letter-spacing:.06em; }
+    .finance-central-metric strong { display:block; margin-top:8px; color:#57B7FF; font-size:19px; line-height:1.05; }
+    .finance-central-metric small { display:block; margin-top:5px; color:var(--p3-muted); font-size:10px; }
+    .finance-central-metric.good { border-color:rgba(0,237,142,.26); } .finance-central-metric.good strong { color:#57D990; }
+    .finance-central-metric.warn { border-color:rgba(255,214,107,.28); } .finance-central-metric.warn strong { color:#FFD66B; }
+    .finance-central-metric.tax { border-color:rgba(172,137,255,.30); } .finance-central-metric.tax strong { color:#B59AFF; }
+    .finance-central-allocation { display:grid; grid-template-columns:repeat(5,minmax(130px,1fr)); gap:10px; padding:14px; border:1px solid rgba(84,180,255,.22); border-radius:11px; background:rgba(8,25,45,.62); }
+    .finance-central-allocation .sub { display:block; margin:0; font-size:9px; font-weight:820; letter-spacing:.05em; }
+    .finance-central-allocation strong { display:block; margin-top:7px; color:#57B7FF; font-size:18px; }
+    .finance-central-allocation .good { color:#57D990; } .finance-central-allocation .tax { color:#B59AFF; } .finance-central-allocation .warn { color:#FFD66B; }
+    .finance-settlement { border-color:rgba(87,183,255,.38); background:linear-gradient(145deg,rgba(13,42,73,.98),rgba(7,21,38,.98)); }
+    .finance-settlement-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+    .finance-settlement-head h2 { margin:5px 0 0; color:#fff; }
+    .finance-settlement-head p { margin:6px 0 0; max-width:760px; }
+    .finance-settlement-status { display:flex; align-items:center; gap:9px; flex-wrap:wrap; border:1px solid rgba(87,183,255,.22); border-radius:9px; padding:8px 10px; background:rgba(6,20,36,.54); color:var(--p3-muted); font-size:11px; }
+    .finance-settlement-status::before { content:""; width:8px; height:8px; border-radius:50%; background:#57B7FF; box-shadow:0 0 0 3px rgba(87,183,255,.12); }
+    .finance-settlement-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; margin:18px 0; }
+    .finance-settlement-kpi { position:relative; min-width:0; min-height:108px; padding:13px; border:1px solid rgba(84,180,255,.17); border-radius:11px; background:rgba(5,18,33,.53); overflow:hidden; }
+    .finance-settlement-kpi::after { content:""; position:absolute; inset:auto 0 0; height:3px; background:rgba(87,183,255,.72); }
+    .finance-settlement-kpi span { display:block; color:var(--p3-muted); font-size:9px; font-weight:850; letter-spacing:.065em; text-transform:uppercase; }
+    .finance-settlement-kpi strong { display:block; margin-top:11px; color:#EAF4FF; font-size:20px; line-height:1.08; overflow-wrap:anywhere; }
+    .finance-settlement-kpi small { display:block; margin-top:6px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .finance-settlement table td:first-child { min-width:360px; }
+    .finance-line-detail { display:block; margin-top:4px; color:var(--p3-muted); font-size:10px; font-weight:500; line-height:1.35; }
+    .finance-cost-value { display:inline-flex; align-items:center; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
+    .finance-cost-share { display:inline-block; padding:3px 6px; border:1px solid rgba(87,183,255,.28); border-radius:999px; background:rgba(87,183,255,.08); color:#9CCEFF; font-size:9px; font-weight:800; line-height:1.2; white-space:nowrap; }
+    .finance-settlement-kpi.result::after { background:#57D990; } .finance-settlement-kpi.result strong { color:#57D990; }
+    .finance-settlement-kpi.reserve::after { background:#B59AFF; } .finance-settlement-kpi.reserve strong { color:#C7B1FF; }
+    .finance-settlement-kpi.attention::after { background:#FFD66B; } .finance-settlement-kpi.attention strong { color:#FFD66B; }
     .finance-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
     .finance-section-head h2 { margin:0; padding:0; border:0; }
     .finance-section-head p { margin:4px 0 0; max-width:760px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
@@ -596,6 +633,10 @@
     .finance-result-card.bad strong { color:#FF7A7A; }
     .finance-result-card small { display:block; margin-top:7px; color:var(--p3-muted); font-size:11px; line-height:1.4; }
     .uby-finance-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:14px 0; }
+    .uby-finance-summary .kpi-feature { grid-column:span 1; min-height:0; padding:13px; }
+    .uby-finance-summary .kpi-feature::before { height:3px; }
+    .uby-finance-summary .kpi-feature .label { font-size:9px; line-height:1.35; }
+    .uby-finance-summary .kpi-feature .value { margin-top:7px; font-size:clamp(22px,2vw,30px); line-height:1.08; }
     .uby-finance-list { display:grid; gap:10px; }
     .uby-finance-row { display:grid; grid-template-columns:minmax(220px,1.2fr) repeat(4,minmax(105px,.55fr)) auto; gap:12px; align-items:center; border:1px solid var(--surface-border); border-radius:12px; background:var(--surface-bg); padding:13px 14px; box-shadow:var(--p3-shadow); }
     .uby-finance-row--partner { border-color:rgba(66,223,154,.42); background:linear-gradient(100deg,rgba(18,91,75,.23),var(--surface-bg) 42%); }
@@ -662,6 +703,17 @@
     .station-occupancy-row.occ-green .station-occupancy-value { color:var(--metric-success); }
     .station-occupancy-row.occ-green .station-occupancy-bar span { background:var(--metric-success); }
     .station-layout-actions { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px 18px; border-top:1px solid var(--surface-border); }
+    .backup-history-dialog { width:min(1080px,calc(100vw - 24px)); max-height:min(820px,calc(100vh - 24px)); border:1px solid rgba(84,180,255,.30); border-radius:12px; padding:0; background:#0D1B2E; color:var(--p3-text); box-shadow:0 30px 80px rgba(0,0,0,.55); }
+    .backup-history-dialog::backdrop { background:rgba(2,8,18,.76); backdrop-filter:blur(3px); }
+    .backup-history-content { padding:18px 20px; overflow:auto; max-height:calc(100vh - 190px); }
+    .backup-history-intro { margin:0 0 15px; color:var(--p3-muted); font-size:12px; line-height:1.5; }
+    .backup-history-table { width:100%; border-collapse:collapse; min-width:820px; }
+    .backup-history-table th { color:var(--p3-muted); font-size:10px; text-align:left; text-transform:uppercase; letter-spacing:.06em; padding:9px 8px; border-bottom:1px solid var(--surface-border); }
+    .backup-history-table td { padding:12px 8px; border-bottom:1px solid rgba(84,180,255,.12); vertical-align:middle; font-size:12px; }
+    .backup-history-table strong { display:block; color:var(--p3-text); font-size:12px; }
+    .backup-history-table small { display:block; margin-top:3px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .backup-delta-positive { color:#57D990; } .backup-delta-negative { color:#FF9A8B; } .backup-delta-neutral { color:var(--p3-muted); }
+    .backup-history-empty { padding:26px 8px; color:var(--p3-muted); text-align:center; }
     .plant-count { display:inline-grid; gap:2px; min-width:56px; }
     .plant-count strong { color:var(--p3-text); font-size:13px; }
     .plant-count small { color:var(--p3-muted); font-size:9px; white-space:nowrap; }
@@ -877,6 +929,8 @@
       .report-library-card .report-library-value.optional { display:none; }
       .investor-preview { grid-template-columns:repeat(3,minmax(0,1fr)); }
       .finance-basis-grid,.finance-results:not(.finance-result-stages),.uby-finance-summary,.finance-month-status-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .finance-central-summary,.finance-central-allocation { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .finance-settlement-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
       .finance-result-stage-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .finance-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .uby-finance-row { grid-template-columns:minmax(190px,1fr) repeat(2,minmax(105px,.55fr)) auto; }
@@ -1039,6 +1093,8 @@
       .station-occupancy-row,.station-schedule-row { grid-template-columns:1fr auto; gap:8px; }
       .station-occupancy-meta { grid-column:1/-1; }
       .finance-result-card { min-height:112px; padding:12px; }
+      .finance-central-summary,.finance-central-allocation { grid-template-columns:1fr 1fr; gap:8px; }
+      .finance-settlement-kpis { grid-template-columns:1fr 1fr; gap:8px; }
       .finance-result-card strong { font-size:20px; }
       .uby-finance-row { grid-template-columns:1fr 1fr; gap:9px; padding:12px; }
     }
@@ -1165,6 +1221,7 @@
         <button type="button" class="btn-danger" id="undoLastImportBtn" style="display:none">Desfazer última planilha</button>
         <button type="button" class="btn-danger" id="clearSelectedMonthBtn" style="display:none">Excluir mês selecionado</button>
         <button type="button" class="btn-danger" id="clearRechargeBaseBtn" style="display:none">Excluir base salva desta obra</button>
+        <button type="button" class="btn-recalc" id="openBackupHistoryBtn">Histórico de backups</button>
       </div>
     </div>
   </div>
@@ -1599,7 +1656,7 @@
       <div class="finance-section-head">
         <div>
           <h2>Resultado financeiro por carregador UBY</h2>
-          <p>Custos, receitas e resultado operacional por carregador. Os custos compartilhados da matriz sao rateados aos destinos e entram no custo final por kWh.</p>
+          <p>Leitura operacional por carregador: receitas, energia, plataforma e custos diretos. Custos corporativos aparecem separadamente como atribuição da matriz, sem substituir a eficiência do ponto.</p>
         </div>
         <span class="accountability-pill" id="ubyFinancePeriodLabel">Periodo atual</span>
       </div>
@@ -1611,14 +1668,16 @@
     <section class="section"><div id="ubyDistribution"></div></section>
 
     <section class="section">
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
-          <h2 style="margin:0">Custos da matriz UBY</h2>
+      <div class="card finance-central-command">
+        <div class="finance-central-head">
+          <div>
+          <h2 style="margin:0">Central financeira · matriz e compromissos</h2>
+          <p>Cadastre cada compromisso uma única vez, escolha seus destinos e acompanhe o impacto em cada carregador — sem misturar a operação do ponto com a governança corporativa.</p>
+          </div>
+          <span class="finance-central-tag">Centralizada e auditável</span>
           <span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span>
         </div>
-        <p style="color:var(--p3-muted);font-size:13px;margin:6px 0 16px;max-width:78ch">
-          Cadastre despesas compartilhadas uma vez, defina as parcelas, os carregadores atendidos e a regra de rateio. Os destinos e a vigencia ficam guardados por competencia: adicionar um carregador novo nao reescreve os meses anteriores.
-        </p>
+        <div id="matrizCentralSummary" class="finance-central-summary" aria-live="polite"></div>
         <div style="overflow-x:auto">
           <table>
             <thead><tr><th>Despesa</th><th>Competencia</th><th>Rateio e destinos</th><th style="text-align:right">Valor desta competencia</th><th style="text-align:right">Acao</th></tr></thead>
@@ -1628,7 +1687,7 @@
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:16px">
           <label class="sub">NOME DO CUSTO<input id="matrizNewName" type="text" placeholder="Ex.: Seguro carregadores" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
-          <label class="sub">CATEGORIA<select id="matrizCostCategory" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Seguro</option><option>Locacao / aluguel</option><option>Internet / dados</option><option>Manutencao preventiva</option><option>Manutencao corretiva</option><option>Licenca / plataforma</option><option>Marketing</option><option>Administrativo</option><option>Outros custos</option></select></label>
+          <label class="sub">CATEGORIA<select id="matrizCostCategory" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Seguro</option><option>Locacao / aluguel</option><option>Internet / dados</option><option>Manutencao preventiva</option><option>Manutencao corretiva</option><option>Licenca / plataforma</option><option>Tributos corporativos / centralizados</option><option>Marketing</option><option>Administrativo</option><option>Outros custos</option></select></label>
           <label class="sub">FORNECEDOR OU DOCUMENTO<input id="matrizCostSupplier" type="text" placeholder="Ex.: Seguradora / boleto" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
           <label class="sub">TIPO DE COBRANCA<select id="matrizCostKind" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="recurring">Recorrente mensal</option><option value="installment">Parcelado</option><option value="one_off">Pontual</option></select></label>
           <label class="sub">VALOR DE CADA PARCELA (R$)<input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Ex.: 526,24" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
@@ -1647,7 +1706,7 @@
           <button class="btn-open" type="button" onclick="resetMatrizCostForm();renderMatrizCosts(getGeneralUnitData())">Limpar</button>
           <span id="matrizFeedback" class="sub"></span>
         </div>
-        <div id="matrizRateio" style="margin-top:18px"></div>
+        <div id="matrizRateio" style="margin-top:14px"></div>
       </div>
     </section>
 
@@ -2132,7 +2191,7 @@
             <tr data-finance-setting-key="operationModel" data-finance-setting-format="model"><td class="setting-group">Operacao</td><td class="setting-name">Modelo de faturamento</td><td class="setting-rule">Define a titularidade do ativo e quem recebe o resultado. O parceiro com gestao P3 e royalty UBY fica fora dos custos e da distribuicao da matriz.</td><td class="setting-value"><select class="ctl-select" id="financeOperationModel" onchange="handleFinanceSettingChange()"><option value="uby">Ativo UBY - operacao e investidores UBY</option><option value="p3_society">Ativo P3 em parceria - lucro liquido dividido</option><option value="hybrid">Ativo UBY hibrido AC/DC</option><option value="management_only">Gestao P3 - ativo do parceiro, sem UBY</option><option value="third_party_management">Parceiro - gestao P3 + royalty UBY (fora da matriz)</option></select></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
             <tr data-finance-setting-key="managementPct" data-finance-setting-format="pct"><td class="setting-group">Gestao</td><td class="setting-name">Gestao P3</td><td class="setting-rule">Percentual sobre o faturamento total: recargas, ociosidade e demais receitas reconhecidas.</td><td class="setting-value"><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
             <tr class="finance-model-row" data-models="third_party_management" data-finance-setting-key="ubyRoyaltyPct" data-finance-setting-format="pct"><td class="setting-group">Marca</td><td class="setting-name">Royalty de marca UBY</td><td class="setting-rule">Percentual sobre o faturamento, separado da gestao P3 e da plataforma</td><td class="setting-value"><input class="ctl-input" id="financeUbyRoyaltyPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
-            <tr data-finance-setting-key="taxRatePct" data-finance-setting-format="pct"><td class="setting-group">Tributacao</td><td class="setting-name">Impostos sobre faturamento</td><td class="setting-rule">Percentual aplicado ao faturamento das recargas. Use 0 enquanto nao houver aliquota definida.</td><td class="setting-value"><input class="ctl-input" id="financeTaxRatePct" type="number" min="0" max="100" step="0.01" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="legacy_tax" data-finance-setting-key="taxRatePct" data-finance-setting-format="pct"><td class="setting-group">Tributacao</td><td class="setting-name">Tributo por carregador — histórico</td><td class="setting-rule">Configuração preservada apenas para competências já cadastradas. Novos tributos devem ser lançados na Central Financeira, com destinos e rateio definidos.</td><td class="setting-value"><input class="ctl-input" id="financeTaxRatePct" type="number" min="0" max="100" step="0.01" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>Centralizado</span></td></tr>
             <tr class="finance-model-row" data-models="p3_society" data-finance-setting-key="p3SocietyPct" data-finance-setting-format="pct"><td class="setting-group">Sociedade</td><td class="setting-name">Participacao P3 na parceria</td><td class="setting-rule">Percentual do investimento e do lucro liquido. Use 100% se o ativo P3 nao tiver socio.</td><td class="setting-value"><input class="ctl-input" id="financeP3SocietyPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
             <tr class="finance-model-row" data-models="hybrid" data-finance-setting-key="p3AcEquityPct" data-finance-setting-format="pct"><td class="setting-group">Sociedade</td><td class="setting-name">Sociedade P3 em AC</td><td class="setting-rule">Percentual aplicado a operacao AC</td><td class="setting-value"><input class="ctl-input" id="financeP3AcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
             <tr class="finance-model-row" data-models="hybrid" data-finance-setting-key="p3DcEquityPct" data-finance-setting-format="pct"><td class="setting-group">Sociedade</td><td class="setting-name">Sociedade P3 em DC</td><td class="setting-rule">Percentual aplicado a operacao DC</td><td class="setting-value"><input class="ctl-input" id="financeP3DcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
@@ -2140,7 +2199,7 @@
             <tr data-finance-setting-key="energyCostPerKWh" data-finance-setting-format="brl_kwh"><td class="setting-group">Energia</td><td class="setting-name">Composição mensal de energia</td><td class="setting-rule">Selecione o modelo e informe os dados da fatura deste mês. Copel e arrendamento formam um único custo de energia no resultado mensal.</td><td class="setting-value"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;min-width:560px"><label class="sub">MODELO DE COBRANÇA<select class="ctl-input" id="financeEnergyMode" onchange="handleFinanceEnergySettingChange()"><option value="copel">Somente Copel</option><option value="copel_lease">Copel + arrendamento</option></select></label><label class="sub">VALOR DA FATURA COPEL (R$)<input class="ctl-input" id="financeCopelAmount" type="number" min="0" step="0.01" placeholder="Ex.: 1250,50" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub">KWH DA FATURA COPEL<input class="ctl-input" id="financeCopelKWh" type="number" min="0" step="0.01" placeholder="Ex.: 1300" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub">VENCIMENTO COPEL (DIA)<input class="ctl-input" id="financeCopelDueDay" type="number" min="1" max="31" step="1" placeholder="Ex.: 25" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub" data-energy-lease-field>CRÉDITOS ABATIDOS (KWH)<input class="ctl-input" id="financeLeaseCreditedKWh" type="number" min="0" step="0.01" placeholder="Ex.: 10000" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub" data-energy-lease-field>PREÇO DO ARRENDAMENTO (R$/KWH)<input class="ctl-input" id="financeLeaseRate" type="number" min="0" step="0.0001" placeholder="Ex.: 0,08" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub" data-energy-lease-field>VENCIMENTO ARRENDAMENTO (DIA)<input class="ctl-input" id="financeLeaseDueDay" type="number" min="1" max="31" step="1" value="10" placeholder="Ex.: 10" oninput="handleFinanceEnergyDraftChange()"></label></div><input id="financeEnergyCost" type="hidden" value="0"><small id="financeEnergyCompositionSummary" class="sub"></small></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
             <tr data-finance-setting-key="investmentValue" data-finance-setting-format="brl"><td class="setting-group">Capital</td><td class="setting-name">Investimento no ponto</td><td class="setting-rule">Base para ROI e payback</td><td class="setting-value"><input class="ctl-input" id="financeInvestmentValue" type="number" min="0" step="100" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
             <tr class="finance-model-row" data-models="uby hybrid" data-finance-setting-key="investorQuotaPct" data-finance-setting-format="pct"><td class="setting-group">Investidores</td><td class="setting-name">Cotas dos investidores</td><td class="setting-rule">Percentual distribuivel aos cotistas</td><td class="setting-value"><input class="ctl-input" id="financeInvestorQuotaPct" type="number" min="0" max="100" step="0.1" value="100" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
-            <tr class="finance-model-row" data-models="uby hybrid" data-finance-setting-key="saRetentionPct" data-finance-setting-format="pct"><td class="setting-group">Retencao</td><td class="setting-name">Retencao obrigatoria S.A.</td><td class="setting-rule">Percentual retido sobre o lucro liquido</td><td class="setting-value"><input class="ctl-input" id="financeSaRetentionPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="legacy_reserve" data-finance-setting-key="saRetentionPct" data-finance-setting-format="pct"><td class="setting-group">Retencao</td><td class="setting-name">Retenção S.A. por carregador — histórico</td><td class="setting-rule">Configuração preservada para leitura de competências já salvas. Reserva legal e expansão passam a ser tratadas no fechamento consolidado da UBY.</td><td class="setting-value"><input class="ctl-input" id="financeSaRetentionPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>Centralizado</span></td></tr>
             <tr data-finance-setting-key="targetOccPct" data-finance-setting-format="pct"><td class="setting-group">Meta</td><td class="setting-name">Objetivo de ocupacao</td><td class="setting-rule">Meta mensal de utilizacao</td><td class="setting-value"><input class="ctl-input" id="financeTargetOccPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
             <tr data-finance-setting-key="targetRevenuePerKWh" data-finance-setting-format="brl_kwh"><td class="setting-group">Meta</td><td class="setting-name">Preco objetivo</td><td class="setting-rule">Zero usa o preco medio real</td><td class="setting-value"><input class="ctl-input" id="financeTargetRevenuePerKWh" type="number" min="0" step="0.01" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
             <tr data-finance-setting-key="ownerEnergyRate" data-finance-setting-format="brl_kwh"><td class="setting-group">Parceiro</td><td class="setting-name">Energia para reembolso</td><td class="setting-rule">Inicia igual ao custo da energia; pode ser ajustado</td><td class="setting-value"><input class="ctl-input" id="ownerEnergyRate" type="number" min="0" step="0.01" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
@@ -2326,6 +2385,21 @@
     <div class="station-layout-actions">
       <button class="btn-danger" type="button" onclick="document.getElementById('stationLayoutDialog').close()">Cancelar</button>
       <button class="btn-recalc" type="button" onclick="saveStationLayoutConfiguration()">Salvar configuracao</button>
+    </div>
+  </dialog>
+
+  <dialog class="backup-history-dialog" id="backupHistoryDialog">
+    <div class="station-layout-head">
+      <h2>Histórico de backups por obra</h2>
+      <p id="backupHistoryTitle">Snapshots da base de recargas.</p>
+    </div>
+    <div class="backup-history-content">
+      <p class="backup-history-intro">Cada linha compara o snapshot com a base ativa. Ao restaurar, a base ativa é arquivada antes da troca, preservando um caminho de retorno.</p>
+      <div id="backupHistoryContent" aria-live="polite"></div>
+    </div>
+    <div class="station-layout-actions">
+      <button class="btn-danger" type="button" onclick="document.getElementById('backupHistoryDialog').close()">Fechar</button>
+      <button class="btn-recalc" type="button" onclick="openRechargeBackupHistory()">Atualizar</button>
     </div>
   </dialog>
 

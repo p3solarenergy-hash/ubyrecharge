@@ -84,6 +84,41 @@
     }).reduce(function (sum, rule) { return sum + positive(rule.value); }, 0);
   }
 
+  // Central costs are stored once. This helper only derives the auditable
+  // allocation for their selected destinations and protects the total from
+  // floating-point rounding drift.
+  function allocateCentralCost(input) {
+    const data = input || {};
+    const amountInCents = Math.round(positive(data.amount) * 100);
+    const targets = (Array.isArray(data.targets) ? data.targets : [])
+      .filter(function (target) { return target && String(target.id || '').trim(); })
+      .map(function (target) { return Object.assign({}, target, { id: String(target.id).trim() }); });
+    if (!targets.length || amountInCents <= 0) return [];
+    const custom = data.allocation === 'custom';
+    const rawWeights = targets.map(function (target) { return custom ? positive(target.weight) : 1; });
+    const totalWeight = rawWeights.reduce(function (sum, weight) { return sum + weight; }, 0);
+    const weights = totalWeight > 0 ? rawWeights : targets.map(function () { return 1; });
+    const denominator = weights.reduce(function (sum, weight) { return sum + weight; }, 0);
+    const rawCents = weights.map(function (weight) { return amountInCents * weight / denominator; });
+    const floorCents = rawCents.map(function (value) { return Math.floor(value); });
+    let remainder = amountInCents - floorCents.reduce(function (sum, value) { return sum + value; }, 0);
+    const rankedRemainders = rawCents.map(function (value, index) {
+      return { index: index, fraction: value - floorCents[index] };
+    }).sort(function (left, right) { return right.fraction - left.fraction || left.index - right.index; });
+    const remainderIndexes = new Set(rankedRemainders.slice(0, remainder).map(function (entry) { return entry.index; }));
+    return targets.map(function (target, index) {
+      // Distribute residual cents by the largest fractional remainder. This
+      // yields a deterministic allocation that always totals the source cost.
+      const receivesRemainder = remainderIndexes.has(index);
+      const cents = floorCents[index] + (receivesRemainder ? 1 : 0);
+      return {
+        id: target.id,
+        amount: cents / 100,
+        pct: Number((weights[index] / denominator * 100).toFixed(6))
+      };
+    });
+  }
+
   function monthKeys(store) {
     return Object.keys(store || {}).filter(function (key) {
       return /^\d{4}-\d{2}$/.test(key);
@@ -153,6 +188,7 @@
   }
 
   global.UBY_FINANCE_ENGINE = Object.freeze({
+    allocateCentralCost: allocateCentralCost,
     calculateEnergyComposition: calculateEnergyComposition,
     evaluateRules: evaluateRules,
     fixedTotal: fixedTotal,
