@@ -3270,7 +3270,14 @@ function updateEnergyCompositionSummary() {
   if (!summary) return;
   const data = window.UBY_FINANCE_ENGINE.calculateEnergyComposition({ mode: document.getElementById('financeEnergyMode')?.value, copelAmount: numberInputValue('financeCopelAmount'), copelKWh: numberInputValue('financeCopelKWh'), creditedKWh: numberInputValue('financeLeaseCreditedKWh'), leaseRatePerKWh: numberInputValue('financeLeaseRate') });
   document.querySelectorAll('[data-energy-lease-field]').forEach(field => { field.hidden = data.mode !== 'copel_lease'; });
-  summary.textContent = `Copel: ${fmtBRL(data.copelCost)} | Arrendamento: ${fmtBRL(data.leaseCost)} | Total de energia no mês: ${fmtBRL(data.totalCost)} | Custo calculado: ${fmtBRL(data.costPerKWh)}/kWh`;
+  const paymentMonth = matrizAddMonths(financeMonthKey(), 1);
+  const paymentParts = [];
+  if (data.copelCost > 0 && numberInputValue('financeCopelDueDay') > 0) paymentParts.push(`Copel: dia ${numberInputValue('financeCopelDueDay')}`);
+  if (data.leaseCost > 0 && numberInputValue('financeLeaseDueDay', 10) > 0) paymentParts.push(`arrendamento: dia ${numberInputValue('financeLeaseDueDay', 10)}`);
+  const paymentPlan = paymentParts.length && paymentMonth
+    ? `Pagamento programado em ${monthLabel(paymentMonth)} — ${paymentParts.join(' | ')}`
+    : 'Informe os valores e vencimentos para criar os pagamentos do mês seguinte.';
+  summary.innerHTML = `Copel: ${fmtBRL(data.copelCost)} | Arrendamento: ${fmtBRL(data.leaseCost)} | Total de energia no mês: ${fmtBRL(data.totalCost)} | <strong>Custo calculado do mês: ${fmtBRL(data.costPerKWh)}/kWh</strong><br><span>${paymentPlan}</span>`;
 }
 
 function formatFinanceSettingValue(value, format = '') {
@@ -3329,7 +3336,17 @@ function renderFinanceMonthVersionState(settings = currentFinanceSettingsFromInp
     const state = financeVersionStateInfo(financeSettingValuesEqual(currentValue, previousValue), hasPrevious, resolution.exact);
     if (hasPrevious && !financeSettingValuesEqual(currentValue, previousValue)) changed += 1;
     const previousEl = row.querySelector('[data-finance-setting-previous]');
-    if (previousEl) previousEl.textContent = hasPrevious ? formatFinanceSettingValue(previousValue, format) : 'Sem base anterior';
+    if (previousEl && key === 'energyCostPerKWh') {
+      const composition = window.UBY_FINANCE_ENGINE.calculateEnergyComposition({
+        mode: settings?.energyBillingMode,
+        copelAmount: settings?.energyCopelAmount,
+        copelKWh: settings?.energyCopelKWh,
+        creditedKWh: settings?.energyLeaseCreditedKWh,
+        leaseRatePerKWh: settings?.energyLeaseRatePerKWh
+      });
+      const previousLabel = hasPrevious ? formatFinanceSettingValue(previousValue, format) : 'Sem base anterior';
+      previousEl.innerHTML = `<strong>${fmtBRL(composition.costPerKWh)}/kWh</strong><small style="display:block;margin-top:4px">custo calculado | anterior: ${previousLabel}</small>`;
+    } else if (previousEl) previousEl.textContent = hasPrevious ? formatFinanceSettingValue(previousValue, format) : 'Sem base anterior';
     const stateEl = row.querySelector('[data-finance-setting-state]');
     if (stateEl) {
       stateEl.textContent = state.label;
@@ -4838,6 +4855,9 @@ function financeSaveSnapshot(monthKey = financeMonthKey()) {
     workId: targetWorkId,
     monthKey,
     workName: currentWorkName,
+    stationName: currentStationReportName,
+    stationKey: financeChargerStorageKey(),
+    settings: JSON.parse(JSON.stringify(financeEditorCurrentSettings || {})),
     record: JSON.parse(JSON.stringify(record))
   };
 }
@@ -4860,6 +4880,7 @@ async function commitPendingFinancialSettingsSave() {
   if (!snapshot) return financeSaveInFlight;
   try {
     await queueFinancialSettingsSave(snapshot);
+    await syncEnergyPaymentsFromFinanceSnapshot(snapshot);
     if (String(currentWorkId) === String(snapshot.workId)) {
       setStorageState(`Financeiro de ${monthLabel(snapshot.monthKey)} salvo automaticamente para <strong>${snapshot.workName}</strong>.`);
       renderFinanceMonthVersionState(financeEditorCurrentSettings);
@@ -5865,6 +5886,78 @@ function matrizAddMonths(mk, amount = 0) {
   const index = Number(mk.slice(0, 4)) * 12 + Number(mk.slice(5, 7)) - 1 + Number(amount || 0);
   return `${Math.floor(index / 12)}-${String(index % 12 + 1).padStart(2, '0')}`;
 }
+function energyPaymentId(workId, stationKey, competenceMonth, type) {
+  return `energy-${String(workId)}-${String(stationKey)}-${String(competenceMonth)}-${String(type)}`;
+}
+async function syncEnergyPaymentsFromFinanceSnapshot(snapshot = {}) {
+  const competenceMonth = String(snapshot.monthKey || '');
+  const stationKey = String(snapshot.stationKey || '');
+  const workId = String(snapshot.workId || '');
+  const settings = snapshot.settings || {};
+  if (!/^\d{4}-\d{2}$/.test(competenceMonth) || !workId || !stationKey) return;
+  const paymentMonth = matrizAddMonths(competenceMonth, 1);
+  const target = {
+    scope: `${workId}::${stationKey}`,
+    workId,
+    station: safeText(snapshot.stationName || snapshot.workName || ''),
+    stationKey,
+    workName: safeText(snapshot.workName || ''),
+    startMonth: paymentMonth,
+    share: 100
+  };
+  const paymentSpecs = [
+    { type: 'copel', name: 'Energia Copel', supplier: 'Copel', amount: Math.max(0, Number(settings.energyCopelAmount || 0)), dueDay: Number(settings.energyCopelDueDay || 0) },
+    { type: 'lease', name: 'Arrendamento de energia', supplier: 'Arrendamento', amount: settings.energyBillingMode === 'copel_lease' ? Math.max(0, Number(settings.energyLeaseCreditedKWh || 0)) * Math.max(0, Number(settings.energyLeaseRatePerKWh || 0)) : 0, dueDay: Number(settings.energyLeaseDueDay || 10) }
+  ];
+  const current = await ensureMatrizCostsLoaded();
+  const next = [...current];
+  let changed = false;
+  paymentSpecs.forEach(spec => {
+    const index = next.findIndex(item => item.derivedEnergyPayment === true
+      && item.sourceCompetenceMonth === competenceMonth
+      && item.energyPaymentType === spec.type
+      && String(item.targets?.[0]?.workId || '') === workId
+      && String(item.targets?.[0]?.stationKey || '') === stationKey);
+    const existing = index >= 0 ? next[index] : null;
+    const wasPaid = existing?.paymentLedger?.[paymentMonth]?.status === 'paid';
+    if (wasPaid) return;
+    const valid = spec.amount > 0 && spec.dueDay >= 1 && spec.dueDay <= 31;
+    if (!valid) {
+      if (existing?.enabled) {
+        next[index] = { ...existing, enabled: false, updatedAt: new Date().toISOString() };
+        changed = true;
+      }
+      return;
+    }
+    const updated = matrizNormalizeCost({
+      ...(existing || {}),
+      id: existing?.id || energyPaymentId(workId, stationKey, competenceMonth, spec.type),
+      name: `${spec.name} — ${target.station || target.workName}`,
+      category: 'Energia',
+      supplier: spec.supplier,
+      amount: spec.amount,
+      dueDay: spec.dueDay,
+      scheduledPayment: true,
+      derivedEnergyPayment: true,
+      sourceCompetenceMonth: competenceMonth,
+      energyPaymentType: spec.type,
+      costKind: 'one_off',
+      installments: 1,
+      coverageMonths: 1,
+      startMonth: paymentMonth,
+      endMonth: paymentMonth,
+      allocation: 'equal',
+      targets: [target],
+      enabled: true,
+      notes: `Gerado automaticamente pela competência ${monthLabel(competenceMonth)}. Não entra novamente no DRE.`
+    });
+    if (index >= 0) next[index] = updated; else next.push(updated);
+    changed = true;
+  });
+  if (!changed) return;
+  saveMatrizCosts(next);
+  if (document.getElementById('scheduledPaymentsWorkspace')) renderScheduledPayments(getGeneralUnitData());
+}
 function matrizMethodLabel(method) { return ({ equal: 'Rateio igual', power: 'Por potencia', energy: 'Por kWh', revenue: 'Por faturamento', custom: 'Participacao definida' })[method] || 'Rateio igual'; }
 function matrizKindLabel(kind) { return ({ recurring: 'Recorrente', installment: 'Parcelado', one_off: 'Pontual' })[kind] || 'Recorrente'; }
 function matrizNormalizeCost(raw = {}) {
@@ -5887,6 +5980,9 @@ function matrizNormalizeCost(raw = {}) {
     // Compromissos de caixa por carregador ficam no mesmo cofre sincronizado
     // da matriz, mas não entram no DRE sem lançamento financeiro explícito.
     scheduledPayment: raw.scheduledPayment === true,
+    derivedEnergyPayment: raw.derivedEnergyPayment === true,
+    sourceCompetenceMonth: /^\d{4}-\d{2}$/.test(String(raw.sourceCompetenceMonth || '')) ? String(raw.sourceCompetenceMonth) : '',
+    energyPaymentType: ['copel', 'lease'].includes(String(raw.energyPaymentType || '')) ? String(raw.energyPaymentType) : '',
     paymentLedger: raw.paymentLedger && typeof raw.paymentLedger === 'object' && !Array.isArray(raw.paymentLedger)
       ? Object.entries(raw.paymentLedger).reduce((ledger, [monthKeyValue, entry]) => {
         if (!/^\d{4}-\d{2}$/.test(monthKeyValue)) return ledger;
