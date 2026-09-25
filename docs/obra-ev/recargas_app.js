@@ -2908,6 +2908,13 @@ function defaultFinanceSettings() {
     ubyRoyaltyPct: 0,
     taxRatePct: 0,
     energyCostPerKWh: 0,
+    energyBillingMode: 'copel',
+    energyCopelAmount: 0,
+    energyCopelKWh: 0,
+    energyLeaseCreditedKWh: 0,
+    energyLeaseRatePerKWh: 0,
+    energyCopelDueDay: 0,
+    energyLeaseDueDay: 10,
     investmentValue: 0,
     investorQuotaPct: 100,
     saRetentionPct: 0,
@@ -3009,7 +3016,14 @@ function financeLegacyValuesFromRules(rules = [], kind = 'cost') {
 }
 
 function currentFinanceSettingsFromInputs() {
-  const energyCostPerKWh = numberInputValue('financeEnergyCost', 0);
+  const energyComposition = window.UBY_FINANCE_ENGINE.calculateEnergyComposition({
+    mode: document.getElementById('financeEnergyMode')?.value || 'copel',
+    copelAmount: numberInputValue('financeCopelAmount', 0),
+    copelKWh: numberInputValue('financeCopelKWh', 0),
+    creditedKWh: numberInputValue('financeLeaseCreditedKWh', 0),
+    leaseRatePerKWh: numberInputValue('financeLeaseRate', 0)
+  });
+  const energyCostPerKWh = energyComposition.costPerKWh || numberInputValue('financeEnergyCost', 0);
   const savedScopeSettings = financeSettingsForMonth(financeMonthKey());
   const savedOwnerEnergyRate = Number(savedScopeSettings.ownerEnergyRate || 0);
   const costRules = financeRulesFromInputs('cost');
@@ -3024,6 +3038,13 @@ function currentFinanceSettingsFromInputs() {
     ubyRoyaltyPct: numberInputValue('financeUbyRoyaltyPct', 0),
     taxRatePct: numberInputValue('financeTaxRatePct', 0),
     energyCostPerKWh,
+    energyBillingMode: energyComposition.mode,
+    energyCopelAmount: energyComposition.copelCost,
+    energyCopelKWh: energyComposition.copelKWh,
+    energyLeaseCreditedKWh: energyComposition.creditedKWh,
+    energyLeaseRatePerKWh: energyComposition.leaseRatePerKWh,
+    energyCopelDueDay: numberInputValue('financeCopelDueDay', 0),
+    energyLeaseDueDay: numberInputValue('financeLeaseDueDay', 10),
     investmentValue: numberInputValue('financeInvestmentValue', 0),
     investorQuotaPct: numberInputValue('financeInvestorQuotaPct', 100),
     saRetentionPct: numberInputValue('financeSaRetentionPct', 0),
@@ -3209,10 +3230,22 @@ function handleFinanceSettingChange() {
 }
 
 function handleFinanceEnergySettingChange() {
+  const composition = window.UBY_FINANCE_ENGINE.calculateEnergyComposition({ mode: document.getElementById('financeEnergyMode')?.value, copelAmount: numberInputValue('financeCopelAmount'), copelKWh: numberInputValue('financeCopelKWh'), creditedKWh: numberInputValue('financeLeaseCreditedKWh'), leaseRatePerKWh: numberInputValue('financeLeaseRate') });
+  const costInput = document.getElementById('financeEnergyCost');
+  if (costInput && composition.costPerKWh > 0) costInput.value = composition.costPerKWh;
   const priorEnergy = Number(financeEditorCurrentSettings?.energyCostPerKWh || 0);
   const ownerRate = numberInputValue('ownerEnergyRate', 0);
   syncOwnerEnergyRateFromCost(!ownerRate || Math.abs(ownerRate - priorEnergy) < 0.000001);
+  updateEnergyCompositionSummary();
   handleFinanceSettingChange();
+}
+
+function updateEnergyCompositionSummary() {
+  const summary = document.getElementById('financeEnergyCompositionSummary');
+  if (!summary) return;
+  const data = window.UBY_FINANCE_ENGINE.calculateEnergyComposition({ mode: document.getElementById('financeEnergyMode')?.value, copelAmount: numberInputValue('financeCopelAmount'), copelKWh: numberInputValue('financeCopelKWh'), creditedKWh: numberInputValue('financeLeaseCreditedKWh'), leaseRatePerKWh: numberInputValue('financeLeaseRate') });
+  ['financeLeaseCreditedKWh','financeLeaseRate','financeLeaseDueDay'].forEach(id => { const input = document.getElementById(id); if (input) input.style.display = data.mode === 'copel_lease' ? '' : 'none'; });
+  summary.textContent = `Copel: ${fmtBRL(data.copelCost)} | Arrendamento: ${fmtBRL(data.leaseCost)} | Energia total: ${fmtBRL(data.totalCost)} | ${fmtBRL(data.costPerKWh)}/kWh`;
 }
 
 function formatFinanceSettingValue(value, format = '') {
@@ -3359,6 +3392,13 @@ function applyFinanceSettingsToInputs(settings = {}) {
     financeUbyRoyaltyPct: merged.ubyRoyaltyPct,
     financeTaxRatePct: merged.taxRatePct,
     financeEnergyCost: merged.energyCostPerKWh,
+    financeEnergyMode: merged.energyBillingMode,
+    financeCopelAmount: merged.energyCopelAmount,
+    financeCopelKWh: merged.energyCopelKWh,
+    financeLeaseCreditedKWh: merged.energyLeaseCreditedKWh,
+    financeLeaseRate: merged.energyLeaseRatePerKWh,
+    financeCopelDueDay: merged.energyCopelDueDay,
+    financeLeaseDueDay: merged.energyLeaseDueDay,
     financeInvestmentValue: merged.investmentValue,
     financeInvestorQuotaPct: merged.investorQuotaPct,
     financeSaRetentionPct: merged.saRetentionPct,
@@ -3381,6 +3421,7 @@ function applyFinanceSettingsToInputs(settings = {}) {
   });
   renderFinanceRuleInputs('financeCostRuleRows', merged.costRules, 'cost');
   renderFinanceRuleInputs('financeRevenueRuleRows', merged.revenueRules, 'revenue');
+  updateEnergyCompositionSummary();
 }
 
 function syncOwnerEnergyRateFromCost(force = false) {
@@ -5128,7 +5169,13 @@ function financeForCharges(charges, settings = {}, options = {}) {
   const platform = chargingRevenue * cfg.platformPct / 100;
   const ubyRoyalty = model === 'third_party_management' ? revenue * cfg.ubyRoyaltyPct / 100 : 0;
   const taxes = revenue * cfg.taxRatePct / 100;
-  const energyCost = commercialEnergy * cfg.energyCostPerKWh;
+  const energyComposition = window.UBY_FINANCE_ENGINE.calculateEnergyComposition({
+    mode: cfg.energyBillingMode, copelAmount: cfg.energyCopelAmount, copelKWh: cfg.energyCopelKWh,
+    creditedKWh: cfg.energyLeaseCreditedKWh, leaseRatePerKWh: cfg.energyLeaseRatePerKWh
+  });
+  // Quando há fatura mensal, o DRE usa o desembolso real da competência. A
+  // tarifa calculada permanece disponível para leitura, comparação e projeção.
+  const energyCost = energyComposition.totalCost > 0 ? energyComposition.totalCost : commercialEnergy * cfg.energyCostPerKWh;
   const mk = options.monthKey || chargeMonthKey(charges[0] || {}) || financeMonthKey();
   const planning = financePlanningContext(charges, mk === 'unknown' ? financeMonthKey() : mk, cfg, options.historyCharges || charges, options.power);
   const costEvaluation = evaluateFinanceRules(cfg.costRules, planning);

@@ -10,6 +10,27 @@
     return Math.max(number(value), 0);
   }
 
+  function calculateEnergyComposition(input) {
+    const data = input || {};
+    const mode = data.mode === 'copel_lease' ? 'copel_lease' : 'copel';
+    const copelCost = positive(data.copelAmount);
+    const creditedKWh = mode === 'copel_lease' ? positive(data.creditedKWh) : 0;
+    const leaseRatePerKWh = mode === 'copel_lease' ? positive(data.leaseRatePerKWh) : 0;
+    const leaseCost = creditedKWh * leaseRatePerKWh;
+    const totalCost = copelCost + leaseCost;
+    const baseKWh = positive(data.rateBaseKWh || data.copelKWh);
+    return {
+      mode: mode,
+      copelCost: copelCost,
+      copelKWh: positive(data.copelKWh),
+      creditedKWh: creditedKWh,
+      leaseRatePerKWh: leaseRatePerKWh,
+      leaseCost: leaseCost,
+      totalCost: totalCost,
+      costPerKWh: baseKWh > 0 ? totalCost / baseKWh : 0
+    };
+  }
+
   function ruleAmount(rule, context, planned) {
     if (!rule || rule.enabled === false) return 0;
     const value = positive(rule.value);
@@ -132,6 +153,7 @@
   }
 
   global.UBY_FINANCE_ENGINE = Object.freeze({
+    calculateEnergyComposition: calculateEnergyComposition,
     evaluateRules: evaluateRules,
     fixedTotal: fixedTotal,
     latestMonthBefore: latestMonthBefore,

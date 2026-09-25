@@ -4,6 +4,15 @@ require('../docs/obra-ev/finance_engine.js');
 
 const engine = globalThis.UBY_FINANCE_ENGINE;
 
+const copelWithLease = engine.calculateEnergyComposition({
+  mode: 'copel_lease', copelAmount: 1200, copelKWh: 1000,
+  creditedKWh: 10000, leaseRatePerKWh: 0.08, rateBase: 'invoice'
+});
+assert.strictEqual(copelWithLease.copelCost, 1200);
+assert.strictEqual(copelWithLease.leaseCost, 800);
+assert.strictEqual(copelWithLease.totalCost, 2000);
+assert.strictEqual(copelWithLease.costPerKWh, 2);
+
 const context = {
   energy: 5000,
   revenue: 8950,
