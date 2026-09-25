@@ -68,6 +68,11 @@ const context = {
   hydrateCharge: charge => ({ ...charge }),
   workNameById: id => id,
   currentWorkId: 'malassise',
+  currentWorkName: '',
+  workOptions: () => [],
+  isRobertKochWorkId: () => false,
+  isRobertKochCandidateText: () => false,
+  stationAvailabilityFor: () => ({ operationStart: '' }),
   safeText: value => String(value == null ? '' : value),
   normalizeStationForCompare: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
   canonicalStationNameForWork: workId => String(workId) === 'malassise' ? 'UBY RECHARGE - POSTO ROBERT KOCH' : String(workId || ''),
@@ -85,6 +90,8 @@ const context = {
 vm.createContext(context);
 vm.runInContext([
   extractFunction(html, 'monthKey'),
+  extractFunction(html, 'isAuroraAcCandidateText'),
+  extractFunction(html, 'canonicalStationNameForWork'),
   extractFunction(html, 'daysInMonth'),
   extractFunction(html, 'timeMinutes'),
   extractFunction(html, 'stationAvailableHours'),
@@ -113,6 +120,16 @@ vm.runInContext([
   extractFunction(html, 'ubyAreaCurrentCycle'),
   extractFunction(html, 'ubyAreaCyclesUntil')
 ].join('\n'), context);
+
+assert.strictEqual(
+  context.canonicalStationNameForWork('aurora-ac-a', 'AURORA AC', 'Shopping Aurora'),
+  'UBY RECHARGE - SHOPPING AURORA AC',
+  'the two Aurora AC source records must share one canonical station identity'
+);
+assert(
+  html.includes("return 'Aurora AC automatico';"),
+  'Aurora AC must be included in the UBY operation without a browser-local manual override'
+);
 
 assert.strictEqual(context.monthCanBeClosed('2026-07', new Date(2026, 6, 18)), false, 'current month must remain partial before its last day');
 assert.strictEqual(context.monthCanBeClosed('2026-07', new Date(2026, 6, 31)), true, 'current month may close on its last day');

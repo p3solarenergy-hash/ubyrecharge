@@ -1164,6 +1164,12 @@ function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
   const normalized = normalizeStationForCompare(raw);
   const work = workOptions().find(item => String(item.id) === String(workId));
   const workName = work?.nome || fallbackName || raw;
+  // As duas bases Aurora AC representam os dois conectores da mesma unidade.
+  // A origem segue preservada em cada recarga, mas a leitura operacional usa
+  // uma única identidade para não apresentar dois carregadores AC fictícios.
+  if (isAuroraAcCandidateText(`${raw} ${workName}`)) {
+    return 'UBY RECHARGE - SHOPPING AURORA AC';
+  }
   if (String(workId) === 'rio' || normalizeStationForCompare(workName).includes('rio beach') || normalized.includes('rio beach')) {
     return 'Rio Beach EV';
   }
@@ -1181,6 +1187,15 @@ function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
     return 'SANTAREM EV JARDINS';
   }
   return raw || workName || 'Estacao';
+}
+
+function isAuroraAcCandidateText(value = '') {
+  const text = normalizeStationForCompare(value);
+  return text.includes('aurora') && (text.includes('ac') || text.includes('shopping'));
+}
+
+function isUnifiedAuroraAcStation(stationName = '') {
+  return normalizeStationForCompare(stationName) === normalizeStationForCompare('UBY RECHARGE - SHOPPING AURORA AC');
 }
 
 function isUnifiedJardinsStation(stationName = '') {
@@ -9007,6 +9022,7 @@ function isSinglePhysicalChargerStation(workId, stationName, workName = '') {
   const context = normalizeStationForCompare(`${stationName || ''} ${workName || ''}`);
   return station.includes('robert koch') ||
     station.includes('rio beach') ||
+    isUnifiedAuroraAcStation(station) ||
     context.includes('central jk') ||
     context.includes('posto central jk');
 }
@@ -9042,8 +9058,15 @@ function isUbyOperationGroup(group = {}, overrides = ubyOperationOverrides) {
   for (const key of keys) {
     if (Object.prototype.hasOwnProperty.call(overrides || {}, key)) return !!overrides[key];
   }
+  if (isUnifiedAuroraAcStation(group.station)) return true;
   if (group.kind === 'dc') return true;
   return (group.charges || []).some(charge => isUbyOperationCharge(charge, overrides));
+}
+
+function ubyOperationRuleSource(group = {}, hasOverride = false, included = false) {
+  if (hasOverride) return 'manual';
+  if (isUnifiedAuroraAcStation(group.station)) return 'Aurora AC automatico';
+  return included ? 'DC automatico' : 'fora por padrao';
 }
 
 function generalAcDcStats(charges = []) {
@@ -9375,7 +9398,7 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
         connTypes: undefined,
         clients: group.clients.size,
         included,
-        ruleSource: hasOverride ? 'manual' : included ? 'DC automatico' : 'fora por padrao'
+        ruleSource: ubyOperationRuleSource(group, hasOverride, included)
       });
     });
   });
@@ -9408,11 +9431,42 @@ function getUbyChargerRows(unitData = getGeneralUnitData()) {
       energy: 0,
       revenue: 0,
       included: isUbyOperationGroup(group, overrides),
-      ruleSource: hasOverride ? 'manual' : group.included ? 'DC automatico' : 'fora por padrao'
+      ruleSource: ubyOperationRuleSource(group, hasOverride, group.included)
     });
     existingStations.add(identity);
   });
-  return rows.sort((a, b) => Number(b.included) - Number(a.included) || b.revenue - a.revenue);
+  return mergeUnifiedAuroraAcUbyRows(rows)
+    .sort((a, b) => Number(b.included) - Number(a.included) || b.revenue - a.revenue);
+}
+
+function mergeUnifiedAuroraAcUbyRows(rows = []) {
+  const auroraRows = rows.filter(row => isUnifiedAuroraAcStation(row.station));
+  if (!auroraRows.length) return [...rows];
+  const remainingRows = rows.filter(row => !isUnifiedAuroraAcStation(row.station));
+  const primary = [...auroraRows].sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0))[0];
+  const charges = dedupeChargesByUniqueKey(auroraRows.flatMap(row => row.charges || []));
+  const connTypes = [...new Set(auroraRows.flatMap(row => String(row.connType || '').split(' + ')).filter(Boolean))];
+  const clientKeys = new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean));
+  const sourceWorkIds = [...new Set(auroraRows.map(row => String(row.workId)).filter(Boolean))];
+  const sourceWorkNames = [...new Set(auroraRows.map(row => row.workName).filter(Boolean))];
+  const merged = {
+    ...primary,
+    key: 'uby-recharge-shopping-aurora-ac|carregador',
+    stationOverrideKey: 'uby-recharge-shopping-aurora-ac|station',
+    station: 'UBY RECHARGE - SHOPPING AURORA AC',
+    kind: 'ac',
+    charges,
+    connType: connTypes.join(' + ') || primary.connType,
+    energy: charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0),
+    revenue: charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0),
+    clients: clientKeys.size || auroraRows.reduce((sum, row) => sum + Number(row.clients || 0), 0),
+    included: true,
+    ruleSource: 'Aurora AC automatico',
+    sourceWorkIds,
+    sourceWorkNames,
+    virtualUnifiedStation: auroraRows.length > 1
+  };
+  return [...remainingRows, merged];
 }
 
 function normalizePhone(value = '') {
