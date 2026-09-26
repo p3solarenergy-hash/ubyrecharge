@@ -280,6 +280,96 @@
       </section>`;
   }
 
+  // ---------- operação: quem entra na UBY, potência, horários e cortesia ----------
+  const DAYS = [["1", "Seg"], ["2", "Ter"], ["3", "Qua"], ["4", "Qui"], ["5", "Sex"], ["6", "Sáb"], ["0", "Dom"]];
+  function checkPending(w) {
+    const st = txt(w.document.getElementById("storageState"));
+    if (/pendente/i.test(st)) throw new Error(`Não gravou na nuvem: ${st}`);
+    return st;
+  }
+  function operationTab(w) {
+    const rows = w.getUbyChargerRows(w.getGeneralUnitData());
+    const key = r => `${r.workId}|${r.station}`;
+    const sel = rows.find(r => key(r) === ui.opCharger) || null;
+    if (sel && !ui.opForm) {
+      const c = w.stationAvailabilityFor(sel.workId, sel.station, sel.workName);
+      ui.opForm = { ...c, courtesyUsersText: (c.courtesyUsers || []).join("\n"), openDays: (c.openDays || [0, 1, 2, 3, 4, 5, 6]).map(String) };
+    }
+    const f = ui.opForm || {};
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const inp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-of="${k}" type="${type}" value="${esc(f[k] ?? "")}" ${extra} style="width:100%">`);
+    const works = [...new Set(rows.map(r => String(r.workId)))];
+    return `
+      <section class="section"><div class="section-head"><div><p class="kicker">Operação UBY</p><h2>Carregadores, inclusão e potência do local</h2>
+          <p>Marque quem entra na operação UBY (resultado, rateio da matriz e cotistas). A potência é do local inteiro (ex.: 2 × 7 kW = 14 kW) e vale para ocupação e rateio por potência.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Carregador</th><th>Tipo</th><th>Regra atual</th><th>Na operação UBY</th><th class="num">Potência do local</th><th></th></tr></thead>
+          <tbody>${rows.map(r => `<tr class="${r.included ? "" : "muted"}"><td><strong>${esc(r.station)}</strong><small>${esc(r.workName)}</small></td>
+            <td><span class="badge ${r.kind === "ac" ? "ac" : "dc"}">${esc(String(r.kind || "").toUpperCase() || "—")}</span></td><td><small>${esc(r.ruleSource || "")}</small></td>
+            <td><input type="checkbox" data-op-toggle="${esc(`${r.workId}|${r.key}|${r.station}`)}" ${r.included ? "checked" : ""} ${can}></td>
+            <td class="num"><input class="select" type="number" min="1" max="360" step="0.1" data-op-power="${esc(`${r.workId}|${r.station}`)}" value="${esc(w.workPowerById(r.workId))}" style="width:90px" ${can}> kW</td>
+            <td><button class="btn ghost" data-op-cfg="${esc(key(r))}" type="button">${ui.opCharger === key(r) ? "Editando ▾" : "Horários e cortesia"}</button></td></tr>`).join("")}</tbody></table></div>
+        <p class="source-line">${works.length} local(is). A potência é salva por local: alterar num carregador altera todos do mesmo local.</p>
+      </section>
+      ${sel ? `<section class="section"><div class="section-head"><div><p class="kicker">Configuração do carregador</p><h2>${esc(sel.station)}</h2><p>${esc(sel.workName)} · horários de funcionamento (base da ocupação), início da operação, conectores e cortesias.</p></div></div>
+        <div class="grid g4" style="gap:8px">
+          ${inp("plantName", "Nome de exibição")}${inp("operationStart", "Início da operação", "date")}
+          ${inp("acChargers", "Carregadores AC", "number", 'min="0"')}${inp("acPlugs", "Conectores AC", "number", 'min="0"')}
+          ${inp("dcChargers", "Carregadores DC", "number", 'min="0"')}${inp("dcPlugs", "Conectores DC", "number", 'min="0"')}
+          ${field("Funcionamento", `<select class="select" data-of="open24h"><option value="1" ${f.open24h !== false ? "selected" : ""}>24 horas</option><option value="0" ${f.open24h === false ? "selected" : ""}>Horário definido</option></select>`)}
+          ${f.open24h === false ? inp("openTime", "Abre às", "time") + inp("closeTime", "Fecha às", "time") : ""}
+          ${inp("referenceTariffPerKwh", "Tarifa de referência (R$/kWh)", "number", 'min="0" step="0.01"')}
+          ${field("Cortesias", `<select class="select" data-of="courtesyTreatment">${[["operational", "Operacional (custo da operação)"], ["partner_absorbed", "Absorvida pelo parceiro"], ["uby_absorbed", "Absorvida pela UBY"]].map(([v, l]) => `<option value="${v}" ${f.courtesyTreatment === v ? "selected" : ""}>${l}</option>`).join("")}</select>`)}
+          ${inp("courtesyResponsible", "Responsável pelas cortesias")}
+        </div>
+        <p style="margin:10px 0 4px;font-size:11px;font-weight:800">Dias de funcionamento</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">${DAYS.map(([v, l]) => `<label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" data-of-day="${v}" ${(f.openDays || []).includes(v) ? "checked" : ""}>${l}</label>`).join("")}</div>
+        ${field("Usuários de cortesia (um por linha: e-mail, nome ou telefone)", `<textarea class="select" data-of="courtesyUsersText" rows="4" style="width:100%;height:auto;padding:8px">${esc(f.courtesyUsersText || "")}</textarea>`)}
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="pmOpSave" type="button" ${can}>Salvar configuração</button><button class="btn" id="pmOpCancel" type="button">Fechar</button></div>
+      </section>` : ""}`;
+  }
+
+  // ---------- documentos financeiros (NF, boletos, faturas) ----------
+  function docsTab(w, data) {
+    const mk = ui.docMonth;
+    const costs = w.loadMatrizCosts().filter(c => c.enabled !== false);
+    const rows = w.getUbyChargerRows(w.getGeneralUnitData()).filter(r => r.included);
+    const df = ui.docForm || (ui.docForm = { link: "", documentType: "boleto", supplier: "", category: "Outros custos", documentNumber: "", amount: "", dueDate: "", status: "pending", installmentNumber: "", installmentTotal: "", notes: "" });
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const inp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-df="${k}" type="${type}" value="${esc(df[k] ?? "")}" ${extra} style="width:100%">`);
+    const docs = data.docs || [];
+    const total = docs.reduce((s, d) => s + Number(d.amount || 0), 0);
+    const paid = docs.filter(d => d.status === "paid").reduce((s, d) => s + Number(d.amount || 0), 0);
+    return `
+      <div class="toolbar"><label>Competência <select class="select" id="pmDocMonth">${data.months.slice().reverse().map(m => `<option value="${m}" ${m === mk ? "selected" : ""}>${esc(UBY.state.api?.monthName?.(m) || m)}</option>`).join("")}</select></label>
+        <span class="spacer"></span><small>${docs.length} documento(s) · ${fmt.brl(total)} · pagos ${fmt.brl(paid)}</small></div>
+      ${data.docsError ? `<div class="note">Não consegui ler os documentos: ${esc(data.docsError)}</div>` : ""}
+      <div class="split" style="margin-bottom:14px">
+        <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Caixa</p><h2>Documentos da competência</h2></div></div>
+          <div class="table-wrap" style="max-height:520px"><table><thead><tr><th>Fornecedor</th><th>Vínculo</th><th>Vencimento</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead>
+            <tbody>${docs.map(d => { const cost = costs.find(c => c.id === d.matrix_cost_id); const row = rows.find(r => String(r.workId) === String(d.work_id)); return `<tr>
+              <td><strong>${esc(d.supplier || "Documento")}</strong><small>${esc([d.document_type, d.category, d.document_number, d.installment_number ? `parcela ${d.installment_number}${d.installment_total ? "/" + d.installment_total : ""}` : ""].filter(Boolean).join(" · "))}</small></td>
+              <td><small>${esc(cost ? `Matriz · ${cost.name}` : row ? `Carregador · ${row.station}` : d.scope === "matrix" ? "Matriz UBY" : "—")}</small></td>
+              <td>${d.due_date ? fmt.date(d.due_date + "T12:00:00") : "—"}</td><td class="num">${fmt.brl(d.amount)}</td>
+              <td><span class="badge ${d.status === "paid" ? "ok" : d.status === "cancelled" ? "neutral" : "warn"}">${d.status === "paid" ? "Pago" : d.status === "cancelled" ? "Cancelado" : "Pendente"}</span></td>
+              <td style="white-space:nowrap">${d.storage_path ? `<button class="btn ghost" data-doc-open="${esc(d.id)}" type="button">Abrir</button>` : "<small>sem arquivo</small>"}<button class="btn ghost" data-doc-del="${esc(d.id)}" type="button" style="color:var(--uby-red)" ${can}>Excluir</button></td></tr>`; }).join("") || `<tr><td colspan="6" class="empty">Nenhum documento nesta competência.</td></tr>`}</tbody></table></div>
+        </section>
+        <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Novo documento</p><h2>Anexar NF, boleto ou fatura</h2><p>PDF, JPG, PNG ou WEBP de até 15 MB. O arquivo fica privado e só abre para quem está logado.</p></div></div>
+          <div class="grid g2" style="gap:8px">
+            ${field("Vínculo", `<select class="select" data-df="link"><option value="">Matriz UBY (geral)</option><optgroup label="Custos da matriz">${costs.map(c => `<option value="cost|${esc(c.id)}" ${df.link === `cost|${c.id}` ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</optgroup><optgroup label="Carregadores">${rows.map(r => `<option value="work|${esc(r.workId)}" ${df.link === `work|${r.workId}` ? "selected" : ""}>${esc(r.station)}</option>`).join("")}</optgroup></select>`)}
+            ${field("Tipo", `<select class="select" data-df="documentType">${[["boleto", "Boleto"], ["nota_fiscal", "Nota fiscal"], ["fatura", "Fatura"], ["recibo", "Recibo"], ["contrato", "Contrato"], ["outro", "Outro"]].map(([v, l]) => `<option value="${v}" ${df.documentType === v ? "selected" : ""}>${l}</option>`).join("")}</select>`)}
+            ${inp("supplier", "Fornecedor")}${inp("category", "Categoria")}
+            ${inp("documentNumber", "Número do documento")}${inp("amount", "Valor (R$)", "number", 'min="0" step="0.01"')}
+            ${inp("dueDate", "Vencimento", "date")}
+            ${field("Situação", `<select class="select" data-df="status"><option value="pending" ${df.status === "pending" ? "selected" : ""}>Pendente</option><option value="paid" ${df.status === "paid" ? "selected" : ""}>Pago</option><option value="cancelled" ${df.status === "cancelled" ? "selected" : ""}>Cancelado</option></select>`)}
+            ${inp("installmentNumber", "Parcela nº (opcional)", "number", 'min="1"')}${inp("installmentTotal", "de (total de parcelas)", "number", 'min="1"')}
+          </div>
+          ${inp("notes", "Observações")}
+          ${field("Arquivo", `<input class="select" id="pmDocFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" style="width:100%;padding-top:6px">`)}
+          <button class="btn primary" id="pmDocSave" type="button" style="margin-top:12px" ${can}>Salvar documento</button>
+        </section>
+      </div>`;
+  }
+
   function quotasTab(w) {
     const p = w.loadNetworkDistribution();
     const e = ui.policyEdits || (ui.policyEdits = JSON.parse(JSON.stringify({
@@ -340,14 +430,20 @@
       }
     } else {
       data.months = (UBY.state.months && UBY.state.months.length ? UBY.state.months : (w.getMonths?.() || [])).slice();
+      if (ui.tab === "documentos") {
+        const mk = ui.docMonth || data.months.at(-1) || "";
+        ui.docMonth = mk;
+        try { data.docs = await w.UBY_SUPABASE.loadFinanceDocuments({ competenceKey: mk, limit: 200 }); data.docsError = ""; }
+        catch (err) { data.docs = []; data.docsError = err.message; }
+      }
     }
     const c = data.chargers.find(x => x.key === ui.charger);
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
         <p class="lead">Modelo, splits, energia, capital, metas e regras de cada carregador por competência; custos centrais da matriz; calendário de pagamentos; rodadas e cotistas. As contas e a gravação são as mesmas da plataforma original.</p></div>
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
-      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["cotas", "Cotas, impostos e rodadas"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
-      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : quotasTab(w)}
+      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["operacao", "Operação e carregadores"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
+      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
@@ -436,6 +532,73 @@
         const fb = await awaitMatrixSave(w);
         ui.payForm = null;
         return fb || "pagamento programado salvo";
+      });
+    };
+    // --- operação ---
+    target.querySelectorAll("[data-op-cfg]").forEach(b => b.onclick = () => { ui.opCharger = ui.opCharger === b.dataset.opCfg ? "" : b.dataset.opCfg; ui.opForm = null; draw(target, w); });
+    if ($("#pmOpCancel")) $("#pmOpCancel").onclick = () => { ui.opCharger = ""; ui.opForm = null; draw(target, w); };
+    target.querySelectorAll("[data-of]").forEach(el => el.onchange = () => { const k = el.dataset.of; ui.opForm[k] = k === "open24h" ? el.value === "1" : el.value; if (k === "open24h") draw(target, w); });
+    target.querySelectorAll("[data-of-day]").forEach(el => el.onchange = () => { const d = el.dataset.ofDay; ui.opForm.openDays = el.checked ? [...new Set([...(ui.opForm.openDays || []), d])] : (ui.opForm.openDays || []).filter(x => x !== d); });
+    target.querySelectorAll("[data-op-toggle]").forEach(el => el.onchange = () => {
+      const [workId, key, station] = el.dataset.opToggle.split("|");
+      const on = el.checked;
+      if (!confirm(`${on ? "Incluir" : "Retirar"} ${station} ${on ? "na" : "da"} operação UBY? Isso muda resultado, rateio da matriz e cotistas.`)) { el.checked = !on; return; }
+      run(target, w, `Operação UBY · ${station}`, async () => { await w.toggleUbyOperation(workId, key, on); checkPending(w); return on ? "incluído na operação UBY" : "retirado da operação UBY"; });
+    });
+    target.querySelectorAll("[data-op-power]").forEach(el => el.onchange = () => {
+      const [workId, station] = el.dataset.opPower.split("|");
+      const kw = Number(el.value);
+      if (!(kw >= 1 && kw <= 360)) { log("Potência: informe entre 1 e 360 kW.", "bad"); draw(target, w); return; }
+      run(target, w, `Potência do local · ${station}`, async () => { await w.openWorkReport(workId, "mensal", station); await w.saveOperationalPowerFromInputs(kw); checkPending(w); return `${kw} kW`; });
+    });
+    if ($("#pmOpSave")) $("#pmOpSave").onclick = () => {
+      const [workId, station] = ui.opCharger.split("|");
+      const f = ui.opForm;
+      if (!(f.openDays || []).length) { log("Horários: selecione ao menos um dia de funcionamento.", "bad"); draw(target, w); return; }
+      run(target, w, `Horários e cortesia · ${station}`, async () => {
+        try { w.openStationLayoutConfiguration(workId, station); } catch (_) { /* o modal pode não abrir na moldura invisível; os campos são preenchidos abaixo */ }
+        const d = w.document;
+        const set = (id, v) => { const el = d.getElementById(id); if (el) el.value = v ?? ""; };
+        set("stationLayoutWorkId", workId); set("stationLayoutSourceName", station);
+        set("stationLayoutPlantName", f.plantName); set("stationLayoutAcChargers", f.acChargers); set("stationLayoutAcPlugs", f.acPlugs);
+        set("stationLayoutDcChargers", f.dcChargers); set("stationLayoutDcPlugs", f.dcPlugs); set("stationLayoutOperationStart", f.operationStart);
+        const h24 = d.getElementById("stationLayoutOpen24h"); if (h24) h24.checked = f.open24h !== false;
+        set("stationLayoutOpenTime", f.openTime || "08:00"); set("stationLayoutCloseTime", f.closeTime || "22:00");
+        set("stationLayoutReferenceTariff", f.referenceTariffPerKwh); set("stationLayoutCourtesyTreatment", f.courtesyTreatment || "operational");
+        set("stationLayoutCourtesyResponsible", f.courtesyResponsible); set("stationLayoutCourtesyUsers", f.courtesyUsersText);
+        d.querySelectorAll(".station-open-day").forEach(i => { i.checked = (f.openDays || []).includes(String(i.value)); });
+        await w.saveStationLayoutConfiguration();
+        try { d.getElementById("stationLayoutDialog")?.close(); } catch (_) {}
+        checkPending(w);
+        ui.opForm = null;
+        return "configuração salva";
+      });
+    };
+    // --- documentos ---
+    if ($("#pmDocMonth")) $("#pmDocMonth").onchange = e => { ui.docMonth = e.target.value; draw(target, w); };
+    target.querySelectorAll("[data-df]").forEach(el => el.onchange = () => { ui.docForm[el.dataset.df] = el.value; });
+    target.querySelectorAll("[data-doc-open]").forEach(b => b.onclick = async () => {
+      const win = window.open("", "_blank");
+      try { const r = await w.UBY_SUPABASE.openFinanceDocument(b.dataset.docOpen); if (win) win.location.href = r.url; else window.location.assign(r.url); }
+      catch (err) { if (win) win.close(); log(`Abrir documento: ${err.message}`, "bad"); draw(target, w); }
+    });
+    target.querySelectorAll("[data-doc-del]").forEach(b => b.onclick = () => {
+      if (!confirm("Excluir este documento e o arquivo anexado? Não dá para desfazer.")) return;
+      run(target, w, "Excluir documento", async () => { const r = await w.UBY_SUPABASE.deleteFinanceDocument(b.dataset.docDel); if (!r?.deleted) throw new Error("documento não encontrado"); return "documento excluído"; });
+    });
+    if ($("#pmDocSave")) $("#pmDocSave").onclick = () => {
+      const df = ui.docForm;
+      const file = $("#pmDocFile")?.files?.[0] || null;
+      if (!String(df.supplier || "").trim() || !(Number(df.amount) > 0)) { log("Documento: informe fornecedor e valor.", "bad"); draw(target, w); return; }
+      const [kind, ref] = String(df.link || "").split("|");
+      run(target, w, `Documento ${df.supplier}`, async () => {
+        await w.UBY_SUPABASE.createFinanceDocument({
+          scope: kind === "work" ? "charger" : "matrix", workId: kind === "work" ? ref : null, matrixCostId: kind === "cost" ? ref : null,
+          competenceKey: ui.docMonth, supplier: df.supplier, category: df.category, documentNumber: df.documentNumber, documentType: df.documentType,
+          amount: Number(df.amount), dueDate: df.dueDate || null, status: df.status, installmentNumber: df.installmentNumber || null, installmentTotal: df.installmentTotal || null, notes: df.notes
+        }, file);
+        ui.docForm = null;
+        return file ? `salvo com o arquivo ${file.name}` : "salvo sem arquivo";
       });
     };
     // --- cotas ---

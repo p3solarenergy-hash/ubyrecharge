@@ -53,7 +53,8 @@
   // pagamentos e cotas (uby_financial_matrix). Nada de sessões, obras, RPCs ou arquivos.
   const PARAMS_SCOPE = {
     name: "parametros",
-    tables: { obra_recargas_base: ["update"], uby_financial_matrix: ["upsert"], app_audit_log: ["insert"] },
+    tables: { obra_recargas_base: ["update"], uby_financial_matrix: ["upsert"], app_audit_log: ["insert"], uby_finance_documents: ["insert", "delete"] },
+    storage: { "finance-documents": ["upload", "remove"] },
     rpcs: []
   };
   function writeScope() {
@@ -126,7 +127,7 @@
                 const api = s.from(bucket);
                 return new Proxy(api, {
                   get(a, m) {
-                    if (storageWrites.has(m)) return () => Promise.resolve({ data: null, error: readOnlyError(`storage ${m} em ${bucket}`) });
+                    if (storageWrites.has(m) && !(scope && (scope.storage?.[bucket] || []).includes(m))) return () => Promise.resolve({ data: null, error: readOnlyError(`storage ${m} em ${bucket}`) });
                     const v = a[m];
                     return typeof v === "function" ? v.bind(a) : v;
                   }
