@@ -1467,7 +1467,9 @@
       return { key: m.monthKey, label: monthLabel(m.monthKey), taxBase: m.taxBase, taxes: m.taxes, taxSource: m.taxSource, preTax: m.preTax, result: m.result,
         carryIn: m.carryIn, carryOut: m.carryOut, distributable: m.distributable, legalReserve: m.legalReserve, expansionReserve: m.expansionReserve,
         investorPool: m.investorPool, eligibleQuotas, perQuota: eligibleQuotas && m.investorPool > 0 ? m.investorPool / eligibleQuotas : 0,
-        status: policy.paymentLedger?.[m.monthKey]?.status || "pendente" };
+        status: policy.paymentLedger?.[m.monthKey]?.status || "pendente",
+        approvedAt: policy.paymentLedger?.[m.monthKey]?.approvedAt || "", approvedBy: policy.paymentLedger?.[m.monthKey]?.approvedBy || "",
+        paidAt: policy.paymentLedger?.[m.monthKey]?.paidAt || "", snapshot: policy.paymentLedger?.[m.monthKey]?.snapshot || null };
     });
     const investors = net.investors.map(inv => ({ name: inv.name, quotas: inv.quotas, eligibleFrom: inv.eligibleFrom, status: inv.status,
       allocations: idx.map(i => inv.allocations[i]), due: inv.due, quotaValue: n0(inv.quotaValue) || net.quotaValue,

@@ -5814,7 +5814,12 @@ function normalizeDistributionLedger(raw) {
     if (!/^\d{4}-\d{2}$/.test(monthKey)) return ledger;
     ledger[monthKey] = {
       status: ['pendente', 'aprovado', 'pago'].includes(item?.status) ? item.status : 'pendente',
-      updatedAt: item?.updatedAt || '', note: safeText(item?.note || '').slice(0, 300)
+      updatedAt: item?.updatedAt || '', note: safeText(item?.note || '').slice(0, 300),
+      // NOVA PLATAFORMA: fechamento aprovado guarda quem aprovou, quando pagou e a
+      // foto dos números aprovados (para acusar divergência se a base mudar depois).
+      approvedAt: String(item?.approvedAt || ''), approvedBy: safeText(item?.approvedBy || '').slice(0, 120),
+      paidAt: /^\d{4}-\d{2}-\d{2}$/.test(String(item?.paidAt || '')) ? String(item.paidAt) : '',
+      snapshot: item?.snapshot && typeof item.snapshot === 'object' && !Array.isArray(item.snapshot) ? item.snapshot : null
     };
     return ledger;
   }, {});

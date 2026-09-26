@@ -382,6 +382,55 @@
       </div>`;
   }
 
+  // ---------- fechamentos: aprovar (congela os números), pagar, reabrir ----------
+  const nz = v => Number(v || 0);
+  function closingSnapshot(inv, idx) {
+    const m = inv.months[idx];
+    return {
+      engine: "v2", savedAt: new Date().toISOString(),
+      taxBase: nz(m.taxBase), taxes: nz(m.taxes), preTax: nz(m.preTax), result: nz(m.result), carryIn: nz(m.carryIn),
+      distributable: nz(m.distributable), legalReserve: nz(m.legalReserve), expansionReserve: nz(m.expansionReserve),
+      investorPool: nz(m.investorPool), eligibleQuotas: nz(m.eligibleQuotas), perQuota: nz(m.perQuota),
+      investors: inv.investors.filter(i => i.eligibleFrom <= m.key).map(i => ({ name: i.name, quotas: nz(i.quotas), value: Math.round(nz(i.allocations[idx]) * 100) / 100 }))
+    };
+  }
+  function closingDiff(inv, idx) {
+    const m = inv.months[idx], snap = m.snapshot;
+    if (!snap) return [];
+    const out = [];
+    [["result", "resultado"], ["taxes", "impostos"], ["investorPool", "pool dos cotistas"], ["perQuota", "valor por cota"]].forEach(([k, l]) => {
+      if (Math.abs(nz(snap[k]) - nz(m[k])) > 0.009) out.push(`${l}: aprovado ${fmt.brl(snap[k])} · agora ${fmt.brl(m[k])}`);
+    });
+    const live = new Map(inv.investors.map(i => [i.name, nz(i.allocations[idx])]));
+    (snap.investors || []).forEach(i => { if (Math.abs(nz(i.value) - nz(live.get(i.name))) > 0.009) out.push(`${i.name}: aprovado ${fmt.brl(i.value)} · agora ${fmt.brl(live.get(i.name))}`); });
+    return out;
+  }
+  function closingsTab(w) {
+    let inv;
+    try { inv = UBY.data("investorDistribution"); } catch (_) { return `<div class="note">Atualizando os números… abra a aba de novo em alguns segundos.</div>`; }
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const today = new Date().toISOString().slice(0, 10);
+    const badge = s => `<span class="badge ${s === "pago" ? "ok" : s === "aprovado" ? "dc" : "neutral"}">${esc(s)}</span>`;
+    return `
+      <section class="section"><div class="section-head"><div><p class="kicker">Governança</p><h2>Fechamentos da distribuição</h2>
+          <p>Aprovar uma competência congela os números daquele mês (resultado, impostos, reservas, pool e o repasse de cada cotista). Se a base mudar depois — planilha nova, parâmetro, custo —, a tela mostra a diferença entre o aprovado e o atual. Depois do pagamento, marque como pago com a data.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Resultado</th><th class="num">Impostos</th><th class="num">Pool cotistas</th><th class="num">Por cota</th><th>Situação</th><th>Aprovação</th><th></th></tr></thead>
+          <tbody>${inv.months.map((m, idx) => { const diff = closingDiff(inv, idx); return `<tr>
+            <td><strong>${esc(m.label)}</strong></td><td class="num">${fmt.brl(m.result)}</td><td class="num">${m.taxes ? fmt.brl(m.taxes) : `<span class="badge warn">sem imposto</span>`}</td>
+            <td class="num">${fmt.brl(m.investorPool)}</td><td class="num">${fmt.brl(m.perQuota)}</td><td>${badge(m.status)}</td>
+            <td style="white-space:normal;min-width:220px">${m.approvedAt ? `<small>aprovado ${fmt.dt(m.approvedAt)}${m.approvedBy ? ` por ${esc(m.approvedBy)}` : ""}${m.paidAt ? ` · pago em ${fmt.date(m.paidAt + "T12:00:00")}` : ""}</small>` : "<small>—</small>"}
+              ${diff.length ? `<div class="note" style="margin-top:6px;border-color:var(--uby-red)"><strong>Mudou depois da aprovação</strong><br>${diff.map(esc).join("<br>")}</div>` : ""}</td>
+            <td style="white-space:nowrap">
+              <button class="btn ghost" data-close-report="${esc(m.key)}" type="button">Relatório</button>
+              ${m.status === "pendente" ? `<button class="btn primary" data-close="${esc(m.key)}|approve" type="button" ${can}>Aprovar</button>` : ""}
+              ${m.status === "aprovado" ? `<input class="select" type="date" data-paid-date="${esc(m.key)}" value="${today}" style="width:140px"> <button class="btn primary" data-close="${esc(m.key)}|pay" type="button" ${can}>Marcar pago</button>` : ""}
+              ${m.status === "aprovado" && diff.length ? `<button class="btn" data-close="${esc(m.key)}|approve" type="button" ${can}>Aprovar números atuais</button>` : ""}
+              ${m.status !== "pendente" ? `<button class="btn ghost" data-close="${esc(m.key)}|reopen" type="button" ${can}>Reabrir</button>` : ""}
+            </td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">Nenhuma competência de distribuição.</td></tr>`}</tbody></table></div>
+        <p class="source-line">Cada competência é dividida só entre as cotas habilitadas no primeiro dia do mês. Aprove em ordem: o prejuízo de um mês é compensado nos seguintes.</p>
+      </section>`;
+  }
+
   // Cotista: a partir da data do aporte e do valor investido, calcula cotas e o mês de entrada.
   const nextMonthKey = mk => { const [y, m] = mk.split("-").map(Number); const d = new Date(y, m, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
   function deriveInvestor(i, defaultQuota) {
@@ -438,7 +487,7 @@
   }
 
   // ---------- render ----------
-  const TAB_IDS = ["carregador", "operacao", "matriz", "pagamentos", "documentos", "cotas"];
+  const TAB_IDS = ["carregador", "operacao", "matriz", "pagamentos", "documentos", "cotas", "fechamentos"];
   async function render(target, params = []) {
     if (TAB_IDS.includes(params[0])) {
       ui.tab = params[0];
@@ -478,8 +527,8 @@
       <div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
         <p class="lead">Modelo, splits, energia, capital, metas e regras de cada carregador por competência; custos centrais da matriz; calendário de pagamentos; rodadas e cotistas. As contas e a gravação são as mesmas da plataforma original.</p></div>
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
-      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["operacao", "Operação e carregadores"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
-      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : quotasTab(w)}
+      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["operacao", "Operação e carregadores"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
+      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
@@ -651,6 +700,39 @@
         return file ? `salvo com o arquivo ${file.name}` : "salvo sem arquivo";
       });
     };
+    // --- fechamentos ---
+    target.querySelectorAll("[data-close-report]").forEach(b => b.onclick = () => UBY.reports.competencia(b.dataset.closeReport));
+    target.querySelectorAll("[data-close]").forEach(b => b.onclick = () => {
+      const [mk, action] = b.dataset.close.split("|");
+      let inv;
+      try { inv = UBY.data("investorDistribution"); } catch (_) { log("Fechamento: aguarde os números atualizarem.", "bad"); return; }
+      const idx = inv.months.findIndex(m => m.key === mk);
+      const m = inv.months[idx];
+      if (!m) return;
+      if (action === "approve") {
+        const earlier = inv.months.slice(0, idx).filter(x => x.status === "pendente").map(x => x.label);
+        const msg = `Aprovar ${m.label}? Pool dos cotistas ${fmt.brl(m.investorPool)} (${fmt.brl(m.perQuota)} por cota).${m.taxes ? "" : "\n\nAtenção: não há imposto lançado para este mês."}${earlier.length ? `\n\nAinda pendentes antes deste: ${earlier.join(", ")}.` : ""}`;
+        if (!confirm(msg)) return;
+      }
+      if (action === "reopen" && !confirm(`Reabrir ${m.label}? A aprovação e a data de pagamento são apagadas.`)) return;
+      const paidAt = action === "pay" ? (target.querySelector(`[data-paid-date="${mk}"]`)?.value || new Date().toISOString().slice(0, 10)) : "";
+      const email = UBY.state.status?.user?.email || "";
+      run(target, w, `Fechamento ${m.label}`, async () => {
+        await resyncMatrix(w);
+        const cur = w.loadNetworkDistribution();
+        const ledger = { ...(cur.paymentLedger || {}) };
+        const prev = ledger[mk] || {};
+        const now = new Date().toISOString();
+        if (action === "approve") ledger[mk] = { ...prev, status: "aprovado", approvedAt: now, approvedBy: email, paidAt: "", snapshot: closingSnapshot(inv, idx), updatedAt: now };
+        else if (action === "pay") ledger[mk] = { ...prev, status: "pago", paidAt, updatedAt: now };
+        else ledger[mk] = { ...prev, status: "pendente", approvedAt: "", approvedBy: "", paidAt: "", snapshot: null, updatedAt: now };
+        const saved = w.saveNetworkDistribution({ ...cur, paymentLedger: ledger });
+        const fb = await awaitMatrixSave(w);
+        if (saved.paymentLedger?.[mk]?.status !== ledger[mk].status) throw new Error("a situação não foi aceita pela plataforma original");
+        if (action === "approve" && !saved.paymentLedger?.[mk]?.snapshot) throw new Error("os números aprovados não foram guardados");
+        return action === "approve" ? `aprovado · pool ${fmt.brl(m.investorPool)}` : action === "pay" ? `pago em ${fmt.date(paidAt + "T12:00:00")}` : "reaberto";
+      });
+    });
     // --- cotas ---
     target.querySelectorAll("[data-pol]").forEach(el => el.onchange = () => { const k = el.dataset.pol; ui.policyEdits[k] = ["roundLabel", "distributionStartMonth"].includes(k) ? el.value : Number(el.value || 0); draw(target, w); });
     target.querySelectorAll("[data-tax-month]").forEach(el => el.onchange = () => { const k = el.dataset.taxMonth; if (el.value === "") delete ui.policyEdits.taxByMonth[k]; else ui.policyEdits.taxByMonth[k] = Math.max(0, Number(el.value)); draw(target, w); });

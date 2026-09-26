@@ -67,7 +67,10 @@
     const cotistas = acc ? inv.investors.map(i => ({ ...i, value: i.due })) : inv.investors.filter(i => i.eligibleFrom <= mk).map(i => ({ ...i, value: idx >= 0 ? i.allocations[idx] || 0 : 0 }));
     const monthsRows = inv.months.filter(x => acc || x.key === mk);
     const status = acc ? "pendente" : (m?.status || "pendente");
-    return `${header(`Relatório unificado da operação · ${monthName(mk)}`, `${d.ownedCount} ativo(s) UBY e ${d.partnerCount} parceiro(s) com royalty · ${inv.investors.length} cotista(s) · ${esc(p.roundLabel || "")}${acc ? ` · ${inv.months.length} competência(s) de distribuição` : ""}`, status)}
+    const approval = !acc && m?.approvedAt ? ` · aprovado em ${fmt.dt(m.approvedAt)}${m.approvedBy ? ` por ${esc(m.approvedBy)}` : ""}${m.paidAt ? ` · pago em ${fmt.date(m.paidAt + "T12:00:00")}` : ""}` : "";
+    const changed = !acc && m?.snapshot && (Math.abs(n(m.snapshot.investorPool) - n(m.investorPool)) > 0.009 || Math.abs(n(m.snapshot.result) - n(m.result)) > 0.009);
+    return `${header(`Relatório unificado da operação · ${monthName(mk)}`, `${d.ownedCount} ativo(s) UBY e ${d.partnerCount} parceiro(s) com royalty · ${inv.investors.length} cotista(s) · ${esc(p.roundLabel || "")}${acc ? ` · ${inv.months.length} competência(s) de distribuição` : ""}${approval}`, status)}
+      ${changed ? `<div class="note" style="border-color:#e0a4a0;background:#fdf0ef;color:#8a2f2a"><strong>Os números mudaram depois da aprovação.</strong> Aprovado: resultado ${signed(m.snapshot.result)} · pool ${fmt.brl(m.snapshot.investorPool)} (${fmt.brl(m.snapshot.perQuota)} por cota). Agora: resultado ${signed(m.result)} · pool ${fmt.brl(m.investorPool)}. Revise em Parâmetros e custos → Fechamentos.</div>` : ""}
       <div class="kpis">
         ${kpi("Faturamento UBY", fmt.brl(d.networkRevenue + d.royalties), `${fmt.int(sessions)} recargas · ${fmt.kwh0(energy)}`)}
         ${kpi("Resultado após impostos", signed(d.networkResult), d.networkTaxes ? `impostos ${fmt.brl(d.networkTaxes)}` : "sem imposto lançado")}
