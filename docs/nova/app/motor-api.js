@@ -1156,15 +1156,18 @@
     return cfg;
   }
 
-  function fv2Eligible(mk) {
-    if (!FV2.eligible.has(mk)) FV2.eligible.set(mk, FV2.rows.filter(r => matrizEligibleRow(r, mk)));
-    return FV2.eligible.get(mk);
+  // Com zeroSaleMonths, o rateio da matriz só considera carregadores já em operação
+  // na competência: a parte de quem ainda não operava vai para quem operava.
+  function fv2Eligible(mk, fixes = CORE().FIXES_OFF) {
+    const k = `${mk}|${fixes.zeroSaleMonths ? 1 : 0}`;
+    if (!FV2.eligible.has(k)) FV2.eligible.set(k, FV2.rows.filter(r => matrizEligibleRow(r, mk) && (!fixes.zeroSaleMonths || (rowFirstMonth(r) && mk >= rowFirstMonth(r)))));
+    return FV2.eligible.get(k);
   }
   // Rateio de um custo da matriz entre todos os destinos da competência (calculado uma vez).
   function fv2MatrixAlloc(item, mk, fixes) {
-    const k = `${item.id}|${mk}|${fixes.matrixCents ? 1 : 0}${fixes.powerPerCharger ? 1 : 0}`;
+    const k = `${item.id}|${mk}|${fixes.matrixCents ? 1 : 0}${fixes.powerPerCharger ? 1 : 0}${fixes.zeroSaleMonths ? 1 : 0}`;
     if (FV2.matrix.has(k)) return FV2.matrix.get(k);
-    const rows = fv2Eligible(mk);
+    const rows = fv2Eligible(mk, fixes);
     const targets = (item.targets || []).filter(t => !t.startMonth || t.startMonth <= mk)
       .map(t => ({ target: t, row: matrizResolveTargetRow(t, rows) || rows.find(c => matrizTargetMatchesRow(t, c)) || null }));
     const byScope = new Map();
@@ -1190,8 +1193,8 @@
     return out;
   }
   function fv2MatrixItems(row, mk, fixes) {
-    if (!fixes.matrixCents && !fixes.powerPerCharger) return matrizCostItemsForRow(row, mk, FV2.unitData);
-    if (!matrizEligibleRow(row, mk)) return [];
+    if (!fixes.matrixCents && !fixes.powerPerCharger && !fixes.zeroSaleMonths) return matrizCostItemsForRow(row, mk, FV2.unitData);
+    if (!fv2Eligible(mk, fixes).some(r => r.fv2Id === row.fv2Id)) return [];
     return loadMatrizCosts().filter(item => matrizApplies(item, mk)).flatMap(item => {
       const { active, shares, cashShares } = fv2MatrixAlloc(item, mk, fixes);
       if (!active.length) return [];
@@ -1244,13 +1247,18 @@
     const included = FV2.rows.filter(r => r.included);
     return FV2.months.map(mk => {
       let ownedNet = 0, royalties = 0;
+      const rows = [];
       included.forEach(row => {
-        if (fixes.zeroSaleMonths && !(rowFirstMonth(row) && mk >= rowFirstMonth(row))) return;
+        const active = !!(rowFirstMonth(row) && mk >= rowFirstMonth(row));
+        if (fixes.zeroSaleMonths && !active) return;
         const r = fv2Month(row, mk, fixes);
-        if (r.operationModel === "uby" || r.operationModel === "hybrid") ownedNet += r.operationNet;
+        const owned = r.operationModel === "uby" || r.operationModel === "hybrid";
+        if (owned) ownedNet += r.operationNet;
         else if (r.operationModel === "third_party_management") royalties += r.ubyRoyalty;
+        if (owned || r.operationModel === "third_party_management") rows.push({ station: row.stationName, active, model: r.operationModel, revenue: r.revenue, energyCost: r.energyCost,
+          localExtraCosts: r.localExtraCosts, matrizCost: r.matrizCost, taxes: r.taxes, operationNet: r.operationNet, royalty: r.ubyRoyalty, flags: r.flags });
       });
-      return { monthKey: mk, ownedNet, royalties };
+      return { monthKey: mk, ownedNet, royalties, rows };
     });
   }
 

@@ -46,12 +46,24 @@
     tables: { obra_recargas_base: ["upsert"], obra_recargas_historico: ["insert"], app_audit_log: ["insert"], recharge_customers: ["upsert"] },
     rpcs: ["save_recharge_base_atomic", "replace_recharge_sessions", "restore_recharge_snapshot_atomic"]
   };
+  // NOVA PLATAFORMA (aprovado pelo usuário: "monte isso na nova, é muito
+  // importante" e "pode gravar"): a tela "Parâmetros e custos" grava os
+  // parâmetros financeiros por carregador (resumo.financialSettings, só UPDATE
+  // de registro existente via saveRechargeMetadata) e a matriz de custos,
+  // pagamentos e cotas (uby_financial_matrix). Nada de sessões, obras, RPCs ou arquivos.
+  const PARAMS_SCOPE = {
+    name: "parametros",
+    tables: { obra_recargas_base: ["update"], uby_financial_matrix: ["upsert"], app_audit_log: ["insert"] },
+    rpcs: []
+  };
   function writeScope() {
     try {
       const embedded = window.self !== window.top;
-      const flagged = new URLSearchParams(location.search).get("nova_import") === "1";
-      const onImportRoute = /^#\/importar/.test(window.top.location.hash || "");
-      return embedded && flagged && onImportRoute ? IMPORT_SCOPE : null;
+      const params = new URLSearchParams(location.search);
+      const hash = window.top.location.hash || "";
+      if (embedded && params.get("nova_import") === "1" && /^#\/importar/.test(hash)) return IMPORT_SCOPE;
+      if (embedded && params.get("nova_params") === "1" && /^#\/parametros/.test(hash)) return PARAMS_SCOPE;
+      return null;
     } catch (_) { return null; }
   }
   // Na tela de importação, só as abas de sessões/importação e de clientes ficam visíveis.
