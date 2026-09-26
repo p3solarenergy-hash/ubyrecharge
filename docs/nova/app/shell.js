@@ -38,6 +38,7 @@
     ] },
     { label: "GESTÃO E GOVERNANÇA", items: [
       { id: "financeiro", icon: "R$", label: "Financeiro e fechamento", type: "view", period: true },
+      { id: "relatorios", icon: "▤", label: "Gerador de relatórios", type: "view" },
       { id: "configuracao", icon: "⚙", label: "Configuração da rede", type: "view" },
       { id: "parametros", icon: "✎", label: "Parâmetros e custos", type: "view" },
       { id: "auditoria", icon: "✓", label: "Auditoria do motor financeiro", type: "view" },
