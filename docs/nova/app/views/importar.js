@@ -169,20 +169,21 @@
       const local = w.rowCellText(r, c.station);
       const mk = w.monthKey(w.parseDate(w.rowCellText(r, c.startLocal)));
       const k = local + "\u0000" + mk;
-      if (!byKey.has(k)) byKey.set(k, { local, month: mk, rows: [], ids: new Set(), charges: 0, energy: 0, revenue: 0 });
+      if (!byKey.has(k)) byKey.set(k, { local, month: mk, rows: [], ids: new Set(), charges: 0, energy: 0, revenue: 0, uEnergy: 0, uRevenue: 0 });
       const g = byKey.get(k);
       g.rows.push(r); g.charges++;
       // Mesma regra do motor (markDistinctRepeatedRows): só é a mesma recarga se a linha
       // for idêntica em motorista, início, fim, carregador, energia, valor, status e duração.
-      g.ids.add([c.email, c.driver, c.startLocal, c.endLocal, c.endCharge, c.charger, c.energy, c.totalValue, c.status, c.duration].map(i => w.rowCellText(r, i)).join("|"));
-      g.energy += Number(w.parseNumber(w.readCell(r, c.energy))) || 0;
-      g.revenue += Number(w.parseNumber(w.readCell(r, c.totalValue))) || 0;
+      const rowId = [c.email, c.driver, c.startLocal, c.endLocal, c.endCharge, c.charger, c.energy, c.totalValue, c.status, c.duration].map(i => w.rowCellText(r, i)).join("|");
+      const kwh = Number(w.parseNumber(w.readCell(r, c.energy))) || 0, brl = Number(w.parseNumber(w.readCell(r, c.totalValue))) || 0;
+      g.energy += kwh; g.revenue += brl;
+      if (!g.ids.has(rowId)) { g.ids.add(rowId); g.uEnergy += kwh; g.uRevenue += brl; }
     }
     // Linhas sem data seguem o único mês do mesmo Local (é o que o motor faz ao importar).
     let groups = [...byKey.values()];
     groups.filter(g => g.month === "unknown").forEach(u => {
       const same = groups.filter(g => g.local === u.local && g.month !== "unknown");
-      if (same.length === 1) { const t = same[0]; t.rows.push(...u.rows); u.ids.forEach(x => t.ids.add(x)); t.charges += u.charges; t.energy += u.energy; t.revenue += u.revenue; u.merged = true; }
+      if (same.length === 1) { const t = same[0]; t.rows.push(...u.rows); u.ids.forEach(x => t.ids.add(x)); t.charges += u.charges; t.energy += u.energy; t.revenue += u.revenue; t.uEnergy += u.uEnergy; t.uRevenue += u.uRevenue; u.merged = true; }
     });
     groups = groups.filter(g => !g.merged);
     if (!groups.length) return { file: file.name, error: "planilha sem recargas." };
@@ -200,7 +201,7 @@
           part = new File([X.write(wb, { type: "array", bookType: "xlsx" })], `${base} (${tag}).xlsx`,
             { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         }
-        return { source: file.name, local: g.local, month: g.month === "unknown" ? "" : g.month, charges: g.charges, unique: g.ids.size,
+        return { source: file.name, local: g.local, month: g.month === "unknown" ? "" : g.month, charges: g.charges, unique: g.ids.size, uEnergy: g.uEnergy, uRevenue: g.uRevenue,
           energy: g.energy, revenue: g.revenue, ...routeLocal(w, g.local, hist, works), part, status: "pronto", msg: "" };
       })
     };
@@ -208,12 +209,23 @@
 
   const monthName = mk => { const [y, m] = mk.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(". de ", "/").replace(" de ", "/"); };
 
+  // Estado legível pelo robô (sem os arquivos): window.UBY_SPOTT_STATE.
+  function publishState() {
+    const a = ui.auto;
+    window.UBY_SPOTT_STATE = {
+      running: a.running, errors: [...a.errors], at: new Date().toISOString(),
+      groups: a.groups.map(g => ({ source: g.source, local: g.local, month: g.month, workId: g.workId, auto: !!g.auto, how: g.how,
+        charges: g.charges, unique: g.unique, energy: g.uEnergy, revenue: g.uRevenue, status: g.status, msg: g.msg }))
+    };
+  }
+
   function autoSection(works) {
     const a = ui.auto, label = id => works.find(x => x.id === id)?.label || "";
     const badge = g => g.status === "ok" ? `<span class="badge ok">importado</span>`
       : g.status === "erro" ? `<span class="badge bad">atenção</span>`
       : g.status === "importando" ? `<span class="badge neutral">importando…</span>`
       : g.status === "ignorado" ? `<span class="badge neutral">ignorado</span>`
+      : g.status === "igual" ? `<span class="badge ok">sem novidade</span>`
       : (!g.workId || !g.month) ? `<span class="badge bad">escolha</span>` : `<span class="badge neutral">pronto</span>`;
     const ready = a.groups.filter(g => g.status === "pronto" && g.workId && g.month).length;
     const rows = a.groups.map((g, i) => `<tr>
@@ -394,6 +406,7 @@
         } catch (err) { a.errors.push(`${f.name}: ${err.message}`); }
       }
       a.groups.sort((x, y) => String(x.workId).localeCompare(String(y.workId)) || String(x.month).localeCompare(String(y.month)));
+      publishState();
       draw(target, w, works);
     };
     $("#autoFile").onchange = e => addSpott(e.target.files);
@@ -413,10 +426,14 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
     if (aclear) aclear.onclick = () => { a.groups = []; a.errors = []; draw(target, w, works); };
     const arun = $("#autoRun");
     if (arun) arun.onclick = async () => {
+      const robot = window.UBY_SPOTT_ROBOT === true;
+      // Robô: o que não tem destino certo nunca é importado; fica para conferência manual.
+      if (robot) a.groups.filter(g => g.status === "pronto" && (!g.auto || !g.workId || !g.month))
+        .forEach(g => { g.status = "ignorado"; g.msg = "Sem destino certo: o robô não importa. Confira e importe manualmente."; });
       const todo = a.groups.filter(g => g.status === "pronto" && g.workId && g.month);
-      if (!todo.length) return;
+      if (!todo.length) { publishState(); return; }
       const obras = new Set(todo.map(g => g.workId)).size;
-      if (!confirm(`Importar ${todo.length} planilha(s) da Spott em ${obras} obra(s), no modo "Consolidar no mês"?\n\nRecargas que já estão na base são reconhecidas e não duplicam. Cada importação pode ser desfeita no histórico de backups.`)) return;
+      if (!robot && !confirm(`Importar ${todo.length} planilha(s) da Spott em ${obras} obra(s), no modo "Consolidar no mês"?\n\nRecargas que já estão na base são reconhecidas e não duplicam. Cada importação pode ser desfeita no histórico de backups.`)) return;
       a.running = true;
       let okCount = 0;
       for (const g of todo) {
@@ -425,6 +442,15 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
         try {
           await selectWork(w, g.workId);
           ui.work = g.workId; w.__novaWorkLoaded = true;
+          // Sem novidade: a obra já tem exatamente estas recargas (quantidade, kWh e R$)
+          // deste Local no mês. Não grava de novo (cada gravação guarda um backup da base).
+          const k0 = localKey(w, g.local);
+          const have = (w.eval("allCharges") || []).filter(c => localKey(w, c.rawStation || c._sourceStation) === k0 && w.chargeMonthKey(c) === g.month);
+          const hk = have.reduce((t, c) => t + (Number(c.energyKWh) || 0), 0), hr = have.reduce((t, c) => t + (Number(c.revenue) || 0), 0);
+          if (have.length === g.unique && Math.abs(hk - g.uEnergy) < 0.01 && Math.abs(hr - g.uRevenue) < 0.01) {
+            g.status = "igual"; g.msg = `A obra já tem estas ${have.length} recargas (${fmt.kwh(hk)}, ${fmt.brl(hr)}). Nada a gravar.`;
+            continue;
+          }
           w.document.getElementById("uploadFeedback").innerHTML = "";
           w.document.getElementById("importMonth").value = g.month;
           w.document.getElementById("importMode").value = "merge";
@@ -446,6 +472,7 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
         } catch (err) { g.status = "erro"; g.msg = err.message; log(`Spott ${g.local} ${g.month} → ${err.message}`, "bad"); }
       }
       a.running = false;
+      publishState();
       if (okCount) { refreshPanels(); log(`Importação automática: ${okCount} de ${todo.length} planilha(s) gravadas. Painéis atualizados.`, "ok"); }
       if (location.hash.startsWith("#/importar")) draw(target, w, works);
     };
