@@ -2029,6 +2029,9 @@ function rechargeUniqueKey(charge = {}) {
     ? String(Math.floor(startDate.getTime() / 60000))
     : '';
   const person = rechargePersonIdentity(charge);
+  // Linha repetida na MESMA planilha, mas com fim/energia/valor diferentes, é outra
+  // recarga (ver markDistinctRepeatedRows). As demais mantêm a chave de sempre.
+  const repeat = safeText(charge._repeatSeq).trim();
   if (startMinute) {
     return [
       'session',
@@ -2036,7 +2039,7 @@ function rechargeUniqueKey(charge = {}) {
       normalizeHeaderName(station),
       startMinute,
       person
-    ].join('|');
+    ].concat(repeat ? [repeat] : []).join('|');
   }
   const id = safeText(charge.id).trim();
   const platform = normalizeStationForCompare(charge.sourcePlatform || charge.platform || '');
@@ -2049,6 +2052,51 @@ function rechargeUniqueKey(charge = {}) {
     person,
     Number(charge.energyKWh || 0).toFixed(3)
   ].join('|');
+}
+
+// Nova plataforma (26/09/2026): a mesma exportação nunca lista a mesma recarga
+// duas vezes. Linhas com a mesma chave (mesmo minuto de início e mesmo motorista)
+// só são a mesma recarga se forem idênticas; se o fim, a energia, o valor, o
+// carregador ou o status mudarem, são tentativas/recargas distintas. A versão que
+// o motor sempre preferiu (preferredRechargeVersion) fica com a chave original,
+// para continuar casando com o que já está gravado; as outras recebem _repeatSeq
+// e um id próprio (source_session_id único no Supabase). Entre planilhas
+// diferentes nada muda: reexportar a mesma recarga continua consolidando.
+function markDistinctRepeatedRows(charges = []) {
+  const groups = new Map();
+  charges.forEach(charge => {
+    const key = rechargeUniqueKey(charge);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(charge);
+  });
+  let marked = 0;
+  groups.forEach(list => {
+    if (list.length < 2) return;
+    const signature = charge => [
+      safeText(charge.endStr).trim(), Number(charge.energyKWh || 0).toFixed(3), Number(charge.revenue || 0).toFixed(2),
+      normalizeHeaderName(charge.connType), normalizeHeaderName(charge.paymentStatus), safeText(charge.duration).trim()
+    ].join('|');
+    const distinct = new Map();
+    list.forEach(charge => { if (!distinct.has(signature(charge))) distinct.set(signature(charge), charge); });
+    if (distinct.size < 2) return;
+    // Ordem estável: o resultado não depende da ordem das linhas no arquivo.
+    const versions = [...distinct.values()].sort((a, b) => signature(a).localeCompare(signature(b)));
+    const primary = versions.reduce((best, charge) => preferredRechargeVersion(best, charge) === charge ? charge : best);
+    const suffixBySignature = new Map();
+    versions.filter(v => v !== primary).forEach(v => {
+      const end = safeText(v.endStr).trim();
+      const sameEnd = versions.filter(o => o !== primary && safeText(o.endStr).trim() === end);
+      suffixBySignature.set(signature(v), `fim:${end || 'sem-fim'}` + (sameEnd.length > 1 ? `#${sameEnd.indexOf(v) + 1}` : ''));
+    });
+    list.forEach(charge => {
+      const suffix = suffixBySignature.get(signature(charge));
+      if (!suffix) return;
+      charge._repeatSeq = suffix;
+      charge.id = `${safeText(charge.id).trim()}|${suffix}`;
+      marked++;
+    });
+  });
+  return marked;
 }
 
 function preferredRechargeVersion(current = {}, candidate = {}) {
@@ -2502,6 +2550,7 @@ async function readFile(file) {
       }
       }
       if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
+      markDistinctRepeatedRows(importedCharges);
       const importControlIssues = importedCharges.filter(rechargeControlIssue);
 
       const dateMonths = [...new Set(importedCharges.map(charge => monthKey(charge.startDate)).filter(k => k && k !== 'unknown'))];

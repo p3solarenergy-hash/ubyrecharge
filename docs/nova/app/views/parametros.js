@@ -210,7 +210,7 @@
         startMonth: editing.startMonth, endMonth: editing.endMonth, dueDay: editing.dueDay, method: editing.allocation, shares: (editing.targets || []).map(t => t.share || 0).join(", "),
         documentRef: editing.documentRef, notes: editing.notes,
         targets: eligible.filter(e => (editing.targets || []).some(t => { try { return w.matrizRowsMatch(w.matrizResolveTargetRow(t, eligibleRows), e.row); } catch (_) { return false; } })).map(e => e.scope)
-      } : { name: "", amount: "", category: "Outros custos", supplier: "", kind: "recurring", installments: 1, startMonth: mk, endMonth: "", dueDay: 1, method: "equal", shares: "", documentRef: "", notes: "", targets: [] };
+      } : { name: "", amount: "", category: "Outros custos", supplier: "", kind: "recurring", installments: 1, startMonth: new Date().toISOString().slice(0, 7), endMonth: "", dueDay: 1, method: "equal", shares: "", documentRef: "", notes: "", targets: [] };
     }
     const form = ui.costForm;
     const cats = ["Seguro", "Locacao / aluguel", "Internet / dados", "Manutencao preventiva", "Manutencao corretiva", "Licenca / plataforma", "Tributos corporativos / centralizados", "Marketing", "Administrativo", "Outros custos"];
@@ -232,7 +232,8 @@
             ${inp("name", "Nome do custo")}${inp("amount", "Valor por parcela ou competência (R$)", "number", 'step="0.01" min="0"')}
             ${sel("category", "Categoria", cats.map(c => [c, c]))}${inp("supplier", "Fornecedor")}
             ${sel("kind", "Tipo", [["recurring", "Recorrente mensal"], ["installment", "Parcelado"], ["one_off", "Pontual"]])}${inp("installments", "Parcelas", "number", 'min="1" step="1"')}
-            ${inp("startMonth", "Início", "month")}${inp("endMonth", "Fim (opcional)", "month")}
+            ${inp("startMonth", "Início (primeira competência)", "month")}${inp("endMonth", "Fim (opcional)", "month")}
+            ${form.startMonth && form.startMonth < new Date().toISOString().slice(0, 7) ? `<div class="note" style="grid-column:1/-1;border-color:var(--uby-amber)">Início em ${esc(UBY.state.api?.monthName?.(form.startMonth) || form.startMonth)}: este custo também entra nas competências passadas a partir desse mês e muda o resultado já apurado. Se ele só começou agora, use o mês atual.</div>` : ""}
             ${inp("dueDay", "Dia do vencimento", "number", 'min="1" max="31"')}${sel("method", "Rateio", [["equal", "Rateio igual"], ["power", "Por potência instalada"], ["energy", "Por kWh vendido"], ["revenue", "Por faturamento"], ["custom", "Participação definida"]])}
             ${form.method === "custom" ? inp("shares", "Participações (na ordem dos destinos, ex.: 60, 40)") : ""}${inp("documentRef", "Documento / NF")}
           </div>
@@ -518,7 +519,7 @@
     });
     // --- matriz ---
     if ($("#pmMatrixMonth")) $("#pmMatrixMonth").onchange = e => { ui.matrixMonth = e.target.value; ui.costForm = null; draw(target, w); };
-    target.querySelectorAll("[data-cf]").forEach(el => el.onchange = () => { ui.costForm[el.dataset.cf] = el.value; if (el.dataset.cf === "method") draw(target, w); });
+    target.querySelectorAll("[data-cf]").forEach(el => el.onchange = () => { ui.costForm[el.dataset.cf] = el.value; if (["method", "startMonth"].includes(el.dataset.cf)) draw(target, w); });
     target.querySelectorAll("[data-cf-target]").forEach(el => el.onchange = () => { const s = el.dataset.cfTarget; ui.costForm.targets = el.checked ? [...new Set([...ui.costForm.targets, s])] : ui.costForm.targets.filter(x => x !== s); });
     target.querySelectorAll("[data-cost-edit]").forEach(b => b.onclick = () => { ui.editingCost = b.dataset.costEdit; ui.costForm = null; draw(target, w); });
     if ($("#pmCostCancel")) $("#pmCostCancel").onclick = () => { ui.editingCost = ""; ui.costForm = null; draw(target, w); };
@@ -534,7 +535,7 @@
         if (ui.editingCost) w.editMatrizCost(ui.editingCost); else w.resetMatrizCostForm();
         const set = (id, v) => { const el = w.document.getElementById(id); if (el) el.value = v ?? ""; };
         set("matrizNewName", f.name); set("matrizNewValue", f.amount); set("matrizCostCategory", f.category); set("matrizCostSupplier", f.supplier);
-        set("matrizCostKind", f.kind); set("matrizCostInstallments", f.installments || 1); set("matrizCostStartMonth", f.startMonth || mk); set("matrizCostEndMonth", f.endMonth);
+        set("matrizCostKind", f.kind); set("matrizCostInstallments", f.installments || 1); set("matrizCostStartMonth", f.startMonth || new Date().toISOString().slice(0, 7)); set("matrizCostEndMonth", f.endMonth);
         set("matrizCostDueDay", f.dueDay || 1); set("matrizCostMethod", f.method); set("matrizCostCustomShares", f.shares); set("matrizCostDocument", f.documentRef); set("matrizCostNotes", f.notes);
         const tsel = w.document.getElementById("matrizCostTargets");
         if (tsel) [...tsel.options].forEach(o => { o.selected = f.targets.includes(o.value); });
