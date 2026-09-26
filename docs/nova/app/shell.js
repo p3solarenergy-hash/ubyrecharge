@@ -23,7 +23,6 @@
       { id: "uso", icon: "◔", label: "Análise de uso", type: "view", period: true },
       { id: "clientes", icon: "◎", label: "Clientes", type: "view", period: true },
       { id: "clube", icon: "✦", label: "Clube UBY", type: "view" },
-      { id: "clube-classico", icon: "✧", label: "Clube · participantes e cupons", type: "classic", src: LEGACY + "recargas.html", tab: "clube" },
       { id: "sessoes", icon: "✓", label: "Sessões importadas (consulta)", type: "classic", src: LEGACY + "recargas.html", tab: "detalhes" },
       { id: "recargas", icon: "⌁", label: "Recargas · tela original", type: "classic", src: LEGACY + "recargas.html", tab: "geral" }
     ] },
@@ -322,6 +321,9 @@
     clearCharts();
     const view = VIEWS[def.id];
     const target = $("#view");
+    // Arquivo da tela não carregou (rede instável ou publicação em andamento):
+    // busca de novo sozinho, em vez de derrubar a tela.
+    if (!view) { healView(def.id, target); return; }
     if (!state.api || !state.status) { target.innerHTML = loadingMarkup(); return; }
     // Recortes grandes (acumulado, detalhe com todas as sessões) levam alguns
     // segundos no motor: mostra o aviso antes de bloquear a tela no cálculo.
@@ -339,6 +341,18 @@
       target.style.opacity = "";
       document.getElementById("calcBadge")?.remove();
     }, 30);
+  }
+
+  const healTries = {};
+  function healView(id, target) {
+    const n = (healTries[id] = (healTries[id] || 0) + 1);
+    if (n > 4) { renderError(new Error("Esta tela não carregou. Confira a internet e toque em Tentar de novo.")); return; }
+    target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Carregando a tela…</h2><p>Buscando os arquivos novamente (tentativa ${n}).</p></div>`;
+    const s = document.createElement("script");
+    s.src = `app/views/${encodeURIComponent(id)}.js?r=${Date.now()}`;
+    s.onload = () => { if (VIEWS[id]) healTries[id] = 0; rerender(); };
+    s.onerror = () => setTimeout(rerender, 1500 * n);
+    document.body.appendChild(s);
   }
 
   function loadingMarkup() {

@@ -765,6 +765,109 @@
     };
   }
 
+  // Clube UBY com a base na nuvem (linha "club-uby"): parceiros, usos de cupons
+  // e participantes importados. Só leitura aqui; a gravação é da tela Clube.
+  let clubCloud = { payload: null, updatedAt: null, loadedAt: 0, error: "" };
+  async function clubCloudLoad(force) {
+    if (!force && clubCloud.loadedAt && Date.now() - clubCloud.loadedAt < 60000) return clubCloud;
+    try {
+      const r = await window.UBY_SUPABASE.loadClubData();
+      clubCloud = { payload: r.payload, updatedAt: r.updatedAt, loadedAt: Date.now(), error: "" };
+    } catch (err) { clubCloud = { ...clubCloud, loadedAt: Date.now(), error: err.message || String(err) }; }
+    const manual = clubCloud.payload?.participants?.rows;
+    if (Array.isArray(manual) && manual.length) { try { mergeClubParticipants(manual, "nuvem (importação)"); } catch (_) {} }
+    return clubCloud;
+  }
+  function clubCouponSummary(rowsAll, mk, monthClients, participants) {
+    const eligible = rowsAll.filter(r => !mk || String(r.dateKey || "").startsWith(`${mk}-`));
+    const pLookup = clubParticipantLookup(participants);
+    const cLookup = new Map();
+    monthClients.forEach(c => clubParticipantKeys(c).forEach(k => { if (!cLookup.has(k)) cLookup.set(k, c); }));
+    const matchedClients = new Set();
+    const groups = new Map();
+    eligible.forEach(row => {
+      const keys = clubParticipantKeys(row);
+      const participant = keys.map(k => pLookup.get(k)).find(Boolean);
+      const client = keys.map(k => cLookup.get(k)).find(Boolean);
+      const ck = client ? clubParticipantKey(client) : "";
+      if (ck) matchedClients.add(ck);
+      const coupon = String(row.coupon || "").trim() || "SEM CÓDIGO";
+      const g = groups.get(coupon) || { coupon, uses: 0, clubMatches: 0, clients: new Map(), value: 0, discount: 0 };
+      g.uses += 1; g.clubMatches += participant ? 1 : 0; g.value += n0(row.value); g.discount += n0(row.discount);
+      if (client && ck) g.clients.set(ck, client);
+      groups.set(coupon, g);
+    });
+    return {
+      total: rowsAll.length, undated: rowsAll.filter(r => !r.dateKey).length, uses: eligible.length,
+      clubMatches: eligible.filter(r => clubParticipantKeys(r).some(k => pLookup.has(k))).length,
+      value: sumBy(eligible, r => r.value), discount: sumBy(eligible, r => r.discount),
+      clientsRevenue: [...matchedClients].reduce((s, k) => s + n0(cLookup.get(k)?.revenue), 0),
+      groups: [...groups.values()].sort((a, b) => b.uses - a.uses || b.value - a.value).map(g => ({ coupon: g.coupon, uses: g.uses, clubMatches: g.clubMatches, clients: g.clients.size,
+        value: g.value, discount: g.discount, revenue: [...g.clients.values()].reduce((s, c) => s + n0(c.revenue), 0) })),
+      rows: eligible.slice(0, 500).map(r => ({ key: r.key || couponControlIdentityKey(r), dateKey: r.dateKey, coupon: r.coupon, name: r.name, email: r.email, phone: r.phone, partner: r.partner, value: n0(r.value), discount: n0(r.discount), status: r.status || "" }))
+    };
+  }
+  async function clubData(monthKey, force) {
+    await waitForReady();
+    await clubCloudLoad(force);
+    const base = club(monthKey);
+    const payload = clubCloud.payload || {};
+    const participants = clubParticipantsStore().rows;
+    const charges = getUbyOperationCharges(getGeneralUnitData()).filter(c => Number(c.revenue || 0) > 0);
+    const monthCharges = base.monthKey ? charges.filter(c => chargeMonthKey(c) === base.monthKey) : [];
+    const consumedKeys = new Set();
+    clubClientRows(charges).forEach(r => clubParticipantKeys(r).forEach(k => consumedKeys.add(k)));
+    return JSON.parse(JSON.stringify({
+      ...base,
+      cloud: { exists: !!clubCloud.payload, updatedAt: clubCloud.updatedAt, error: clubCloud.error, legacyImportedAt: payload.legacyImportedAt || "" },
+      partners: Array.isArray(payload.partners) ? payload.partners : [],
+      coupons: clubCouponSummary(Array.isArray(payload.coupons?.rows) ? payload.coupons.rows : [], base.monthKey, clubClientRows(monthCharges), participants),
+      couponsMeta: { updatedAt: payload.coupons?.updatedAt || "", source: payload.coupons?.source || "" },
+      participantsList: participants.map(p => ({ key: clubParticipantKey(p), name: p.name, phone: p.phone, email: p.email, createdAt: p.createdAtMs ? new Date(p.createdAtMs).toISOString() : "",
+        vehicle: [p.vehicleBrand, p.vehicleModel].filter(Boolean).join(" "), plate: p.vehiclePlate || "", lgpd: !!p.acceptedLgpd, regulation: !!p.acceptedRegulation,
+        desiredBenefit: p.desiredBenefit || "", region: p.regionInterest || "", indication: [p.indication, p.indicationContact].filter(Boolean).join(" · "),
+        consumes: clubParticipantKeys(p).some(k => consumedKeys.has(k)) })),
+      manualParticipants: Array.isArray(payload.participants?.rows) ? payload.participants.rows.length : 0
+    }));
+  }
+  // CSV com separador escolhido e aspas ("a;b" dentro de aspas não quebra a coluna).
+  function splitDelimited(text, sep) {
+    const out = []; let row = [], cell = "", quoted = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (quoted) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else quoted = false; } else cell += ch; continue; }
+      if (ch === '"') quoted = true;
+      else if (ch === sep) { row.push(cell); cell = ""; }
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); cell = ""; if (row.some(c => String(c).trim())) out.push(row); row = []; }
+      else cell += ch;
+    }
+    row.push(cell); if (row.some(c => String(c).trim())) out.push(row);
+    return out;
+  }
+  // Leitura de planilha (CSV/Excel) para as importações do Clube, com as mesmas regras da plataforma.
+  async function clubParseSheet(file, kind) {
+    const buffer = await file.arrayBuffer();
+    let rows = [];
+    if (/\.csv$/i.test(file.name) || /csv/i.test(file.type || "")) {
+      const text = new TextDecoder("utf-8").decode(buffer).replace(/^﻿/, "");
+      const first = text.split(/\r?\n/, 1)[0] || "";
+      // Excel em português exporta CSV com ";" — lê os dois formatos.
+      rows = (first.split(";").length > first.split(",").length) ? splitDelimited(text, ";") : parseCsvRows(text);
+    } else {
+      const XLSX = await ensureSpreadsheetLibrary();
+      const wb = XLSX.read(new Uint8Array(buffer), { type: "array" });
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, blankrows: false });
+    }
+    // Valor com ponto decimal ("45.00") viraria 4.500 na leitura brasileira: normaliza para "45,00".
+    rows = rows.map(r => Array.isArray(r) ? r.map(c => (typeof c === "string" && /^\s*(R\$\s*)?-?\d+\.\d{1,2}\s*$/.test(c)) ? c.replace(".", ",") : c) : r);
+    const out = kind === "coupons" ? couponControlRowsFromSheet(rows).map(r => ({ ...r, key: couponControlIdentityKey(r) })) : clubParticipantsFromRows(rows);
+    return JSON.parse(JSON.stringify(out));
+  }
+  async function clubSyncForm() {
+    const merged = await syncClubParticipantsFromSheet({ force: true, silent: true });
+    return { total: (merged || []).length };
+  }
+
   // ---------------------------------------------------------------------
   // Análise de uso (Geral de recargas + Painel mensal por estação):
   // horários, permanência, dia da semana, cupons, pagamentos, ociosidade,
@@ -1643,7 +1746,7 @@
     return out;
   }
 
-  window.UBY_MOTOR_API = { waitForReady, energyInvoices, loadFull, status, months, monthName, command, companyResults, stations, stationDetail, works, usage, networkConfig,
+  window.UBY_MOTOR_API = { waitForReady, energyInvoices, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,

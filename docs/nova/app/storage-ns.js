@@ -37,5 +37,11 @@
     };
     Object.defineProperty(S, "length", { configurable: true, get: function () { return isLocal(this) ? ownKeys(this).length : lenGet.call(this); } });
     S.__novaNs = true;
+    // Só leitura de dados do Clube que a plataforma atual guardou neste navegador,
+    // para importar para a nuvem. Não grava nem apaga nada da plataforma atual.
+    window.__novaLegacyRead = function (k) {
+      if (!/^uby-club-/.test(String(k || ""))) return null;
+      try { return get.call(window.localStorage, String(k)); } catch (e) { return null; }
+    };
   } catch (e) { console.error("[nova] isolamento de armazenamento indisponível", e); }
 })();

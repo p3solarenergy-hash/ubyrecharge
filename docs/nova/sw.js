@@ -23,10 +23,17 @@ self.addEventListener("fetch", event => {
   event.respondWith(
     // "no-cache": sempre confere com o servidor. Sem isso o GitHub Pages deixa o
     // aparelho usar a cópia antiga por até 10 minutos depois de cada publicação.
-    fetch(req, { cache: "no-cache" }).then(res => {
+    fetch(req, { cache: "no-cache" }).then(async res => {
       if (res.ok && res.type === "basic") {
         const copy = res.clone();
         caches.open(CACHE).then(cache => cache.put(req, copy)).catch(() => {});
+        return res;
+      }
+      // Durante uma publicação o GitHub Pages responde 404/5xx por alguns segundos:
+      // usa a última cópia boa do arquivo em vez de repassar o erro.
+      if (res.status === 404 || res.status >= 500) {
+        const hit = await caches.match(req, { ignoreSearch: true });
+        if (hit) return hit;
       }
       return res;
     }).catch(async () => {

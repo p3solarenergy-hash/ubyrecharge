@@ -75,6 +75,15 @@
     storage: { "obra-documentos": ["upload"] },
     rpcs: []
   };
+  // NOVA PLATAFORMA (usuário: "o resto siga" — Clube UBY editável na nova):
+  // parceiros, usos de cupons e participantes importados ficam na linha
+  // própria "club-uby" de uby_financial_matrix (a plataforma atual só lê/grava
+  // "shared-costs"). Gravação só pela página mínima clube-gravacao.html.
+  const CLUB_SCOPE = {
+    name: "clube",
+    tables: { uby_financial_matrix: ["upsert"], app_audit_log: ["insert"] },
+    rpcs: []
+  };
   const OBRAS_PAGES = /\/legado\/(obra-ev\/(index\.html|gestao_obra_ev_detalhe\.html|mapa-implantacao\.html|engenharia\.html)?|tarefas\/(index\.html)?)$/;
   const OBRAS_ROUTES = /^#\/((obras-classico|mapa-classico|engenharia|tarefas-classico)(\/|$)|abrir\/legado(%2F|\/)obra-ev(%2F|\/)gestao_obra_ev_detalhe)/i;
   function writeScope() {
@@ -86,6 +95,7 @@
       if (embedded && params.get("nova_params") === "1" && /^#\/parametros/.test(hash)) return PARAMS_SCOPE;
       const frameId = (window.frameElement && window.frameElement.id) || "";
       if (embedded && frameId === "classicFrame" && OBRAS_PAGES.test(location.pathname) && OBRAS_ROUTES.test(hash)) return OBRAS_SCOPE;
+      if (embedded && frameId === "clubFrame" && /\/legado\/obra-ev\/clube-gravacao\.html$/.test(location.pathname) && /^#\/clube(\/|$)/.test(hash)) return CLUB_SCOPE;
       return null;
     } catch (_) { return null; }
   }
@@ -676,6 +686,35 @@
     };
   }
 
+  // Clube UBY na nuvem (linha própria, nunca a "shared-costs").
+  const CLUB_DOC_ID = "club-uby";
+  async function loadClubData() {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    if (!(await currentUser())) throw new Error("Entre na plataforma para ler o Clube UBY.");
+    const { data, error } = await sb.from("uby_financial_matrix").select("payload,updated_at").eq("id", CLUB_DOC_ID).maybeSingle();
+    if (error) throw error;
+    return { payload: data?.payload && typeof data.payload === "object" ? data.payload : null, updatedAt: data?.updated_at || null };
+  }
+  // Relê a nuvem, aplica a alteração (mutate) e grava — nunca a partir de cópia velha.
+  async function saveClubData(mutate, summary = {}) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre na plataforma antes de salvar o Clube UBY.");
+    const current = await loadClubData();
+    const base = JSON.parse(JSON.stringify(current.payload || {}));
+    const next = await mutate(base);
+    if (!next || typeof next !== "object") throw new Error("Alteração do Clube inválida. Nada foi gravado.");
+    next.updatedAt = new Date().toISOString();
+    const { data, error } = await sb.from("uby_financial_matrix")
+      .upsert({ id: CLUB_DOC_ID, payload: next, updated_by: user.id, updated_at: next.updatedAt }, { onConflict: "id" })
+      .select("id,updated_at").single();
+    if (error) throw error;
+    await insertAuditLog(sb, user, { modulo: "clube", entidadeTipo: "uby_financial_matrix", entidadeId: CLUB_DOC_ID, acao: summary.acao || "save_club", resumo: summary });
+    return { payload: next, updatedAt: data?.updated_at || next.updatedAt };
+  }
+
   async function saveFinancialMatrix(matrizCosts = [], networkDistribution) {
     const sb = client();
     if (!sb) throw new Error("Supabase ainda nao configurado.");
@@ -1247,6 +1286,8 @@
     loadRechargeWorks,
     upsertProspects,
     uploadDocumentFile,
+    loadClubData,
+    saveClubData,
     saveRechargeBase,
     saveRechargeMetadata,
     loadFinancialMatrix,

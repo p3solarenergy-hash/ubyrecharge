@@ -15,7 +15,7 @@
       { t: "Horário e disponibilidade das estações", d: "Base do cálculo de ocupação: dias e horas de funcionamento, início da operação e conectores.", freq: "quando mudar o funcionamento", route: P("operacao"), where: "Parâmetros e custos · Operação e carregadores · Horários e cortesia" },
       { t: "Potência do local", d: "Potência total do local (ex.: 2 × 7 kW = 14 kW), usada na ocupação e no rateio por potência.", freq: "quando mudar o equipamento", route: P("operacao"), where: "Parâmetros e custos · Operação e carregadores" },
       { t: "Cortesias", d: "Quem recarrega de cortesia e quem absorve o custo (operação, parceiro ou UBY).", freq: "quando mudar", route: P("operacao"), where: "Parâmetros e custos · Operação e carregadores · Horários e cortesia" },
-      { t: "Clube UBY", d: "Sincronizar o formulário de cadastro, participantes, cupons e parcerias.", freq: "mensal", route: "#/clube-classico", original: true, where: "Clube · tela original (migração em andamento)" }
+      { t: "Clube UBY", d: "Sincronizar o formulário de cadastro, participantes, cupons e parcerias.", freq: "mensal", route: "#/clube", where: "Clube UBY · abas Participantes, Parceiros e Cupons" }
     ] },
     { title: "Financeiro", items: [
       { t: "Configuração financeira de cada carregador", d: "Modelo (UBY, parceiro, P3), % gestão, plataforma, área e royalty, energia e fatura Copel/arrendamento, investimento, metas, receitas e custos extras, por competência. Escolha a estação:", freq: "mensal (fechamento)", stations: true, where: "Parâmetros e custos · Por carregador" },
