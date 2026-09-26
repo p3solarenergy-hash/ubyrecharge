@@ -76,7 +76,7 @@
       <p style="margin:0 0 12px"><a href="#/unidades" style="font-weight:800;font-size:12px">← Unidades e carregadores</a></p>
       <div class="hero"><div><p class="eyebrow">Unidade operacional · ${esc(d.workName)}</p><h1>${esc(d.station)}</h1>
         <p class="lead">${d.power ? `${fmt.int(d.power)} kW · ` : ""}${esc(d.schedule || "disponibilidade padrão")}</p></div>
-        <div class="callout"><strong>${esc(periodLabel)} · ocupação ${fmt.pct(d.occupancy)} (${esc(d.band)})</strong><small>${fmt.n1(d.hours)} h disponíveis no período. <a href="${classicHref}" target="_blank" rel="noopener">Abrir relatório completo da estação (clássico) ↗</a></small>
+        <div class="callout"><strong>${esc(periodLabel)} · ocupação ${fmt.pct(d.occupancy)} (${esc(d.band)})</strong><small>${fmt.n1(d.hours)} h disponíveis no período. <a href="#/financeiro/estacao">Financeiro da estação</a> · <a href="#/parametros/carregador/${encodeURIComponent(`${d.workId}|${d.station}`)}">Editar valores</a> · <a href="#/parametros/operacao/${encodeURIComponent(`${d.workId}|${d.station}`)}">Horários e potência</a></small>
           <p style="margin:10px 0 0"><a class="btn primary link-btn" href="#/importar/${encodeURIComponent(d.workId)}/${month || new Date().toISOString().slice(0, 7)}/${encodeURIComponent(location.hash)}/${encodeURIComponent(d.station)}">⇪ Importar planilha desta estação</a></p></div></div>
 
       <div class="grid g6" style="margin-bottom:18px">

@@ -30,7 +30,7 @@
         </select></label>
         <span class="badge ${UBY.isUbyModel(f.model) ? (partner ? "partner" : "ok") : "neutral"}">${esc(UBY.modelLabel(f.model))}</span><span class="spacer"></span>
         <a class="btn primary link-btn" href="#/importar/${encodeURIComponent(workId)}/${mk || UBY.state.months.at(-1) || new Date().toISOString().slice(0, 7)}/${encodeURIComponent("#/financeiro/estacao")}/${encodeURIComponent(station)}">⇪ Importar planilha desta estação</a>
-        <a class="btn link-btn" href="https://p3solarenergy-hash.github.io/ubyrecharge/obra-ev/recargas.html?obra=${encodeURIComponent(workId)}&openReport=financeiro&station=${encodeURIComponent(station)}" target="_blank" rel="noopener">Editar valores (publicada) ↗</a></div>
+        <a class="btn link-btn" href="#/parametros/carregador/${encodeURIComponent(`${workId}|${station}`)}">Editar valores</a></div>
 
       <section class="section"><div class="section-head"><div><p class="kicker">${esc(s.label)} · ${esc(s.workName)}</p><h2>${esc(s.station)}</h2><p>Cálculo financeiro do carregador na competência. Custos da matriz entram já rateados.</p></div>
           <div class="meta">Gestão ${fmt.pct1(st.managementPct)} · plataforma ${fmt.pct1(st.platformPct)} · tributos ${fmt.pct1(st.taxRatePct)}${st.ubyRoyaltyPct ? ` · royalty ${fmt.pct1(st.ubyRoyaltyPct)}` : ""}<br>energia ${fmt.brl(f.energyRate)}/kWh · investimento ${fmt.brl(st.investmentValue)}</div></div>
@@ -191,7 +191,7 @@
     return `
       <div class="hero"><div><p class="eyebrow">Gestão e governança · ${esc(f.period.label)}</p><h1>Financeiro e fechamento</h1>
         <p class="lead">Resultado dos ativos UBY, DRE por competência, custos centrais com rateio, agenda de caixa e distribuição aos cotistas. Parceiros ficam fora da matriz: entram só os royalties.</p></div>
-        <div class="callout"><strong>Leitura das regras da plataforma</strong><small>Mesmo motor de financeiro.html. Para editar custos, marcar pagamentos ou salvar a política da rodada, use <a href="#/financeiro-edicao">Financeiro · edição (clássico)</a>.</small></div></div>
+        <div class="callout"><strong>Leitura das regras da plataforma</strong><small>Mesmo motor de financeiro.html. Para editar custos, marcar pagamentos, anexar documentos, lançar impostos ou mudar a política da rodada, use <a href="#/parametros">Parâmetros e custos</a>.</small></div></div>
       <div class="toolbar"><div class="seg" id="finTabs">${TABS.map(([id, label]) => `<button data-tab="${id}" class="${tab === id ? "on" : ""}">${label}</button>`).join("")}</div></div>`;
   }
 

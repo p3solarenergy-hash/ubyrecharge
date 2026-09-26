@@ -258,7 +258,7 @@
       </div>
 
       <section class="section">
-        <div class="section-head"><div><p class="kicker">Classificação</p><h2>Carregadores e regra de inclusão na operação UBY</h2><p>Mostra por que cada carregador entra ou não no comando: DC automático, Aurora AC automático, ajuste manual ou fora por padrão. Alterações continuam na plataforma publicada.</p></div></div>
+        <div class="section-head"><div><p class="kicker">Classificação</p><h2>Carregadores e regra de inclusão na operação UBY</h2><p>Mostra por que cada carregador entra ou não no comando: DC automático, Aurora AC automático, ajuste manual ou fora por padrão. Para alterar: <a href="#/parametros/operacao">Parâmetros e custos → Operação e carregadores</a>.</p></div></div>
         <div class="table-wrap" style="max-height:420px"><table><thead><tr><th>Obra</th><th>Estação</th><th>Tipo</th><th>Na operação UBY</th><th>Regra</th><th>Modelo</th><th class="num">Recargas</th><th class="num">Energia</th><th class="num">Faturamento</th></tr></thead>
           <tbody>${r.chargerTable.map(row => `<tr class="${row.included ? "" : "muted"}"><td>${esc(row.workName)}</td><td><strong>${esc(row.station)}</strong></td><td><span class="badge ${row.kind}">${kindLabel(row.kind)}</span></td>
             <td>${row.included ? '<span class="badge ok">sim</span>' : '<span class="badge neutral">não</span>'}</td><td>${esc(row.ruleSource)}</td><td>${esc(row.included ? modelLabel(row.model) : "—")}</td>

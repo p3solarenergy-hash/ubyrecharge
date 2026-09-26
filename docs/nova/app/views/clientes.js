@@ -104,7 +104,7 @@
       ui.sort === "name" ? String(a.name).localeCompare(String(b.name), "pt-BR") : Number(b[ui.sort] || 0) - Number(a[ui.sort] || 0));
     const tot = registry.rows.reduce((a, r) => ({ transactions: a.transactions + r.transactions, energy: a.energy + r.energy, spent: a.spent + r.spent }), { transactions: 0, energy: 0, spent: 0 });
     return `
-      <section class="section"><div class="section-head"><div><p class="kicker">Base oficial · recharge_customers</p><h2>Cadastro geral de clientes</h2><p>Base consolidada importada das plataformas de recarga. Importações novas continuam na plataforma publicada.</p></div><div class="meta">atualizada ${fmt.dt(registry.updatedAt)}</div></div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Base oficial · recharge_customers</p><h2>Cadastro geral de clientes</h2><p>Base consolidada importada das plataformas de recarga. Importações novas: <a href="#/importar">Importar planilhas</a>.</p></div><div class="meta">atualizada ${fmt.dt(registry.updatedAt)}</div></div>
         <div class="grid g4" style="margin-bottom:14px">
           ${kpi("Clientes", fmt.int(registry.rows.length), "cadastros únicos", "", "lead")}
           ${kpi("Transações", fmt.int(tot.transactions), "acumulado informado")}

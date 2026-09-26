@@ -24,7 +24,7 @@
         <td class="num">${r.energyCostPerKWh ? `${fmt.brl(r.energyCostPerKWh)}/kWh` : "—"}<small>${esc(r.energyBillingMode)}</small></td>
         <td class="num">${r.investmentValue ? fmt.brl(r.investmentValue) : "—"}${r.investmentValue ? `<small>cotas ${fmt.pct1(r.investorQuotaPct)} · retenção ${fmt.pct1(r.saRetentionPct)}</small>` : ""}</td>
         <td style="white-space:normal;min-width:200px"><small style="color:var(--uby-muted)">${esc(rulesText(r.costRules) || "sem custos fixos")}${r.revenueRules.some(x => x.value) ? `<br>Receitas: ${esc(rulesText(r.revenueRules))}` : ""}</small></td>
-        <td><a class="btn link-btn" target="_blank" rel="noopener" href="${PUB}recargas.html?obra=${encodeURIComponent(r.workId)}&openReport=financeiro&station=${encodeURIComponent(r.station)}">Editar ↗</a></td>
+        <td style="white-space:nowrap"><a class="btn link-btn" href="#/parametros/carregador/${encodeURIComponent(`${r.workId}|${r.station}`)}">Editar valores</a> <a class="btn ghost link-btn" href="#/parametros/operacao/${encodeURIComponent(`${r.workId}|${r.station}`)}">Horários</a></td>
       </tr>`).join("")}</tbody></table></div>`;
   }
 
@@ -37,7 +37,7 @@
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Gestão e governança</p><h1>Configuração da rede</h1>
         <p class="lead">Todos os carregadores e os parâmetros que a plataforma usa nos cálculos: inclusão na operação UBY, modelo, horário, percentuais, energia, investimento e custos fixos.</p></div>
-        <div class="callout"><strong>Valores vigentes${month ? ` em ${esc(UBY.state.api.monthName(month))}` : ""}</strong><small>Só leitura. Para alterar, use "Editar ↗" na linha do carregador (abre o financeiro da estação na plataforma publicada). Inclusão na operação UBY e horários ficam na aba UBY e na aba Geral da publicada.</small></div></div>
+        <div class="callout"><strong>Valores vigentes${month ? ` em ${esc(UBY.state.api.monthName(month))}` : ""}</strong><small>Para alterar, use "Editar valores" (parâmetros financeiros por competência) ou "Horários" (funcionamento, potência, inclusão na UBY e cortesias) na linha do carregador. Tudo é editado aqui na nova, em Parâmetros e custos.</small></div></div>
 
       <section class="section"><div class="grid g4">
         ${kpi("Na operação UBY", fmt.int(inOp.length), `${inOp.filter(r => r.kind === "dc").length} DC · ${inOp.filter(r => r.kind === "ac").length} AC`, "", "lead")}

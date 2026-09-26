@@ -41,8 +41,7 @@
       { id: "configuracao", icon: "⚙", label: "Configuração da rede", type: "view" },
       { id: "parametros", icon: "✎", label: "Parâmetros e custos", type: "view" },
       { id: "auditoria", icon: "✓", label: "Auditoria do motor financeiro", type: "view" },
-      { id: "financeiro-edicao", icon: "✎", label: "Financeiro · edição", type: "classic", src: LEGACY + "financeiro.html" },
-      { id: "operacao-uby", icon: "◆", label: "Operação UBY e relatórios", type: "classic", src: LEGACY + "recargas.html", tab: "uby" },
+      { id: "operacao-uby", icon: "◆", label: "Relatórios antigos (consulta)", type: "classic", src: LEGACY + "recargas.html", tab: "uby" },
       { id: "tarefas", icon: "☰", label: "Tarefas", type: "view" },
       { id: "tarefas-classico", icon: "✎", label: "Tarefas · edição", type: "classic", src: "legado/tarefas/index.html" }
     ] }

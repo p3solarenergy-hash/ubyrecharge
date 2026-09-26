@@ -409,7 +409,14 @@
   }
 
   // ---------- render ----------
-  async function render(target) {
+  const TAB_IDS = ["carregador", "operacao", "matriz", "pagamentos", "documentos", "cotas"];
+  async function render(target, params = []) {
+    if (TAB_IDS.includes(params[0])) {
+      ui.tab = params[0];
+      const ref = params[1] ? decodeURIComponent(params[1]) : "";
+      if (ref && ui.tab === "carregador" && ref !== ui.charger) { ui.charger = ref; ui.edits = {}; ui.rules = null; }
+      if (ref && ui.tab === "operacao") { ui.opCharger = ref; ui.opForm = null; }
+    }
     target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Abrindo parâmetros e custos</h2><p>Carregando a plataforma original com a base completa. Na primeira vez leva alguns segundos.</p></div>`;
     let w;
     try { w = await engine(); } catch (err) { target.innerHTML = `<div class="loading"><h2>Não foi possível abrir</h2><p>${esc(err.message)}</p></div>`; return; }
