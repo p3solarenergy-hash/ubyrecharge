@@ -293,7 +293,8 @@
     const sel = rows.find(r => key(r) === ui.opCharger) || null;
     if (sel && !ui.opForm) {
       const c = w.stationAvailabilityFor(sel.workId, sel.station, sel.workName);
-      ui.opForm = { ...c, courtesyUsersText: (c.courtesyUsers || []).join("\n"), openDays: (c.openDays || [0, 1, 2, 3, 4, 5, 6]).map(String) };
+      ui.opForm = { ...c, courtesyUsersText: (c.courtesyUsers || []).join("\n"), openDays: (c.openDays || [0, 1, 2, 3, 4, 5, 6]).map(String),
+        dayHours: Object.fromEntries(Object.entries(c.dayHours || {}).map(([d, r]) => [String(d), { ...r }])) };
     }
     const f = ui.opForm || {};
     const can = canWrite(w) && !busy ? "" : "disabled";
@@ -323,6 +324,16 @@
         </div>
         <p style="margin:10px 0 4px;font-size:11px;font-weight:800">Dias de funcionamento</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">${DAYS.map(([v, l]) => `<label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" data-of-day="${v}" ${(f.openDays || []).includes(v) ? "checked" : ""}>${l}</label>`).join("")}</div>
+        <p style="margin:12px 0 4px;font-size:11px;font-weight:800">Horário por dia da semana</p>
+        <p class="source-line" style="margin:0 0 6px">Marque "Horário próprio" no dia que funciona diferente do horário geral (ex.: domingo das 10:00 às 18:00). Os demais dias seguem o horário geral acima.</p>
+        <div class="table-wrap"><table><thead><tr><th>Dia</th><th>Horário próprio</th><th>Funcionamento</th><th>Abre</th><th>Fecha</th></tr></thead><tbody>
+          ${DAYS.filter(([v]) => (f.openDays || []).includes(v)).map(([v, l]) => { const r = (f.dayHours || {})[v]; return `<tr>
+            <td><strong>${l}</strong></td>
+            <td><input type="checkbox" data-dh-on="${v}" ${r ? "checked" : ""}></td>
+            <td>${r ? `<select class="select" data-dh="${v}|open24h"><option value="0" ${r.open24h === true ? "" : "selected"}>Horário definido</option><option value="1" ${r.open24h === true ? "selected" : ""}>24 horas</option></select>` : `<small>${f.open24h === false ? `${esc(f.openTime || "08:00")} às ${esc(f.closeTime || "22:00")}` : "24 horas"} (geral)</small>`}</td>
+            <td>${r && r.open24h !== true ? `<input class="select" type="time" data-dh="${v}|openTime" value="${esc(r.openTime || "08:00")}">` : ""}</td>
+            <td>${r && r.open24h !== true ? `<input class="select" type="time" data-dh="${v}|closeTime" value="${esc(r.closeTime || "22:00")}">` : ""}</td></tr>`; }).join("")}
+        </tbody></table></div>
         ${field("Usuários de cortesia (um por linha: e-mail, nome ou telefone)", `<textarea class="select" data-of="courtesyUsersText" rows="4" style="width:100%;height:auto;padding:8px">${esc(f.courtesyUsersText || "")}</textarea>`)}
         <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="pmOpSave" type="button" ${can}>Salvar configuração</button><button class="btn" id="pmOpCancel" type="button">Fechar</button></div>
       </section>` : ""}`;
@@ -545,7 +556,18 @@
     target.querySelectorAll("[data-op-cfg]").forEach(b => b.onclick = () => { ui.opCharger = ui.opCharger === b.dataset.opCfg ? "" : b.dataset.opCfg; ui.opForm = null; draw(target, w); });
     if ($("#pmOpCancel")) $("#pmOpCancel").onclick = () => { ui.opCharger = ""; ui.opForm = null; draw(target, w); };
     target.querySelectorAll("[data-of]").forEach(el => el.onchange = () => { const k = el.dataset.of; ui.opForm[k] = k === "open24h" ? el.value === "1" : el.value; if (k === "open24h") draw(target, w); });
-    target.querySelectorAll("[data-of-day]").forEach(el => el.onchange = () => { const d = el.dataset.ofDay; ui.opForm.openDays = el.checked ? [...new Set([...(ui.opForm.openDays || []), d])] : (ui.opForm.openDays || []).filter(x => x !== d); });
+    target.querySelectorAll("[data-of-day]").forEach(el => el.onchange = () => { const d = el.dataset.ofDay; ui.opForm.openDays = el.checked ? [...new Set([...(ui.opForm.openDays || []), d])] : (ui.opForm.openDays || []).filter(x => x !== d); draw(target, w); });
+    target.querySelectorAll("[data-dh-on]").forEach(el => el.onchange = () => {
+      const d = el.dataset.dhOn; ui.opForm.dayHours = ui.opForm.dayHours || {};
+      if (el.checked) ui.opForm.dayHours[d] = { open24h: false, openTime: ui.opForm.openTime || "08:00", closeTime: ui.opForm.closeTime || "22:00" };
+      else delete ui.opForm.dayHours[d];
+      draw(target, w);
+    });
+    target.querySelectorAll("[data-dh]").forEach(el => el.onchange = () => {
+      const [d, k] = el.dataset.dh.split("|"); const r = ui.opForm.dayHours[d];
+      r[k] = k === "open24h" ? el.value === "1" : el.value;
+      if (k === "open24h") draw(target, w);
+    });
     target.querySelectorAll("[data-op-toggle]").forEach(el => el.onchange = () => {
       const [workId, key, station] = el.dataset.opToggle.split("|");
       const on = el.checked;
@@ -574,7 +596,10 @@
         set("stationLayoutReferenceTariff", f.referenceTariffPerKwh); set("stationLayoutCourtesyTreatment", f.courtesyTreatment || "operational");
         set("stationLayoutCourtesyResponsible", f.courtesyResponsible); set("stationLayoutCourtesyUsers", f.courtesyUsersText);
         d.querySelectorAll(".station-open-day").forEach(i => { i.checked = (f.openDays || []).includes(String(i.value)); });
-        await w.saveStationLayoutConfiguration();
+        const openSet = new Set((f.openDays || []).map(String));
+        w.__novaDayHours = Object.fromEntries(Object.entries(f.dayHours || {}).filter(([d]) => openSet.has(String(d)))
+          .map(([d, r]) => [d, r.open24h === true ? { open24h: true } : { open24h: false, openTime: r.openTime || "08:00", closeTime: r.closeTime || "22:00" }]));
+        try { await w.saveStationLayoutConfiguration(); } finally { delete w.__novaDayHours; }
         try { d.getElementById("stationLayoutDialog")?.close(); } catch (_) {}
         checkPending(w);
         ui.opForm = null;

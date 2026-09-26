@@ -279,6 +279,11 @@ async function saveStationLayoutConfiguration() {
   };
   const source = allRechargeRecords[workId] || localRecord(workId) || rechargeMetadataSeed(workId);
   const availability = { ...(source.stationAvailability || source.summary?.stationAvailability || {}) };
+  // NOVA PLATAFORMA: horário próprio por dia da semana. A tela nova envia em
+  // window.__novaDayHours; sem isso, preserva o que já estava salvo.
+  const previousDayHours = availability[stationAvailabilityKey(sourceName)]?.dayHours;
+  const dayHours = window.__novaDayHours !== undefined ? window.__novaDayHours : previousDayHours;
+  if (dayHours && typeof dayHours === 'object' && Object.keys(dayHours).length) config.dayHours = dayHours;
   availability[stationAvailabilityKey(sourceName)] = config;
   const updatedAt = new Date().toISOString();
   const record = {
@@ -320,11 +325,16 @@ function stationAvailableHours(config, start, end) {
     if (openDays.has(cursor.getDay())) {
       let availableStart = new Date(cursor);
       let availableEnd = new Date(cursor);
-      if (config?.open24h !== false) {
+      // NOVA PLATAFORMA: exceção de horário por dia da semana (ex.: domingo diferente).
+      const dayRule = config?.dayHours?.[cursor.getDay()] || config?.dayHours?.[String(cursor.getDay())] || null;
+      const is24h = dayRule ? dayRule.open24h === true : config?.open24h !== false;
+      const openAt = dayRule ? dayRule.openTime : config?.openTime;
+      const closeAt = dayRule ? dayRule.closeTime : config?.closeTime;
+      if (is24h) {
         availableEnd.setDate(availableEnd.getDate() + 1);
       } else {
-        availableStart.setMinutes(timeMinutes(config.openTime, 0));
-        availableEnd.setMinutes(timeMinutes(config.closeTime, 24 * 60));
+        availableStart.setMinutes(timeMinutes(openAt, 0));
+        availableEnd.setMinutes(timeMinutes(closeAt, 24 * 60));
         if (availableEnd <= availableStart) availableEnd.setDate(availableEnd.getDate() + 1);
       }
       const overlapStart = Math.max(start.getTime(), availableStart.getTime());
@@ -339,7 +349,11 @@ function stationAvailableHours(config, start, end) {
 function stationScheduleLabel(config) {
   const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
   const days = (config.openDays || []).map(day => dayNames[Number(day)]).join(', ');
-  return `${days || 'Sem dias'} - ${config.open24h !== false ? '24 horas' : `${config.openTime} as ${config.closeTime}`}`;
+  const base = `${days || 'Sem dias'} - ${config.open24h !== false ? '24 horas' : `${config.openTime} as ${config.closeTime}`}`;
+  const exceptions = Object.entries(config.dayHours || {})
+    .filter(([day]) => (config.openDays || []).map(Number).includes(Number(day)))
+    .map(([day, rule]) => `${dayNames[Number(day)]}: ${rule.open24h === true ? '24 horas' : `${rule.openTime} as ${rule.closeTime}`}`);
+  return exceptions.length ? `${base} (exceto ${exceptions.join('; ')})` : base;
 }
 
 function markRechargeRecordsDirty() {
