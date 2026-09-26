@@ -3,12 +3,18 @@
 <head>
 <script src="app/storage-ns.js"></script>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#173c30">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="UBY">
+  <link rel="apple-touch-icon" href="assets/pwa/icon-180.png">
   <title>UBY Recharge — Entrar</title>
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap">
-  <link rel="stylesheet" href="app/app.css?v=1">
+  <link rel="stylesheet" href="app/app.css?v=2">
 </head>
 <body>
   <main class="login-page">
@@ -49,5 +55,6 @@
       });
     })();
   </script>
+  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});</script>
 </body>
 </html>
