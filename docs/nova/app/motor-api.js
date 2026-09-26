@@ -548,7 +548,9 @@
       valid: d.valid, totalAllocated: d.totalAllocated, totalPool: d.totalPool,
       months: d.months.map(m => ({ key: m.monthKey, label: monthLabel(m.monthKey), result: m.result, legalReserve: m.legalReserve, expansionReserve: m.expansionReserve,
         investorPool: m.investorPool, eligibleQuotas: m.eligibleQuotas, perQuota: m.valuePerQuota, status: m.payment?.status || "pendente" })),
+      quotaValue: Number(loadNetworkDistribution().quotaValue) || 80000, distributionStartMonth: loadNetworkDistribution().distributionStartMonth || "2026-06",
       investors: d.investors.map(i => ({ name: i.name, quotas: i.quotas, eligibleFrom: i.eligibleFrom, status: i.status, allocations: i.allocations, due: i.due,
+        quotaValue: Number(i.quotaValue) || Number(loadNetworkDistribution().quotaValue) || 80000,
         investment: i.investment, returnRate: i.returnRate, annualized: i.annualized, paybackYears: i.paybackYears }))
     };
   }
@@ -1048,9 +1050,301 @@
     });
   }
 
+  // =====================================================================
+  // Motor financeiro v2 — adaptador.
+  // Lê a base uma vez (carregadores, sessões por mês, configurações, matriz),
+  // guarda em cache e entrega as contas ao núcleo puro (app/finance-core.js).
+  // Nada aqui grava: é leitura e cálculo.
+  // =====================================================================
+  const CORE = () => window.UBY_FINANCE_CORE;
+  const n0 = v => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+  const FV2 = { stamp: "", rows: null, unitData: null, months: [], rowMonths: new Map(), eligible: new Map(), matrix: new Map(), results: new Map() };
+  const FIX_LABELS = {
+    aggregation: "Payback, ROI e margem pela média mensal (E1/E2)",
+    zeroSaleMonths: "Meses sem venda e período ativo do carregador (E3/E7)",
+    hybridMarketing: "Híbrido: marketing na divisão AC/DC (E4)",
+    courtesyInvoice: "Cortesia do parceiro fora da fatura de energia (E5)",
+    monthScope: "Fatura e avulsos só na própria competência (E6)",
+    matrixCents: "Rateio da matriz fechando ao centavo",
+    powerPerCharger: "Peso por potência dividido no local",
+    lossCarry: "Prejuízo compensado antes de distribuir"
+  };
+  const MONTH_SPECIFIC = ["energyCopelAmount", "energyCopelKWh", "energyLeaseCreditedKWh"];
+
+  function fv2Stamp() {
+    let charges = 0, updated = "";
+    Object.values(allRechargeRecords || {}).forEach(r => {
+      charges += Array.isArray(r?.charges) ? r.charges.length : 0;
+      const u = String(r?.updatedAt || r?.summary?.updatedAt || "");
+      if (u > updated) updated = u;
+    });
+    let matrix = 0;
+    try { matrix = (loadMatrizCosts() || []).length; } catch (_) {}
+    return `${Object.keys(allRechargeRecords || {}).length}|${charges}|${updated}|${matrix}`;
+  }
+  function fv2Ensure() {
+    const stamp = fv2Stamp();
+    if (FV2.rows && FV2.stamp === stamp) return;
+    FV2.stamp = stamp;
+    FV2.rowMonths.clear(); FV2.eligible.clear(); FV2.matrix.clear(); FV2.results.clear();
+    FV2.unitData = getGeneralUnitData();
+    FV2.rows = getUbyChargerRows(FV2.unitData).map((row, i) => ({ ...row, stationName: row.station, fv2Id: `${row.workId}::${normalizeStationForCompare(row.station || row.workName || "")}::${i}` }));
+    FV2.rows.forEach(row => {
+      const by = new Map();
+      (row.charges || []).forEach(c => { const mk = chargeMonthKey(c); if (mk === "unknown") return; if (!by.has(mk)) by.set(mk, []); by.get(mk).push(c); });
+      FV2.rowMonths.set(row.fv2Id, by);
+    });
+    FV2.months = [...new Set(FV2.rows.filter(r => r.included).flatMap(r => [...FV2.rowMonths.get(r.fv2Id).keys()]))].filter(isPlausibleMonthKey).sort();
+  }
+  function fv2Fixes(spec) {
+    if (spec === "on" || spec === true) return CORE().FIXES_ON;
+    if (!spec || spec === "off") return CORE().FIXES_OFF;
+    return Object.fromEntries(CORE().FIXES.map(k => [k, !!spec[k]]));
+  }
+  const fixKey = fixes => CORE().FIXES.map(k => (fixes[k] ? 1 : 0)).join("");
+  const rowFirstMonth = row => [...(FV2.rowMonths.get(row.fv2Id)?.keys() || [])].filter(isPlausibleMonthKey).sort()[0] || "";
+
+  // Configuração da competência. Com monthScope: fatura e avulsos nunca herdam
+  // de mês antigo, e mês anterior à primeira configuração não herda a mais recente.
+  function fv2Settings(row, mk, fixes) {
+    const rec = allRechargeRecords[row.workId] || {};
+    const root = rec.financialSettings || rec.summary?.financialSettings || {};
+    const stationName = row.stationName || row.station || row.workName || "";
+    const key = normalizeStationForCompare(canonicalStationNameForWork(row.workId, stationName, row.workName));
+    const scoped = root?.chargers?.[key] || {};
+    const E = window.UBY_FINANCE_ENGINE;
+    const res = E.resolveMonthlySettings(defaultFinanceSettings(), root, scoped, mk);
+    let settings = res.settings;
+    const flags = [];
+    if (fixes.monthScope) {
+      const saved = [...new Set([...E.monthKeys(root), ...E.monthKeys(scoped)])].sort();
+      if (!res.exact && !res.previousMonth && saved.length) {
+        const first = saved[0];
+        settings = { ...defaultFinanceSettings(), ...(root[first] || {}), ...(scoped[first] || {}) };
+        flags.push("antes-da-primeira-config");
+      }
+      let inherited = !res.exact;
+      const src = res.exact ? settings.periodMeta?.inheritedFrom : "";
+      if (src && src !== mk && n0(settings.energyCopelAmount) > 0) {
+        const prior = E.resolveMonthlySettings(defaultFinanceSettings(), root, scoped, src).settings;
+        if (MONTH_SPECIFIC.every(f => n0(settings[f]) === n0(prior[f]))) { inherited = true; flags.push("fatura-copiada"); }
+      }
+      if (inherited) {
+        if (!flags.includes("fatura-copiada") && (n0(settings.energyCopelAmount) > 0 || n0(settings.energyLeaseCreditedKWh) > 0)) flags.push("fatura-herdada");
+        settings = { ...settings };
+        MONTH_SPECIFIC.forEach(f => { settings[f] = 0; });
+        ["costRules", "revenueRules"].forEach(k => {
+          if (Array.isArray(settings[k]) && settings[k].some(r => r?.basis === "one_off" && r.enabled !== false)) {
+            settings[k] = settings[k].map(r => (r?.basis === "one_off" ? { ...r, enabled: false } : r));
+            flags.push("avulso-herdado");
+          }
+        });
+      }
+    }
+    return { settings, flags, exact: res.exact, sourceMonth: res.sourceMonth };
+  }
+  // Mesma preparação do início de financeForCharges().
+  function fv2Cfg(settings) {
+    const cfg = { ...defaultFinanceSettings(), ...settings };
+    if (!settings.operationModel && (n0(settings.p3AcEquityPct) > 0 || n0(settings.p3DcEquityPct) > 0)) cfg.operationModel = "hybrid";
+    cfg.costItems = { ...(settings.costItems || {}), ...(settings.extraCosts || {}) };
+    if (n0(settings.otherCosts) > 0 && !cfg.costItems.otherCostsLegacy) cfg.costItems.otherCostsLegacy = n0(settings.otherCosts);
+    cfg.revenueItems = { ...(settings.revenueItems || {}), ...(settings.extraRevenue || {}) };
+    cfg.costRules = normalizeFinanceRules({ ...settings, costItems: cfg.costItems }, "cost");
+    cfg.revenueRules = normalizeFinanceRules({ ...settings, revenueItems: cfg.revenueItems }, "revenue");
+    cfg.operationModel = normalizeOperationModel(cfg.operationModel);
+    return cfg;
+  }
+
+  function fv2Eligible(mk) {
+    if (!FV2.eligible.has(mk)) FV2.eligible.set(mk, FV2.rows.filter(r => matrizEligibleRow(r, mk)));
+    return FV2.eligible.get(mk);
+  }
+  // Rateio de um custo da matriz entre todos os destinos da competência (calculado uma vez).
+  function fv2MatrixAlloc(item, mk, fixes) {
+    const k = `${item.id}|${mk}|${fixes.matrixCents ? 1 : 0}${fixes.powerPerCharger ? 1 : 0}`;
+    if (FV2.matrix.has(k)) return FV2.matrix.get(k);
+    const rows = fv2Eligible(mk);
+    const targets = (item.targets || []).filter(t => !t.startMonth || t.startMonth <= mk)
+      .map(t => ({ target: t, row: matrizResolveTargetRow(t, rows) || rows.find(c => matrizTargetMatchesRow(t, c)) || null }));
+    const byScope = new Map();
+    targets.filter(e => e.row).forEach(e => { const s = matrizStationScope(e.row) || matrizScopeKey(e.row); if (!byScope.has(s)) byScope.set(s, e); });
+    const active = [...byScope.values()];
+    const weights = active.map(e => {
+      if (item.allocation === "power" && fixes.powerPerCharger) {
+        const sameLocal = rows.filter(r => String(r.workId) === String(e.row.workId)).length || 1;
+        return Math.max(0, n0(workPowerById(e.row.workId))) / sameLocal;
+      }
+      return matrizWeight(e.row, e.target, item, mk);
+    });
+    const comp = matrizCompetencyAmount(item), cash = matrizCashAmount(item, mk);
+    let shares, cashShares;
+    if (fixes.matrixCents) { shares = CORE().allocate(comp, weights); cashShares = CORE().allocate(cash, weights); }
+    else {
+      const tw = weights.reduce((s, w) => s + w, 0);
+      shares = weights.map(w => (tw > 0 ? comp * w / tw : comp / weights.length));
+      cashShares = weights.map(w => (tw > 0 ? cash * w / tw : cash / weights.length));
+    }
+    const out = { active, shares, cashShares };
+    FV2.matrix.set(k, out);
+    return out;
+  }
+  function fv2MatrixItems(row, mk, fixes) {
+    if (!fixes.matrixCents && !fixes.powerPerCharger) return matrizCostItemsForRow(row, mk, FV2.unitData);
+    if (!matrizEligibleRow(row, mk)) return [];
+    return loadMatrizCosts().filter(item => matrizApplies(item, mk)).flatMap(item => {
+      const { active, shares, cashShares } = fv2MatrixAlloc(item, mk, fixes);
+      if (!active.length) return [];
+      let idx = active.findIndex(e => matrizRowsMatch(e.row, row));
+      if (idx < 0) {
+        const same = active.map((e, i) => [e, i]).filter(([e]) => String(e.row.workId || "") === String(row.workId || ""));
+        if (same.length === 1) idx = same[0][1];
+      }
+      if (idx < 0 || !(shares[idx] > 0)) return [];
+      return [{ id: item.id, label: item.name, category: item.category || "Outros custos", amount: shares[idx], cashAmount: cashShares[idx],
+        coverageMonths: matrizCoverageMonths(item), rule: `${matrizMethodLabel(item.allocation)} | ${active.length} destino(s)` }];
+    });
+  }
+
+  function fv2Month(row, mk, fixes) {
+    const k = `${row.fv2Id}|${mk}|${fixKey(fixes)}`;
+    if (FV2.results.has(k)) return FV2.results.get(k);
+    const charges = FV2.rowMonths.get(row.fv2Id)?.get(mk) || [];
+    const { settings, flags } = fv2Settings(row, mk, fixes);
+    const cfg = fv2Cfg(settings);
+    const stationName = row.stationName || row.station;
+    const courtesy = courtesyFinanceBreakdown(charges, stationAvailabilityFor(row.workId, stationName, row.workName), cfg.energyCostPerKWh);
+    const planning = financePlanningContext(charges, mk, cfg, row.charges || [], workPowerById(row.workId));
+    const result = CORE().computeMonth({
+      monthKey: mk, model: cfg.operationModel, cfg,
+      revenue: charges.reduce((s, c) => s + c.revenue, 0), energy: charges.reduce((s, c) => s + c.energyKWh, 0),
+      acRevenue: charges.filter(c => chargerKind(c) === "ac").reduce((s, c) => s + c.revenue, 0),
+      dcRevenue: charges.filter(c => chargerKind(c) === "dc").reduce((s, c) => s + c.revenue, 0),
+      courtesy: { treatment: courtesy.treatment, energy: courtesy.energy, energyCost: courtesy.energyCost, commercialEnergy: courtesy.commercialEnergy, charges: courtesy.charges, revenue: courtesy.revenue },
+      planning, matrixItems: fv2MatrixItems(row, mk, fixes)
+    }, fixes);
+    result.flags = flags;
+    result.sessions = charges.length;
+    FV2.results.set(k, result);
+    return result;
+  }
+  // Meses que entram para o carregador: com zeroSaleMonths, do primeiro mês com
+  // venda em diante (com ou sem venda); sem a correção, como a plataforma original.
+  function fv2RowMonths(row, fixes, monthKey) {
+    const own = [...(FV2.rowMonths.get(row.fv2Id)?.keys() || [])].filter(isPlausibleMonthKey).sort();
+    if (monthKey) return fixes.zeroSaleMonths ? (own[0] && monthKey >= own[0] ? [monthKey] : []) : [monthKey];
+    return fixes.zeroSaleMonths ? FV2.months.filter(m => own[0] && m >= own[0]) : own;
+  }
+  function fv2Policy() {
+    const p = loadNetworkDistribution();
+    return { legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct, investorPct: p.investorPct,
+      quotaValue: p.quotaValue, distributionStartMonth: p.distributionStartMonth, investors: normalizeNetworkInvestors(p.investors) };
+  }
+  function fv2NetworkMonthly(fixes) {
+    const included = FV2.rows.filter(r => r.included);
+    return FV2.months.map(mk => {
+      let ownedNet = 0, royalties = 0;
+      included.forEach(row => {
+        if (fixes.zeroSaleMonths && !(rowFirstMonth(row) && mk >= rowFirstMonth(row))) return;
+        const r = fv2Month(row, mk, fixes);
+        if (r.operationModel === "uby" || r.operationModel === "hybrid") ownedNet += r.operationNet;
+        else if (r.operationModel === "third_party_management") royalties += r.ubyRoyalty;
+      });
+      return { monthKey: mk, ownedNet, royalties };
+    });
+  }
+
+  // Resultado único com óticas: por carregador (acumulado ou mês), rede por mês e distribuição.
+  function financeV2(opts = {}) {
+    fv2Ensure();
+    const fixes = fv2Fixes(opts.fixes ?? "on");
+    const monthKey = opts.monthKey || "";
+    const stations = FV2.rows.filter(r => r.included).map(row => {
+      const months = fv2RowMonths(row, fixes, monthKey);
+      const results = months.map(mk => fv2Month(row, mk, fixes));
+      const total = CORE().aggregate(results, fixes, { months: results.length || 1 });
+      return { workId: row.workId, workName: row.workName, station: row.stationName, kind: row.kind, model: total.operationModel,
+        firstMonth: rowFirstMonth(row), months: results.map(r => ({ monthKey: r.monthKey, revenue: r.revenue, operationNet: r.operationNet, ubyNet: r.ubyNet, energyCost: r.energyCost, matrizCost: r.matrizCost, flags: r.flags })),
+        finance: total, flags: [...new Set(results.flatMap(r => r.flags || []))] };
+    });
+    const net = CORE().network(fv2NetworkMonthly(fixes), fv2Policy(), fixes);
+    return { fixes, months: FV2.months, stations, network: net };
+  }
+
+  // Paridade: v2 com correções desligadas contra financeForCharges() original, carregador × mês.
+  function financeV2Parity() {
+    fv2Ensure();
+    const OFF = CORE().FIXES_OFF;
+    const fields = ["revenue", "totalRevenue", "energyCost", "localExtraCosts", "matrizCost", "extraCosts", "taxes", "management", "platform", "ubyRoyalty",
+      "areaParticipation", "operationNet", "ubyNet", "p3SocietyProfit", "partnerShare", "saRetention", "investorDistribution", "partnerInvestorDistribution", "paybackBase", "totalOperatingCost"];
+    const included = FV2.rows.filter(r => r.included);
+    const t0 = performance.now();
+    const legacy = new Map();
+    included.forEach(row => FV2.months.forEach(mk => {
+      const charges = FV2.rowMonths.get(row.fv2Id)?.get(mk) || [];
+      const stationName = row.stationName || row.station;
+      legacy.set(`${row.fv2Id}|${mk}`, financeForCharges(charges, financeSettingsForUbyRow(row, mk), { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId),
+        matrizCostItems: matrizCostItemsForRow(row, mk), workId: row.workId, workName: row.workName, stationName, courtesyConfig: stationAvailabilityFor(row.workId, stationName, row.workName) }));
+    }));
+    const legacyMs = performance.now() - t0;
+    FV2.results.clear(); FV2.matrix.clear(); FV2.eligible.clear();
+    const t1 = performance.now();
+    let checked = 0;
+    const diffs = [];
+    included.forEach(row => FV2.months.forEach(mk => {
+      const v = fv2Month(row, mk, OFF), l = legacy.get(`${row.fv2Id}|${mk}`);
+      checked += 1;
+      fields.forEach(f => {
+        const a = n0(l[f]), b = n0(v[f]);
+        if (Math.abs(a - b) > 0.005) diffs.push({ station: row.stationName, monthKey: mk, field: f, legacy: a, v2: b });
+      });
+    }));
+    const v2Ms = performance.now() - t1;
+    // Rede por mês: networkUnifiedReportModel original × v2 sem correções.
+    const t2 = performance.now();
+    const legacyNet = FV2.months.map(mk => ({ monthKey: mk, result: n0(networkUnifiedReportModel({ monthKey: mk }).result) }));
+    const legacyNetMs = performance.now() - t2;
+    const t3 = performance.now();
+    const v2Net = CORE().network(fv2NetworkMonthly(OFF), fv2Policy(), OFF).months;
+    const v2NetMs = performance.now() - t3;
+    const netDiffs = legacyNet.map((m, i) => ({ monthKey: m.monthKey, legacy: m.result, v2: v2Net[i]?.result || 0 })).filter(m => Math.abs(m.legacy - m.v2) > 0.005);
+    return { checked, fields: fields.length, diffs: diffs.slice(0, 200), diffCount: diffs.length, legacyMs, v2Ms, legacyNetMs, v2NetMs, netMonths: legacyNet.length, netDiffs };
+  }
+
+  // Impacto de cada correção sozinha e de todas juntas, contra a regra original.
+  function financeV2Impact() {
+    fv2Ensure();
+    const base = financeV2({ fixes: "off" });
+    const summarize = r => ({ result: r.network.totals.result, distributable: r.network.totals.distributable, investorPool: r.network.totals.investorPool,
+      ownedNet: r.stations.filter(s => s.model === "uby" || s.model === "hybrid").reduce((s, x) => s + x.finance.operationNet, 0),
+      ubyNet: r.stations.reduce((s, x) => s + x.finance.ubyNet, 0) });
+    const b = summarize(base);
+    const compare = run => run.stations.map(s => {
+      const o = base.stations.find(x => x.workId === s.workId && x.station === s.station)?.finance || {};
+      const f = s.finance;
+      return { station: s.station, workName: s.workName, model: s.model,
+        operationNet: [n0(o.operationNet), n0(f.operationNet)], ubyNet: [n0(o.ubyNet), n0(f.ubyNet)], matrizCost: [n0(o.matrizCost), n0(f.matrizCost)],
+        energyCost: [n0(o.energyCost), n0(f.energyCost)], paybackMonths: [n0(o.paybackMonths), n0(f.paybackMonths)], roiMonthly: [n0(o.roiMonthly), n0(f.roiMonthly)], margin: [n0(o.margin), n0(f.margin)] };
+    }).filter(r => ["operationNet", "ubyNet", "matrizCost", "energyCost", "paybackMonths", "roiMonthly", "margin"].some(k => Math.abs(r[k][0] - r[k][1]) > 0.005));
+    const each = CORE().FIXES.map(key => {
+      const run = financeV2({ fixes: { [key]: true } });
+      const s = summarize(run);
+      return { key, label: FIX_LABELS[key], delta: Object.fromEntries(Object.keys(b).map(k => [k, s[k] - b[k]])), stations: compare(run) };
+    });
+    const allRun = financeV2({ fixes: "on" });
+    const flags = allRun.stations.flatMap(s => s.months.filter(m => (m.flags || []).length).map(m => ({ station: s.station, monthKey: m.monthKey, flags: m.flags })));
+    const multi = [...new Set(FV2.rows.map(r => r.workId))].map(workId => {
+      const rows = FV2.rows.filter(r => String(r.workId) === String(workId));
+      return { workId, workName: rows[0]?.workName || workId, power: workPowerById(workId), chargers: rows.map(r => ({ station: r.stationName, kind: r.kind, included: r.included })) };
+    }).filter(w => w.chargers.length > 1);
+    return { base: b, all: { ...summarize(allRun), delta: Object.fromEntries(Object.keys(b).map(k => [k, summarize(allRun)[k] - b[k]])) }, each, flags,
+      multiChargerSites: multi, stationsAll: compare(allRun), quotaValue: allRun.network.quotaValue, distributionStartMonth: allRun.network.distributionStartMonth,
+      networkMonths: { before: base.network.months, after: allRun.network.months }, investors: { before: base.network.investors, after: allRun.network.investors } };
+  }
+
   window.UBY_MOTOR_API = { waitForReady, loadFull, status, months, monthName, command, companyResults, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
-    customerRegistry, clientIntelligence, club };
+    customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact };
   document.dispatchEvent(new CustomEvent("uby:motor-api-ready"));
 })();

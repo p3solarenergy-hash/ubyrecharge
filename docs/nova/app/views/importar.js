@@ -69,6 +69,28 @@
       ${st ? `<div class="list-row" style="display:block;white-space:normal"><strong style="color:var(--uby-ink)">Base desta obra</strong><br>${esc(st)}</div>` : ""}`;
   }
 
+  // handleFiles() da plataforma original só enfileira a planilha e retorna na hora;
+  // a leitura e a gravação no Supabase acontecem em rechargeImportQueue. Espera a
+  // fila de verdade (inclui saveRechargeBase) antes de considerar a importação concluída.
+  async function waitQueue(w, ms = 300000) {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      try { await w.eval("rechargeImportQueue"); } catch (_) {}
+      await new Promise(r => setTimeout(r, 250));
+      let pending = 0;
+      try { pending = Number(w.eval("queuedRechargeImports")) || 0; } catch (_) {}
+      if (!pending) return true;
+    }
+    return false;
+  }
+  function importOutcome(w) {
+    const fb = text(w, "uploadFeedback"), st = text(w, "storageState");
+    const msg = [fb, st].filter(Boolean).join(" · ") || "Planilha importada e salva na base.";
+    return { msg, bad: /(❌|bloquead|erro|falha ao|nao foi possivel|não foi possível|reconhecid)/i.test(`${fb} ${st}`) };
+  }
+  // Recarrega o motor da nova (mesmo efeito do F5 nos painéis) sem sair da tela.
+  function refreshPanels() { document.getElementById("refreshButton")?.click(); }
+
   // Aguarda o motor terminar (mensagem final no uploadFeedback, sem "carregando").
   async function waitIdle(w, target, ms = 120000) {
     const t0 = Date.now();
@@ -173,15 +195,18 @@
       $("#impStatus").innerHTML = `<div class="note">Importando ${esc(arr.map(f => f.name).join(", "))}…</div>`;
       try {
         await w.handleFiles(arr);
-        const result = await waitIdle(w, target);
-        const bad = /(bloquead|erro|falha|reconhecid)/i.test(result);
-        log(`${arr.map(f => f.name).join(", ")} → ${result}`, bad ? "bad" : "ok");
-        // Veio da página do carregador: atualiza os painéis e volta para ela.
-        if (!bad && ui.returnTo) {
-          const back = ui.returnTo;
-          $("#impStatus").innerHTML = `<div class="note">Importação concluída: ${esc(result)}<br>Atualizando os painéis e voltando para ${esc(ui.returnLabel || "a estação")}…</div>`;
-          setTimeout(() => { document.getElementById("refreshButton").click(); UBY.go(back); }, 1800);
-          return;
+        const finished = await waitQueue(w);
+        const { msg, bad } = finished ? importOutcome(w) : { msg: "A gravação ainda não terminou após 5 minutos. Confira a base antes de importar de novo.", bad: true };
+        log(`${arr.map(f => f.name).join(", ")} → ${msg}`, bad ? "bad" : "ok");
+        if (!bad) {
+          // Gravação concluída no Supabase: atualiza os painéis já, sem precisar de F5.
+          refreshPanels();
+          if (ui.returnTo) {
+            $("#impStatus").innerHTML = `<div class="note">Importação concluída: ${esc(msg)}<br>Painéis atualizando · voltando para ${esc(ui.returnLabel || "a estação")}…</div>`;
+            UBY.go(ui.returnTo);
+            return;
+          }
+          log("Painéis atualizados com a planilha nova (Comando, Unidades, Financeiro…).", "ok");
         }
       } catch (err) { log(`${arr.map(f => f.name).join(", ")} → ${err.message}`, "bad"); }
       draw(target, w, works);
@@ -199,7 +224,9 @@
       try {
         await w.handleCustomerRegistryFiles(arr);
         const st = text(w, "customerRegistryStatus") || "Importação de clientes concluída.";
-        log(`Clientes: ${st}`, /(pendente|nao executada|não executada|erro)/i.test(st) ? "bad" : "ok");
+        const badCli = /(pendente|nao executada|não executada|erro)/i.test(st);
+        log(`Clientes: ${st}`, badCli ? "bad" : "ok");
+        if (!badCli) refreshPanels();
       } catch (err) { log(`Clientes: ${err.message}`, "bad"); }
       draw(target, w, works);
     };
@@ -210,9 +237,9 @@
     cdrop.ondrop = e => { e.preventDefault(); cdrop.style.borderColor = ""; runClients(e.dataTransfer.files); };
 
     const undo = $("#impUndo");
-    if (undo) undo.onclick = async () => { w.document.getElementById("undoLastImportBtn").click(); const r = await waitIdle(w, target, 60000); log(`Desfazer última planilha → ${r}`); draw(target, w, works); };
+    if (undo) undo.onclick = async () => { w.document.getElementById("undoLastImportBtn").click(); const r = await waitIdle(w, target, 60000); log(`Desfazer última planilha → ${r}`); refreshPanels(); draw(target, w, works); };
     const clr = $("#impClearMonth");
-    if (clr) clr.onclick = async () => { w.document.getElementById("importMonth").value = ui.month; w.document.getElementById("clearSelectedMonthBtn").click(); const r = await waitIdle(w, target, 60000); log(`Excluir mês ${ui.month} → ${r}`); draw(target, w, works); };
+    if (clr) clr.onclick = async () => { w.document.getElementById("importMonth").value = ui.month; w.document.getElementById("clearSelectedMonthBtn").click(); const r = await waitIdle(w, target, 60000); log(`Excluir mês ${ui.month} → ${r}`); refreshPanels(); draw(target, w, works); };
     $("#impRefresh").onclick = () => document.getElementById("refreshButton").click();
   }
 

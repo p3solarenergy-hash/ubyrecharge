@@ -5736,7 +5736,8 @@ function normalizeNetworkInvestors(raw) {
     name: safeText(item?.name || fallback[index]?.name || `Cotista ${index + 1}`).slice(0, 120),
     quotas: Math.max(0, Math.round(Number(item?.quotas ?? fallback[index]?.quotas ?? 0))),
     eligibleFrom: /^\d{4}-\d{2}$/.test(String(item?.eligibleFrom || '')) ? String(item.eligibleFrom) : (fallback[index]?.eligibleFrom || '2099-12'),
-    status: ['pendente', 'aprovado', 'pago'].includes(item?.status) ? item.status : 'pendente'
+    status: ['pendente', 'aprovado', 'pago'].includes(item?.status) ? item.status : 'pendente',
+    quotaValue: Number(item?.quotaValue) > 0 ? Number(item.quotaValue) : (Number(fallback[index]?.quotaValue) > 0 ? Number(fallback[index].quotaValue) : 0)
   })).filter(item => item.name && item.quotas > 0);
 }
 
@@ -5756,6 +5757,10 @@ function defaultNetworkDistribution() {
   return {
     roundLabel: 'Rodada 1', totalQuotas: 10, soldQuotas: 10, investorPct: 100,
     legalReservePct: 5, expansionReservePct: 10, policyVersion: 3,
+    // NOVA PLATAFORMA: valor de referência da cota e início da distribuição
+    // passam a ser configuração (antes fixos no cálculo). Cada cotista pode
+    // ter o valor da própria rodada (quotaValue no cotista).
+    quotaValue: 80000, distributionStartMonth: '2026-06',
     legalReservePurpose: 'Reserva legal obrigatória da S.A.',
     expansionReservePurpose: 'Fundo de reserva e expansão',
     investors: defaultNetworkInvestors(), paymentLedger: {}
@@ -5776,6 +5781,8 @@ function normalizeNetworkDistribution(raw = {}) {
     legalReservePct: Math.min(100, Math.max(0, Number(raw.legalReservePct ?? base.legalReservePct))),
     expansionReservePct: Math.min(100, Math.max(0, Number(legacyExpansionPct))),
     policyVersion: base.policyVersion,
+    quotaValue: Number(raw.quotaValue) > 0 ? Number(raw.quotaValue) : base.quotaValue,
+    distributionStartMonth: /^\d{4}-\d{2}$/.test(String(raw.distributionStartMonth || '')) ? String(raw.distributionStartMonth) : base.distributionStartMonth,
     legalReservePurpose: base.legalReservePurpose,
     expansionReservePurpose: base.expansionReservePurpose,
     investors: normalizeNetworkInvestors(raw.investors),
@@ -12103,7 +12110,7 @@ function networkUnifiedReportModel(options = {}) {
 
 function networkInvestorDistributionModel() {
   const accumulated = networkUnifiedReportModel({ accumulated: true });
-  const sourceMonths = [...new Set(accumulated.rows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => /^\d{4}-\d{2}$/.test(key) && key >= '2026-06'))].sort();
+  const sourceMonths = [...new Set(accumulated.rows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => /^\d{4}-\d{2}$/.test(key) && key >= (accumulated.policy.distributionStartMonth || '2026-06')))].sort();
   const investors = normalizeNetworkInvestors(accumulated.policy.investors);
   const months = sourceMonths.map(monthKey => {
     const finance = networkUnifiedReportModel({ monthKey });
@@ -12116,7 +12123,7 @@ function networkInvestorDistributionModel() {
   const byInvestor = investors.map(investor => {
     const allocations = months.map(month => month.monthKey >= investor.eligibleFrom ? month.valuePerQuota * investor.quotas : 0);
     const due = allocations.reduce((sum, value) => sum + value, 0);
-    const investment = investor.quotas * 80000;
+    const investment = investor.quotas * (Number(investor.quotaValue) || Number(accumulated.policy.quotaValue) || 80000);
     const activeMonths = months.filter(month => month.monthKey >= investor.eligibleFrom && month.result > 0).length;
     const returnRate = investment ? due / investment : 0;
     const annualized = activeMonths ? returnRate / activeMonths * 12 : 0;

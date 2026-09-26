@@ -39,6 +39,7 @@
     { label: "GESTÃO E GOVERNANÇA", items: [
       { id: "financeiro", icon: "R$", label: "Financeiro e fechamento", type: "view", period: true },
       { id: "configuracao", icon: "⚙", label: "Configuração da rede", type: "view" },
+      { id: "auditoria", icon: "✓", label: "Auditoria do motor financeiro", type: "view" },
       { id: "financeiro-edicao", icon: "✎", label: "Financeiro · edição", type: "classic", src: LEGACY + "financeiro.html" },
       { id: "operacao-uby", icon: "◆", label: "Operação UBY e relatórios", type: "classic", src: LEGACY + "recargas.html", tab: "uby" },
       { id: "tarefas", icon: "☰", label: "Tarefas", type: "view" },
