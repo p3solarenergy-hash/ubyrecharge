@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<script src="../../app/storage-ns.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UBY Recharge - Login</title>
+<link rel="icon" type="image/png" href="assets/brand/v2/14_icone_app.png">
+<link rel="stylesheet" href="brand.css?v=20260723-brand-v2">
+<style>
+  :root{--p3-primary:#2D7FF9;--p3-accent:#57B7FF;--p3-bg:#07111F;--p3-card:#0E1B2D;--p3-text:#E8EFEB;--p3-muted:#9DB5AA;--p3-border:#24364E;--p3-danger:#E55545;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;min-height:100vh}
+  body{display:grid;place-items:center;padding:28px}
+  .shell{width:min(1040px,100%);display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:stretch}
+  .hero,.login-card{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:8px;box-shadow:var(--p3-shadow)}
+  .hero{padding:38px;display:flex;flex-direction:column;justify-content:space-between;min-height:560px;overflow:hidden;position:relative}
+  .hero::after{content:"";position:absolute;right:-110px;top:-120px;width:360px;height:360px;background:radial-gradient(circle,rgba(87,183,255,.34),transparent 70%);border-radius:50%}
+  .brand{display:flex;align-items:center;gap:14px;position:relative;z-index:1}.logo{width:64px;height:64px;border-radius:14px;display:grid;place-items:center;background:#071527;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.26)}.logo img{width:100%;height:100%;object-fit:cover}.brand-name{font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:.88}.brand-tag{font-size:11px;color:#c7d7cf;letter-spacing:1px}
+  h1{font-size:38px;line-height:1.08;margin:34px 0 12px;position:relative;z-index:1}.hero p{color:#d4e3dc;line-height:1.6;max-width:620px;position:relative;z-index:1}
+  .scope{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:34px;position:relative;z-index:1}.scope-card{background:rgba(14,24,19,.46);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px}.scope-card strong{display:block;color:#fff;margin-bottom:5px}.scope-card span{font-size:12px;color:#b9cec4;line-height:1.45}
+  .login-card{background:var(--p3-card);padding:28px}.login-card h2{font-size:23px;margin-bottom:6px;color:#fff}.login-card .sub{color:var(--p3-muted);font-size:13px;line-height:1.5;margin-bottom:22px}
+  form{display:grid;gap:14px}.field label{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:900;margin-bottom:6px}.field input{width:100%;height:46px;border:1px solid var(--p3-border);border-radius:9px;background:#0B1524;color:var(--p3-text);padding:0 12px;font-weight:800}.field input:focus{outline:none;border-color:var(--p3-accent);box-shadow:0 0 0 3px rgba(87,183,255,.16)}
+  .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.btn{height:44px;border:1px solid var(--p3-accent);background:var(--p3-accent);color:#fff;border-radius:9px;padding:0 18px;font-weight:900;cursor:pointer}.btn.ghost{background:#0B1524;border-color:var(--p3-border)}.btn:disabled{opacity:.65;cursor:wait}
+  .status{min-height:20px;color:var(--p3-muted);font-size:12px;margin-top:2px}.status.error{color:#FF958A}.status.ok{color:#8DE8AA}
+  .users{margin-top:24px;border-top:1px solid var(--p3-border);padding-top:18px}.users h3{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--p3-primary);margin-bottom:10px}.user-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px}.user-row span{color:var(--p3-muted)}.pill{border:1px solid rgba(87,183,255,.28);background:rgba(87,183,255,.12);border-radius:999px;padding:4px 8px;color:#dff3e8;font-size:11px;font-weight:900;white-space:nowrap}
+  .notice{margin-top:18px;background:#0B1524;border-left:3px solid var(--p3-accent);border-radius:10px;padding:13px;color:var(--p3-muted);font-size:12px;line-height:1.5}
+  @media(max-width:860px){body{padding:16px}.shell{grid-template-columns:1fr}.hero{min-height:auto;padding:28px}.scope{grid-template-columns:1fr}h1{font-size:30px}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <section class="hero">
+    <div>
+      <div class="brand">
+        <img class="uby-wordmark" src="assets/brand/02_logo_dark.svg" alt="UBY Recharge">
+      </div>
+      <div class="brand-tag">Engenharia em Energia Solar &amp; Mobilidade El&eacute;trica</div>
+      <h1>Login UBY Recharge</h1>
+      <p>Entrada central para obras EV, engenharia, analisadores, tarefas e documentos. Cada perfil abre somente os m&oacute;dulos definidos para sua fun&ccedil;&atilde;o.</p>
+    </div>
+    <div class="scope">
+      <div class="scope-card"><strong>Admin</strong><span>Acesso completo para gest&atilde;o, tarefas, backups, documentos, analisadores e administra&ccedil;&atilde;o.</span></div>
+      <div class="scope-card"><strong>Engenharia</strong><span>Acesso focado em obras, concession&aacute;ria, or&ccedil;amentos e analisadores.</span></div>
+    </div>
+  </section>
+
+  <section class="login-card">
+    <h2>Acessar sistema</h2>
+    <p class="sub">Use o e-mail e senha cadastrados no Supabase. A sess&atilde;o local expira automaticamente e o perfil vem da tabela de acesso.</p>
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" autocomplete="username" required placeholder="seu@email.com">
+      </div>
+      <div class="field">
+        <label for="password">Senha</label>
+        <input id="password" type="password" autocomplete="current-password" required placeholder="Senha">
+      </div>
+      <div class="actions">
+        <button class="btn" id="loginButton" type="submit">Entrar</button>
+        <button class="btn ghost" type="button" id="logoutButton">Sair da sess&atilde;o</button>
+      </div>
+      <div class="status" id="status"></div>
+    </form>
+
+    <div class="users">
+      <h3>Perfis cadastrados</h3>
+      <div class="user-row"><strong>Eduardo</strong><span>Admin completo</span><span class="pill">Admin</span></div>
+      <div class="user-row"><strong>P3 Solar</strong><span>Admin completo</span><span class="pill">Admin</span></div>
+      <div class="user-row"><strong>Alan</strong><span>Portal engenharia</span><span class="pill">Engenharia</span></div>
+    </div>
+    <div class="notice">O login agora valida no Supabase. As telas est&aacute;ticas ainda n&atilde;o substituem uma API protegida, mas a senha n&atilde;o fica mais gravada no JavaScript do site.</div>
+  </section>
+</main>
+
+<script src="supabase_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_bridge.js?v=20260714-integrity1"></script>
+<script src="auth.js"></script>
+<script src="backup_guard.js?v=20260714-integrity1"></script>
+<script>
+const form = document.getElementById("loginForm");
+const email = document.getElementById("email");
+const password = document.getElementById("password");
+const statusEl = document.getElementById("status");
+const loginButton = document.getElementById("loginButton");
+const params = new URLSearchParams(location.search);
+const next = params.get("next") || "index.html";
+const current = UBY_AUTH.current();
+
+if (current) {
+  statusEl.className = "status ok";
+  statusEl.textContent = `Sessao ativa: ${current.label}. Entrar novamente troca o perfil.`;
+  email.value = current.email || "";
+}
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  loginButton.disabled = true;
+  statusEl.className = "status";
+  statusEl.textContent = "Validando acesso...";
+  try {
+    const session = await UBY_AUTH.login(email.value, password.value);
+    statusEl.className = "status ok";
+    statusEl.textContent = `Acesso liberado: ${session.label}.`;
+    location.href = next;
+  } catch (err) {
+    statusEl.className = "status error";
+    statusEl.textContent = err.message || "Nao foi possivel entrar.";
+  } finally {
+    loginButton.disabled = false;
+  }
+});
+
+document.getElementById("logoutButton").addEventListener("click", () => UBY_AUTH.logout("login.html"));
+</script>
+</body>
+</html>

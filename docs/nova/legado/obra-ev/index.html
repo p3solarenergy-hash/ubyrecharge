@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<script src="../../app/storage-ns.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UBY Recharge - Dashboard de Obras EV</title>
+<link rel="icon" type="image/png" href="assets/brand/v2/14_icone_app.png">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="brand.css?v=20260723-brand-v2">
+<style>
+  :root{--p3-primary:#2D7FF9;--p3-primary-deep:#0B2A4A;--p3-accent:#57B7FF;--p3-accent-2:#FFD66B;--p3-bg:#07111F;--p3-card:#0E1B2D;--p3-text:#E8EFEB;--p3-muted:#8FA39A;--p3-border:#24364E;--p3-danger:#E55545;--p3-warn:#F2A93D;--p3-ok:#2D7FF9;--p3-shadow:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--p3-bg);color:var(--p3-text);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.55;min-height:100vh}
+  .page{max-width:1540px;margin:0 auto;padding:32px 36px 80px}
+  .header{background:linear-gradient(135deg,#0B2A4A 0%,#134B7A 100%);color:#fff;border-radius:16px;padding:36px;margin-bottom:28px;box-shadow:var(--p3-shadow);position:relative;overflow:hidden}
+  .header::after{content:"";position:absolute;right:-80px;top:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(45,127,249,.35),transparent 70%);border-radius:50%}
+  .brand{display:flex;align-items:center;gap:16px;margin-bottom:20px;position:relative;z-index:1}
+  .logo-mark{width:64px;height:64px;border-radius:14px;background:#071527;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .logo-mark img{width:100%;height:100%;object-fit:cover}
+  .brand-name{font-size:14px;letter-spacing:3px;text-transform:uppercase;opacity:.85}.brand-tag{font-size:11px;opacity:.65;letter-spacing:1px}
+  .header h1{font-size:32px;font-weight:700;margin-bottom:8px;position:relative;z-index:1}.subtitle{opacity:.85;font-size:15px;max-width:720px;position:relative;z-index:1}
+  .bookmark-hint{position:absolute;top:24px;right:28px;background:rgba(255,255,255,.08);padding:8px 14px;border-radius:20px;font-size:11px;backdrop-filter:blur(6px);z-index:2}.bookmark-hint b{color:#FFE082}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}.stat{background:var(--p3-card);padding:18px;border-radius:12px;border:1px solid var(--p3-border);box-shadow:var(--p3-shadow)}.stat.alert-stat{font:inherit;text-align:left;color:inherit;border-color:rgba(229,85,69,.7);cursor:pointer}.stat.alert-stat .value{color:var(--p3-danger)}
+  .stat .label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--p3-muted);font-weight:600}.stat .value{font-size:28px;font-weight:700;color:var(--p3-primary);margin-top:6px;line-height:1}.unit{font-size:13px;color:var(--p3-muted);font-weight:500;margin-left:4px}.sub{font-size:11px;color:var(--p3-muted);margin-top:6px}
+  .toolbar{display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap}.toolbar h2{flex:1;font-size:18px;font-weight:700;color:var(--p3-primary);display:flex;align-items:center;gap:10px}.toolbar h2::before{content:"";width:4px;height:22px;background:var(--p3-accent);border-radius:3px}
+  .search{flex:0 0 310px;position:relative}.search input{width:100%;padding:9px 12px 9px 34px;border-radius:8px;border:1px solid var(--p3-border);font-size:13px;background:#13243B;color:var(--p3-text)}.search::before{content:"Buscar";position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:10px;opacity:.55}.search input{padding-left:58px}.search input:focus{outline:none;border-color:var(--p3-accent);box-shadow:0 0 0 3px rgba(45,127,249,.15)}
+  .new-btn{background:var(--p3-accent);color:#fff;padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}.new-btn:hover{background:#1D65D8}
+  .new-panel{display:none;background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:20px;margin:-6px 0 24px;box-shadow:var(--p3-shadow)}.new-panel.open{display:block}.new-panel h3{color:var(--p3-primary);font-size:16px;margin-bottom:14px}.new-grid{display:grid;grid-template-columns:1.3fr 1fr 1.3fr .7fr .8fr .9fr;gap:12px;align-items:end}.field label{display:block;color:var(--p3-muted);font-size:10px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;margin-bottom:5px}.field input,.field select{width:100%;height:40px;border:1px solid var(--p3-border);border-radius:8px;background:#13243B;color:var(--p3-text);padding:0 10px;font-weight:600}.form-actions{display:flex;gap:8px}.ghost-btn{border:1px solid var(--p3-border);background:#0B1524;color:var(--p3-text);border-radius:8px;padding:9px 12px;font-size:12px;font-weight:800;cursor:pointer}
+  .compare-section{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:24px;margin-bottom:28px;box-shadow:var(--p3-shadow)}.compare-section h2{font-size:16px;font-weight:700;color:var(--p3-primary);margin-bottom:14px;display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}.compare-section h2::before{content:"";width:4px;height:18px;background:var(--p3-accent);border-radius:3px}
+  .phase-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.phase-mini{background:#13243B;border:1px solid var(--p3-border);border-radius:12px;padding:14px}.phase-mini strong{display:flex;justify-content:space-between;color:var(--p3-text);gap:10px}.phase-mini small{display:block;color:var(--p3-muted);margin-top:4px}.progress{height:8px;background:#1C314A;border-radius:999px;overflow:hidden;margin-top:10px}.bar{height:100%;background:var(--p3-primary);border-radius:999px}.macro-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.macro-list{display:grid;gap:10px}.macro-item{background:#13243B;border:1px solid var(--p3-border);border-left:4px solid var(--p3-accent);border-radius:10px;padding:13px}.macro-item.warn{border-left-color:var(--p3-warn)}.macro-item.danger{border-left-color:var(--p3-danger)}.macro-item strong{display:block;color:var(--p3-text);font-size:13px;margin-bottom:3px}.macro-item span{font-size:12px;color:var(--p3-muted)}.pipeline-bars{display:grid;gap:10px}.pipeline-row{display:grid;grid-template-columns:150px 1fr 42px;gap:10px;align-items:center;font-size:12px}.pipeline-row strong{color:var(--p3-text)}.pipeline-track{height:12px;background:#1C314A;border-radius:999px;overflow:hidden}.pipeline-fill{height:100%;border-radius:999px;background:var(--p3-primary)}.stage-group{margin-bottom:28px}.stage-title{display:flex;justify-content:space-between;align-items:center;margin:0 0 12px;padding:0 0 8px;border-bottom:1px solid var(--p3-border);color:var(--p3-primary);font-size:16px}.stage-count{font-size:11px;color:var(--p3-muted);font-weight:600}.stage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px}
+  .reports{display:block;margin-bottom:32px}.report-card{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:22px;box-shadow:var(--p3-shadow);text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:14px;transition:all .2s;position:relative;overflow:hidden}.report-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(11,42,74,.16)}.report-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#0B2A4A,var(--p3-accent))}
+  .report-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.report-title{font-size:16px;font-weight:700;color:var(--p3-primary);line-height:1.3}.report-sub{font-size:11px;color:var(--p3-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.7px}.report-status{font-size:9px;padding:3px 9px;border-radius:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0}.status-ok{background:#0B2A4A;color:#9DCEFF}.status-warn{background:#2E2310;color:#F2D77F}.status-danger{background:#2E1714;color:#FF8B7C}
+  .report-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:12px 0;border-top:1px solid var(--p3-border);border-bottom:1px solid var(--p3-border)}.ml{font-size:9px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}.mv{font-size:14px;font-weight:700;color:var(--p3-primary);margin-top:2px}.mu{font-size:10px;color:var(--p3-muted);font-weight:500}
+  .report-flags{display:flex;gap:6px;flex-wrap:wrap}.flag{font-size:10px;padding:3px 8px;border-radius:6px;background:#172A42;color:var(--p3-muted);font-weight:600}.flag.crit{background:#2E1714;color:#FF8B7C}.flag.warn{background:#2E2310;color:#F2D77F}.flag.ok{background:#0B2A4A;color:#9DCEFF}
+  .report-foot{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--p3-muted);margin-top:auto}.open{color:var(--p3-accent);font-weight:700}.delete-btn{border:1px solid var(--p3-danger);background:#2E1714;color:#FF8B7C;border-radius:7px;padding:6px 9px;font-size:10px;font-weight:800;cursor:pointer;text-transform:uppercase;letter-spacing:.4px}.delete-btn:hover{filter:brightness(1.12)}
+  .analyzer-section{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:20px;margin:0 0 28px;box-shadow:var(--p3-shadow)}.analyzer-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.analyzer-head h2{font-size:16px;color:var(--p3-primary)}.analyzer-links{display:flex;gap:8px;flex-wrap:wrap}.analyzer-links a{border:1px solid var(--p3-border);background:#0B1524;color:var(--p3-text);border-radius:8px;padding:8px 11px;font-size:11px;font-weight:800;text-decoration:none}.analyzer-links a.main{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
+  .cloud-panel{background:var(--p3-card);border:1px solid var(--p3-border);border-left:4px solid var(--p3-accent);border-radius:14px;padding:18px 20px;margin:0 0 24px;box-shadow:var(--p3-shadow);display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}.cloud-panel h2{font-size:16px;color:var(--p3-primary);margin-bottom:4px}.cloud-panel p{font-size:12px;color:var(--p3-muted)}.cloud-actions{display:flex;gap:8px;flex-wrap:wrap}.cloud-status{font-size:12px;color:var(--p3-muted);margin-top:8px}.cloud-panel.ok{border-left-color:var(--p3-ok)}.cloud-panel.warn{border-left-color:var(--p3-warn)}.cloud-panel.danger{border-left-color:var(--p3-danger)}
+  .compare-section + .analyzer-section{display:none}
+  .prospect-section{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:22px;margin:10px 0 32px;box-shadow:var(--p3-shadow)}.prospect-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--p3-border)}.prospect-head h2{font-size:16px;color:var(--p3-primary)}.prospect-actions{display:flex;gap:8px;flex-wrap:wrap}.prospect-list{display:grid;gap:8px}.prospect-row{display:grid;grid-template-columns:82px minmax(220px,1.3fr) 120px 150px minmax(190px,1fr) 80px 190px;gap:10px;align-items:center;background:#13243B;border:1px solid var(--p3-border);border-radius:10px;padding:11px 12px}.prospect-row.head{background:#172A42;color:var(--p3-primary);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.7px}.prospect-main{min-width:0}.prospect-title{font-size:13px;font-weight:800;color:var(--p3-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prospect-sub{font-size:10px;color:var(--p3-muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prospect-status{font-size:10px;color:#F2D77F;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prospect-note{font-size:11px;color:var(--p3-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-link{display:inline-block;border:1px solid var(--p3-border);background:#0B1524;color:var(--p3-text);border-radius:7px;padding:7px 10px;font-size:11px;font-weight:800;text-decoration:none}.mini-link.primary{background:var(--p3-accent);border-color:var(--p3-accent);color:#fff}
+  .theme-toggle{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;border:1px solid var(--p3-border);background:var(--p3-card);color:var(--p3-text);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;z-index:1000;box-shadow:var(--p3-shadow)}
+  footer{text-align:center;padding:24px 0;color:var(--p3-muted);font-size:11px;margin-top:30px;border-top:1px solid var(--p3-border)}footer strong{color:var(--p3-primary)}
+  [data-theme="light"]{--p3-primary:#0B2A4A;--p3-primary-deep:#0B2A4A;--p3-accent:#2D7FF9;--p3-accent-2:#FFB300;--p3-bg:#F5F7F6;--p3-card:#FFFFFF;--p3-text:#1F2A24;--p3-muted:#5C6B62;--p3-border:#DDE8F6;--p3-danger:#C0392B;--p3-warn:#E08E0B;--p3-ok:#1F8A4C;--p3-shadow:0 1px 3px rgba(11,42,74,.06),0 4px 12px rgba(11,42,74,.05)}[data-theme="light"] .header{background:linear-gradient(135deg,#0B2A4A 0%,#155340 100%)}[data-theme="light"] .logo-mark{background:#2D7FF9;color:#fff;border:none}[data-theme="light"] .phase-mini,[data-theme="light"] .search input{background:#fff}
+  @media(max-width:1100px){.prospect-row{grid-template-columns:70px minmax(180px,1fr) 100px 130px 1fr}.prospect-row>:nth-child(6){display:none}.prospect-row>:nth-child(7){grid-column:1/-1}}@media(max-width:880px){.stats,.phase-grid,.macro-grid{grid-template-columns:repeat(2,1fr)}.stage-grid{grid-template-columns:1fr}.bookmark-hint{display:none}}@media(max-width:620px){.page{padding:18px 14px 60px}.stats,.phase-grid,.macro-grid{grid-template-columns:1fr}.pipeline-row{grid-template-columns:120px 1fr 32px}.prospect-row{grid-template-columns:1fr}.prospect-row.head{display:none}.search{flex:1 1 100%}.header{padding:26px 22px}}
+
+
+  /* === UBY THEME STANDARD === */
+  .ghost-btn,.analyzer-links a,.mini-link,.nav a:not(.main),.tiny-btn{
+    border-color:#2E4D70;
+    background:#0B1524;
+    color:#E8EFEB;
+  }
+  .ghost-btn:hover,.analyzer-links a:hover,.mini-link:hover,.nav a:not(.main):hover,.tiny-btn:hover{
+    border-color:var(--p3-accent);
+    background:#0E1B2D;
+  }
+  .new-btn,.primary-btn,.primary-link,.analyzer-links a.main,.mini-link.primary,.nav a.main{
+    background:#2D7FF9;
+    border-color:#2D7FF9;
+    color:#FFFFFF;
+  }
+  .new-btn:hover,.primary-btn:hover,.primary-link:hover,.analyzer-links a.main:hover,.mini-link.primary:hover,.nav a.main:hover{
+    background:#1D65D8;
+    border-color:#1D65D8;
+  }
+  .theme-toggle{
+    background:#0E1B2D;
+    color:#E8EFEB;
+    border-color:#2E4D70;
+  }
+  [data-theme="light"] .ghost-btn,
+  [data-theme="light"] .analyzer-links a,
+  [data-theme="light"] .mini-link,
+  [data-theme="light"] .nav a:not(.main),
+  [data-theme="light"] .tiny-btn{
+    background:#FFFFFF !important;
+    color:#0B2A4A !important;
+    border-color:#B9D7FF !important;
+  }
+  [data-theme="light"] .ghost-btn:hover,
+  [data-theme="light"] .analyzer-links a:hover,
+  [data-theme="light"] .mini-link:hover,
+  [data-theme="light"] .nav a:not(.main):hover,
+  [data-theme="light"] .tiny-btn:hover{
+    background:#EAF3FF !important;
+    border-color:#2D7FF9 !important;
+  }
+  [data-theme="light"] .new-btn,
+  [data-theme="light"] .primary-btn,
+  [data-theme="light"] .primary-link,
+  [data-theme="light"] .analyzer-links a.main,
+  [data-theme="light"] .mini-link.primary,
+  [data-theme="light"] .nav a.main{
+    background:#2D7FF9 !important;
+    border-color:#2D7FF9 !important;
+    color:#FFFFFF !important;
+  }
+  [data-theme="light"] .stat,
+  [data-theme="light"] .compare-section,
+  [data-theme="light"] .analyzer-section,
+  [data-theme="light"] .cloud-panel,
+  [data-theme="light"] .prospect-section,
+  [data-theme="light"] .panel,
+  [data-theme="light"] section,
+  [data-theme="light"] .report-card,
+  [data-theme="light"] .new-panel{
+    background:#FFFFFF !important;
+    color:#1F2A24 !important;
+    border-color:#D7E6F8 !important;
+  }
+  [data-theme="light"] .phase-mini,
+  [data-theme="light"] .macro-item,
+  [data-theme="light"] .prospect-row,
+  [data-theme="light"] .work-card,
+  [data-theme="light"] .task-block,
+  [data-theme="light"] .planner-row,
+  [data-theme="light"] .chart-card,
+  [data-theme="light"] .analysis-card,
+  [data-theme="light"] .agent-card,
+  [data-theme="light"] .library-card,
+  [data-theme="light"] .doc-card,
+  [data-theme="light"] .agent-item,
+  [data-theme="light"] .insight{
+    background:#F8FBFF !important;
+    color:#1F2A24 !important;
+    border-color:#D7E6F8 !important;
+  }
+  [data-theme="light"] input,
+  [data-theme="light"] select,
+  [data-theme="light"] textarea,
+  [data-theme="light"] .note{
+    background:#FFFFFF !important;
+    color:#1F2A24 !important;
+    border-color:#B9D7FF !important;
+  }
+  [data-theme="light"] .progress,
+  [data-theme="light"] .pipeline-track,
+  [data-theme="light"] .mini-track,
+  [data-theme="light"] .seg{
+    background:#E6EEF8 !important;
+  }
+  [data-theme="light"] .theme-toggle{
+    background:#FFFFFF !important;
+    color:#0B2A4A !important;
+    border-color:#D7E6F8 !important;
+  }
+  .activity-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:0 0 28px}
+  .activity-panel{background:var(--p3-card);border:1px solid var(--p3-border);border-radius:14px;padding:20px;box-shadow:var(--p3-shadow)}
+  .activity-panel h2{font-size:16px;color:var(--p3-primary);margin-bottom:6px}
+  .message-compose{display:grid;grid-template-columns:1fr auto;gap:8px;margin:12px 0}
+  .message-compose textarea{min-height:72px;border:1px solid var(--p3-border);border-radius:8px;background:#0B1524;color:var(--p3-text);padding:10px;resize:vertical;font-family:inherit}
+  .activity-list{display:grid;gap:8px;max-height:360px;overflow:auto}
+  .activity-item{background:#0B1524;border:1px solid var(--p3-border);border-left:3px solid var(--p3-accent);border-radius:8px;padding:10px}
+  .activity-item strong{display:block;color:var(--p3-text);font-size:12px;margin-bottom:3px}
+  .activity-item span{display:block;color:var(--p3-muted);font-size:11px;line-height:1.4}
+  .activity-item .meta{color:var(--p3-primary);font-weight:800;text-transform:uppercase;letter-spacing:.4px;font-size:9px;margin-bottom:4px}
+  .operational-board{background:linear-gradient(135deg,rgba(19,56,88,.98),rgba(10,29,48,.98));border:1px solid #2C6D9C;border-radius:14px;padding:20px;margin:0 0 28px;box-shadow:var(--p3-shadow)}
+  .operational-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}.operational-head h2{font-size:18px;color:#7FCCFF;margin-bottom:4px}.operational-head .sub{max-width:700px}.operational-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.task-focus{background:rgba(7,20,34,.86);border:1px solid var(--p3-border);border-radius:10px;padding:12px;min-height:156px}.task-focus h3{font-size:12px;color:var(--p3-primary);text-transform:uppercase;letter-spacing:.7px;margin:0 0 9px}.task-focus-item{border-left:3px solid var(--p3-accent);padding:7px 0 7px 9px;border-bottom:1px solid rgba(70,108,139,.34)}.task-focus-item:last-child{border-bottom:0}.task-focus-item.urgent{border-left-color:var(--p3-danger)}.task-focus-item.done{border-left-color:var(--p3-ok)}.task-focus-item strong{display:block;font-size:12px;color:var(--p3-text)}.task-focus-item span{display:block;font-size:10px;color:var(--p3-muted);margin-top:2px}.task-focus-empty{font-size:11px;color:var(--p3-muted);padding:10px 0}
+  .deadline-command{background:linear-gradient(135deg,rgba(99,31,28,.98),rgba(40,20,29,.98));border:1px solid rgba(229,85,69,.7);border-radius:14px;padding:20px;margin:0 0 28px;box-shadow:var(--p3-shadow)}.deadline-command.safe{background:linear-gradient(135deg,rgba(19,56,88,.98),rgba(10,29,48,.98));border-color:#2C6D9C}.deadline-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}.deadline-head h2{font-size:18px;color:#fff;margin-bottom:4px}.deadline-head .sub{max-width:760px}.deadline-columns{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.deadline-card{background:rgba(7,20,34,.82);border:1px solid var(--p3-border);border-radius:10px;padding:12px;min-height:148px}.deadline-card h3{font-size:11px;color:#FFD0CA;text-transform:uppercase;letter-spacing:.7px;margin:0 0 9px}.deadline-command.safe .deadline-card h3{color:#7FCCFF}.deadline-item{border-left:3px solid var(--p3-danger);padding:7px 0 7px 9px;border-bottom:1px solid rgba(255,255,255,.12)}.deadline-item:last-child{border-bottom:0}.deadline-item.warn{border-left-color:var(--p3-warn)}.deadline-item.info{border-left-color:var(--p3-accent)}.deadline-item strong{display:block;font-size:12px;color:var(--p3-text)}.deadline-item span{display:block;font-size:10px;color:var(--p3-muted);margin-top:2px}.deadline-empty{font-size:11px;color:var(--p3-muted);padding:10px 0}.alert-modal{position:fixed;inset:0;background:rgba(2,8,15,.76);z-index:3000;display:none;place-items:center;padding:18px}.alert-modal.open{display:grid}.alert-dialog{width:min(700px,100%);max-height:82vh;overflow:auto;background:#0E1B2D;border:1px solid rgba(229,85,69,.85);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:22px}.alert-dialog h2{color:#FFB3A8;font-size:20px;margin-bottom:6px}.alert-dialog p{font-size:13px;color:var(--p3-muted);margin-bottom:14px}.alert-list{display:grid;gap:8px;margin-bottom:16px}.alert-row{border-left:3px solid var(--p3-danger);background:#0B1524;border-radius:7px;padding:10px}.alert-row strong{display:block;font-size:13px}.alert-row span{display:block;font-size:11px;color:var(--p3-muted);margin-top:3px}.alert-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+  @media(max-width:1100px){.deadline-columns{grid-template-columns:repeat(2,1fr)}}@media(max-width:880px){.activity-grid,.operational-columns,.deadline-columns{grid-template-columns:1fr}.operational-head,.deadline-head{flex-direction:column}}
+
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Alternar tema">Sol</button>
+<div class="page">
+  <div class="header">
+    <span class="bookmark-hint"><b>Modelo</b> gestao de obra EV</span>
+    <div class="brand">
+      <div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt=""></div>
+      <div><div class="brand-name">UBY Recharge</div><div class="brand-tag">Engenharia em Energia Solar & Mobilidade Eletrica</div></div>
+    </div>
+    <h1>Dashboard de Obras de Carregadores EV</h1>
+    <div class="subtitle">Central para acompanhar implantacoes por obra, com progresso por fase, pendencias criticas, materiais, terceiros e entrega final.</div>
+  </div>
+
+  <div class="analyzer-section">
+    <div class="analyzer-head">
+      <div>
+        <h2>Atalhos dos analisadores</h2>
+        <div class="sub">Central unica para abrir os HTMLs tecnicos.</div>
+      </div>
+    </div>
+    <div class="analyzer-links">
+      <a href="index.html">Pagina inicial</a>
+      <a class="main" href="analisadores/dashboard.html" target="_blank" rel="noopener">Dashboard geral dos analisadores</a>
+      <a href="mapa-implantacao.html">Mapa de implantação</a>
+      <a href="recargas.html">Painel de recargas</a>
+      <a href="mercado.html">Mercado EV</a>
+      <a href="engenharia.html">Portal engenharia</a>
+      <a href="../tarefas/">Gestao de tarefas</a>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="label">Obras ativas</div><div class="value" id="statObras">4</div><div class="sub">Projetos em implantacao</div></div>
+    <div class="stat"><div class="label">Progresso medio</div><div class="value" id="statProgresso">54<span class="unit">%</span></div><div class="sub">OK + N/A sobre o total</div></div>
+    <div class="stat"><div class="label">Pendencias criticas</div><div class="value" id="statCriticas">9</div><div class="sub">Concessionaria, materiais e eletrica</div></div>
+    <div class="stat"><div class="label">Potencia planejada</div><div class="value" id="statKw">270<span class="unit">kW</span></div><div class="sub">Soma das obras cadastradas</div></div>
+    <button class="stat alert-stat" type="button" id="openDeadlineAlerts"><div class="label">Alertas de prazo</div><div class="value" id="statDeadlineAlerts">0</div><div class="sub" id="statDeadlineSub">Nenhuma ação imediata</div></button>
+  </div>
+
+  <div class="cloud-panel">
+    <div>
+      <h2>Sincronizacao automatica</h2>
+      <p>Quando estiver conectado, este painel carrega e salva pela nuvem automaticamente. A copia local fica so como seguranca.</p>
+      <div class="cloud-status" id="cloudStatus">Verificando conexao...</div>
+    </div>
+    <div class="cloud-actions">
+      <a class="ghost-btn" id="loginCloud" href="login.html">Conectar</a>
+      <button class="ghost-btn" id="refreshCloud">Atualizar agora</button>
+    </div>
+  </div>
+
+  <section class="deadline-command safe" id="deadlineCommand" aria-label="Central de prazos e pendências">
+    <div class="deadline-head">
+      <div><h2>Central de prazos e pendências</h2><div class="sub" id="deadlineSummary">Consolidando atrasos, entregas próximas e cadastros sem responsável ou prazo.</div></div>
+      <a class="new-btn" href="../tarefas/?filter=critical">Tratar pendências</a>
+    </div>
+    <div class="deadline-columns">
+      <div class="deadline-card"><h3>Atrasadas</h3><div id="deadlineLate"></div></div>
+      <div class="deadline-card"><h3>Próximas 7 dias</h3><div id="deadlineSoon"></div></div>
+      <div class="deadline-card"><h3>Obras em risco</h3><div id="deadlineWorks"></div></div>
+      <div class="deadline-card"><h3>Cadastro a completar</h3><div id="deadlineHygiene"></div></div>
+    </div>
+  </section>
+
+  <section class="operational-board" aria-label="Controle operacional de tarefas">
+    <div class="operational-head">
+      <div><h2>Controle operacional das obras</h2><div class="sub">Próximos passos, prazos e entregas reunidos em um só lugar. As alterações ficam vinculadas à central compartilhada de tarefas.</div></div>
+      <a class="new-btn" href="../tarefas/">Abrir gestão de tarefas</a>
+    </div>
+    <div class="operational-columns">
+      <div class="task-focus"><h3>Foco de hoje</h3><div id="tasksToday"></div></div>
+      <div class="task-focus"><h3>Próximos 7 dias</h3><div id="tasksWeek"></div></div>
+      <div class="task-focus"><h3>Concluído nesta semana</h3><div id="tasksDoneWeek"></div></div>
+    </div>
+  </section>
+
+  <div class="alert-modal" id="deadlineAlertModal" role="dialog" aria-modal="true" aria-labelledby="deadlineAlertTitle">
+    <div class="alert-dialog">
+      <h2 id="deadlineAlertTitle">Atenção: pendências que exigem decisão</h2>
+      <p id="deadlineAlertText"></p>
+      <div class="alert-list" id="deadlineAlertList"></div>
+      <div class="alert-actions"><button class="ghost-btn" type="button" id="dismissDeadlineAlerts">Lembrar amanhã</button><a class="new-btn" href="../tarefas/?filter=critical">Abrir gestão de tarefas</a></div>
+    </div>
+  </div>
+
+  <div class="activity-grid">
+    <div class="activity-panel">
+      <h2>Mensagens gerais</h2>
+      <div class="sub">Recados para a equipe inteira, sem prender em uma obra especifica.</div>
+      <div class="message-compose">
+        <textarea id="generalMessageText" placeholder="Escreva uma mensagem geral..."></textarea>
+        <button class="new-btn" type="button" id="sendGeneralMessage">Enviar</button>
+      </div>
+      <div class="activity-list" id="generalMessages"></div>
+    </div>
+    <div class="activity-panel">
+      <h2>Historico recente</h2>
+      <div class="sub">Quem alterou, quando alterou e em qual projeto.</div>
+      <div class="activity-list" id="globalActivity"></div>
+    </div>
+  </div>
+
+  <div class="compare-section">
+    <h2>Avanco geral por fase</h2>
+    <div class="phase-grid" id="phaseGrid"></div>
+  </div>
+
+  <div class="compare-section">
+    <h2>Insights macro da carteira</h2>
+    <div class="macro-grid">
+      <div class="macro-list" id="macroInsights"></div>
+      <div class="pipeline-bars" id="pipelineChart"></div>
+    </div>
+  </div>
+
+  <div class="analyzer-section">
+    <div class="analyzer-head">
+      <div>
+        <h2>Atalhos dos analisadores</h2>
+        <div class="sub">Central única para abrir os HTMLs técnicos sem poluir cada projeto.</div>
+      </div>
+    </div>
+    <div class="analyzer-links">
+      <a class="main" href="analisadores/dashboard.html" target="_blank" rel="noopener">Dashboard geral</a>
+      <a href="recargas.html">Painel de recargas</a>
+      <a href="mercado.html">Mercado EV</a>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <h2>Obras</h2>
+    <div class="search"><input id="searchInput" placeholder="Nome, cliente, cidade ou status..."></div>
+    <button class="ghost-btn" id="exportBackup">Backup</button>
+    <button class="ghost-btn" id="importBackup">Restaurar</button>
+    <input id="backupFile" type="file" accept="application/json,.json" style="display:none">
+    <button class="new-btn" id="openNewObra">+ Nova Obra</button>
+  </div>
+
+  <div class="new-panel" id="newObraPanel">
+    <h3>Criar nova obra</h3>
+    <div class="new-grid">
+      <div class="field"><label>Nome da obra</label><input id="newNome" placeholder="Ex: Condominio Alpha EV"></div>
+      <div class="field"><label>Cliente</label><input id="newCliente" placeholder="Cliente"></div>
+      <div class="field"><label>Endereco / local</label><input id="newLocal" placeholder="Cidade - UF"></div>
+      <div class="field"><label>Carregadores</label><input id="newQtd" type="number" min="1" step="1" value="1"></div>
+      <div class="field"><label>kW por carregador</label><input id="newKw" type="number" min="1" step="1" value="60"></div>
+      <div class="field"><label>Status</label><select id="newStatus"><option>Prospecção / Estudo</option><option>Projeto</option><option>Em obra</option><option>Aguardando cliente</option><option>Concluida</option></select></div>
+      <div class="form-actions">
+        <button class="new-btn" id="saveNewObra">Criar</button>
+        <button class="ghost-btn" id="cancelNewObra">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="reports" id="reportsGrid"></div>
+
+  <div class="prospect-section">
+    <div class="prospect-head">
+      <div>
+        <h2>Base de prospeccao de areas</h2>
+        <div class="sub">Dados principais vindos da planilha CONTROLE DE PROSPECCAO - AREAS EV</div>
+      </div>
+      <div class="prospect-actions">
+        <a class="mini-link" href="https://docs.google.com/spreadsheets/d/1IiUqtF8xobzwmMkRqJiNXcT1CFW6tskEybT6GWgvvPs/edit?gid=2137351283" target="_blank" rel="noopener">Abrir planilha</a>
+      </div>
+    </div>
+    <div class="prospect-list" id="prospectGrid"></div>
+  </div>
+
+  <footer><strong>P3 Energy</strong> - Engenharia em Energia Solar e Mobilidade Eletrica<br>Prototipo visual para anexar na plataforma UBY Recharge</footer>
+</div>
+
+<script src="sidebar.js"></script>
+<script src="backup_guard.js?v=20260714-integrity1"></script>
+<script src="drive_config.js"></script>
+<script src="supabase_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_bridge.js?v=20260819-shared-data1"></script>
+<script src="app_data.js"></script>
+  <script src="app_store.js?v=20260819-no-empty-overwrite1"></script>
+<script src="activity.js"></script>
+<script>
+const KEY="p3_obras_theme";
+const root=document.documentElement;
+const themeBtn=document.getElementById("themeToggle");
+function applyTheme(t){root.setAttribute("data-theme",t);themeBtn.textContent=t==="light"?"Lua":"Sol"}
+applyTheme(localStorage.getItem(KEY)||"dark");
+themeBtn.onclick=()=>{const nxt=(root.getAttribute("data-theme")==="light")?"dark":"light";localStorage.setItem(KEY,nxt);applyTheme(nxt)};
+
+const phaseLabels=[
+  ["Documentacao","Documentacao"],
+  ["Concessionaria","Concessionaria"],
+  ["Projeto","Projeto"],
+  ["Orcamentos","Orcamentos"],
+  ["Materiais","Materiais"],
+  ["Obra civil","Obra civil"],
+  ["Obra eletrica","Obra eletrica"],
+  ["Adicionais","Adicionais"],
+  ["Comissionamento","Instalacao"],
+  ["Operacao assistida","Operacao"]
+];
+const appData=window.UBY_APP_DATA||{};
+const baseObras=appData.baseObras||[];
+const prospectSheetUrl=appData.prospectSheetUrl||"#";
+let prospects=appData.prospects||[];
+const obrasKey="uby-obras-dashboard-v1";
+const deletedKey="uby-obras-dashboard-deleted-v1";
+const mapCreation=(()=>{const q=new URLSearchParams(location.search);if(q.get("novaObra")!=="1"||!q.get("mapPoint"))return null;return{pointId:q.get("mapPoint"),name:q.get("nome")||"Nova obra",local:q.get("local")||"Local a definir",lat:Number(q.get("lat")),lon:Number(q.get("lon"))}})();
+let obras=loadObras();
+function detailKey(id){return "uby-obra-detalhe-"+(id||"rio")}
+function detailStats(detail){const tasks=(detail.phases||[]).flatMap(p=>(p.tasks||[]).map(t=>({...t,phase:p.name})));const total=tasks.length||1;const released=tasks.filter(t=>t.status==="done"||t.status==="na").length;const pct=Math.round(released/total*100);const critical=tasks.filter(t=>["Concessionaria","Orcamentos e contratacoes","Materiais e equipamentos","Obra eletrica"].includes(t.phase)&&["pending","doing"].includes(t.status));return{pct,crit:critical.length,flags:critical.slice(0,3).map(t=>t.title)}}
+function workDetailLink(id){return `gestao_obra_ev_detalhe.html?obra=${encodeURIComponent(String(id||""))}`}
+function obraFromDetail(id,detail){const p=detail.project||{};const qtd=parseInt(p.qtdCarregadores,10)||parseInt((p.equip||"1 x 60").split("x")[0],10)||1;const pot=parseInt(p.potenciaCarregador,10)||parseInt((p.equip||"1 x 60").split("x")[1],10)||60;const ds=detailStats(detail);return{id,nome:p.obraNome||id,cliente:p.cliente||"Cliente",local:p.local||"Local a definir",status:p.statusExec||"Projeto",kind:ds.pct>=100?"ok":ds.crit?"danger":"warn",pct:ds.pct,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,crit:ds.crit,flags:ds.flags.length?ds.flags:(ds.pct===100?["Obra completa"]:["Obra criada"]),link:workDetailLink(id)}}
+function mergeDetailData(obra){try{const detail=obra?.detail?.project?obra.detail:JSON.parse(localStorage.getItem(detailKey(obra.id)));if(!detail||!detail.project)return obra;const qtd=parseInt(detail.project.qtdCarregadores,10)||parseInt((detail.project.equip||"1 x 60").split("x")[0],10)||1;const pot=parseInt(detail.project.potenciaCarregador,10)||parseInt((detail.project.equip||"1 x 60").split("x")[1],10)||60;const ds=detailStats(detail);return{...obra,nome:detail.project.obraNome||obra.nome,local:detail.project.local||obra.local,status:detail.project.statusExec||obra.status,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,pct:ds.pct,crit:ds.crit,flags:ds.flags.length?ds.flags:(ds.pct===100?["Obra completa"]:obra.flags)}}catch{return obra}}
+function deletedIds(){try{return JSON.parse(localStorage.getItem(deletedKey))||[]}catch{return[]}}
+function effectiveDeletedIds(){const protectedCompleted=new Set(["rio","posto-central-jk","malassise"]);return [...new Set(deletedIds().filter(id=>id&&!protectedCompleted.has(String(id))))]}
+function isArchived(obra){return Boolean(obra?.archived||/arquivad/i.test(obra?.status||obra?.statusExec||""))}
+function detailObras(){const deleted=new Set(effectiveDeletedIds());const items=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||!key.startsWith("uby-obra-detalhe-"))continue;const id=key.replace("uby-obra-detalhe-","");if(deleted.has(id))continue;try{const detail=JSON.parse(localStorage.getItem(key));if(detail&&detail.project&&!isArchived(detail.project))items.push(obraFromDetail(id,detail))}catch{}}return items}
+function normalizeDefaults(saved){const deleted=new Set(effectiveDeletedIds());const activeBase=baseObras.filter(o=>!deleted.has(o.id)&&!isArchived(o));const byId=new Map((saved||[]).filter(o=>!deleted.has(o.id)&&!isArchived(o)).map(o=>[o.id,o]));activeBase.forEach(base=>{if(!byId.has(base.id))byId.set(base.id,base)});detailObras().forEach(obra=>byId.set(obra.id,{...(byId.get(obra.id)||{}),...obra}));return [...byId.values()].map(o=>o.id==="rio"&&o.pct<100?{...o,...baseObras.find(b=>b.id==="rio")}:o)}
+function loadObras(){try{return normalizeDefaults(JSON.parse(localStorage.getItem(obrasKey))).map(mergeDetailData)}catch{return normalizeDefaults([]).map(mergeDetailData)}}
+function saveObras(){localStorage.setItem(obrasKey,JSON.stringify(obras))}
+function sortObras(list){return [...list].sort((a,b)=>(a.pct??0)-(b.pct??0)||a.nome.localeCompare(b.nome))}
+async function deleteObra(nome){const alvo=obras.find(o=>o.nome===nome);if(!alvo)return;if(!confirm(`Arquivar a obra "${nome}"? Ela sairá do painel, mas as recargas e todo o histórico continuarão preservados.`))return;const detail=(()=>{try{return alvo.detail||JSON.parse(localStorage.getItem(detailKey(alvo.id))||"null")}catch{return alvo.detail||null}})();const archivedDetail=detail?{...detail,archived:true,project:{...(detail.project||{}),statusExec:"Arquivada"}}:{...alvo,archived:true,status:"Arquivada"};try{const result=await window.UBY_STORE?.saveWork({...alvo,archived:true,status:"Arquivada"},archivedDetail);if(!result?.cloud)throw new Error("não houve confirmação de gravação na base compartilhada. Verifique se você está logado na plataforma.")}catch(err){alert("A obra não foi alterada: "+err.message);return}const deleted=[...new Set([...effectiveDeletedIds(),alvo.id])];localStorage.setItem(deletedKey,JSON.stringify(deleted));obras=normalizeDefaults(obras.filter(o=>o.id!==alvo.id)).map(mergeDetailData);saveObras();renderCards(filteredObras());updateStats();alert("Obra arquivada com segurança. As recargas e o histórico foram preservados.")}
+function filteredObras(){const q=document.getElementById("searchInput").value.toLowerCase();return sortObras(obras.filter(o=>[o.nome,o.cliente,o.local,o.status,...o.flags].join(" ").toLowerCase().includes(q)))}
+function updateStats(){document.getElementById("statObras").textContent=obras.length;const avg=obras.length?Math.round(obras.reduce((a,o)=>a+o.pct,0)/obras.length):0;document.getElementById("statProgresso").innerHTML=avg+'<span class="unit">%</span>';document.getElementById("statCriticas").textContent=obras.reduce((a,o)=>a+o.crit,0);document.getElementById("statKw").innerHTML=obras.reduce((a,o)=>a+o.kw,0)+'<span class="unit">kW</span>';renderPhases();renderMacro()}
+function operationalTasks(){try{return JSON.parse(localStorage.getItem("uby-tarefas-v1"))||[]}catch{return[]}}
+function taskDaysUntil(due){if(!due)return 999;const now=new Date();now.setHours(0,0,0,0);const date=new Date(`${due}T00:00:00`);return Math.round((date-now)/86400000)}
+function taskText(value){return String(value||"").replace(/[&<>\"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[char]))}
+function taskFocusMarkup(items,empty,done=false){if(!items.length)return `<div class="task-focus-empty">${empty}</div>`;return items.slice(0,4).map(task=>{const days=taskDaysUntil(task.due);const deadline=done?`Concluída ${new Date(task.completedAt).toLocaleDateString("pt-BR")}`:(!task.due?"Sem prazo":days<0?`${Math.abs(days)} dia(s) atrasada`:days===0?"Prazo hoje":days===1?"Prazo amanhã":`Prazo em ${days} dias`);return `<div class="task-focus-item ${done?"done":days<=0?"urgent":""}"><strong>${taskText(task.title)}</strong><span>${taskText(task.project||"Geral")} · ${taskText(task.owner||"Sem responsável")} · ${deadline}</span></div>`}).join("")}
+function renderOperationalTasks(tasks=operationalTasks()){const open=tasks.filter(task=>task.status!=="Concluida");const today=open.filter(task=>taskDaysUntil(task.due)<=0).sort((a,b)=>taskDaysUntil(a.due)-taskDaysUntil(b.due));const week=open.filter(task=>{const days=taskDaysUntil(task.due);return days>=1&&days<=7}).sort((a,b)=>taskDaysUntil(a.due)-taskDaysUntil(b.due));const weekStart=Date.now()-7*86400000;const completed=tasks.filter(task=>task.status==="Concluida"&&task.completedAt&&new Date(task.completedAt).getTime()>=weekStart).sort((a,b)=>new Date(b.completedAt)-new Date(a.completedAt));document.getElementById("tasksToday").innerHTML=taskFocusMarkup(today,"Nenhuma tarefa vencida ou para hoje.");document.getElementById("tasksWeek").innerHTML=taskFocusMarkup(week,"Nenhuma tarefa com prazo nos próximos 7 dias.");document.getElementById("tasksDoneWeek").innerHTML=taskFocusMarkup(completed,"As conclusões desta semana aparecerão aqui.",true);renderDeadlineCommand(tasks)}
+function deadlineItem(item,kind="danger"){return `<div class="deadline-item ${kind}"><strong>${taskText(item.title)}</strong><span>${taskText(item.meta)}</span></div>`}
+function deadlineEmpty(message){return `<div class="deadline-empty">${message}</div>`}
+function activeWorks(){return obras.filter(obra=>!isArchived(obra)&&!/(conclu|cancel)/i.test(obra.status||""))}
+function workDeliveryRisks(){return activeWorks().map(obra=>{let detail=obra.detail;try{detail=detail||JSON.parse(localStorage.getItem(detailKey(obra.id))||"null")}catch{}const delivery=detail?.project?.entrega||"";return{obra,delivery,days:taskDaysUntil(delivery)}}).filter(item=>item.delivery&&item.days<=14).sort((a,b)=>a.days-b.days)}
+function deadlineAlertItems(tasks=operationalTasks()){const open=tasks.filter(task=>task.status!=="Concluida");const late=open.filter(task=>task.due&&taskDaysUntil(task.due)<0).map(task=>({title:task.title,meta:`${task.project||"Geral"} · ${Math.abs(taskDaysUntil(task.due))} dia(s) atrasada`}));const urgent=open.filter(task=>task.due&&taskDaysUntil(task.due)<=2&&taskDaysUntil(task.due)>=0&&task.priority==="Alta").map(task=>({title:task.title,meta:`${task.project||"Geral"} · ${taskDaysUntil(task.due)===0?"prazo hoje":"prazo amanhã"}`}));const deliveries=workDeliveryRisks().filter(item=>item.days<=0).map(item=>({title:`Entrega da obra: ${item.obra.nome}`,meta:item.days<0?`${Math.abs(item.days)} dia(s) em atraso`:"prazo de entrega hoje"}));return[...late,...deliveries,...urgent]}
+function renderDeadlineCommand(tasks=operationalTasks()){const open=tasks.filter(task=>task.status!=="Concluida");const late=open.filter(task=>task.due&&taskDaysUntil(task.due)<0).sort((a,b)=>taskDaysUntil(a.due)-taskDaysUntil(b.due));const soon=open.filter(task=>task.due&&taskDaysUntil(task.due)>=0&&taskDaysUntil(task.due)<=7).sort((a,b)=>taskDaysUntil(a.due)-taskDaysUntil(b.due));const workRisks=workDeliveryRisks();const hygiene=open.filter(task=>!task.due||!task.owner||/sem responsavel/i.test(task.owner));const critical=deadlineAlertItems(tasks);document.getElementById("deadlineLate").innerHTML=late.length?late.slice(0,4).map(task=>deadlineItem({title:task.title,meta:`${task.project||"Geral"} · ${Math.abs(taskDaysUntil(task.due))} dia(s) atrasada`})).join(""):deadlineEmpty("Nenhuma tarefa vencida.");document.getElementById("deadlineSoon").innerHTML=soon.length?soon.slice(0,4).map(task=>deadlineItem({title:task.title,meta:`${task.project||"Geral"} · ${taskDaysUntil(task.due)===0?"hoje":taskDaysUntil(task.due)===1?"amanhã":"em "+taskDaysUntil(task.due)+" dias"}`},"warn")).join(""):deadlineEmpty("Nenhum prazo nos próximos 7 dias.");document.getElementById("deadlineWorks").innerHTML=workRisks.length?workRisks.slice(0,4).map(item=>deadlineItem({title:item.obra.nome,meta:item.days<0?`Entrega ${Math.abs(item.days)} dia(s) atrasada`:item.days===0?"Entrega prevista para hoje":`Entrega prevista em ${item.days} dias`},item.days<=2?"danger":"warn")).join(""):deadlineEmpty("Nenhuma entrega cadastrada para os próximos 14 dias.");document.getElementById("deadlineHygiene").innerHTML=hygiene.length?hygiene.slice(0,4).map(task=>deadlineItem({title:task.title,meta:`${task.project||"Geral"} · ${!task.due?"sem prazo":"sem responsável"}`},"info")).join(""):deadlineEmpty("Todas as tarefas abertas têm prazo e responsável.");const command=document.getElementById("deadlineCommand");command.classList.toggle("safe",!critical.length);document.getElementById("deadlineSummary").textContent=critical.length?`${critical.length} alerta(s) exigem ação imediata. A fila abaixo mostra o que venceu, o que está próximo e o que ainda não está pronto para ser gerido.`:"Nenhum atraso crítico identificado. Continue acompanhando os próximos prazos e complete os cadastros sem responsável ou data.";document.getElementById("statDeadlineAlerts").textContent=critical.length;document.getElementById("statDeadlineSub").textContent=critical.length?`${late.length} atrasada(s) e ${workRisks.filter(item=>item.days<=0).length} entrega(s) vencida(s)`:"Nenhuma ação imediata";renderDeadlineAlertModal(critical)}
+function renderDeadlineAlertModal(alerts){const list=document.getElementById("deadlineAlertList");list.innerHTML=alerts.slice(0,6).map(alert=>`<div class="alert-row"><strong>${taskText(alert.title)}</strong><span>${taskText(alert.meta)}</span></div>`).join("");document.getElementById("deadlineAlertText").textContent=alerts.length?`${alerts.length} pendência(s) de prazo precisam de encaminhamento. O aviso é reapresentado quando houver uma nova situação crítica ou no próximo dia.`:"Não há alertas críticos agora.";const signature=alerts.map(alert=>`${alert.title}|${alert.meta}`).join(";");const key="uby-obra-deadline-alert-dismissed-v1";const today=new Date().toISOString().slice(0,10);let dismissed=null;try{dismissed=JSON.parse(localStorage.getItem(key)||"null")}catch{}const modal=document.getElementById("deadlineAlertModal");if(alerts.length&&(!dismissed||dismissed.date!==today||dismissed.signature!==signature))modal.classList.add("open");else modal.classList.remove("open");modal.dataset.signature=signature}
+function dismissDeadlineAlerts(){const modal=document.getElementById("deadlineAlertModal");localStorage.setItem("uby-obra-deadline-alert-dismissed-v1",JSON.stringify({date:new Date().toISOString().slice(0,10),signature:modal.dataset.signature||""}));modal.classList.remove("open")}
+async function refreshOperationalTasks(){const local=operationalTasks();renderOperationalTasks(local);try{const cloud=await window.UBY_STORE?.loadTasks(local);if(Array.isArray(cloud)){localStorage.setItem("uby-tarefas-v1",JSON.stringify(cloud));renderOperationalTasks(cloud)}}catch(err){console.warn("Falha ao carregar tarefas compartilhadas:",err.message)}}
+function stageLabel(status){if(/prospec|estudo/i.test(status))return"Prospecção / Estudo";if(/conclu/i.test(status))return"Concluida";if(/obra/i.test(status))return"Em obra";if(/aguard/i.test(status))return"Aguardando cliente";return"Projeto"}
+function renderMacro(){const total=obras.length||1;const crit=obras.reduce((a,o)=>a+o.crit,0);const low=sortObras(obras).filter(o=>o.pct<50);const highPower=[...obras].sort((a,b)=>b.kw-a.kw)[0];const stuck=sortObras(obras).find(o=>o.crit>0)||low[0];const priorityProspects=prospects.filter(p=>p.prioridade.startsWith("1."));const insights=[];if(stuck)insights.push(["Atencao operacional",`${stuck.nome} pede foco: ${stuck.pct}% de avanco, ${stuck.crit} critica(s) e status ${stuck.status}.`,stuck.crit?"danger":"warn"]);if(highPower)insights.push(["Maior impacto tecnico",`${highPower.nome} concentra ${highPower.kw} kW. Antes de acelerar compras, validar demanda, DLM e concessionaria.`,highPower.kw>=50?"warn":"ok"]);insights.push(["Prospecao alimentando obras",`${priorityProspects.length} ponto(s) de prioridade 1 na base. Proximo corte: transformar estudo aprovado em obra vinculada.`,"ok"]);document.getElementById("macroInsights").innerHTML=insights.slice(0,3).map(i=>`<div class="macro-item ${i[2]}"><strong>${i[0]}</strong><span>${i[1]}</span></div>`).join("");const order=["Prospecção / Estudo","Projeto","Aguardando cliente","Em obra","Concluida"];document.getElementById("pipelineChart").innerHTML=order.map(stage=>{const count=obras.filter(o=>stageLabel(o.status)===stage).length;const pct=Math.round(count/total*100);return`<div class="pipeline-row"><strong>${stage}</strong><div class="pipeline-track"><div class="pipeline-fill" style="width:${pct}%;background:${stage==="Concluida"?"var(--p3-ok)":stage==="Em obra"?"var(--p3-warn)":"var(--p3-accent)"}"></div></div><span>${count}</span></div>`}).join("")}
+function createSlug(text){return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,48)||("obra-"+Date.now())}
+function createDetailSeed(obra,qtd,pot){const today=new Date().toISOString().slice(0,10);return{project:{obraNome:obra.nome,cliente:obra.cliente,local:obra.local,qtdCarregadores:qtd,potenciaCarregador:pot,entrega:today,statusExec:obra.status},prospecting:{stage:"Triagem inicial",responsible:"",contactName:"",contactRole:"",phone:"",email:"",nextAction:"",nextActionDate:"",notes:"",protocols:[],documents:[]},phases:[["Documentacao e liberacoes","UBY / cliente",["Contrato ou proposta aprovada","Dados cadastrais do cliente e local","Autorizacao do proprietario ou condominio","ART / TRT definida","Fotos e levantamento tecnico inicial","Documentos exigidos pela concessionaria","Termo de aceite para inicio da implantacao"]],["Concessionaria","UBY / responsavel tecnico",["Pedido segundo padrao","Pedido de aumento de carga","Consulta de carga disponivel","Definicao se precisa aumento de carga","Protocolo aberto na concessionaria","Projeto enviado para analise","Aprovacao da concessionaria","Ligacao ou energizacao liberada"]],["Projeto e engenharia","Equipe terceirizada",["Projeto eletrico executivo entregue","Diagrama unifilar entregue","Lista tecnica de materiais validada","Dimensionamento de cabos, protecoes e quadro","Definicao de transformador quando necessario","Compatibilizacao com obra civil","Projeto aprovado para execucao"]],["Orcamentos e contratacoes","UBY / compras",["Orcamento de pintura recebido","Orcamento de obra civil recebido","Orcamento de obra eletrica recebido","Orcamento de projeto ou engenharia recebido","Orcamento de cobertura recebido, quando necessario","Orcamento de comunicacao visual e sinalizacao recebido","Pedido ou contrato da equipe terceirizada liberado"]],["Materiais e equipamentos","Compras / UBY",["Carregador EV comprado","Smart charging comprado","Transformador comprado quando necessario","Quadro e protecoes comprados","Cabos, eletrodutos e eletrocalhas comprados","Pedestal, base ou suporte comprado","Materiais recebidos e conferidos em obra"]],["Obra civil","Equipe terceirizada",["Local demarcado e liberado","Base do carregador ou pedestal executada","Base do transformador ou quadro executada","Infraestrutura de dutos ou passagem pronta","Recomposicao de piso e acabamento","Protecao mecanica instalada quando necessario","Area limpa e liberada para eletrica"]],["Obra eletrica","Equipe terceirizada",["Quadro eletrico montado","Cabos e infraestrutura eletrica instalados","Protecoes instaladas: disjuntor, DPS e DR","Aterramento validado","Transformador instalado quando necessario","Testes eletricos realizados","Energizacao tecnica liberada"]],["Adicionais","UBY / terceiros",["Cobertura definida ou descartada","Sinalizacao de vaga definida","Totem ou comunicacao visual definida","Protecao contra impacto definida","Internet, Wi-Fi, cabo ou 4G definido","Iluminacao adicional definida","Camera ou controle de acesso definido"]],["Instalacao e comissionamento","UBY / tecnico",["Carregador fixado e ligado","Configuracao de potencia realizada","Smart charging configurado","Equipamento cadastrado na plataforma","Teste com veiculo realizado","Teste de cobranca ou liberacao realizado","Termo de entrega assinado"]],["Operacao assistida","UBY",["Monitoramento inicial realizado","Pendencias de entrega registradas","Pendencias corrigidas","Cliente orientado sobre uso","Plano de suporte e manutencao definido"]]].map(([name,owner,tasks])=>({name,owner,tasks:tasks.map((title,i)=>({id:name+"-"+i,title,status:"pending",note:"",protocol:"",requestDate:"",forecastDate:""}))}))}}
+async function createObra(){const nome=document.getElementById("newNome").value.trim();if(!nome){alert("Informe o nome da obra.");return}const cliente=document.getElementById("newCliente").value.trim()||"Cliente";const local=document.getElementById("newLocal").value.trim()||"Local a definir";const qtd=parseInt(document.getElementById("newQtd").value,10)||1;const pot=parseInt(document.getElementById("newKw").value,10)||60;let id=createSlug(nome);while(obras.some(o=>o.id===id))id=id+"-"+Math.floor(Math.random()*900+100);const mapLocation=mapCreation?{pointId:mapCreation.pointId,name:mapCreation.name,lat:mapCreation.lat,lon:mapCreation.lon,linkedAt:new Date().toISOString()}:null;const obra={id,nome,cliente,local,status:document.getElementById("newStatus").value,kind:"warn",pct:0,kw:qtd*pot,carregadores:`${qtd} x ${pot} kW`,crit:0,flags:["Nova obra"],mapLocation,link:`gestao_obra_ev_detalhe.html?obra=${id}`};const detail=createDetailSeed(obra,qtd,pot);if(mapLocation)detail.project.mapLocation=mapLocation;obras.unshift(obra);saveObras();localStorage.setItem(detailKey(id),JSON.stringify(detail));try{await window.UBY_STORE?.saveWork(obra,detail)}catch(err){alert("Obra criada localmente, mas nao foi possivel salvar no banco: "+err.message)}document.getElementById("newObraPanel").classList.remove("open");["newNome","newCliente","newLocal"].forEach(id=>document.getElementById(id).value="");if(mapCreation)history.replaceState({},document.title,location.pathname);renderCards(filteredObras());updateStats()}
+function statusClass(kind){return kind==="danger"?"status-danger":kind==="warn"?"status-warn":"status-ok"}
+function flagClass(text){return /pendente|aumento|trafo|concessionaria/i.test(text)?"crit":/projeto|materiais|orcamento/i.test(text)?"warn":"ok"}
+function phasePctFromDetail(detail, needle, fallbackPct){try{const phase=(detail.phases||[]).find(p=>(p.name||"").toLowerCase().includes(needle.toLowerCase()));if(!phase)return fallbackPct;const tasks=phase.tasks||[];if(!tasks.length)return fallbackPct;const ok=tasks.filter(t=>t.status==="done"||t.status==="na").length;return Math.round(ok/tasks.length*100)}catch{return fallbackPct}}
+function phaseProgress(){
+  return phaseLabels.map(([label,needle])=>{
+    const values=obras.map(obra=>{let detail=null;try{detail=JSON.parse(localStorage.getItem(detailKey(obra.id))||"null")}catch{};const fallback=/conclu/i.test(obra.status)?100:Number(obra.pct||0);return detail?phasePctFromDetail(detail,needle,fallback):fallback});
+    const pct=values.length?Math.round(values.reduce((a,v)=>a+v,0)/values.length):0;
+    return [label,pct];
+  });
+}
+function renderPhases(){
+  document.getElementById("phaseGrid").innerHTML=phaseProgress().map(([name,pct])=>`
+    <div class="phase-mini">
+      <strong><span>${name}</span><span>${pct}%</span></strong>
+      <small>${pct>=70?"Bem encaminhada":pct>=40?"Em andamento":"Precisa atencao"}</small>
+      <div class="progress"><div class="bar" style="width:${pct}%;background:${pct>=70?"var(--p3-ok)":pct>=40?"var(--p3-warn)":"var(--p3-danger)"}"></div></div>
+    </div>`).join("");
+}
+function renderCards(list){
+  const order=["Prospecção / Estudo","Projeto","Aguardando cliente","Em obra","Concluida"];
+  const groups=order.map(stage=>[stage,sortObras(list.filter(o=>stageLabel(o.status)===stage))]).filter(g=>g[1].length);
+  document.getElementById("reportsGrid").innerHTML=groups.map(([stage,items])=>`<div class="stage-group"><div class="stage-title"><strong>${stage}</strong><span class="stage-count">${items.length} obra(s) - menor avanco primeiro</span></div><div class="stage-grid">${items.map(o=>`
+    <a class="report-card" href="${workDetailLink(o.id)}">
+      <div class="report-head">
+        <div><div class="report-title">${o.nome}</div><div class="report-sub">${o.cliente} - ${o.local}</div></div>
+        <div class="report-status ${statusClass(o.kind)}">${o.status}</div>
+      </div>
+      <div class="report-meta">
+        <div class="item"><div class="ml">Avanco</div><div class="mv">${o.pct}%</div><div class="mu">OK + N/A</div></div>
+        <div class="item"><div class="ml">Potencia</div><div class="mv">${o.kw} kW</div><div class="mu">${o.carregadores}</div></div>
+        <div class="item"><div class="ml">Criticas</div><div class="mv">${o.crit}</div><div class="mu">pendencias</div></div>
+      </div>
+      <div class="progress"><div class="bar" style="width:${o.pct}%;background:${o.pct>=70?"var(--p3-ok)":o.pct>=40?"var(--p3-warn)":"var(--p3-danger)"}"></div></div>
+      <div class="report-flags">${o.flags.map(f=>`<span class="flag ${flagClass(f)}">${f}</span>`).join("")}</div>
+      <div class="report-foot"><span>Ultima atualizacao: hoje</span><button class="delete-btn" title="Arquivar sem apagar recargas ou histórico" onclick="event.preventDefault();event.stopPropagation();deleteObra('${o.nome.replace(/'/g,"\\'")}')">Arquivar</button><span class="open">Abrir obra -></span></div>
+    </a>`).join("")}</div></div>`).join("");
+}
+function prospectKind(p){return p.prioridade.startsWith("1.")?"crit":p.prioridade.startsWith("2.")?"warn":"ok"}
+function prospectToProjectLink(p){return `gestao_obra_ev_detalhe.html?obra=prospect-${p.id}`}
+function renderProspects(){document.getElementById("prospectGrid").innerHTML=`<div class="prospect-row head"><div>ID</div><div>Ponto</div><div>Prioridade</div><div>Status</div><div>Etapa / acao</div><div>kW</div><div>Acoes</div></div>`+prospects.map(p=>`<div class="prospect-row"><div><span class="flag ${prospectKind(p)}">#${p.id}</span></div><div class="prospect-main"><div class="prospect-title">${p.ponto}</div><div class="prospect-sub">${p.cidade}/${p.uf} - ${p.tipo} - ${p.contato||"sem contato"}</div></div><div><span class="flag ${prospectKind(p)}">${p.prioridade.replace(/^[0-9]+\\. /,"")}</span></div><div class="prospect-status">${p.status}</div><div class="prospect-note">${p.etapa||"Sem etapa"}${p.acao?` - ${p.acao}`:""}${p.trafo||p.disjuntor?` | ${[p.trafo,p.disjuntor].filter(Boolean).join(" / ")}`:""}</div><div><strong>${p.kw||"-"} kW</strong></div><div class="prospect-actions"><a class="mini-link" href="${prospectSheetUrl}" target="_blank" rel="noopener">Planilha</a><a class="mini-link primary" href="${prospectToProjectLink(p)}">Criar par</a></div></div>`).join("")}
+function renderActivityCenter(){if(!window.UBY_ACTIVITY)return;const messages=window.UBY_ACTIVITY.messages({limit:30});document.getElementById("generalMessages").innerHTML=messages.map(item=>`<div class="activity-item"><div class="meta">${window.UBY_ACTIVITY.nowLabel(item.createdAt)} - ${item.user?.label||"Usuario"}</div><strong>${item.workName||"Geral"}</strong><span>${item.text}</span></div>`).join("")||'<div class="activity-item"><strong>Sem mensagens ainda</strong><span>Envie o primeiro recado geral para a equipe.</span></div>';const acts=window.UBY_ACTIVITY.list({limit:35});document.getElementById("globalActivity").innerHTML=acts.map(item=>`<div class="activity-item"><div class="meta">${window.UBY_ACTIVITY.nowLabel(item.createdAt)} - ${item.user?.label||"Usuario"}</div><strong>${item.workName||"Geral"} - ${item.title||window.UBY_ACTIVITY.summarize(item)}</strong><span>${item.detail||""}${item.after?`<br><b>Valor:</b> ${item.after}`:""}</span></div>`).join("")||'<div class="activity-item"><strong>Nenhuma alteracao registrada</strong><span>As proximas edicoes feitas nas obras aparecem aqui.</span></div>'}
+function sendGeneralMessage(){const input=document.getElementById("generalMessageText");const msg=window.UBY_ACTIVITY?.sendMessage({workId:"geral",workName:"Geral",text:input.value});if(msg){input.value="";renderActivityCenter()}}
+function setCloudStatus(message, kind=""){const el=document.getElementById("cloudStatus");const panel=el?.closest(".cloud-panel");if(el)el.textContent=message;if(panel){panel.classList.remove("ok","warn","danger");if(kind)panel.classList.add(kind)}}
+async function refreshCloudData({manual=false}={}){try{if(!window.UBY_SUPABASE?.configured?.()){setCloudStatus("Supabase nao configurado. Este navegador esta usando apenas a copia local.", "danger");return}const user=await window.UBY_SUPABASE.currentUser();if(!user){setCloudStatus("Este navegador ainda nao esta conectado. Entre uma vez para puxar a mesma base dos outros navegadores.", "warn");return}setCloudStatus("Sincronizando automaticamente com a nuvem...", "warn");obras=normalizeDefaults(await window.UBY_STORE.loadWorks(obras)).map(mergeDetailData);prospects=await window.UBY_STORE.loadProspects(prospects);renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();const status=await window.UBY_SUPABASE.cloudStatus();setCloudStatus(`Sincronizado com a nuvem. Usuario: ${user.email}. Obras no banco: ${status.obras}.`, "ok")}catch(err){setCloudStatus("Nao foi possivel sincronizar agora: "+err.message, "danger");if(manual)alert("Nao foi possivel sincronizar: "+err.message)}}
+document.getElementById("searchInput").addEventListener("input",e=>{
+  renderCards(filteredObras());
+});
+document.getElementById("openNewObra").addEventListener("click",()=>document.getElementById("newObraPanel").classList.add("open"));
+document.getElementById("cancelNewObra").addEventListener("click",()=>document.getElementById("newObraPanel").classList.remove("open"));
+document.getElementById("saveNewObra").addEventListener("click",createObra);
+if(mapCreation){document.getElementById("newNome").value=mapCreation.name;document.getElementById("newLocal").value=mapCreation.local;document.getElementById("newObraPanel").classList.add("open")}
+document.getElementById("exportBackup").addEventListener("click",()=>window.UBY_BACKUP.export());
+document.getElementById("importBackup").addEventListener("click",()=>document.getElementById("backupFile").click());
+document.getElementById("backupFile").addEventListener("change",e=>window.UBY_BACKUP.importFile(e.target.files[0]));
+document.getElementById("refreshCloud").addEventListener("click",()=>refreshCloudData({manual:true}));
+document.getElementById("openDeadlineAlerts").addEventListener("click",()=>{const modal=document.getElementById("deadlineAlertModal");if((modal.dataset.signature||"").length)modal.classList.add("open");else document.getElementById("deadlineCommand").scrollIntoView({behavior:"smooth",block:"start"})});
+document.getElementById("dismissDeadlineAlerts").addEventListener("click",dismissDeadlineAlerts);
+document.getElementById("deadlineAlertModal").addEventListener("click",event=>{if(event.target===event.currentTarget)dismissDeadlineAlerts()});
+document.getElementById("sendGeneralMessage").addEventListener("click",sendGeneralMessage);
+async function initData(){renderPhases();renderCards(filteredObras());renderProspects();updateStats();renderActivityCenter();renderOperationalTasks();try{await window.UBY_ACTIVITY?.refresh?.();await refreshCloudData();await refreshOperationalTasks();renderActivityCenter();}catch(err){setCloudStatus("Banco indisponivel: "+err.message,"danger")}}
+initData();
+</script>
+<script src="obras_pendencias_geral.js?v=20260911-work-command1"></script>
+</body>
+</html>

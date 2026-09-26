@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title">
+  <title id="title">UBY Recharge — laboratório offline</title>
+  <defs>
+    <linearGradient id="surface" x1="28" y1="18" x2="170" y2="178" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#123D34"/>
+      <stop offset="1" stop-color="#071A2C"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="67" y1="43" x2="122" y2="148" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9FA55"/>
+      <stop offset="1" stop-color="#65E3B7"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="44" fill="url(#surface)"/>
+  <path d="M105 33 57 103h34l-7 56 52-77H101l4-49Z" fill="url(#bolt)"/>
+  <circle cx="151" cy="42" r="12" fill="#E9FA55"/>
+</svg>

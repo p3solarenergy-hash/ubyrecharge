@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<script src="app/storage-ns.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173c30">
+  <title>UBY Recharge — Entrar</title>
+  <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="app/app.css?v=1">
+</head>
+<body>
+  <main class="login-page">
+    <section class="login-card">
+      <img src="assets/brand.svg" alt="UBY Recharge">
+      <p class="eyebrow">Plataforma UBY · versão local</p>
+      <h1>Entrar</h1>
+      <p style="margin:0;font-size:12.5px">Use o mesmo e-mail e senha da plataforma publicada. O acesso é validado no Supabase e nesta versão local nenhuma alteração é gravada na base.</p>
+      <form id="loginForm">
+        <label>E-mail<input id="email" type="email" autocomplete="username" required></label>
+        <label>Senha<input id="password" type="password" autocomplete="current-password" required></label>
+        <div class="login-error" id="loginError"></div>
+        <button class="btn primary" id="loginButton" type="submit">Entrar</button>
+      </form>
+    </section>
+  </main>
+  <script src="legado/obra-ev/supabase_config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="legado/obra-ev/supabase_bridge.js?v=nova1"></script>
+  <script src="legado/obra-ev/auth.js?v=nova1"></script>
+  <script>
+    (function () {
+      const form = document.getElementById("loginForm");
+      const error = document.getElementById("loginError");
+      const button = document.getElementById("loginButton");
+      form.addEventListener("submit", async event => {
+        event.preventDefault();
+        error.classList.remove("on");
+        button.disabled = true; button.textContent = "Validando…";
+        try {
+          await window.UBY_AUTH.login(document.getElementById("email").value, document.getElementById("password").value);
+          location.replace("index.html#/comando");
+        } catch (err) {
+          error.textContent = err.message || "Não foi possível entrar.";
+          error.classList.add("on");
+          button.disabled = false; button.textContent = "Entrar";
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

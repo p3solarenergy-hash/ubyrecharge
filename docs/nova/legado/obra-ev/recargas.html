@@ -1,0 +1,2423 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<script src="../../app/storage-ns.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel de Recargas UBY</title>
+<link rel="icon" type="image/png" href="assets/brand/v2/14_icone_app.png">
+  <link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="brand.css?v=20260723-brand-v2">
+  <style>
+    /* ── Design system UBY (original) ── */
+    :root {
+      --p3-primary:     #2D7FF9;
+      --p3-primary-deep:#0B2A4A;
+      --p3-accent:      #57B7FF;
+      --p3-accent-2:    #FFD66B;
+      --p3-bg:          #07111F;
+      --p3-card:        #0E1B2D;
+      --p3-card-soft:   #13243B;
+      --p3-text:        #E8EFEB;
+      --p3-muted:       #8FA39A;
+      --p3-border:      #24364E;
+      --p3-warn:        #F2A93D;
+      --ui-font:        "Segoe UI Variable", "Segoe UI", Arial, sans-serif;
+      --metric-danger:  #FF6B6B;
+      --metric-warning: #FFD66B;
+      --metric-info:    #57B7FF;
+      --metric-success: #00E889;
+      --p3-shadow:      0 1px 3px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.5);
+      --surface-bg:     linear-gradient(135deg,#102945 0%,#0B1524 72%,#0E2035 100%);
+      --surface-border: rgba(84,180,255,.26);
+    }
+    * { box-sizing: border-box; }
+    body, button, input, select, textarea { font-family:var(--ui-font); }
+    body { margin:0; background:var(--p3-bg); color:var(--p3-text); font-size:14px; line-height:1.55; }
+    .wrap { max-width:1540px; margin:0 auto; padding:32px 36px 80px; }
+
+    /* Hero */
+    .hero { background:linear-gradient(135deg,#0B2A4A 0%,#134B7A 100%); color:#fff; border-radius:14px; padding:28px 32px; display:grid; grid-template-columns:1.35fr .85fr; gap:22px; align-items:end; box-shadow:var(--p3-shadow); position:relative; overflow:hidden; }
+    .hero::after { content:""; position:absolute; right:-70px; top:-70px; width:260px; height:260px; background:radial-gradient(circle,rgba(45,127,249,.36),transparent 70%); border-radius:50%; }
+    .hero > * { position:relative; z-index:1; }
+    .brand { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+    .logo-mark { width:54px; height:54px; border-radius:12px; background:#071527; display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,.22); }
+    .logo-mark img { width:100%; height:100%; object-fit:cover; }
+    .brand-name { font-size:13px; letter-spacing:3px; text-transform:uppercase; opacity:.86; }
+    .brand-tag  { font-size:11px; opacity:.72; letter-spacing:1px; }
+    h1 { margin:0 0 6px; font-size:26px; font-weight:700; }
+    .meta { color:rgba(255,255,255,.84); font-size:14px; line-height:1.7; }
+    .formula { background:rgba(7,21,39,.28); border:1px solid rgba(255,255,255,.14); border-radius:10px; padding:16px 18px; font-size:13px; color:#E8EFEB; backdrop-filter:blur(8px); }
+
+    /* Cards e grid */
+    .grid   { display:grid; gap:14px; }
+    .kpis   { grid-template-columns:repeat(6,minmax(150px,1fr)); margin-top:24px; }
+    .card   { position:relative; overflow:hidden; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:18px; box-shadow:var(--p3-shadow); }
+    .card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.9; pointer-events:none; }
+    .card > * { position:relative; z-index:1; }
+    .kpis .card { min-height:136px; }
+    .label  { color:var(--p3-muted); font-size:11px; text-transform:uppercase; font-weight:750; letter-spacing:.08em; line-height:1.3; min-height:18px; overflow-wrap:anywhere; }
+    .value  { font-size:clamp(22px,2.1vw,30px); font-weight:800; color:var(--p3-primary); margin-top:6px; line-height:1.1; letter-spacing:0; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .sub    { color:var(--p3-muted); font-size:11px; line-height:1.45; margin-top:6px; }
+    .section   { margin-top:18px; display:grid; grid-template-columns:1.15fr .85fr; gap:18px; align-items:start; }
+    .section-3 { grid-template-columns:1.1fr .95fr .95fr; }
+    .section-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .section-client-insights { align-items:stretch; }
+    .section-client-insights > .card { min-width:0; height:100%; }
+    .tech-section { margin-top:28px; }
+
+    /* Tipografia */
+    h2 { margin:0 0 14px; font-size:16px; color:var(--p3-primary); padding-bottom:10px; border-bottom:1px solid var(--p3-border); }
+
+    /* Tabelas */
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { padding:10px; border-bottom:1px solid var(--p3-border); text-align:left; vertical-align:top; }
+    th { background:#172A42; color:var(--p3-primary); font-size:11px; text-transform:uppercase; letter-spacing:.7px; }
+    td { color:var(--p3-text); }
+
+    /* Nota / alerta */
+    .note { border-left:4px solid var(--p3-warn); background:#2E2310; padding:14px 18px; border-radius:8px; font-size:13px; color:#F2D77F; line-height:1.55; }
+
+    /* Barra de ocupação */
+    .bar       { height:9px; background:#1C314A; border-radius:999px; overflow:hidden; margin-top:10px; }
+    .bar span  { display:block; height:100%; background:var(--p3-primary); }
+
+    /* Barras de usuário */
+    .user-bars { display:grid; gap:12px; }
+    .user-row  { display:grid; grid-template-columns:100px 1fr 96px; align-items:center; gap:12px; color:var(--p3-muted); font-size:12px; }
+    .user-row strong { color:var(--p3-text); text-align:right; }
+    .track   { height:20px; background:#1C314A; border-radius:6px; overflow:hidden; }
+    .track i { display:block; height:100%; background:linear-gradient(90deg,#2D7FF9,#57B7FF); border-radius:6px; }
+    .client-revenue { min-width:220px; }
+    .client-revenue-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; white-space:nowrap; }
+    .client-revenue-head strong { color:var(--p3-text); }
+    .client-revenue-head small { color:var(--p3-muted); font-size:10px; }
+    .client-revenue .track { height:8px; margin-top:7px; }
+
+    /* Chips de pagamento */
+    .pay-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px; }
+    .pay-chip { background:#0B1524; border:1px solid var(--p3-border); border-left:3px solid var(--p3-primary); border-radius:8px; padding:11px 12px; }
+    .pay-chip strong { display:block; color:var(--p3-text); font-size:12px; }
+    .pay-chip span   { color:var(--p3-muted); font-size:11px; }
+    .general-hero { margin-top:0; align-items:center; }
+    .general-hero .value { color:#fff; font-size:clamp(30px,4vw,48px); }
+    .general-split { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
+    .unit-rank { display:grid; gap:12px; }
+    .unit-card { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(180px,1fr) minmax(104px,.42fr) minmax(112px,.45fr) minmax(150px,.56fr) auto; gap:12px; align-items:center; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:12px 14px; box-shadow:var(--p3-shadow); }
+    .unit-card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
+    .unit-card > * { position:relative; z-index:1; }
+    .unit-card strong { display:block; color:var(--p3-text); font-size:13px; }
+    .unit-card span { color:var(--p3-muted); font-size:11px; }
+    .unit-card .unit-value { color:var(--p3-primary); font-weight:700; text-align:right; white-space:nowrap; }
+    .unit-card .unit-sub { color:var(--p3-muted); font-size:11px; text-align:right; }
+    .unit-card .unit-occupancy { min-width:0; }
+    .unit-card .unit-occupancy .unit-value { text-align:left; font-size:18px; font-variant-numeric:tabular-nums; }
+    .unit-card .unit-occupancy .unit-sub { text-align:left; }
+    .unit-occupancy-bar { height:6px; margin-top:6px; overflow:hidden; border-radius:99px; background:#1B334F; }
+    .unit-occupancy-bar span { display:block; height:100%; border-radius:inherit; background:var(--metric-info); }
+    .unit-occupancy.occ-red .unit-value { color:var(--metric-danger); }
+    .unit-occupancy.occ-red .unit-occupancy-bar span { background:var(--metric-danger); }
+    .unit-occupancy.occ-yellow .unit-value { color:var(--metric-warning); }
+    .unit-occupancy.occ-yellow .unit-occupancy-bar span { background:var(--metric-warning); }
+    .unit-occupancy.occ-blue .unit-value { color:var(--metric-info); }
+    .unit-occupancy.occ-blue .unit-occupancy-bar span { background:var(--metric-info); }
+    .unit-occupancy.occ-green .unit-value { color:var(--metric-success); }
+    .unit-occupancy.occ-green .unit-occupancy-bar span { background:var(--metric-success); }
+    .unit-actions { display:flex; gap:8px; justify-content:flex-end; align-items:center; }
+    .btn-open {
+      background:var(--p3-primary);
+      color:#fff;
+      border:1px solid rgba(87,183,255,.5);
+      border-radius:8px;
+      padding:7px 12px;
+      font-size:12px;
+      font-family:inherit;
+      font-weight:700;
+      cursor:pointer;
+      white-space:nowrap;
+      box-shadow:0 6px 16px rgba(45,127,249,.18);
+    }
+    .btn-open:hover { background:#57B7FF; color:#07111F; }
+
+    /* Canvas */
+    .usage-grid .card { min-height:330px; }
+    .usage-grid canvas { height:230px !important; max-height:240px; }
+    .pie-card canvas { min-height:260px; max-height:300px; }
+    canvas { width:100%; max-height:320px; }
+    /* Comparativo mensal: duas unidades exigem altura previsível e eixos legíveis. */
+    .monthly-comparison-chart { height:300px !important; max-height:300px !important; }
+    .dc-comparison-card { margin-top:18px; }
+    .dc-comparison-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+    .dc-comparison-controls { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border:1px solid var(--p3-border); border-radius:10px; background:rgba(8,23,42,.56); }
+    .dc-comparison-controls label { display:flex; align-items:center; gap:8px; color:var(--p3-muted); font-size:12px; font-weight:700; }
+    .dc-comparison-controls select { min-width:190px; }
+    .dc-comparison-selector-list { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .dc-comparison-selector-item { display:inline-flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid var(--p3-border); border-radius:999px; color:var(--p3-text); font-size:11px; cursor:pointer; }
+    .dc-comparison-selector-item input { accent-color:var(--p3-primary); }
+    .dc-comparison-charts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:14px; }
+    .dc-comparison-chart { min-width:0; border:1px solid var(--p3-border); border-radius:12px; background:rgba(8,23,42,.52); padding:13px; }
+    .dc-comparison-chart h3 { margin:0 0 9px; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:var(--p3-text); }
+    .dc-comparison-chart canvas { height:220px !important; max-height:220px !important; }
+    .dc-comparison-table-wrap { overflow-x:auto; margin-top:16px; border:1px solid var(--p3-border); border-radius:12px; }
+    .dc-comparison-table { min-width:920px; margin:0; }
+    .dc-daily-comparison { margin-top:16px; border:1px solid var(--p3-border); border-radius:12px; background:rgba(8,23,42,.52); padding:16px; }
+    .dc-daily-comparison h3 { margin:0; font-size:14px; color:var(--p3-text); }
+    .dc-daily-comparison canvas { height:300px !important; max-height:300px !important; margin-top:10px; }
+    .coupon-summary { display:grid; gap:8px; margin-top:12px; }
+    .coupon-row { display:grid; grid-template-columns:minmax(120px,1fr) repeat(4,auto); gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--p3-border); color:var(--p3-muted); font-size:11px; }
+    .coupon-row strong { color:var(--p3-text); font-size:12px; overflow-wrap:anywhere; }
+    .coupon-row span { white-space:nowrap; }
+    .ai-insights { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:16px; }
+    .ai-card { background:#0B1524; border:1px solid var(--p3-border); border-left:4px solid var(--p3-primary); border-radius:10px; padding:14px; min-height:150px; }
+    .ai-card.warn { border-left-color:var(--p3-warn); }
+    .ai-card.good { border-left-color:#38C96F; }
+    .ai-card strong { display:block; color:var(--p3-text); font-size:13px; margin-bottom:8px; }
+    .ai-card p { margin:0 0 10px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .ai-card .action { color:#E8EFEB; font-size:12px; font-weight:700; }
+    .daily-metrics { display:grid; gap:10px; }
+    .daily-metrics.is-scrollable { max-height:360px; overflow-y:auto; overscroll-behavior:contain; padding-right:4px; scrollbar-color:#2D7FF9 transparent; }
+    .daily-metrics.is-scrollable::-webkit-scrollbar { width:7px; }
+    .daily-metrics.is-scrollable::-webkit-scrollbar-thumb { background:#2D7FF9; border-radius:8px; }
+    .daily-metrics.is-scrollable::-webkit-scrollbar-track { background:transparent; }
+    .metric-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; align-items:stretch; }
+    .metric-mini { position:relative; overflow:hidden; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:11px 12px; min-height:104px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:var(--p3-shadow); }
+    .metric-mini::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
+    .metric-mini > * { position:relative; z-index:1; }
+    .metric-mini strong { display:block; color:var(--p3-primary); font-size:17px; margin-top:4px; line-height:1.15; }
+    .metric-mini span { display:block; color:var(--p3-muted); font-size:11px; }
+    .metric-mini.good strong { color:#38C96F; }
+    .metric-mini.warn strong { color:var(--p3-warn); }
+    .metric-lines { display:grid; gap:7px; margin-top:4px; }
+    .metric-line { display:grid; grid-template-columns:92px 1fr auto; gap:10px; align-items:center; border-bottom:1px solid var(--p3-border); padding:8px 0; color:var(--p3-muted); font-size:12px; }
+    .metric-line strong { color:var(--p3-text); }
+    .metric-line b { color:var(--p3-primary); font-weight:700; white-space:nowrap; }
+    .metric-line .warn { color:var(--p3-warn); }
+    .metric-line .good { color:#38C96F; }
+    .visual-summary { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:12px; margin:18px 0; }
+    .visual-card { grid-column:span 2; position:relative; min-height:136px; overflow:hidden; border-radius:12px; border:1px solid var(--surface-border); background:var(--surface-bg); color:var(--p3-text); box-shadow:var(--p3-shadow); padding:16px; display:flex; flex-direction:column; justify-content:space-between; gap:10px; }
+    .visual-card.feature { grid-column:span 3; min-height:152px; }
+    .visual-card::before { content:""; position:absolute; inset:auto 0 0 0; height:4px; background:#57B7FF; opacity:.95; }
+    .visual-card::after { content:""; display:none; position:absolute; right:-18px; top:-10px; width:120px; height:120px; background:var(--visual-img) center/contain no-repeat; opacity:.07; filter:grayscale(1) brightness(2.1); }
+    .visual-card.main::after { display:block; }
+    .visual-card .visual-title { position:relative; z-index:1; color:#BFEAD8; font-size:14px; font-weight:900; line-height:1.25; max-width:calc(100% - 30px); }
+    .visual-card .visual-value { position:relative; z-index:1; color:#57B7FF; font-size:24px; font-weight:900; line-height:1; }
+    .visual-card.feature .visual-value { font-size:30px; }
+    .visual-card .visual-content { position:relative; z-index:1; min-width:0; }
+    .visual-card .visual-footer { position:relative; z-index:1; display:flex; align-items:flex-end; justify-content:space-between; gap:9px; min-width:0; }
+    .visual-card .visual-sub { color:var(--p3-muted); font-size:11px; line-height:1.35; max-width:58%; min-width:0; }
+    .visual-card .visual-trend { position:absolute; right:12px; bottom:16px; z-index:1; display:grid; place-items:center; width:26px; height:26px; border-radius:999px; color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.28); font-weight:900; font-size:15px; }
+    .visual-card .visual-period-trend { display:inline-flex; align-items:center; gap:5px; flex:0 0 auto; max-width:42%; min-width:0; padding:5px 7px; border-radius:7px; color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.28); font-size:10px; font-weight:900; line-height:1.1; text-align:left; }
+    .visual-card .visual-period-trend > span:last-child { display:grid; gap:2px; min-width:0; }
+    .visual-card .visual-period-trend strong { font-size:10px; line-height:1.1; }
+    .visual-card .visual-period-trend small { display:block; color:inherit; font-size:8px; font-weight:700; line-height:1.1; opacity:.84; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .visual-card .visual-period-arrow { flex:0 0 auto; font-size:14px; line-height:1; }
+    .visual-card .visual-period-trend.up { color:#BFEBD6; background:rgba(56,201,111,.16); border-color:rgba(56,201,111,.3); }
+    .visual-card .visual-period-trend.down { color:#FFD0D0; background:rgba(230,75,75,.16); border-color:rgba(230,75,75,.32); }
+    .visual-card .visual-period-trend.flat { color:#FFE4A0; background:rgba(242,169,61,.16); border-color:rgba(242,169,61,.3); }
+    .visual-card.warn { background:var(--surface-bg); border-color:rgba(255,214,107,.32); }
+    .visual-card.warn::before { background:#FFD66B; }
+    .visual-card.warn .visual-value { color:#FFD66B; }
+    .visual-card.warn .visual-trend { color:#FFE4A0; background:rgba(242,169,61,.16); border-color:rgba(242,169,61,.3); }
+    .visual-card.bad { background:var(--surface-bg); border-color:rgba(230,75,75,.36); }
+    .visual-card.bad::before { background:#E64B4B; }
+    .visual-card.bad .visual-value { color:#FF7A7A; }
+    .visual-card.bad .visual-trend { color:#FFD0D0; background:rgba(230,75,75,.16); border-color:rgba(230,75,75,.32); }
+    .visual-card.occ-red { border-color:rgba(230,75,75,.42); }
+    .visual-card.occ-red::before { background:var(--metric-danger); }
+    .visual-card.occ-red .visual-value { color:var(--metric-danger); }
+    .visual-card.occ-yellow { border-color:rgba(242,169,61,.42); }
+    .visual-card.occ-yellow::before { background:var(--metric-warning); }
+    .visual-card.occ-yellow .visual-value { color:var(--metric-warning); }
+    .visual-card.occ-blue { border-color:rgba(87,183,255,.44); }
+    .visual-card.occ-blue::before { background:var(--metric-info); }
+    .visual-card.occ-blue .visual-value { color:var(--metric-info); }
+    .visual-card.occ-green { border-color:rgba(0,232,137,.42); }
+    .visual-card.occ-green::before { background:var(--metric-success); }
+    .visual-card.occ-green .visual-value { color:var(--metric-success); }
+    .compact-kpis { grid-template-columns:repeat(5,minmax(0,1fr)); }
+    .compact-kpis .card { min-height:128px; background:var(--surface-bg); border-color:var(--surface-border); box-shadow:var(--p3-shadow); }
+    .compact-kpis .card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.9; }
+    .compact-kpis .card::after { content:""; position:absolute; right:-28px; bottom:-38px; width:108px; height:108px; border-radius:50%; background:rgba(87,183,255,.075); pointer-events:none; }
+    .compact-kpis .card > * { position:relative; z-index:1; }
+.compact-kpis .card .value { font-size:26px; }
+    .dc-kpi-heading { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:2px 2px 0; color:#BFEAD8; font-family:var(--ui-font); font-weight:900; font-size:15px; }
+    .dc-kpi-heading small { color:var(--p3-muted); font-family:inherit; font-size:11px; font-weight:600; }
+    .dc-metric-card { border-color:rgba(87,183,255,.44)!important; background:linear-gradient(135deg,rgba(20,54,84,.96),var(--surface-bg))!important; }
+    .dc-metric-card::before { height:4px!important; background:#57B7FF!important; }
+    .dc-metric-card .label { color:#BFEAD8; }
+    .dc-metric-card .value { color:#57B7FF; }
+    .ac-context-card { grid-column:1 / -1; display:grid; grid-template-columns:minmax(220px,1.15fr) repeat(3,minmax(130px,.8fr)); gap:12px; align-items:center; min-height:0!important; padding:14px 16px!important; opacity:.86; border-color:rgba(143,163,154,.34)!important; background:rgba(13,27,46,.72)!important; }
+    .ac-context-card::before { background:#7E91A6!important; opacity:.55!important; }
+    .ac-context-card .ac-title { display:grid; gap:3px; }
+    .ac-context-card .ac-title strong { color:#C4D1D8; font-size:14px; }
+    .ac-context-card .ac-title span, .ac-context-card .ac-mini span { color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .ac-context-card .ac-mini { display:grid; gap:3px; }
+    .ac-context-card .ac-mini b { color:#D6E0E5; font-size:16px; }
+    .uby-overview-section { margin:18px 0; }
+    .uby-dashboard-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:20px 2px 10px; color:#BFEAD8; font-family:var(--ui-font); font-size:16px; font-weight:900; }
+    .uby-dashboard-heading small { color:var(--p3-muted); font-family:inherit; font-size:11px; font-weight:600; text-align:right; }
+    .uby-metrics-dashboard { display:grid; gap:18px; margin:22px 0; }
+    .uby-core-panels { display:grid; grid-template-columns:1fr; gap:18px; }
+    .uby-bottom-panels { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); gap:18px; align-items:stretch; }
+    .uby-finance-stack { display:grid; grid-template-rows:repeat(2,minmax(0,1fr)); gap:18px; min-width:0; }
+    .uby-metric-panel { overflow:hidden; border:1px solid var(--surface-border); border-radius:16px; background:linear-gradient(145deg,rgba(15,34,55,.98),rgba(8,20,35,.98)); box-shadow:var(--p3-shadow); }
+    .uby-metric-panel.dc { border-color:rgba(87,183,255,.46); }
+    .uby-metric-panel.ac { border-color:rgba(255,214,107,.38); background:linear-gradient(145deg,rgba(45,38,21,.48),rgba(10,23,38,.98)); }
+    .uby-metric-panel.ac.secondary { opacity:.82; }
+    .uby-metric-panel.partner { border-color:rgba(161,117,255,.42); background:linear-gradient(145deg,rgba(47,28,78,.55),rgba(10,22,38,.98)); }
+    .uby-metric-panel.revenue { border-color:rgba(0,232,137,.34); }
+    .uby-panel-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:18px 18px 14px; border-bottom:1px solid rgba(126,157,190,.2); }
+    .uby-panel-head h2 { margin:0; color:var(--p3-text); font-family:var(--ui-font); font-size:19px; line-height:1.15; }
+    .uby-panel-head p { margin:5px 0 0; color:var(--p3-muted); font-size:12px; line-height:1.38; }
+    .uby-panel-tag { flex:0 0 auto; border-radius:999px; padding:5px 9px; color:#57B7FF; border:1px solid rgba(87,183,255,.4); background:rgba(87,183,255,.1); font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
+    .uby-metric-panel.ac .uby-panel-tag { color:#FFD66B; border-color:rgba(255,214,107,.36); background:rgba(255,214,107,.08); }
+    .uby-metric-panel.partner .uby-panel-tag { color:#C9AAFF; border-color:rgba(161,117,255,.4); background:rgba(161,117,255,.09); }
+    .uby-metric-panel.revenue .uby-panel-tag { color:#00E889; border-color:rgba(0,232,137,.34); background:rgba(0,232,137,.08); }
+    .uby-panel-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:rgba(126,157,190,.16); }
+    .uby-panel-metric { min-width:0; min-height:112px; padding:15px 17px; background:rgba(8,20,35,.74); }
+    .uby-panel-metric .label { color:#9FB2C8; font-size:10px; }
+    .uby-panel-metric .value { margin-top:9px; color:#57B7FF; font-family:var(--ui-font); font-size:25px; font-weight:900; line-height:1.05; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+    .uby-panel-metric.station-name .value { font-size:18px; line-height:1.16; white-space:normal!important; overflow-wrap:anywhere; word-break:break-word; }
+    .uby-metric-panel.ac .uby-panel-metric .value { color:#FFD66B; }
+    .uby-metric-panel.partner .uby-panel-metric .value { color:#C9AAFF; }
+    .uby-metric-panel.revenue .uby-panel-metric .value { color:#00E889; }
+    .uby-panel-metric .sub { margin-top:7px; color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .uby-metric-comparison { display:inline-flex; align-items:center; gap:4px; margin-top:8px; padding:3px 6px; border:1px solid rgba(87,183,255,.24); border-radius:6px; color:#8BCBFF; background:rgba(87,183,255,.07); font-size:9px; font-weight:900; line-height:1.1; }
+    .uby-metric-comparison small { color:inherit; font-size:8px; font-weight:700; opacity:.78; }
+    .uby-metric-comparison.positive { color:#81E7B3; border-color:rgba(56,201,111,.28); background:rgba(56,201,111,.08); }
+    .uby-metric-comparison.negative { color:#FFA197; border-color:rgba(230,75,75,.28); background:rgba(230,75,75,.08); }
+    .uby-metric-comparison.neutral { color:var(--p3-muted); }
+.metric-card { display:flex; flex-direction:column; }
+.metric-card .metric-period-trend { align-self:flex-start; display:inline-flex; align-items:center; gap:5px; min-width:0; max-width:100%; margin-top:auto; padding:4px 6px; border-radius:7px; font-size:9px; line-height:1.1; font-weight:900; }
+.metric-card .metric-period-trend > span:last-child { display:grid; gap:1px; min-width:0; }
+.metric-card .metric-period-trend strong { font-size:10px; line-height:1.1; }
+.metric-card .metric-period-trend small { display:block; color:inherit; font-size:8px; font-weight:700; line-height:1.1; opacity:.84; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.metric-card .metric-period-arrow { flex:0 0 auto; font-size:13px; line-height:1; }
+.metric-card .metric-period-trend.up { color:#BFEBD6; background:rgba(56,201,111,.16); border:1px solid rgba(56,201,111,.3); }
+.metric-card .metric-period-trend.down { color:#FFD0D0; background:rgba(230,75,75,.16); border:1px solid rgba(230,75,75,.32); }
+.metric-card .metric-period-trend.flat { color:#FFE4A0; background:rgba(242,169,61,.16); border:1px solid rgba(242,169,61,.3); }
+    .day-compare-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:18px 0; }
+    .day-kpi-card { position:relative; overflow:hidden; min-height:152px; border:1px solid var(--surface-border); border-radius:12px; background:linear-gradient(135deg,#173554 0%,#0E1B2D 72%,#132A43 100%); padding:16px; box-shadow:var(--p3-shadow); display:flex; flex-direction:column; justify-content:space-between; gap:10px; }
+    .day-kpi-card::before { content:""; position:absolute; inset:auto 0 0 0; height:4px; background:#57B7FF; opacity:.95; }
+    .day-kpi-card::after { content:""; position:absolute; right:-18px; top:-10px; width:120px; height:120px; background:var(--day-visual-img) center/contain no-repeat; opacity:.07; filter:grayscale(1) brightness(2.1); }
+    .day-kpi-card > * { position:relative; z-index:1; }
+    .day-kpi-card .label { min-height:0; color:#BFEAD8; font-family:var(--ui-font); font-size:14px; font-weight:900; line-height:1.25; text-transform:none; letter-spacing:0; }
+    .day-kpi-card > strong { display:block; color:#57B7FF; font-family:var(--ui-font); font-size:30px; font-weight:900; margin-top:7px; line-height:1; font-variant-numeric:tabular-nums; }
+    .day-kpi-card .day-footer { display:flex; align-items:flex-end; justify-content:space-between; gap:9px; min-width:0; }
+    .day-kpi-card small { display:block; color:var(--p3-muted); font-size:11px; line-height:1.35; max-width:58%; }
+    .day-kpi-card.is-warning { border-color:rgba(255,214,107,.32); }.day-kpi-card.is-warning::before { background:#FFD66B; }.day-kpi-card.is-warning strong { color:#FFD66B; }
+    .day-kpi-card.is-danger { border-color:rgba(230,75,75,.36); }.day-kpi-card.is-danger::before { background:#E64B4B; }.day-kpi-card.is-danger strong { color:#FF7A7A; }
+    .day-dc-breakdown-card { grid-column:1 / -1; border:1px solid rgba(87,183,255,.42); border-radius:14px; background:linear-gradient(135deg,rgba(20,54,84,.94),rgba(10,25,43,.96)); padding:19px 20px; box-shadow:var(--p3-shadow); }
+    .day-dc-breakdown-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .day-dc-breakdown-head strong { color:#BFEAD8; font-family:var(--ui-font); font-size:17px; }
+    .day-dc-breakdown-head span { color:var(--p3-muted); font-size:12px; }
+    .day-dc-breakdown-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+    .day-dc-unit { min-width:0; padding:14px 15px; border:1px solid rgba(117,169,215,.18); border-radius:10px; background:rgba(5,16,30,.46); }
+    .day-dc-unit-head { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; }
+    .day-dc-unit > .day-dc-unit-head > strong { display:block; min-width:0; color:var(--p3-text); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .day-dc-open { flex:0 0 auto; border:1px solid rgba(87,183,255,.36); border-radius:7px; background:rgba(87,183,255,.08); color:#8BCBFF; padding:5px 8px; font:800 10px/1 var(--ui-font); cursor:pointer; transition:.18s ease; }
+    .day-dc-open:hover { background:rgba(87,183,255,.18); border-color:rgba(87,183,255,.72); color:#D9EEFF; }
+    .day-dc-unit-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-top:12px; }
+    .day-dc-unit-metrics span { min-width:0; color:#57B7FF; font-size:14px; font-weight:900; white-space:nowrap; }
+    .day-dc-unit-metrics small { display:block; margin-bottom:3px; color:var(--p3-muted); font-size:9px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+    /* Compatibilidade durante a atualização de cache: mantém o layout antigo legível. */
+    .day-dc-unit > span { display:inline-block; margin:12px 12px 0 0; color:#57B7FF; font-size:14px; font-weight:900; }
+    .uby-panel-comparison { margin:0 17px 16px; padding:10px 11px; border:1px solid rgba(87,183,255,.26); border-radius:9px; background:rgba(87,183,255,.07); color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .uby-panel-comparison strong { color:#BFEAD8; font-size:11px; }
+    .uby-panel-comparison .uby-panel-comparison-values { display:flex; flex-wrap:wrap; gap:7px 13px; margin-top:6px; color:#57B7FF; font-weight:800; }
+    .uby-metric-panel.ac .uby-panel-comparison { border-color:rgba(255,214,107,.25); background:rgba(255,214,107,.06); }
+    .uby-metric-panel.ac .uby-panel-comparison strong, .uby-metric-panel.ac .uby-panel-comparison .uby-panel-comparison-values { color:#FFD66B; }
+    .trend-badge { display:inline-flex; align-items:center; gap:5px; flex:0 0 auto; max-width:42%; border-radius:7px; padding:5px 7px; font-size:10px; font-weight:900; margin:0; border:1px solid rgba(255,255,255,.12); line-height:1.1; text-align:left; }
+    .trend-badge > span:last-child { display:grid; gap:2px; min-width:0; }.trend-badge strong { display:block; color:inherit; font:inherit; font-size:10px; line-height:1.1; white-space:nowrap; }.trend-badge small { display:block; color:inherit; max-width:none; margin:0; font-size:8px; font-weight:700; line-height:1.1; opacity:.84; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .trend-badge.up { color:#BFEBD6; background:rgba(56,201,111,.14); border-color:rgba(56,201,111,.32); }
+    .trend-badge.down { color:#FFD0D0; background:rgba(230,75,75,.14); border-color:rgba(230,75,75,.32); }
+    .trend-badge.flat { color:#FFD66B; background:rgba(242,169,61,.14); border-color:rgba(242,169,61,.32); }
+    .kpi-trend { display:inline-flex; align-items:center; gap:5px; width:max-content; max-width:100%; border-radius:999px; padding:3px 8px; margin-top:8px; font-size:11px; font-weight:900; border:1px solid rgba(255,255,255,.12); }
+    .kpi-trend.up { color:#BFEBD6; background:rgba(56,201,111,.14); border-color:rgba(56,201,111,.32); }
+    .kpi-trend.down { color:#FFD0D0; background:rgba(230,75,75,.14); border-color:rgba(230,75,75,.32); }
+    .kpi-trend.flat { color:#FFD66B; background:rgba(242,169,61,.14); border-color:rgba(242,169,61,.32); }
+    .weekday-report {
+      margin-top:18px;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+    .weekday-report > .card { min-width:0; }
+    .weekday-bars { display:grid; gap:8px; }
+    .weekday-bar { display:grid; grid-template-columns:46px 1fr 104px; gap:10px; align-items:center; color:var(--p3-muted); font-size:12px; }
+    .weekday-bar strong { color:var(--p3-text); }
+    .weekday-bar .track { height:11px; border-radius:999px; background:#1C314A; overflow:hidden; }
+    .weekday-bar i { display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#2D7FF9,#57B7FF); }
+    .weekday-bar i.occ-red { background:linear-gradient(90deg,#E64B4B,#FF7A7A); }
+    .weekday-bar i.occ-yellow { background:linear-gradient(90deg,#F2A93D,#FFD66B); }
+    .weekday-bar i.occ-blue { background:linear-gradient(90deg,#2D7FF9,#57B7FF); }
+    .weekday-bar i.occ-green { background:linear-gradient(90deg,#00B96B,#00E889); }
+    .weekday-best { display:grid; gap:8px; margin-top:12px; color:var(--p3-muted); font-size:12px; }
+    .weekday-best strong { color:#FFD66B; font-size:15px; }
+    .weekday-table tr.best-day td:first-child { color:#FFD66B; font-weight:900; }
+    .weekday-table td strong { display:block; color:var(--p3-text); }
+    .weekday-table td small { display:block; color:var(--p3-muted); margin-top:2px; }
+    .decision-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-top:18px; }
+    .decision-card { position:relative; overflow:hidden; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:16px; min-height:150px; box-shadow:var(--p3-shadow); }
+    .decision-card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.9; }
+    .decision-card.priority::before { background:var(--p3-primary); }
+    .decision-card.warn { border-color:rgba(242,169,61,.34); }
+    .decision-card.warn::before { background:var(--p3-warn); }
+    .decision-card.good { border-color:rgba(56,201,111,.34); }
+    .decision-card.good::before { background:#38C96F; }
+    .decision-card .label { min-height:0; }
+    .decision-card strong { display:block; color:var(--p3-text); font-size:18px; margin:8px 0 6px; line-height:1.2; }
+    .decision-card p { margin:0; color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .action-list { display:grid; gap:10px; }
+    .action-row { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(140px,1fr) auto; gap:12px; align-items:center; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:12px 14px; box-shadow:var(--p3-shadow); }
+    .action-row::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
+    .action-row > * { position:relative; z-index:1; }
+    .action-row strong { display:block; color:var(--p3-text); font-size:13px; }
+    .action-row span { display:block; color:var(--p3-muted); font-size:11px; margin-top:2px; }
+    .action-row b { color:var(--p3-primary); font-size:14px; white-space:nowrap; }
+    .action-row b.warn { color:var(--p3-warn); }
+    .action-row b.good { color:#38C96F; }
+    .club-print-panel { margin-top:18px; border:1px solid rgba(84,180,255,.45); border-radius:12px; background:linear-gradient(135deg,#0B1728 0%,#102949 62%,#0B1728 100%); padding:20px; box-shadow:0 20px 50px rgba(0,0,0,.22); }
+    .club-print-head { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,.12); }
+    .club-print-title { color:#fff; font-size:24px; font-weight:900; letter-spacing:.02em; }
+    .club-print-sub { color:var(--p3-muted); font-size:12px; margin-top:4px; }
+    .club-print-meta { color:#BFEBD6; font-size:12px; text-align:right; line-height:1.5; }
+    .club-podium { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:end; margin-top:20px; }
+    .podium-place { display:grid; grid-template-rows:auto auto; align-items:end; min-height:310px; }
+    .podium-content { position:relative; overflow:hidden; border:1px solid rgba(84,180,255,.35); border-radius:10px 10px 0 0; background:rgba(4,13,26,.72); padding:18px; min-height:172px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 14px 34px rgba(0,0,0,.22); }
+    .podium-content::before { content:""; position:absolute; inset:0 0 auto 0; height:5px; background:linear-gradient(90deg,#54B4FF,#2D7FF9); }
+    .podium-step { min-height:82px; border:1px solid rgba(84,180,255,.38); border-top:0; border-radius:0 0 10px 10px; background:linear-gradient(180deg,rgba(45,127,249,.34),rgba(7,18,33,.88)); display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.2); font-size:58px; font-weight:900; line-height:1; }
+    .podium-place.rank-1 { min-height:360px; }
+    .podium-place.rank-1 .podium-content { min-height:218px; border-color:rgba(255,214,107,.82); background:linear-gradient(180deg,rgba(84,48,9,.62),rgba(4,13,26,.78)); }
+    .podium-place.rank-1 .podium-content::before { background:linear-gradient(90deg,#FFD66B,#FFB23F); }
+    .podium-place.rank-1 .podium-step { min-height:122px; border-color:rgba(255,214,107,.55); background:linear-gradient(180deg,rgba(255,214,107,.52),rgba(84,48,9,.72)); color:rgba(255,255,255,.3); }
+    .podium-place.rank-2 { min-height:326px; }
+    .podium-place.rank-2 .podium-step { min-height:98px; }
+    .podium-place.rank-3 { min-height:296px; }
+    .podium-place.rank-3 .podium-step { min-height:70px; }
+    .podium-rank { color:#fff; font-size:13px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; display:flex; align-items:flex-start; gap:5px; }
+    .podium-rank sup { font-size:.62em; line-height:1; transform:translateY(-.1em); color:#FFE58B; }
+    .podium-ordinal { display:inline-flex; align-items:flex-start; gap:1px; }
+    .podium-medal { font-size:38px; font-weight:900; color:#FFD66B; margin:6px 0 10px; }
+    .podium-name { color:#fff; font-size:18px; line-height:1.2; font-weight:900; min-height:44px; }
+    .podium-points { color:#2D7FF9; font-size:30px; font-weight:900; margin-top:14px; }
+    .podium-detail { color:#BFEBD6; font-size:12px; line-height:1.45; margin-top:8px; }
+    .podium-benefit { margin-top:12px; color:#FFE58B; font-size:12px; font-weight:800; }
+    .podium-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px; }
+    .podium-stat { border:1px solid rgba(255,255,255,.10); border-radius:8px; padding:8px; background:rgba(255,255,255,.04); min-width:0; }
+    .podium-stat strong { display:block; color:#fff; font-size:13px; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .podium-stat span { display:block; color:var(--p3-muted); font-size:10px; margin-top:3px; text-transform:uppercase; letter-spacing:.04em; }
+    .podium-phone { margin-top:8px; color:#DCEBFF; font-size:12px; }
+    .club-print-rule { margin-top:12px; border-left:3px solid #38C96F; padding:8px 10px; border-radius:8px; background:rgba(56,201,111,.10); color:#BFEBD6; font-size:12px; line-height:1.4; }
+    .club-print-foot { margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px; color:#DCEBFF; font-size:13px; }
+    .club-print-foot div { border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:12px; background:rgba(255,255,255,.04); }
+    .club-form-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+    .club-form-head h2 { margin:0; border:none; padding:0; }
+    .club-form-status { color:var(--p3-muted); font-size:12px; line-height:1.45; max-width:640px; }
+    .club-status-pill { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; padding:4px 9px; background:rgba(45,127,249,.14); color:#BFD8FF; border:1px solid rgba(45,127,249,.28); font-size:11px; font-weight:800; white-space:nowrap; }
+    .club-status-pill.good { background:rgba(56,201,111,.14); color:#BFEBD6; border-color:rgba(56,201,111,.32); }
+    .club-status-pill.warn { background:rgba(242,169,61,.16); color:#FFD66B; border-color:rgba(242,169,61,.32); }
+    .club-status-pill.muted { background:rgba(143,163,154,.10); color:var(--p3-muted); border-color:rgba(143,163,154,.18); }
+    .partner-form-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
+    .partner-field { display:grid; gap:6px; }
+    .partner-field label { color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; }
+    .partner-field textarea { min-height:74px; resize:vertical; }
+    .partner-field.wide { grid-column:span 2; }
+    .partner-field.full { grid-column:1/-1; }
+    .partner-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+    .partner-table-actions { display:flex; gap:6px; flex-wrap:wrap; }
+    .partner-table-actions button { min-height:30px; padding:6px 10px; }
+    .kpi-feature { grid-column:span 2; border-left:1px solid var(--surface-border); background:var(--surface-bg); border-color:var(--surface-border); }
+    .kpi-feature::before { content:""; position:absolute; inset:auto 0 0 0; height:4px; background:var(--p3-primary); opacity:.95; }
+    .kpi-feature .value { font-size:clamp(34px,4vw,48px); }
+    .kpi-feature.occ-red { border-color:rgba(230,75,75,.36); background:var(--surface-bg); }
+    .kpi-feature.occ-red::before { background:#E64B4B; }
+    .kpi-feature.occ-red .value { color:#FF6B6B; }
+    .kpi-feature.occ-yellow { border-color:rgba(242,169,61,.36); background:var(--surface-bg); }
+    .kpi-feature.occ-yellow::before { background:var(--p3-warn); }
+    .kpi-feature.occ-yellow .value { color:#F2D77F; }
+    .kpi-feature.occ-blue { border-color:rgba(87,183,255,.42); background:var(--surface-bg); }
+    .kpi-feature.occ-blue::before { background:var(--metric-info); }
+    .kpi-feature.occ-blue .value { color:var(--metric-info); }
+    .kpi-feature.occ-green { border-color:rgba(56,201,111,.36); background:var(--surface-bg); }
+    .kpi-feature.occ-green::before { background:var(--metric-success); }
+    .kpi-feature.occ-green .value { color:var(--metric-success); }
+    .kpi-feature.revenue-card { border-color:var(--surface-border); background:var(--surface-bg); }
+    .kpi-feature.revenue-card::before { background:#57B7FF; }
+    .kpi-feature.revenue-card .value { color:#57B7FF; }
+    .calendar-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:10px; }
+    .calendar-head { color:var(--p3-muted); font-size:11px; text-transform:uppercase; font-weight:700; letter-spacing:.5px; padding:0 4px; }
+    .calendar-day { min-height:142px; background:#0B1524; border:1px solid var(--p3-border); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:7px; }
+    .calendar-day.empty { opacity:.35; background:transparent; }
+    .calendar-day.good { border-left:4px solid #38C96F; }
+    .calendar-day.warn { border-left:4px solid var(--p3-warn); }
+    .calendar-day.down { border-left:4px solid #E64B4B; }
+    .calendar-day .day-num { display:flex; justify-content:space-between; gap:8px; color:var(--p3-text); font-weight:800; font-size:13px; }
+    .calendar-day .day-main { color:var(--p3-primary); font-size:17px; font-weight:800; line-height:1.1; }
+    .calendar-day .day-sub { color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .calendar-day .day-occ { color:var(--p3-muted); font-size:11px; font-weight:800; line-height:1.35; }
+    .calendar-day .day-occ.occ-red { color:var(--metric-danger); }
+    .calendar-day .day-occ.occ-yellow { color:var(--metric-warning); }
+    .calendar-day .day-occ.occ-blue { color:var(--metric-info); }
+    .calendar-day .day-occ.occ-green { color:var(--metric-success); }
+    .calendar-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:auto; }
+    .calendar-tag { background:rgba(45,127,249,.16); color:#BFD8FF; border:1px solid rgba(45,127,249,.25); border-radius:999px; padding:2px 7px; font-size:10px; line-height:1.4; }
+    .calendar-tag.warn { background:rgba(242,169,61,.16); color:#FFD66B; border-color:rgba(242,169,61,.25); }
+    .calendar-tag.muted { background:rgba(143,163,154,.10); color:var(--p3-muted); border-color:rgba(143,163,154,.18); }
+    .accountability-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+    .accountability-head p { margin:0; color:var(--p3-muted); font-size:12px; line-height:1.45; max-width:780px; }
+    .accountability-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .accountability-card { position:relative; background:var(--surface-bg); border:1px solid var(--surface-border); border-radius:12px; padding:16px; box-shadow:var(--p3-shadow); overflow:hidden; }
+    .accountability-card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; opacity:.85; pointer-events:none; }
+    .accountability-card > * { position:relative; z-index:1; }
+    .accountability-title { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding-bottom:12px; border-bottom:1px solid var(--surface-border); }
+    .accountability-title strong { color:var(--p3-text); font-size:15px; line-height:1.25; display:block; }
+    .accountability-title span { color:var(--p3-muted); font-size:11px; display:block; margin-top:4px; }
+    .accountability-pill { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; padding:4px 9px; background:rgba(45,127,249,.16); color:#BFD8FF; border:1px solid rgba(45,127,249,.28); font-size:11px; font-weight:800; white-space:nowrap; }
+    .accountability-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin:12px 0; }
+    .accountability-metric { border:1px solid rgba(84,180,255,.18); border-radius:10px; padding:10px; background:rgba(84,180,255,.05); min-width:0; }
+    .accountability-metric b { display:block; color:#57B7FF; font-size:15px; line-height:1.2; white-space:normal; }
+    .accountability-metric span { display:block; color:var(--p3-muted); font-size:10px; margin-top:4px; text-transform:uppercase; letter-spacing:.05em; }
+    .accountability-controls { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:12px; }
+    .accountability-controls label { display:grid; gap:6px; color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:800; min-width:0; }
+    .accountability-controls .wide { grid-column:span 2; }
+    .accountability-result { margin-top:12px; overflow-x:auto; }
+    .accountability-note { margin-top:12px; border-left:3px solid #57B7FF; border-radius:8px; padding:10px 12px; background:rgba(84,180,255,.08); color:#BFEBD6; font-size:12px; line-height:1.45; }
+    .investor-preview { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:14px; }
+    .investor-preview .accountability-metric { background:rgba(45,127,249,.07); }
+
+    /* Financeiro operacional por carregador */
+    .finance-workbench { margin-top:18px; }
+    .finance-central-command { border-color:rgba(87,183,255,.34); background:linear-gradient(135deg,rgba(12,38,66,.98),rgba(7,20,37,.98)); }
+    .finance-central-command .finance-central-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .finance-central-command .finance-central-head h2 { margin:0; color:#fff; }
+    .finance-central-command .finance-central-head p { max-width:760px; margin:6px 0 0; color:var(--p3-muted); font-size:12px; line-height:1.5; }
+    .finance-central-tag { display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(0,237,142,.35); border-radius:999px; background:rgba(0,237,142,.08); color:#66EAAF; padding:5px 9px; font-size:10px; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+    .finance-central-tag::before { content:""; width:7px; height:7px; border-radius:50%; background:#00ED8E; box-shadow:0 0 0 3px rgba(0,237,142,.12); }
+    .finance-central-summary { display:grid; grid-template-columns:repeat(5,minmax(130px,1fr)); gap:10px; margin:18px 0 14px; }
+    .finance-central-metric { min-height:96px; padding:13px; border:1px solid rgba(84,180,255,.18); border-radius:11px; background:rgba(6,20,36,.62); }
+    .finance-central-metric span { display:block; color:var(--p3-muted); font-size:9px; font-weight:820; letter-spacing:.06em; }
+    .finance-central-metric strong { display:block; margin-top:8px; color:#57B7FF; font-size:19px; line-height:1.05; }
+    .finance-central-metric small { display:block; margin-top:5px; color:var(--p3-muted); font-size:10px; }
+    .finance-central-metric.good { border-color:rgba(0,237,142,.26); } .finance-central-metric.good strong { color:#57D990; }
+    .finance-central-metric.warn { border-color:rgba(255,214,107,.28); } .finance-central-metric.warn strong { color:#FFD66B; }
+    .finance-central-metric.tax { border-color:rgba(172,137,255,.30); } .finance-central-metric.tax strong { color:#B59AFF; }
+    .finance-central-allocation { display:grid; grid-template-columns:repeat(5,minmax(130px,1fr)); gap:10px; padding:14px; border:1px solid rgba(84,180,255,.22); border-radius:11px; background:rgba(8,25,45,.62); }
+    .finance-central-allocation .sub { display:block; margin:0; font-size:9px; font-weight:820; letter-spacing:.05em; }
+    .finance-central-allocation strong { display:block; margin-top:7px; color:#57B7FF; font-size:18px; }
+    .finance-central-allocation .good { color:#57D990; } .finance-central-allocation .tax { color:#B59AFF; } .finance-central-allocation .warn { color:#FFD66B; }
+    .finance-settlement { border-color:rgba(87,183,255,.38); background:linear-gradient(145deg,rgba(13,42,73,.98),rgba(7,21,38,.98)); }
+    .finance-settlement-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+    .finance-settlement-head h2 { margin:5px 0 0; color:#fff; }
+    .finance-settlement-head p { margin:6px 0 0; max-width:760px; }
+    .finance-settlement-status { display:flex; align-items:center; gap:9px; flex-wrap:wrap; border:1px solid rgba(87,183,255,.22); border-radius:9px; padding:8px 10px; background:rgba(6,20,36,.54); color:var(--p3-muted); font-size:11px; }
+    .finance-settlement-status::before { content:""; width:8px; height:8px; border-radius:50%; background:#57B7FF; box-shadow:0 0 0 3px rgba(87,183,255,.12); }
+    .finance-settlement-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; margin:18px 0; }
+    .finance-settlement-kpi { position:relative; min-width:0; min-height:108px; padding:13px; border:1px solid rgba(84,180,255,.17); border-radius:11px; background:rgba(5,18,33,.53); overflow:hidden; }
+    .finance-settlement-kpi::after { content:""; position:absolute; inset:auto 0 0; height:3px; background:rgba(87,183,255,.72); }
+    .finance-settlement-kpi span { display:block; color:var(--p3-muted); font-size:9px; font-weight:850; letter-spacing:.065em; text-transform:uppercase; }
+    .finance-settlement-kpi strong { display:block; margin-top:11px; color:#EAF4FF; font-size:20px; line-height:1.08; overflow-wrap:anywhere; }
+    .finance-settlement-kpi small { display:block; margin-top:6px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .finance-settlement table td:first-child { min-width:360px; }
+    .finance-line-detail { display:block; margin-top:4px; color:var(--p3-muted); font-size:10px; font-weight:500; line-height:1.35; }
+    .finance-cost-value { display:inline-flex; align-items:center; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
+    .finance-cost-share { display:inline-block; padding:3px 6px; border:1px solid rgba(87,183,255,.28); border-radius:999px; background:rgba(87,183,255,.08); color:#9CCEFF; font-size:9px; font-weight:800; line-height:1.2; white-space:nowrap; }
+    .finance-settlement-kpi.result::after { background:#57D990; } .finance-settlement-kpi.result strong { color:#57D990; }
+    .finance-settlement-kpi.reserve::after { background:#B59AFF; } .finance-settlement-kpi.reserve strong { color:#C7B1FF; }
+    .finance-settlement-kpi.attention::after { background:#FFD66B; } .finance-settlement-kpi.attention strong { color:#FFD66B; }
+    .finance-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+    .finance-section-head h2 { margin:0; padding:0; border:0; }
+    .finance-section-head p { margin:4px 0 0; max-width:760px; color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .finance-flow-nav { display:flex; gap:8px; flex-wrap:wrap; margin:16px 0 0; }
+    .finance-flow-nav a { display:inline-flex; align-items:center; gap:7px; min-height:34px; padding:7px 11px; border:1px solid var(--surface-border); border-radius:8px; background:var(--surface-bg); color:#BFD8FF; text-decoration:none; font-size:11px; font-weight:800; }
+    .finance-flow-nav a:hover { border-color:#57B7FF; color:#fff; }
+    .finance-flow-nav b { display:inline-grid; place-items:center; width:19px; height:19px; border-radius:50%; background:rgba(45,127,249,.2); color:#57B7FF; font-size:10px; }
+    .finance-month-panel { margin-top:18px; border:1px solid rgba(84,180,255,.25); border-radius:12px; background:linear-gradient(135deg,rgba(17,39,67,.98),rgba(11,25,43,.98)); padding:16px; box-shadow:var(--p3-shadow); }
+    .finance-month-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+    .finance-month-head h2 { margin:0; padding:0; border:0; }
+    .finance-month-head p { margin:5px 0 0; color:var(--p3-muted); font-size:12px; line-height:1.45; max-width:780px; }
+    .finance-month-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .finance-month-status-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
+    .finance-month-status { min-width:0; border:1px solid rgba(84,180,255,.16); border-radius:10px; padding:11px 12px; background:rgba(84,180,255,.045); }
+    .finance-month-status span { display:block; color:var(--p3-muted); font-size:9px; text-transform:uppercase; letter-spacing:.07em; font-weight:800; }
+    .finance-month-status strong { display:block; margin-top:5px; color:#57B7FF; font-size:15px; line-height:1.2; overflow-wrap:anywhere; }
+    .finance-month-status small { display:block; margin-top:4px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .finance-month-status.good strong { color:#57D990; }
+    .finance-month-status.warn strong { color:#FFD66B; }
+    .finance-step-kicker { display:block; margin-bottom:5px; color:#57B7FF; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+    .finance-variables-ledger { min-width:1080px; }
+    .finance-variables-ledger .setting-group { width:110px; color:var(--p3-muted); font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+    .finance-variables-ledger .setting-name { min-width:220px; font-weight:800; color:var(--p3-text); }
+    .finance-variables-ledger .setting-rule { min-width:180px; color:var(--p3-muted); font-size:11px; }
+    .finance-variables-ledger .setting-value { min-width:170px; }
+    .finance-variables-ledger .setting-previous { min-width:130px; color:#BFD8FF; font-weight:800; white-space:nowrap; }
+    .finance-setting-state { display:inline-flex; align-items:center; justify-content:center; min-width:82px; border-radius:999px; padding:5px 9px; border:1px solid rgba(84,180,255,.25); background:rgba(84,180,255,.1); color:#BFD8FF; font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+    .finance-setting-state.changed { border-color:rgba(255,214,107,.3); background:rgba(255,214,107,.1); color:#FFD66B; }
+    .finance-setting-state.inherited { border-color:rgba(56,201,111,.3); background:rgba(56,201,111,.1); color:#57D990; }
+    .finance-setting-state.new { border-color:rgba(143,163,154,.25); background:rgba(143,163,154,.08); color:var(--p3-muted); }
+    .finance-section-divider { margin-top:18px; }
+    .finance-report-zone { margin-top:20px; border-top:1px solid rgba(84,180,255,.16); padding-top:2px; }
+    .finance-command-center { position:sticky; top:10px; z-index:25; margin-top:16px; padding:14px; border:1px solid rgba(84,180,255,.28); border-radius:12px; background:rgba(8,22,39,.96); box-shadow:0 16px 38px rgba(0,0,0,.28); backdrop-filter:blur(12px); }
+    .finance-command-grid { display:grid; grid-template-columns:minmax(220px,1.4fr) minmax(150px,.7fr) minmax(190px,.9fr) auto; gap:10px; align-items:end; }
+    .finance-command-field { display:grid; gap:6px; min-width:0; }
+    .finance-command-field label { color:var(--p3-muted); font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.07em; }
+    .finance-command-field .ctl-select { width:100%; min-width:0; }
+    .finance-command-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .finance-command-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:12px; }
+    .finance-command-metric { min-width:0; padding:10px 12px; border:1px solid rgba(84,180,255,.16); border-radius:9px; background:rgba(84,180,255,.055); }
+    .finance-command-metric span { display:block; color:var(--p3-muted); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+    .finance-command-metric strong { display:block; margin-top:4px; color:#57B7FF; font-size:17px; line-height:1.15; overflow-wrap:anywhere; }
+    .finance-command-metric.positive strong { color:#57D990; }
+    .finance-command-metric.negative strong { color:#FF7373; }
+    .finance-panel-hidden { display:none !important; }
+    .report-library { display:grid; gap:10px; margin-top:14px; }
+    .report-library-toolbar { display:flex; align-items:end; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:14px; }
+    .report-library-filters { display:flex; align-items:end; gap:8px; flex-wrap:wrap; }
+    .report-library-card { display:grid; grid-template-columns:minmax(210px,1.4fr) repeat(4,minmax(90px,.65fr)) auto; gap:10px; align-items:center; padding:12px 14px; border:1px solid var(--surface-border); border-radius:10px; background:rgba(8,22,39,.7); }
+    .report-library-main strong { display:block; color:var(--p3-text); font-size:13px; }
+    .report-library-main span,.report-library-value span { display:block; margin-top:3px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .report-library-value b { display:block; color:#57B7FF; font-size:13px; }
+    .report-library-actions { display:flex; gap:7px; justify-content:flex-end; flex-wrap:wrap; }
+    .report-status { display:inline-flex; width:max-content; margin-top:5px; padding:3px 7px; border-radius:999px; font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
+    .report-status.closed { color:#57D990; border:1px solid rgba(87,217,144,.32); background:rgba(87,217,144,.1); }
+    .report-status.partial { color:#FFD66B; border:1px solid rgba(255,214,107,.32); background:rgba(255,214,107,.1); }
+    .report-library-empty { padding:18px; border:1px dashed rgba(84,180,255,.24); border-radius:10px; color:var(--p3-muted); text-align:center; font-size:12px; }
+    .finance-basis-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .finance-basis-card { min-width:0; border:1px solid rgba(84,180,255,.18); border-radius:10px; padding:12px; background:rgba(84,180,255,.05); }
+    .finance-basis-card label,.finance-basis-card span { display:block; color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:800; }
+    .finance-basis-card strong { display:block; margin-top:5px; color:#57B7FF; font-size:18px; line-height:1.15; overflow-wrap:anywhere; }
+    .finance-basis-card small { display:block; margin-top:4px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .finance-basis-card .ctl-input { width:100%; margin-top:7px; }
+    .finance-ledger-wrap { overflow-x:auto; border:1px solid rgba(84,180,255,.16); border-radius:10px; }
+    .finance-ledger { min-width:1220px; }
+    .finance-ledger th { white-space:nowrap; }
+    .finance-ledger td { vertical-align:middle; }
+    .finance-ledger .rule-enabled { width:54px; text-align:center; }
+    .finance-ledger .rule-name { min-width:210px; }
+    .finance-ledger .rule-name input { width:100%; min-width:180px; }
+    .finance-ledger .rule-basis { min-width:152px; }
+    .finance-ledger .rule-value { min-width:112px; }
+    .finance-ledger .rule-value small { display:block; margin-top:3px; color:var(--p3-muted); font-size:9px; white-space:nowrap; }
+    .finance-ledger .rule-output { min-width:116px; white-space:nowrap; font-weight:800; color:#DCEBFF; }
+    .finance-ledger .rule-output.primary { color:#57B7FF; }
+    .finance-ledger .rule-previous { min-width:126px; color:#BFD8FF; font-size:10px; font-weight:800; line-height:1.35; }
+    .finance-ledger .rule-state { min-width:96px; text-align:center; }
+    .finance-ledger .rule-actions { width:46px; text-align:center; }
+    .finance-ledger .ctl-input,.finance-ledger .ctl-select { width:100%; min-height:36px; }
+    .finance-ledger input[type="checkbox"] { width:18px; height:18px; accent-color:var(--p3-primary); }
+    .finance-rule-remove { width:32px; height:32px; display:inline-grid; place-items:center; border-radius:8px; border:1px solid rgba(230,75,75,.3); background:rgba(230,75,75,.1); color:#FF9A9A; cursor:pointer; font-size:18px; line-height:1; }
+    .finance-rule-remove:hover { background:rgba(230,75,75,.2); }
+    .finance-ledger tr.rule-disabled td { opacity:.46; }
+    .finance-ledger tr.rule-disabled td.rule-enabled,.finance-ledger tr.rule-disabled td.rule-actions { opacity:1; }
+    .finance-ledger tr.finance-energy-row td { background:rgba(45,127,249,.06); }
+    .finance-ledger tfoot td { background:#13243B; color:#BFEBD6; font-weight:800; border-bottom:0; }
+    .finance-results { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:16px; }
+    .finance-results.finance-result-stages { display:block; }
+    .finance-result-stage { border:1px solid rgba(87,183,255,.20); border-radius:12px; background:rgba(8,24,44,.45); padding:14px; }
+    .finance-result-stage + .finance-result-stage { margin-top:12px; }
+    .finance-result-stage-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:0 0 11px; padding-bottom:10px; border-bottom:1px solid rgba(129,160,204,.20); }
+    .finance-result-stage-head h3 { margin:0; color:var(--p3-text); font-size:14px; letter-spacing:0; }
+    .finance-result-stage-head p { margin:0; color:var(--p3-muted); font-size:11px; text-align:right; }
+    .finance-result-stage-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .finance-result-stage--actual { border-color:rgba(0,237,142,.35); background:linear-gradient(135deg,rgba(0,237,142,.07),rgba(8,24,44,.60) 48%); }
+    .finance-result-card.is-primary { min-height:146px; border-color:rgba(0,237,142,.42); background:linear-gradient(135deg,rgba(0,237,142,.12),var(--surface-bg) 62%); grid-column:span 2; }
+    .finance-result-card.is-primary strong { font-size:31px; }
+    .finance-result-card.is-primary::before { height:4px; background:#00ED8E; }
+    .finance-result-card.is-reference { min-height:108px; opacity:.88; }
+    .finance-result-card { position:relative; overflow:hidden; min-height:126px; border:1px solid var(--surface-border); border-radius:12px; background:var(--surface-bg); padding:15px; box-shadow:var(--p3-shadow); }
+    .finance-result-card::before { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:#57B7FF; }
+    .finance-result-card.good::before { background:#38C96F; }
+    .finance-result-card.warn::before { background:#FFD66B; }
+    .finance-result-card.bad::before { background:#E64B4B; }
+    .finance-result-card span { display:block; color:var(--p3-muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:800; }
+    .finance-result-card strong { display:block; margin-top:7px; color:#57B7FF; font-size:24px; line-height:1.1; overflow-wrap:anywhere; }
+    .finance-result-card.good strong { color:#57D990; }
+    .finance-result-card.warn strong { color:#FFD66B; }
+    .finance-result-card.bad strong { color:#FF7A7A; }
+    .finance-result-card small { display:block; margin-top:7px; color:var(--p3-muted); font-size:11px; line-height:1.4; }
+    .uby-finance-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:14px 0; }
+    .uby-finance-summary .kpi-feature { grid-column:span 1; min-height:0; padding:13px; }
+    .uby-finance-summary .kpi-feature::before { height:3px; }
+    .uby-finance-summary .kpi-feature .label { font-size:9px; line-height:1.35; }
+    .uby-finance-summary .kpi-feature .value { margin-top:7px; font-size:clamp(22px,2vw,30px); line-height:1.08; }
+    .uby-finance-list { display:grid; gap:10px; }
+    .uby-finance-row { display:grid; grid-template-columns:minmax(220px,1.2fr) repeat(4,minmax(105px,.55fr)) auto; gap:12px; align-items:center; border:1px solid var(--surface-border); border-radius:12px; background:var(--surface-bg); padding:13px 14px; box-shadow:var(--p3-shadow); }
+    .uby-finance-row--partner { border-color:rgba(66,223,154,.42); background:linear-gradient(100deg,rgba(18,91,75,.23),var(--surface-bg) 42%); }
+    .uby-finance-row--partner .uby-finance-cell--royalty b { color:#42DF9A; }
+    .uby-partner-pill { display:inline-flex; align-items:center; gap:5px; margin:0 0 5px; padding:3px 8px; border:1px solid rgba(66,223,154,.42); border-radius:999px; color:#42DF9A; background:rgba(20,104,82,.2); font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+    .uby-finance-row strong { display:block; color:var(--p3-text); font-size:13px; }
+    .uby-finance-row span { display:block; color:var(--p3-muted); font-size:11px; margin-top:2px; }
+    .uby-finance-cell { text-align:right; min-width:0; }
+    .uby-finance-cell b { display:block; color:#57B7FF; font-size:14px; white-space:nowrap; }
+    .uby-finance-cell em { display:block; color:var(--p3-muted); font-size:10px; font-style:normal; margin-top:2px; }
+    .uby-finance-cell.result-positive b { color:#57D990; }
+    .uby-finance-cell.result-negative b { color:#FF7A7A; }
+    .finance-empty-guidance { border-left:3px solid #FFD66B; border-radius:8px; background:rgba(242,169,61,.10); color:#FFE4A0; padding:10px 12px; font-size:12px; line-height:1.45; margin-top:12px; }
+    /* Visao executiva do financeiro geral: cada destino de resultado em uma faixa clara e completa. */
+    .finance-overview-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; align-items:stretch; }
+    .finance-overview-panel { --finance-accent:#57B7FF; min-width:0; display:grid; grid-template-rows:auto auto auto 1fr; border:1px solid color-mix(in srgb,var(--finance-accent) 34%,transparent); border-radius:12px; background:linear-gradient(145deg,rgba(16,36,61,.99),rgba(8,21,37,.99)); padding:17px; box-shadow:var(--p3-shadow); overflow:hidden; }
+    .finance-overview-panel.uby { --finance-accent:#57B7FF; }
+    .finance-overview-panel.p3 { --finance-accent:#FFD66B; }
+    .finance-overview-panel.investors { --finance-accent:#57D990; }
+    .finance-overview-panel.partners { --finance-accent:#38D9B1; }
+    .finance-overview-panel h2 { margin:0; padding:0 0 11px; border-bottom:1px solid rgba(84,180,255,.16); color:var(--p3-text); font-size:15px; }
+    .finance-overview-panel .finance-overview-total { display:block; margin-top:15px; color:var(--finance-accent); font-size:30px; line-height:1.05; font-weight:900; letter-spacing:0; overflow-wrap:anywhere; }
+    .finance-overview-panel .finance-overview-caption { display:block; min-height:34px; margin-top:6px; color:var(--p3-muted); font-size:11px; line-height:1.35; }
+    .finance-overview-list { display:grid; align-content:start; gap:0; margin-top:14px; }
+    .finance-overview-row { display:grid; grid-template-columns:minmax(0,1fr) max-content auto; gap:9px; align-items:center; min-height:48px; padding:8px 0; border-top:1px solid rgba(84,180,255,.13); }
+    .finance-overview-row strong { display:block; color:var(--p3-text); font-size:11px; line-height:1.3; overflow-wrap:anywhere; }
+    .finance-overview-row span { display:block; margin-top:2px; color:var(--p3-muted); font-size:10px; line-height:1.25; }
+    .finance-overview-row b { color:var(--finance-accent); font-size:12px; white-space:nowrap; text-align:right; }
+    .finance-overview-row .btn-open { min-height:30px; padding:5px 9px; font-size:10px; white-space:nowrap; }
+    .finance-overview-empty { grid-column:1/-1; color:var(--p3-muted); font-size:11px; line-height:1.4; padding:5px 0; }
+    .station-layout-dialog { width:min(620px,calc(100vw - 24px)); border:1px solid rgba(84,180,255,.28); border-radius:12px; padding:0; background:#0D1B2E; color:var(--p3-text); box-shadow:0 30px 80px rgba(0,0,0,.55); }
+    .station-layout-dialog::backdrop { background:rgba(2,8,18,.76); backdrop-filter:blur(3px); }
+    .station-layout-head { padding:18px 20px 14px; border-bottom:1px solid var(--surface-border); }
+    .station-layout-head h2 { margin:0; padding:0; border:0; }
+    .station-layout-head p { margin:5px 0 0; color:var(--p3-muted); font-size:11px; line-height:1.45; }
+    .station-layout-body { padding:18px 20px; }
+    .station-layout-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .station-layout-field { display:grid; gap:6px; min-width:0; color:var(--p3-muted); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
+    .station-layout-field.wide { grid-column:1/-1; }
+    .station-layout-field input,.station-layout-field textarea { width:100%; min-height:40px; border:1px solid var(--p3-border); border-radius:8px; background:#091526; color:var(--p3-text); padding:9px 10px; font:inherit; }
+    .station-layout-field textarea { min-height:76px; resize:vertical; line-height:1.4; }
+    .station-layout-divider { grid-column:1/-1; margin-top:6px; padding-top:14px; border-top:1px solid var(--surface-border); color:var(--p3-primary); font-size:12px; font-weight:800; }
+    .station-layout-toggle { display:flex; align-items:center; gap:9px; min-height:40px; color:var(--p3-text); font-size:12px; font-weight:700; }
+    .station-layout-toggle input { width:18px; height:18px; accent-color:var(--p3-primary); }
+    .station-weekdays { grid-column:1/-1; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px; }
+    .station-weekdays label { display:grid; place-items:center; gap:5px; min-height:50px; border:1px solid var(--surface-border); border-radius:8px; background:#091526; color:var(--p3-muted); font-size:10px; font-weight:800; }
+    .station-weekdays input { width:16px; height:16px; accent-color:var(--p3-primary); }
+    .station-occupancy-list { display:grid; gap:8px; }
+    .station-occupancy-row { display:grid; grid-template-columns:minmax(210px,1.35fr) minmax(140px,.7fr) minmax(110px,.55fr) auto; gap:16px; align-items:center; padding:13px 0; border-bottom:1px solid var(--surface-border); }
+    .station-occupancy-row:last-child { border-bottom:0; }
+    .station-schedule-row { display:grid; grid-template-columns:minmax(210px,1fr) minmax(220px,.9fr) auto; gap:16px; align-items:center; padding:13px 0; border-bottom:1px solid var(--surface-border); }
+    .station-schedule-row:last-child { border-bottom:0; }
+    .station-occupancy-name strong { display:block; color:var(--p3-text); font-size:13px; }
+    .station-occupancy-name span,.station-occupancy-meta { color:var(--p3-muted); font-size:11px; }
+    .station-occupancy-value { color:var(--p3-primary); font-size:21px; font-weight:900; font-variant-numeric:tabular-nums; }
+    .station-occupancy-bar { height:7px; margin-top:7px; overflow:hidden; border-radius:99px; background:#1B334F; }
+    .station-occupancy-bar span { display:block; height:100%; border-radius:inherit; background:#57B7FF; }
+    .station-occupancy-row.occ-red .station-occupancy-value { color:var(--metric-danger); }
+    .station-occupancy-row.occ-red .station-occupancy-bar span { background:var(--metric-danger); }
+    .station-occupancy-row.occ-yellow .station-occupancy-value { color:var(--metric-warning); }
+    .station-occupancy-row.occ-yellow .station-occupancy-bar span { background:var(--metric-warning); }
+    .station-occupancy-row.occ-blue .station-occupancy-value { color:var(--metric-info); }
+    .station-occupancy-row.occ-blue .station-occupancy-bar span { background:var(--metric-info); }
+    .station-occupancy-row.occ-green .station-occupancy-value { color:var(--metric-success); }
+    .station-occupancy-row.occ-green .station-occupancy-bar span { background:var(--metric-success); }
+    .station-layout-actions { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px 18px; border-top:1px solid var(--surface-border); }
+    .backup-history-dialog { width:min(1080px,calc(100vw - 24px)); max-height:min(820px,calc(100vh - 24px)); border:1px solid rgba(84,180,255,.30); border-radius:12px; padding:0; background:#0D1B2E; color:var(--p3-text); box-shadow:0 30px 80px rgba(0,0,0,.55); }
+    .backup-history-dialog::backdrop { background:rgba(2,8,18,.76); backdrop-filter:blur(3px); }
+    .backup-history-content { padding:18px 20px; overflow:auto; max-height:calc(100vh - 190px); }
+    .backup-history-intro { margin:0 0 15px; color:var(--p3-muted); font-size:12px; line-height:1.5; }
+    .backup-history-table { width:100%; border-collapse:collapse; min-width:820px; }
+    .backup-history-table th { color:var(--p3-muted); font-size:10px; text-align:left; text-transform:uppercase; letter-spacing:.06em; padding:9px 8px; border-bottom:1px solid var(--surface-border); }
+    .backup-history-table td { padding:12px 8px; border-bottom:1px solid rgba(84,180,255,.12); vertical-align:middle; font-size:12px; }
+    .backup-history-table strong { display:block; color:var(--p3-text); font-size:12px; }
+    .backup-history-table small { display:block; margin-top:3px; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .backup-delta-positive { color:#57D990; } .backup-delta-negative { color:#FF9A8B; } .backup-delta-neutral { color:var(--p3-muted); }
+    .backup-history-empty { padding:26px 8px; color:var(--p3-muted); text-align:center; }
+    .plant-count { display:inline-grid; gap:2px; min-width:56px; }
+    .plant-count strong { color:var(--p3-text); font-size:13px; }
+    .plant-count small { color:var(--p3-muted); font-size:9px; white-space:nowrap; }
+    .unit-table-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .connector-report { border-color:rgba(87,183,255,.42); background:linear-gradient(110deg,rgba(20,55,88,.76),var(--surface-bg) 48%); }
+    .connector-report-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; padding-bottom:13px; border-bottom:1px solid rgba(87,183,255,.22); }
+    .connector-report-kicker { display:block; color:var(--p3-primary); font-size:10px; font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
+    .connector-report h2 { margin:4px 0 0; padding:0; border:0; }
+    .connector-report p { max-width:680px; margin:7px 0 0; color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .connector-report-select { display:grid; gap:6px; min-width:235px; color:var(--p3-muted); font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+    .connector-report-select select { width:100%; }
+    .connector-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:14px; }
+    .connector-summary-item { min-width:0; padding:12px 13px; border:1px solid rgba(87,183,255,.22); border-radius:10px; background:rgba(4,18,35,.46); }
+    .connector-summary-item span,.connector-summary-item small { display:block; color:var(--p3-muted); font-size:11px; line-height:1.35; overflow-wrap:anywhere; }
+    .connector-summary-item span { color:#BFEBD6; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .connector-summary-item strong { display:block; margin:7px 0 4px; color:var(--p3-primary); font-size:22px; font-variant-numeric:tabular-nums; }
+    .connector-empty { grid-column:1/-1; padding:11px 12px; border-left:3px solid var(--p3-warn); border-radius:7px; background:rgba(242,169,61,.10); color:#FFE4A0; font-size:12px; line-height:1.45; }
+    .connector-report-table small { display:block; margin-top:3px; color:var(--p3-muted); font-size:10px; white-space:nowrap; }
+    .connector-diagnostics { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; margin-top:16px; }
+    .connector-diagnostic { min-width:0; border:1px solid rgba(87,183,255,.20); border-radius:11px; background:rgba(4,18,35,.40); overflow:hidden; }
+    .connector-diagnostic.is-selected { border-color:rgba(0,237,142,.58); box-shadow:0 0 0 1px rgba(0,237,142,.12) inset; }
+    .connector-diagnostic header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:13px 14px 11px; border-bottom:1px solid rgba(87,183,255,.17); }
+    .connector-diagnostic header span,.connector-diagnostic-context span,.connector-failure-list > span { display:block; color:var(--p3-muted); font-size:9px; font-weight:900; letter-spacing:.07em; }
+    .connector-diagnostic h3 { margin:4px 0 0; color:var(--p3-text); font-size:15px; }
+    .connector-diagnostic header b { padding:4px 7px; border:1px solid; border-radius:999px; font-size:10px; white-space:nowrap; }
+    .connector-success { border-color:rgba(87,217,144,.42); color:#57D990; background:rgba(87,217,144,.08); }
+    .connector-failure { border-color:rgba(255,122,122,.44); color:#FF9A8B; background:rgba(255,122,122,.08); }
+    .connector-diagnostic-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .connector-diagnostic-metrics > div { min-width:0; padding:12px 14px; border-bottom:1px solid rgba(87,183,255,.12); }
+    .connector-diagnostic-metrics > div:nth-child(odd) { border-right:1px solid rgba(87,183,255,.12); }
+    .connector-diagnostic-metrics span,.connector-diagnostic-metrics small { display:block; color:var(--p3-muted); font-size:10px; line-height:1.35; }
+    .connector-diagnostic-metrics strong { display:block; margin:4px 0; color:#57B7FF; font-size:18px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+    .connector-diagnostic-context { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); padding:12px 14px; gap:10px; border-bottom:1px solid rgba(87,183,255,.12); }
+    .connector-diagnostic-context strong { display:block; margin-top:4px; color:var(--p3-text); font-size:11px; line-height:1.35; overflow-wrap:anywhere; }
+    .connector-failure-list { padding:12px 14px; }
+    .connector-failure-list ul { display:grid; gap:5px; margin:7px 0 0; padding:0; list-style:none; }
+    .connector-failure-list li { color:#F7D0C8; font-size:11px; line-height:1.35; }
+    .connector-failure-list li strong { color:#FF9A8B; }
+    .connector-failure-list .connector-diagnostic-ok { color:#8BD7A8; }
+    @media (max-width:720px) { .connector-report-head { display:grid; } .connector-report-select { min-width:0; width:100%; } }
+
+    /* ── NOVO: Upload zone ── */
+    .upload-zone {
+      display:block;
+      border:2px dashed rgba(63,182,107,.25);
+      border-radius:12px;
+      padding:20px 24px;
+      text-align:center;
+      cursor:pointer;
+      background:var(--p3-card);
+      margin-bottom:20px;
+      transition:all .15s;
+    }
+    .upload-zone:hover,.upload-zone.dragover {
+      border-color:var(--p3-primary);
+      background:rgba(63,182,107,.06);
+    }
+    .upload-zone p { color:var(--p3-muted); font-size:13px; margin:4px 0 0; }
+    .upload-zone strong { color:var(--p3-primary); }
+    .upload-zone input[type=file] { display:none; }
+    .up-icon { font-size:1.8rem; display:block; margin-bottom:6px; }
+
+    /* Modo compacto após carregar */
+    .upload-zone.compact {
+      padding:10px 16px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      text-align:left;
+    }
+    .upload-zone.compact .up-icon { font-size:1.1rem; margin:0; }
+    .upload-zone.compact .up-hint { display:none; }
+
+    .file-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; justify-content:center; }
+    .upload-zone.compact .file-chips { margin:0; justify-content:flex-start; flex:1; }
+    .file-chip { background:rgba(63,182,107,.14); color:var(--p3-accent); padding:3px 10px; border-radius:20px; font-size:12px; display:flex; align-items:center; gap:5px; }
+    .file-chip-remove { background:none; border:none; cursor:pointer; color:var(--p3-accent); font-size:15px; line-height:1; padding:0; opacity:.65; }
+    .file-chip-remove:hover { opacity:1; }
+    .upload-feedback { font-size:12px; margin-top:6px; }
+    .up-loading { color:var(--p3-primary); }
+    .up-error   { color:var(--p3-warn); }
+
+    /* ── NOVO: Tabs ── */
+    .tabs-bar {
+      display:flex;
+      align-items:center;
+      gap:14px;
+      margin-bottom:22px;
+      flex-wrap:wrap;
+    }
+    .tabs {
+      display:flex;
+      gap:3px;
+      background:var(--p3-card);
+      border:1px solid var(--p3-border);
+      border-radius:10px;
+      padding:4px;
+    }
+    .tab {
+      padding:7px 22px;
+      border-radius:7px;
+      border:none;
+      background:none;
+      cursor:pointer;
+      font-size:13px;
+      font-weight:500;
+      font-family:var(--ui-font);
+      color:var(--p3-muted);
+      transition:all .15s;
+    }
+    .tab.active { background:var(--p3-primary); color:#fff; }
+    .tab:not(.active):hover { background:rgba(63,182,107,.1); color:var(--p3-text); }
+
+    /* Controles inline (mês + potência) */
+    .controls {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      font-size:13px;
+      color:var(--p3-muted);
+    }
+    .ctl-select, .ctl-input {
+      background:var(--p3-card);
+      border:1px solid var(--p3-border);
+      border-radius:8px;
+      color:var(--p3-text);
+      padding:5px 10px;
+      font-size:13px;
+      font-family:inherit;
+      cursor:pointer;
+    }
+    .ctl-input { width:68px; }
+    .btn-recalc {
+      background:rgba(63,182,107,.14);
+      color:var(--p3-primary);
+      border:1px solid rgba(63,182,107,.3);
+      border-radius:8px;
+      padding:5px 14px;
+      font-size:13px;
+      font-family:inherit;
+      cursor:pointer;
+      transition:all .15s;
+    }
+    .btn-recalc:hover { background:rgba(63,182,107,.26); }
+    .btn-danger {
+      background:rgba(242,169,61,.12);
+      color:var(--p3-warn);
+      border:1px solid rgba(242,169,61,.38);
+      border-radius:8px;
+      padding:7px 12px;
+      font-size:12px;
+      font-family:inherit;
+      cursor:pointer;
+      transition:all .15s;
+    }
+    .btn-danger:hover { background:rgba(242,169,61,.22); }
+
+    .project-bar {
+      display:grid;
+      grid-template-columns:minmax(220px,420px) minmax(150px,200px) minmax(180px,260px) 1fr;
+      gap:12px;
+      align-items:end;
+      margin-bottom:18px;
+      background:var(--p3-card);
+      border:1px solid var(--p3-border);
+      border-radius:12px;
+      padding:14px 16px;
+      box-shadow:var(--p3-shadow);
+    }
+    .project-field label { display:block; color:var(--p3-muted); font-size:11px; text-transform:uppercase; font-weight:700; letter-spacing:.8px; margin-bottom:6px; }
+    .project-field select,
+    .project-field input { width:100%; background:#0B1524; color:var(--p3-text); border:1px solid var(--p3-border); border-radius:8px; padding:9px 10px; font-family:inherit; font-size:13px; }
+    .project-state { color:var(--p3-muted); font-size:12px; line-height:1.45; }
+    .project-state strong { color:var(--p3-text); }
+
+    /* ── NOVO: Acumulado grid ── */
+    .acc-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px; }
+
+    /* ── Empty state ── */
+    .empty-state { text-align:center; padding:70px 20px; color:var(--p3-muted); }
+    .empty-state .ei { font-size:2.8rem; opacity:.3; margin-bottom:14px; }
+
+    /* ── Responsive ── */
+    @media print {
+      body { background:#07111F; }
+      body * { visibility:hidden; }
+      #clubPrintPanel, #clubPrintPanel * { visibility:visible; }
+      #clubPrintPanel { position:absolute; left:0; top:0; width:100%; margin:0; box-shadow:none; }
+    }
+
+    @media (max-width:1180px) {
+      .kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .uby-core-panels, .uby-bottom-panels { grid-template-columns:1fr; }
+      .uby-finance-stack { grid-template-rows:auto; }
+      .ac-context-card { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .section-3, .section-2 { grid-template-columns:1fr; }
+      .dc-comparison-charts { grid-template-columns:1fr; }
+      .acc-grid { grid-template-columns:1fr; }
+      .general-split { grid-template-columns:1fr; }
+      .metric-strip { grid-template-columns:1fr; }
+      .visual-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .visual-card, .visual-card.feature { grid-column:span 1; }
+      .visual-card .visual-footer { align-items:flex-start; flex-direction:column; gap:5px; }
+      .visual-card .visual-sub, .visual-card .visual-period-trend { max-width:100%; }
+      .day-compare-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .decision-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .calendar-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+      .kpi-feature { grid-column:span 2; }
+      .accountability-grid { grid-template-columns:1fr; }
+      .finance-command-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .report-library-card { grid-template-columns:minmax(190px,1.4fr) repeat(2,minmax(100px,.7fr)) auto; }
+      .report-library-card .report-library-value.optional { display:none; }
+      .investor-preview { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .finance-basis-grid,.finance-results:not(.finance-result-stages),.uby-finance-summary,.finance-month-status-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .finance-central-summary,.finance-central-allocation { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .finance-settlement-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .finance-result-stage-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .finance-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .uby-finance-row { grid-template-columns:minmax(190px,1fr) repeat(2,minmax(105px,.55fr)) auto; }
+      .uby-finance-row .uby-finance-cell:nth-of-type(4),.uby-finance-row .uby-finance-cell:nth-of-type(5) { display:none; }
+    }
+    @media (max-width:960px) {
+      .hero,.section,.kpis { grid-template-columns:1fr; }
+      .decision-grid { grid-template-columns:1fr; }
+      .kpi-feature { grid-column:span 1; }
+      .project-bar { grid-template-columns:1fr; }
+      .wrap { padding:16px; }
+      .value { white-space:normal; }
+      .user-row { grid-template-columns:80px 1fr; }
+      .user-row strong { grid-column:2; text-align:left; }
+      .unit-card { grid-template-columns:1fr; }
+      .unit-card .unit-value,.unit-card .unit-sub { text-align:left; }
+      .unit-actions { justify-content:flex-start; }
+      .ai-insights { grid-template-columns:1fr; }
+      .calendar-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .club-print-head, .club-print-foot { grid-template-columns:1fr; display:grid; text-align:left; }
+      .club-print-meta { text-align:left; }
+      .club-podium { grid-template-columns:1fr; }
+      .podium-place, .podium-place.rank-1, .podium-place.rank-2, .podium-place.rank-3 { min-height:auto; }
+      .podium-content, .podium-place.rank-1 .podium-content { min-height:auto; border-radius:10px 10px 0 0; }
+      .podium-step, .podium-place.rank-1 .podium-step, .podium-place.rank-2 .podium-step, .podium-place.rank-3 .podium-step { min-height:50px; }
+      .accountability-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .accountability-metrics, .investor-preview { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .finance-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .uby-finance-row { grid-template-columns:1fr 1fr; }
+      .uby-finance-row > div:first-child,.uby-finance-row .unit-actions { grid-column:1/-1; }
+      .uby-finance-cell { text-align:left; }
+    }
+    @media (max-width:640px) {
+      body { font-size:13px; }
+      .wrap { width:100%; max-width:none; padding:10px 10px 64px; overflow-x:hidden; }
+      .hero { border-radius:12px; padding:18px 16px; gap:14px; align-items:start; }
+      .hero::after { width:170px; height:170px; right:-58px; top:-58px; }
+      .brand { gap:10px; margin-bottom:14px; }
+      .logo-mark { width:44px; height:44px; border-radius:10px; flex:0 0 44px; }
+      .brand-name { font-size:11px; letter-spacing:2px; }
+      .brand-tag { font-size:10px; letter-spacing:.6px; }
+      h1 { font-size:22px; line-height:1.16; }
+      h2 { font-size:15px; margin-bottom:12px; }
+      .meta, .formula, .hero-formula { font-size:12px; line-height:1.5; padding:12px; }
+
+      .tabs-bar { display:block; margin-bottom:14px; }
+      .tabs { width:100%; overflow-x:auto; scrollbar-width:thin; padding:4px; gap:4px; border-radius:12px; }
+      .tab { flex:0 0 auto; min-width:92px; padding:8px 12px; font-size:12px; white-space:nowrap; }
+      .controls { margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; align-items:stretch; }
+      .controls span { grid-column:1/-1; }
+      .ctl-select, .ctl-input, .btn-recalc, .btn-danger { width:100%; min-height:38px; font-size:12px; }
+      .ctl-input { min-width:0; }
+
+      .project-bar { padding:12px; gap:10px; margin-bottom:14px; }
+      .project-field label { font-size:10px; margin-bottom:4px; }
+      .project-field select, .project-field input { min-height:40px; font-size:12px; }
+      .project-state { font-size:11px; }
+
+      .upload-zone { padding:16px 14px; margin-bottom:14px; }
+      .upload-zone p { font-size:12px; line-height:1.45; }
+      .upload-zone.compact { display:grid; grid-template-columns:auto 1fr; align-items:start; gap:8px; padding:12px; }
+      .upload-zone.compact p { margin:0; }
+      .upload-zone.compact .file-chips, .file-chips { grid-column:1/-1; justify-content:flex-start; width:100%; }
+      .file-chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+
+      .kpis { margin-top:14px; gap:10px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .dc-kpi-heading, .ac-context-card { grid-column:1 / -1; }
+      .ac-context-card { grid-template-columns:1fr 1fr; }
+      .finance-overview-grid { grid-template-columns:1fr; }
+      .kpis .card, .card { border-radius:10px; padding:14px; min-height:auto; }
+      .label { font-size:10px; letter-spacing:.55px; }
+      .value { font-size:26px; overflow-wrap:anywhere; }
+      .sub { font-size:10px; line-height:1.45; }
+      .kpi-feature .value { font-size:36px; }
+      .kpi-feature { grid-column:1/-1; }
+      .bar { height:8px; margin-top:8px; }
+      .section, .section-2, .section-3, .general-split, .acc-grid { gap:12px; margin-top:12px; }
+
+      .usage-grid .card { min-height:auto; }
+      .usage-grid canvas { height:190px !important; max-height:200px; }
+      .pie-card canvas { min-height:210px; max-height:230px; }
+      canvas { max-height:240px; }
+      .pay-grid, .metric-strip, .club-print-foot { grid-template-columns:1fr; }
+      .visual-summary { grid-template-columns:1fr 1fr; gap:8px; }
+      .visual-card, .visual-card.feature { grid-column:span 1; min-height:136px; }
+      .visual-card { min-height:136px; padding:13px 12px; gap:7px; }
+      .visual-card .visual-title { font-size:12px; }
+      .visual-card .visual-value, .visual-card.feature .visual-value { font-size:19px; }
+      .visual-card .visual-footer { align-items:flex-start; flex-direction:column; gap:4px; }
+      .visual-card .visual-sub, .visual-card .visual-period-trend { max-width:100%; }
+      .day-compare-grid { grid-template-columns:1fr; gap:8px; }
+      .uby-dashboard-heading { align-items:flex-start; flex-direction:column; gap:4px; }
+      .uby-dashboard-heading small { text-align:left; }
+      .uby-panel-head { padding:15px 14px 12px; }
+      .uby-panel-metric { min-height:100px; padding:13px; }
+      .uby-panel-metric .value { font-size:21px; }
+      .day-kpi-card { min-height:138px; padding:12px; gap:7px; }
+      .day-kpi-card strong { font-size:20px; }
+      .day-kpi-card .day-footer { align-items:flex-end; flex-direction:row; gap:8px; }
+      .day-kpi-card .day-footer > small { max-width:58%; min-height:0; }
+      .day-kpi-card .trend-badge { max-width:42%; width:max-content; padding:4px 6px; }
+      .day-kpi-card .trend-badge strong { font-size:9px; }
+      .weekday-bar { grid-template-columns:38px 1fr 82px; gap:8px; }
+      .metric-mini { min-height:auto; }
+      .metric-line { grid-template-columns:1fr auto; gap:6px; }
+      .metric-line strong { grid-column:1/-1; }
+
+      .unit-card { padding:12px; gap:8px; }
+      .unit-card strong { font-size:13px; }
+      .unit-card .unit-value { font-size:16px; }
+      .unit-actions, .unit-actions .btn-open { width:100%; }
+      .btn-open { min-height:40px; padding:9px 12px; }
+      .action-row { grid-template-columns:1fr; gap:8px; padding:12px; }
+      .action-row b { justify-self:start; }
+
+      .club-print-panel { padding:14px; border-radius:10px; }
+      .club-print-title { font-size:20px; }
+      .club-podium { gap:12px; }
+      .podium-content { padding:14px; }
+      .podium-medal { font-size:32px; margin:4px 0 8px; }
+      .podium-name { min-height:0; font-size:16px; }
+      .podium-points { font-size:24px; }
+      .partner-form-grid { grid-template-columns:1fr 1fr; }
+      .partner-field.wide, .partner-field.full { grid-column:1/-1; }
+      .partner-table-actions { flex-direction:column; }
+
+      .calendar-grid { grid-template-columns:1fr; gap:8px; }
+      .calendar-head { display:none; }
+      .calendar-day { min-height:auto; }
+
+      table { font-size:12px; }
+      div[style*="overflow-x:auto"] table { min-width:680px; }
+      th, td { padding:8px; }
+      .card > table td:first-child { width:56%; }
+      .card > div[style*="overflow-x:auto"] { margin-left:-6px; margin-right:-6px; padding:0 6px 6px; }
+      .empty-state { padding:44px 12px; }
+      .finance-basis-grid,.finance-results:not(.finance-result-stages),.uby-finance-summary,.finance-month-status-grid { grid-template-columns:1fr 1fr; gap:8px; }
+      .finance-result-stage { padding:11px; }
+      .finance-result-stage-grid { grid-template-columns:1fr 1fr; gap:8px; }
+      .finance-result-stage-head { align-items:flex-start; flex-direction:column; gap:3px; }
+      .finance-result-stage-head p { text-align:left; }
+      .finance-result-card.is-primary { grid-column:span 2; min-height:126px; }
+      .finance-result-card.is-primary strong { font-size:26px; }
+      .finance-section-head .btn-recalc { width:auto; }
+      .finance-month-actions { width:100%; }
+      .finance-month-actions .btn-recalc { flex:1 1 160px; }
+      .finance-flow-nav { display:grid; grid-template-columns:1fr 1fr; }
+      .finance-flow-nav a { min-width:0; }
+      .finance-command-center { position:relative; top:auto; padding:12px; }
+      .finance-command-grid { grid-template-columns:1fr 1fr; }
+      .finance-command-field:first-child,.finance-command-actions { grid-column:1/-1; }
+      .finance-command-summary { grid-template-columns:1fr 1fr; }
+      .report-library-card { grid-template-columns:1fr 1fr; }
+      .report-library-main,.report-library-actions { grid-column:1/-1; }
+      .report-library-actions { justify-content:flex-start; }
+      .station-layout-grid { grid-template-columns:1fr 1fr; }
+      .station-layout-dialog { width:calc(100vw - 18px); }
+      .station-layout-body,.station-layout-head { padding-left:14px; padding-right:14px; }
+      .station-weekdays { grid-template-columns:repeat(4,minmax(0,1fr)); }
+      .station-occupancy-row,.station-schedule-row { grid-template-columns:1fr auto; gap:8px; }
+      .station-occupancy-meta { grid-column:1/-1; }
+      .finance-result-card { min-height:112px; padding:12px; }
+      .finance-central-summary,.finance-central-allocation { grid-template-columns:1fr 1fr; gap:8px; }
+      .finance-settlement-kpis { grid-template-columns:1fr 1fr; gap:8px; }
+      .finance-result-card strong { font-size:20px; }
+      .uby-finance-row { grid-template-columns:1fr 1fr; gap:9px; padding:12px; }
+    }
+    #generalFinanceSection { grid-template-columns: 1fr; }
+    #generalFinanceSection > .card { grid-column: 1 / -1; }
+    .finance-group-row th {
+      padding: 18px 12px 9px;
+      color: #57B7FF;
+      background: transparent;
+      border-bottom: 2px solid #294566;
+      font-size: 13px;
+      letter-spacing: 0;
+      text-transform: none;
+      text-align: left;
+    }
+    .finance-total-row td {
+      color: #EAF4FF;
+      font-weight: 800;
+      background: rgba(87,183,255,.06);
+    }
+  </style>
+</head>
+<body>
+<main class="wrap page">
+
+  <div class="tabs-bar" id="tabsBar" style="display:none">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('uby',this)">UBY</button>
+      <button class="tab" onclick="switchTab('geral',this)">Geral</button>
+      <button class="tab" onclick="switchTab('clientes',this)">Clientes</button>
+      <button class="tab" onclick="switchTab('clube',this)">Clube UBY</button>
+      <button class="tab" type="button" onclick="location.href='financeiro.html'">Financeiro UBY</button>
+      <button class="tab" onclick="openUbyReports(this)">Relatorios</button>
+    </div>
+    <div class="controls" id="ctrlGeral">
+      <span id="generalSourceLabel">Escolha uma estação abaixo para abrir o relatório detalhado</span>
+      <span style="margin-left:8px">Visão:</span>
+      <select class="ctl-select" id="generalViewMode" onchange="handleGeneralViewModeChange()">
+        <option value="month">Mês atual</option>
+        <option value="accumulated">Acumulado</option>
+      </select>
+      <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar geral</button>
+    </div>
+    <div class="controls" id="ctrlFinanceiroGeral" style="display:none">
+      <span>Consolidado financeiro das bases salvas</span>
+      <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar financeiro</button>
+    </div>
+    <div class="controls" id="ctrlClube" style="display:none">
+      <span>Competição:</span>
+      <select class="ctl-select" id="clubMonthSelector" onchange="handleClubMonthChange()" aria-label="Mês da competição Clube UBY"></select>
+      <span>Ranking por pontos: R$ 1 gasto = 1 ponto</span>
+      <button class="btn-recalc" onclick="refreshGeneralRechargeBases(true)">Atualizar clube</button>
+      <button class="btn-recalc" onclick="syncClubParticipantsFromSheet()">Sincronizar formulario</button>
+      <button class="btn-recalc" onclick="document.getElementById('clubParticipantFileInput').click()">Importar CSV/Excel</button>
+      <button class="btn-recalc" onclick="configureClubFormEndpoint()">Configurar endpoint</button>
+      <a class="btn-recalc" href="https://docs.google.com/forms/d/1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM/edit#responses" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Abrir Forms</a>
+      <button class="btn-recalc" onclick="window.print()">Imprimir ranking</button>
+      <button class="btn-recalc" onclick="copyClubWinnerNotice()">Copiar aviso aos vencedores</button>
+      <input type="file" id="clubParticipantFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" multiple style="display:none" onchange="handleClubParticipantFiles(Array.from(this.files)); this.value=''">
+    </div>
+    <div class="controls" id="ctrlClientes" style="display:none">
+      <span id="customerRegistryStatus">Base geral de motoristas</span>
+      <button class="btn-recalc" onclick="document.getElementById('customerRegistryFileInput').click()">Importar CSV/Excel</button>
+      <input type="file" id="customerRegistryFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" multiple style="display:none" onchange="handleCustomerRegistryFiles(Array.from(this.files)); this.value=''">
+    </div>
+  </div>
+
+  <div class="tabs-bar" id="workReportTabs" style="display:none">
+    <div class="tabs">
+      <button class="tab report-tab active" onclick="switchTab('mensal',this)">📅 Mensal</button>
+      <button class="tab report-tab"        onclick="switchTab('acumulado',this)">📈 Acumulado</button>
+      <button class="tab report-tab"        onclick="switchTab('financeiro',this)">Financeiro</button>
+      <button class="tab report-tab"        onclick="switchTab('detalhes',this)">📋 Detalhes</button>
+    </div>
+    <div class="controls" id="ctrlMensal">
+      <span>Mês:</span>
+      <select class="ctl-select" id="monthSelector" onchange="renderMensal()"></select>
+      <button class="btn-recalc" onclick="closeSelectedMonth()">Fechar mes</button>
+      <span style="margin-left:8px">Visao:</span>
+      <select class="ctl-select" id="periodMode" onchange="renderAll()">
+        <option value="mtd">Mes ate a planilha</option>
+        <option value="1">Ultimo 1 dia</option>
+        <option value="3">Ultimos 3 dias</option>
+        <option value="7">Ultimos 7 dias</option>
+        <option value="15">Ultimos 15 dias</option>
+        <option value="30">Ultimos 30 dias</option>
+        <option value="closed">Mes fechado</option>
+      </select>
+      <span style="margin-left:8px">Potência operacional:</span>
+      <input  class="ctl-input"  id="chargerPower" type="number" value="7" min="1" max="360" step="0.1" onchange="saveOperationalPowerFromInputs(this.value)">
+      <span>kW</span>
+      <button class="btn-recalc" onclick="saveOperationalPowerFromInputs()">↺ Salvar e recalcular</button>
+    </div>
+    <div class="controls" id="ctrlAcc" style="display:none">
+      <span>Potência operacional:</span>
+      <input  class="ctl-input"  id="chargerPowerAcc" type="number" value="7" min="1" max="360" step="0.1" onchange="saveOperationalPowerFromInputs(this.value)">
+      <span>kW</span>
+      <button class="btn-recalc" onclick="saveOperationalPowerFromInputs()">↺ Salvar e recalcular</button>
+    </div>
+    <div class="controls" id="ctrlFinanceiro" style="display:none">
+      <span>Financeiro mensal com salvamento automatico e historico de fechamentos.</span>
+    </div>
+  </div>
+
+  <div class="project-bar">
+    <div class="project-field">
+      <label>Projeto / obra da base de recargas</label>
+      <select id="workSelector"></select>
+    </div>
+    <div class="project-field">
+      <label>Mês da planilha</label>
+      <input id="importMonth" type="month">
+    </div>
+    <div class="project-field">
+      <label>Modo de importação</label>
+      <select id="importMode">
+        <option value="merge">Consolidar no mês</option>
+        <option value="replace">Substituir mês completo</option>
+      </select>
+    </div>
+    <div>
+      <div class="project-state" id="storageState">Escolha a obra antes de anexar a planilha.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button type="button" class="btn-danger" id="undoLastImportBtn" style="display:none">Desfazer última planilha</button>
+        <button type="button" class="btn-danger" id="clearSelectedMonthBtn" style="display:none">Excluir mês selecionado</button>
+        <button type="button" class="btn-danger" id="clearRechargeBaseBtn" style="display:none">Excluir base salva desta obra</button>
+        <button type="button" class="btn-recalc" id="openBackupHistoryBtn">Histórico de backups</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       UPLOAD ZONE
+  ════════════════════════════════════════ -->
+  <label class="upload-zone" id="uploadZone">
+    <span class="up-icon">📂</span>
+    <p>Arraste a planilha <strong>.xlsx, .xls ou .csv</strong> exportada da plataforma ou <strong>clique para selecionar</strong></p>
+    <p class="up-hint" style="font-size:11px;color:#4a6058;margin-top:3px">
+      Use consolidar para somar vários carregadores no mesmo mês. Use substituir quando a planilha já for o fechamento completo.
+    </p>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,text/csv,application/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple>
+    <div class="file-chips" id="fileChips"></div>
+    <div id="uploadFeedback"></div>
+  </label>
+
+  <!-- ════════════════════════════════════════
+       EMPTY STATE
+  ════════════════════════════════════════ -->
+  <div id="emptyState" class="empty-state">
+    <div class="ei">⚡</div>
+    <p style="font-size:15px;font-weight:600;color:var(--p3-text);margin:0 0 8px">Nenhuma planilha carregada</p>
+    <p style="font-size:13px">Arraste o arquivo .xlsx exportado da plataforma para visualizar o painel</p>
+  </div>
+
+  <div id="tabGeral" style="display:none">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt="UBY"></div>
+          <div>
+            <div class="brand-name">UBY Recharge</div>
+            <div class="brand-tag">Todas as unidades</div>
+          </div>
+        </div>
+        <h1>Painel Geral de Recargas</h1>
+        <div class="meta" id="generalHeroMeta">Consolidado das bases salvas por unidade.</div>
+      </div>
+      <div class="formula" id="generalHeroFormula">Atualize as bases individuais para refletir o painel geral.</div>
+    </section>
+
+    <section class="day-compare-grid" id="usageGeneralDayCompare"></section>
+
+    <section class="visual-summary" id="generalVisualSummary"></section>
+
+    <section class="grid kpis" id="kpiGeneral"></section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Ranking de unidades</h2>
+        <div class="unit-rank" id="generalUnitRank"></div>
+      </div>
+      <div class="card">
+        <h2>Evolucao mensal geral</h2>
+        <p class="note" style="margin:-4px 0 14px">Barras: receita em R$ (eixo esquerdo) · Linha: energia em kWh (eixo direito).</p>
+        <canvas id="chartGeneralMonth" class="monthly-comparison-chart" aria-label="Evolucao mensal geral"></canvas>
+      </div>
+    </section>
+
+    <section class="section weekday-report" id="usageGeneralWeekdayReport"></section>
+
+    <section class="decision-grid" id="generalDecisionCockpit"></section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Unidades em crescimento</h2>
+        <div class="sub" style="margin:-8px 0 12px">Comparação: últimos 7 dias vs 7 dias anteriores</div>
+        <div class="action-list" id="generalGrowthRank"></div>
+      </div>
+      <div class="card">
+        <h2>Alertas de ação</h2>
+        <div class="action-list" id="generalActionRank"></div>
+      </div>
+    </section>
+
+    <section class="general-split">
+      <div class="card">
+        <h2>Receita por unidade</h2>
+        <canvas id="chartGeneralRevenueUnit" aria-label="Receita por unidade"></canvas>
+      </div>
+      <div class="card">
+        <h2>Energia por unidade</h2>
+        <canvas id="chartGeneralEnergyUnit" aria-label="Energia por unidade"></canvas>
+      </div>
+    </section>
+
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Receita diária do período</h2><canvas id="usageGeneralRevenueDaily"></canvas></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageGeneralDailyMetrics"></div></div>
+      <div class="card"><h2>Saúde operacional e erros</h2><div class="daily-metrics" id="usageGeneralOperationalHealth"></div></div>
+    </section>
+    <section class="section section-2 section-client-insights" style="margin-top:18px">
+      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics is-scrollable" id="usageGeneralNewClients"></div></div>
+      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics is-scrollable" id="usageGeneralAbsentClients"></div></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Inteligência UBY · leitura da rede</h2><div class="daily-metrics is-scrollable" id="usageGeneralNetworkIntelligence"></div></div>
+      <div class="card"><h2>Novos clientes e recorrência por mês</h2><div class="daily-metrics is-scrollable" id="usageGeneralClientCohorts"></div></div>
+    </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Calendário operacional</h2><div id="usageGeneralCalendar"></div></div>
+    </section>
+    <section class="section section-3 usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Recargas nos últimos 7 dias</h2><canvas id="usageGeneralCount7"></canvas></div>
+      <div class="card"><h2>Consumo nos últimos 7 dias (kWh)</h2><canvas id="usageGeneralEnergy7"></canvas></div>
+      <div class="card"><h2>Tempo de permanência</h2><canvas id="usageGeneralStayBuckets"></canvas></div>
+    </section>
+    <section class="section section-2 usage-grid" style="margin-top:18px">
+      <div class="card pie-card"><h2>Cupons usados</h2><canvas id="usageGeneralCoupons"></canvas><div class="coupon-summary" id="usageGeneralCouponSummary"></div></div>
+      <div class="card pie-card"><h2>Receita por cupom</h2><canvas id="usageGeneralCouponRevenue"></canvas></div>
+    </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Horários mais populares</h2><canvas id="usageGeneralPopularHours"></canvas></div>
+      <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageGeneralIdleValueDaily"></canvas></div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Resumo por unidade</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Estação</th><th>Obra</th><th>Arquivos</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Total AC</th><th>Total DC</th><th>Carreg. AC</th><th>Carreg. DC</th><th>Ticket medio</th><th>Ultima recarga</th><th>Abrir</th></tr></thead>
+            <tbody id="generalUnitTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px;grid-template-columns:1fr">
+      <div class="card">
+        <h2>Horarios de funcionamento</h2>
+        <div class="sub" style="margin:-8px 0 12px">Defina os horarios realmente disponiveis de cada unidade. A ocupacao fica visivel no ranking acima.</div>
+        <div class="station-occupancy-list" id="generalStationOccupancy"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="tabClientes" style="display:none">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt="UBY"></div>
+          <div><div class="brand-name">Clientes UBY Recharge</div><div class="brand-tag">Cadastro consolidado de motoristas</div></div>
+        </div>
+        <h1>Base geral de clientes</h1>
+        <p id="customerRegistryHero">Importe a listagem de motoristas para iniciar a base.</p>
+      </div>
+      <div class="hero-formula">Novos arquivos atualizam os clientes existentes por e-mail ou telefone, sem somar novamente o acumulado.</div>
+    </section>
+    <section class="kpis" id="customerRegistryKpis"></section>
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="card-heading-row">
+          <div><h2>Motoristas cadastrados</h2><div class="club-form-status" id="customerRegistrySource">Nenhum arquivo importado.</div></div>
+          <div class="controls" style="display:flex">
+            <input class="ctl-input" id="customerRegistrySearch" type="search" placeholder="Buscar nome, e-mail ou telefone" oninput="renderCustomerRegistry()">
+            <select class="ctl-select" id="customerRegistrySort" onchange="renderCustomerRegistry()">
+              <option value="spent">Maior gasto</option><option value="energy">Maior kWh</option><option value="transactions">Mais transacoes</option><option value="name">Nome</option>
+            </select>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Cliente</th><th>Telefone</th><th>E-mail</th><th>Carregadores</th><th>Transacoes</th><th>kWh</th><th>Tempo de recarga</th><th>Total gasto</th></tr></thead>
+            <tbody id="customerRegistryTable"><tr><td colspan="8">Nenhum cliente importado.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="tabClube" style="display:none">
+    <img class="uby-official-banner" src="assets/brand/v2/header_clube_uby.png" alt="Clube UBY" loading="lazy" decoding="async">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt="UBY"></div>
+          <div>
+            <div class="brand-name">Clube UBY</div>
+            <div class="brand-tag">Fidelidade, premiações e parcerias</div>
+          </div>
+        </div>
+        <h1>Ranking mensal do Clube UBY</h1>
+        <p id="clubHeroMeta">Carregando ranking dos clientes...</p>
+      </div>
+      <div class="hero-formula" id="clubHeroFormula">
+        A competição vale somente para o mês selecionado. O acumulado fica como histórico.
+      </div>
+    </section>
+
+    <section class="kpis" id="clubKpis"></section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="club-form-head">
+          <div>
+            <h2>Controle de cupons e benefícios</h2>
+            <div class="club-form-status" id="clubCouponStatus">Base independente: importe quando receber a planilha do parceiro. Ela não é substituída pelas planilhas de faturamento.</div>
+          </div>
+          <div class="controls" style="display:flex">
+            <input class="ctl-input" id="clubCouponUpload" type="file" accept=".csv,.xlsx,.xls" multiple onchange="handleClubCouponFiles(this.files)">
+            <button class="btn-recalc" type="button" onclick="document.getElementById('clubCouponUpload').click()">Importar usos de cupons</button>
+          </div>
+        </div>
+        <section class="kpis" id="clubCouponKpis" style="margin-top:0"></section>
+        <div class="note" style="margin:12px 0 0"><strong>Como alimentar:</strong> importe a planilha de usos recebida do parceiro. Relatórios Spott com <em>Data, Usuário, Energia, Valor Final e Cupom</em> são aceitos. O cruzamento prioriza e-mail e telefone; quando o relatório tiver só Usuário, usa o nome como alternativa.</div>
+        <div style="overflow-x:auto;margin-top:14px">
+          <table>
+            <thead><tr><th>Cupom</th><th>Usos</th><th>Cruzados com Clube</th><th>Com recarga UBY no mês</th><th>Valor final com cupom</th><th>Desconto calculado</th><th>Faturamento UBY dos clientes cruzados</th></tr></thead>
+            <tbody id="clubCouponTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="club-print-panel" id="clubPrintPanel">
+      <div class="club-print-head">
+        <div>
+          <div class="club-print-title">Podio Clube UBY</div>
+          <div class="club-print-sub">Ranking mensal dos clientes da operação UBY para compartilhar no grupo</div>
+        </div>
+        <div class="club-print-meta" id="clubPrintMeta">Atualizando ranking...</div>
+      </div>
+      <div class="club-podium" id="clubPodium"></div>
+      <div class="club-print-rule">Critério do ranking mensal: somente recargas pagas no mês selecionado em carregadores marcados como UBY. Cada R$ 1 gasto gera 1 ponto no Clube UBY. Para receber prêmio, é obrigatório estar no grupo Clube UBY e ter o cadastro preenchido.</div>
+      <div class="club-print-foot">
+        <div><strong>Top 3</strong><br>30% de desconto em alinhamento e balanceamento.</div>
+        <div><strong>Todos do clube</strong><br>10% de desconto em todos os servicos da rede Muffatao Autocenter.</div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Premiações ativas</h2>
+        <div class="action-list" id="clubRewards"></div>
+      </div>
+      <div class="card">
+        <h2>Top 3 do clube</h2>
+        <div class="action-list" id="clubTop3"></div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="club-form-head">
+          <div>
+            <h2>Parceiros comerciais</h2>
+            <div class="club-form-status">Controle dos parceiros do Clube UBY, beneficios combinados, regras basicas e acompanhamento de usos.</div>
+          </div>
+          <button class="btn-recalc" onclick="resetClubPartnerForm()">Nova parceria</button>
+        </div>
+        <section class="kpis" id="clubPartnerKpis" style="margin-top:0"></section>
+        <div class="partner-form-grid">
+          <input type="hidden" id="partnerId">
+          <div class="partner-field">
+            <label>Parceiro</label>
+            <input class="ctl-input" id="partnerName" style="width:100%" placeholder="Muffatao Autocenter">
+          </div>
+          <div class="partner-field">
+            <label>Categoria</label>
+            <input class="ctl-input" id="partnerCategory" style="width:100%" placeholder="Auto center">
+          </div>
+          <div class="partner-field">
+            <label>Status</label>
+            <select class="ctl-select" id="partnerStatus">
+              <option value="active">Ativo</option>
+              <option value="prospect">Em negociacao</option>
+              <option value="paused">Pausado</option>
+            </select>
+          </div>
+          <div class="partner-field">
+            <label>Usos registrados</label>
+            <input class="ctl-input" id="partnerUsageCount" type="number" min="0" step="1" value="0" style="width:100%">
+          </div>
+          <div class="partner-field wide">
+            <label>Beneficio</label>
+            <textarea class="ctl-input" id="partnerBenefit" style="width:100%" placeholder="10% de desconto em todos os servicos"></textarea>
+          </div>
+          <div class="partner-field wide">
+            <label>Regra basica</label>
+            <textarea class="ctl-input" id="partnerRule" style="width:100%" placeholder="Valido para participantes do Clube UBY mediante comprovacao"></textarea>
+          </div>
+          <div class="partner-field">
+            <label>Cupom / codigo</label>
+            <input class="ctl-input" id="partnerCoupon" style="width:100%" placeholder="CLUBEUBY">
+          </div>
+          <div class="partner-field">
+            <label>Contato</label>
+            <input class="ctl-input" id="partnerContact" style="width:100%" placeholder="Nome / WhatsApp">
+          </div>
+          <div class="partner-field">
+            <label>Validade</label>
+            <input class="ctl-input" id="partnerValidity" style="width:100%" placeholder="Sem prazo">
+          </div>
+          <div class="partner-field">
+            <label>Prioridade</label>
+            <select class="ctl-select" id="partnerPriority">
+              <option value="high">Alta</option>
+              <option value="medium">Media</option>
+              <option value="low">Baixa</option>
+            </select>
+          </div>
+          <div class="partner-field full">
+            <label>Observacoes de controle</label>
+            <textarea class="ctl-input" id="partnerNotes" style="width:100%" placeholder="Pendencias, combinados, materiais de divulgacao, data de revisao"></textarea>
+          </div>
+        </div>
+        <div class="partner-actions">
+          <button class="btn-recalc" onclick="saveClubPartner()">Salvar parceria</button>
+          <button class="btn-danger" onclick="resetClubPartnerForm()">Limpar campos</button>
+          <span class="club-form-status" id="clubPartnerStatus">Alteracoes ficam salvas automaticamente neste navegador.</span>
+        </div>
+        <div style="overflow-x:auto;margin-top:16px">
+          <table>
+            <thead><tr><th>Parceiro</th><th>Status</th><th>Beneficio</th><th>Regra</th><th>Cupom</th><th>Usos</th><th>Contato</th><th>Validade</th><th>Acoes</th></tr></thead>
+            <tbody id="clubPartnerTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="club-form-head">
+          <div>
+            <h2>Participantes cadastrados no formulario</h2>
+            <div class="club-form-status" id="clubParticipantsStatus">Use a sincronizacao da planilha ou importe o CSV/Excel das respostas.</div>
+          </div>
+          <span class="club-status-pill muted" id="clubParticipantsSource">Fonte: formulario</span>
+        </div>
+        <section class="kpis" id="clubParticipantsKpis" style="margin-top:0"></section>
+        <div style="overflow-x:auto;margin-top:14px">
+          <table>
+            <thead><tr><th>Nome</th><th>WhatsApp</th><th>E-mail</th><th>Veiculo</th><th>Placa</th><th>Status</th><th>Pontos</th><th>Faturamento</th><th>Beneficio desejado</th><th>Cadastro</th></tr></thead>
+            <tbody id="clubParticipantsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Ranking de clientes</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Posição</th><th>Cliente</th><th>Cadastro</th><th>Telefone</th><th>E-mail</th><th>Veículo</th><th>Pontos no mês</th><th>Faturamento no mês</th><th>kWh no mês</th><th>Recargas no mês</th><th>Pontos acumulados</th><th>Faturamento acumulado</th><th>Última recarga</th><th>Benefício</th></tr></thead>
+            <tbody id="clubRankingTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB: MENSAL
+  ════════════════════════════════════════ -->
+  <div id="tabUby" style="display:none">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt="UBY"></div>
+          <div>
+            <div class="brand-name">UBY Recharge</div>
+            <div class="brand-tag">Operacao propria UBY</div>
+          </div>
+        </div>
+        <h1>Painel UBY</h1>
+        <div class="meta" id="ubyHeroMeta">Carregadores marcados como operacao UBY. Por padrao, DC entra automaticamente.</div>
+      </div>
+      <div class="formula" id="ubyHeroFormula">Use o check para incluir ou retirar carregadores especificos da operacao UBY.</div>
+    </section>
+
+    <div class="uby-dashboard-heading"><span>Resultado diário da rede</span><small>leitura do último dia com movimento</small></div>
+    <section class="day-compare-grid" id="usageUbyDayCompare"></section>
+
+    <section class="uby-metrics-dashboard" id="kpiUby"></section>
+
+    <section class="card dc-comparison-card" aria-labelledby="dcComparisonTitle">
+      <div class="dc-comparison-head">
+        <div>
+          <h2 id="dcComparisonTitle" style="margin:0">Comparativo DC por carregador</h2>
+          <p class="note" style="margin:6px 0 0">Leitura da operação própria UBY. Compare desempenho e ocupação sem misturar AC ou parceiros.</p>
+        </div>
+        <span id="dcComparisonPeriod" style="color:var(--p3-muted);font-size:12px"></span>
+      </div>
+      <div class="dc-comparison-controls">
+        <label>Período
+          <select id="dcComparisonPeriodSelect" onchange="applyDcComparisonControls()"></select>
+        </label>
+        <div class="dc-comparison-selector-list" id="dcComparisonSelectorList"></div>
+        <div style="display:flex;gap:7px">
+          <button class="btn-recalc" type="button" onclick="setAllDcComparisonSelection(true)">Todos</button>
+          <button class="btn-danger" type="button" onclick="setAllDcComparisonSelection(false)">Limpar</button>
+        </div>
+      </div>
+      <div class="dc-comparison-charts">
+        <div class="dc-comparison-chart"><h3>Faturamento</h3><canvas id="chartDcComparisonRevenue" aria-label="Comparativo de faturamento dos carregadores DC"></canvas></div>
+        <div class="dc-comparison-chart"><h3>Ocupação</h3><canvas id="chartDcComparisonOccupancy" aria-label="Comparativo de ocupação dos carregadores DC"></canvas></div>
+        <div class="dc-comparison-chart"><h3>Energia entregue</h3><canvas id="chartDcComparisonEnergy" aria-label="Comparativo de energia entregue dos carregadores DC"></canvas></div>
+      </div>
+      <div class="dc-comparison-table-wrap">
+        <table class="dc-comparison-table">
+          <thead><tr><th>Carregador DC</th><th>Faturamento</th><th>Ocupação</th><th>Disponibilidade real</th><th>Energia</th><th>Recargas</th><th>Clientes</th><th>Ticket médio</th><th>kWh / recarga</th><th>Falhas</th></tr></thead>
+          <tbody id="dcComparisonTable"></tbody>
+        </table>
+      </div>
+      <div class="dc-daily-comparison">
+        <h3>Faturamento diário por carregador DC</h3>
+        <p class="note" style="margin:8px 0 0">Cada linha representa um carregador DC próprio UBY. Assim, fica visível a evolução diária e a diferença de receita entre eles.</p>
+        <canvas id="chartDcComparisonDailyRevenue" aria-label="Comparativo diário de faturamento entre carregadores DC"></canvas>
+      </div>
+    </section>
+
+    <section class="section uby-access-section" style="margin-top:18px">
+      <div class="card">
+        <h2>Acessar unidades UBY</h2>
+        <div class="unit-rank" id="ubyUnitRank"></div>
+      </div>
+      <div class="card">
+        <h2>Evolucao mensal UBY</h2>
+        <p class="note" style="margin:-4px 0 14px">Barras: receita em R$ (eixo esquerdo) · Linha: energia em kWh (eixo direito).</p>
+        <canvas id="chartUbyMonth" class="monthly-comparison-chart" aria-label="Evolucao mensal UBY"></canvas>
+      </div>
+    </section>
+
+    <section class="card finance-workbench" id="ubyFinanceOverview">
+      <div class="finance-section-head">
+        <div>
+          <h2>Resultado financeiro por carregador UBY</h2>
+          <p>Leitura operacional por carregador: receitas, energia, plataforma e custos diretos. Custos corporativos aparecem separadamente como atribuição da matriz, sem substituir a eficiência do ponto.</p>
+        </div>
+        <span class="accountability-pill" id="ubyFinancePeriodLabel">Periodo atual</span>
+      </div>
+      <div class="uby-finance-summary" id="ubyFinanceSummary"></div>
+      <div class="uby-finance-list" id="ubyFinanceRows"></div>
+      <div id="costTree" style="margin-top:16px"></div>
+    </section>
+
+    <section class="section"><div id="ubyDistribution"></div></section>
+
+    <section class="section">
+      <div class="card finance-central-command">
+        <div class="finance-central-head">
+          <div>
+          <h2 style="margin:0">Central financeira · matriz e compromissos</h2>
+          <p>Cadastre cada compromisso uma única vez, escolha seus destinos e acompanhe o impacto em cada carregador — sem misturar a operação do ponto com a governança corporativa.</p>
+          </div>
+          <span class="finance-central-tag">Centralizada e auditável</span>
+          <span id="matrizMonthLabel" style="color:var(--p3-muted);font-size:12px"></span>
+        </div>
+        <div id="matrizCentralSummary" class="finance-central-summary" aria-live="polite"></div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Despesa</th><th>Competencia</th><th>Rateio e destinos</th><th style="text-align:right">Valor desta competencia</th><th style="text-align:right">Acao</th></tr></thead>
+            <tbody id="matrizCostList"></tbody>
+            <tfoot id="matrizCostFoot"></tfoot>
+          </table>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:16px">
+          <label class="sub">NOME DO CUSTO<input id="matrizNewName" type="text" placeholder="Ex.: Seguro carregadores" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">CATEGORIA<select id="matrizCostCategory" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option>Seguro</option><option>Locacao / aluguel</option><option>Internet / dados</option><option>Manutencao preventiva</option><option>Manutencao corretiva</option><option>Licenca / plataforma</option><option>Tributos corporativos / centralizados</option><option>Marketing</option><option>Administrativo</option><option>Outros custos</option></select></label>
+          <label class="sub">FORNECEDOR OU DOCUMENTO<input id="matrizCostSupplier" type="text" placeholder="Ex.: Seguradora / boleto" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">TIPO DE COBRANCA<select id="matrizCostKind" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="recurring">Recorrente mensal</option><option value="installment">Parcelado</option><option value="one_off">Pontual</option></select></label>
+          <label class="sub">VALOR DE CADA PARCELA (R$)<input id="matrizNewValue" type="number" step="0.01" min="0" placeholder="Ex.: 526,24" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">NUMERO DE PARCELAS<input id="matrizCostInstallments" type="number" min="1" step="1" value="1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">MES INICIAL<input id="matrizCostStartMonth" type="month" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">MES FINAL (OPCIONAL)<input id="matrizCostEndMonth" type="month" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">DIA DE VENCIMENTO<input id="matrizCostDueDay" type="number" min="1" max="31" value="1" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></label>
+          <label class="sub">CRITERIO DE RATEIO<select id="matrizCostMethod" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><option value="equal">Rateio igual</option><option value="power">Por potencia instalada</option><option value="energy">Por kWh vendido</option><option value="revenue">Por faturamento</option><option value="custom">Participacao definida</option></select></label>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(260px,1fr) minmax(220px,1fr);gap:10px;margin-top:10px">
+          <label class="sub">Carregadores de destino (pode selecionar mais de um)<select id="matrizCostTargets" multiple size="5" style="display:block;width:100%;margin-top:5px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:8px;font:inherit"></select></label>
+          <div><input id="matrizCostCustomShares" type="text" placeholder="Participacoes: 50, 30, 20" style="width:100%;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><div class="sub" style="margin-top:6px">Use participacao definida somente se quiser percentuais personalizados na mesma ordem dos destinos. Nos outros metodos este campo e ignorado.</div><input id="matrizCostDocument" type="text" placeholder="Referencia do boleto ou documento" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"><input id="matrizCostNotes" type="text" placeholder="Observacao" style="width:100%;margin-top:10px;background:var(--p3-card-soft);border:1px solid var(--p3-border);color:var(--p3-text);border-radius:8px;padding:9px 12px;font:inherit"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+          <button id="matrizSaveButton" class="btn-open" type="button" onclick="addMatrizCost()">Adicionar custo</button>
+          <button class="btn-open" type="button" onclick="resetMatrizCostForm();renderMatrizCosts(getGeneralUnitData())">Limpar</button>
+          <span id="matrizFeedback" class="sub"></span>
+        </div>
+        <div id="matrizRateio" style="margin-top:14px"></div>
+      </div>
+    </section>
+
+    <section class="section weekday-report" id="usageUbyWeekdayReport"></section>
+
+    <section class="decision-grid" id="ubyDecisionCockpit"></section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Unidades UBY em crescimento</h2>
+        <div class="sub" style="margin:-8px 0 12px">Comparacao: ultimos 7 dias vs 7 dias anteriores</div>
+        <div class="action-list" id="ubyGrowthRank"></div>
+      </div>
+      <div class="card">
+        <h2>Alertas da operacao UBY</h2>
+        <div class="action-list" id="ubyActionRank"></div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card">
+        <h2>Receita UBY por unidade</h2>
+        <canvas id="chartUbyRevenueUnit"></canvas>
+      </div>
+      <div class="card">
+        <h2>Energia UBY por unidade</h2>
+        <canvas id="chartUbyEnergyUnit"></canvas>
+      </div>
+    </section>
+
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Receita diaria UBY</h2><canvas id="usageUbyRevenueDaily"></canvas></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Metricas dia a dia</h2><div class="daily-metrics" id="usageUbyDailyMetrics"></div></div>
+      <div class="card"><h2>Saude operacional e erros</h2><div class="daily-metrics" id="usageUbyOperationalHealth"></div></div>
+    </section>
+    <section class="section section-2 section-client-insights" style="margin-top:18px">
+      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics is-scrollable" id="usageUbyNewClients"></div></div>
+      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics is-scrollable" id="usageUbyAbsentClients"></div></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Inteligência UBY · leitura da rede</h2><div class="daily-metrics is-scrollable" id="usageUbyNetworkIntelligence"></div></div>
+      <div class="card"><h2>Novos clientes e recorrência por mês</h2><div class="daily-metrics is-scrollable" id="usageUbyClientCohorts"></div></div>
+    </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Calendario operacional UBY</h2><div id="usageUbyCalendar"></div></div>
+    </section>
+    <section class="section section-3 usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Recargas nos ultimos 7 dias</h2><canvas id="usageUbyCount7"></canvas></div>
+      <div class="card"><h2>Consumo nos ultimos 7 dias (kWh)</h2><canvas id="usageUbyEnergy7"></canvas></div>
+      <div class="card"><h2>Tempo de permanencia</h2><canvas id="usageUbyStayBuckets"></canvas></div>
+    </section>
+    <section class="section section-2 usage-grid" style="margin-top:18px">
+      <div class="card pie-card"><h2>Cupons usados</h2><canvas id="usageUbyCoupons"></canvas><div class="coupon-summary" id="usageUbyCouponSummary"></div></div>
+      <div class="card pie-card"><h2>Receita por cupom</h2><canvas id="usageUbyCouponRevenue"></canvas></div>
+    </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Horarios mais populares</h2><canvas id="usageUbyPopularHours"></canvas></div>
+      <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageUbyIdleValueDaily"></canvas></div>
+    </section>
+
+    <section class="section" id="ubyReportsSection" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Classificacao dos carregadores</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>UBY</th><th>Unidade</th><th>Carregador</th><th>Tipo</th><th>Recargas</th><th>kWh</th><th>Receita</th><th>Origem da regra</th><th>Abrir</th></tr></thead>
+            <tbody id="ubyChargerTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="accountability-head">
+          <div>
+            <h2>Prestacao de contas dos pontos UBY</h2>
+            <p>Fechamento mensal por parceiro de area com custo de energia, participacao da area e ajustes extras. O primeiro periodo considera a data real de inicio da operacao; os seguintes vao do dia 1 ao ultimo dia do mes.</p>
+          </div>
+          <div class="finance-command-actions">
+            <span class="accountability-pill">Fechamento no ultimo dia do mes</span>
+            <select class="ctl-select" id="ubyInvestorMonthSelector" aria-label="Competencia do relatorio de investidores" onchange="renderUbyOperation()"></select>
+            <button class="btn-recalc" type="button" onclick="saveCurrentUbyInvestorReport('partial')">Salvar parcial investidores</button>
+            <button class="btn-recalc" type="button" onclick="generateUbyInvestorReportPdf()">PDF investidores</button>
+          </div>
+        </div>
+        <div class="accountability-grid" id="ubyPartnerReports"></div>
+        <div class="accountability-note" id="ubyInvestorPreview"></div>
+        <div class="report-library-toolbar">
+          <div>
+            <span class="finance-step-kicker">Biblioteca permanente</span>
+            <h2 style="margin:0;border:0;padding:0">Fechamentos anteriores</h2>
+            <p>Consulte os relatorios fechados e os parciais de todas as unidades UBY.</p>
+          </div>
+          <div class="report-library-filters">
+            <select class="ctl-select" id="ubyReportTypeFilter" onchange="renderUbyPartnerReportLibrary()"><option value="">Todos os relatorios</option><option value="partner_area">Dono da area</option><option value="investor">Investidores</option></select>
+            <select class="ctl-select" id="ubyReportUnitFilter" onchange="renderUbyPartnerReportLibrary()"><option value="">Todas as unidades</option></select>
+            <select class="ctl-select" id="ubyReportStatusFilter" onchange="renderUbyPartnerReportLibrary()"><option value="">Todos</option><option value="closed">Fechados</option><option value="partial">Parciais</option></select>
+          </div>
+        </div>
+        <div class="report-library" id="ubyPartnerReportLibrary"><div class="report-library-empty">Carregando historico financeiro...</div></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="tabFinanceiroGeral" style="display:none">
+    <section class="hero general-hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt="UBY"></div>
+          <div>
+            <div class="brand-name">UBY Recharge</div>
+            <div class="brand-tag">P3 gestao, UBY ativos e investidores</div>
+          </div>
+        </div>
+        <h1>Financeiro UBY</h1>
+        <div class="meta" id="generalFinanceHeroMeta">Central financeira das unidades, ativos UBY, gestao P3 e investidores.</div>
+      </div>
+      <div class="formula" id="generalFinanceHeroFormula">A P3 cobra gestao sobre o faturamento; a UBY recebe o resultado operacional dos carregadores e repassa aos investidores conforme cotas.</div>
+    </section>
+
+    <div class="finance-flow-nav" style="margin:18px 0 0" aria-label="Visões do financeiro UBY">
+      <button class="btn-recalc active" type="button" data-general-finance-view="summary" onclick="showGeneralFinanceView('summary',this)">Resumo financeiro</button>
+      <button class="btn-recalc" type="button" data-general-finance-view="payments" onclick="showGeneralFinanceView('payments',this)">Pagamentos programados</button>
+    </div>
+
+    <div id="generalFinanceSummary">
+    <section class="finance-overview-grid" id="generalFinanceOverview"></section>
+
+    <section class="grid kpis" id="kpiGeneralFinance"></section>
+
+    <div id="ubyFinanceWorkspaceMount" aria-live="polite"></div>
+
+    <section class="section" id="generalFinanceSection" style="margin-top:18px">
+      <div class="card">
+        <h2>Financeiro consolidado</h2>
+        <table><tbody id="generalFinanceTable"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Financeiro por unidade</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Unidade</th><th>Modelo de faturamento</th><th>Faturamento</th><th>Custos da operacao</th><th>Gestao P3</th><th>Royalty UBY</th><th>Resultado P3</th><th>Resultado UBY</th><th>Parceiro/local</th><th>Payback</th><th>Abrir</th></tr></thead>
+            <tbody id="generalFinanceUnitTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    </div>
+
+    <div id="generalFinancePayments" style="display:none">
+      <section class="section" style="margin-top:18px">
+        <div class="card" id="scheduledPaymentsWorkspace" aria-live="polite"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="tabMensal" style="display:none">
+
+    <!-- Hero -->
+    <section class="hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt="UBY"></div>
+          <div>
+            <div class="brand-name">UBY Recharge</div>
+            <div class="brand-tag">Energia Solar &amp; Mobilidade Elétrica</div>
+          </div>
+        </div>
+        <h1>Painel de Recargas</h1>
+        <div class="meta" id="heroMeta">—</div>
+      </div>
+      <div class="formula" id="heroFormula">—</div>
+    </section>
+
+    <section class="day-compare-grid" id="usageDayCompare"></section>
+
+    <section class="visual-summary" id="monthlyVisualSummary"></section>
+
+    <section class="section" id="commercialOccupancyPanel" style="margin-top:18px"></section>
+
+    <!-- KPIs -->
+    <section class="grid kpis" id="kpiGrid"></section>
+
+    <section class="section weekday-report" id="weekdayOccupancyMensal"></section>
+
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Receita diária do período</h2><canvas id="usageRevenueDaily"></canvas></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Métricas dia a dia</h2><div class="daily-metrics" id="usageDailyMetrics"></div></div>
+      <div class="card"><h2>Saúde operacional e erros</h2><div class="daily-metrics" id="usageOperationalHealth"></div></div>
+    </section>
+    <section class="section section-2 section-client-insights" style="margin-top:18px">
+      <div class="card"><h2>Novos clientes</h2><div class="daily-metrics is-scrollable" id="usageNewClients"></div></div>
+      <div class="card"><h2>Clientes recorrentes ausentes</h2><div class="daily-metrics is-scrollable" id="usageAbsentClients"></div></div>
+    </section>
+    <section class="section" style="margin-top:18px">
+      <div class="card"><h2>Inteligência UBY · leitura da estação</h2><div class="daily-metrics is-scrollable" id="usageNetworkIntelligence"></div></div>
+      <div class="card"><h2>Novos clientes e recorrência por mês</h2><div class="daily-metrics is-scrollable" id="usageClientCohorts"></div></div>
+    </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1"><h2>Calendário operacional</h2><div id="usageCalendar"></div></div>
+    </section>
+    <section class="section section-3 usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Recargas nos últimos 7 dias</h2><canvas id="usageCount7"></canvas></div>
+      <div class="card"><h2>Consumo nos últimos 7 dias (kWh)</h2><canvas id="usageEnergy7"></canvas></div>
+      <div class="card"><h2>Tempo de permanência</h2><canvas id="usageStayBuckets"></canvas></div>
+    </section>
+    <section class="section section-2 usage-grid" style="margin-top:18px">
+      <div class="card pie-card"><h2>Cupons usados</h2><canvas id="usageCoupons"></canvas><div class="coupon-summary" id="usageCouponSummary"></div></div>
+      <div class="card pie-card"><h2>Receita por cupom</h2><canvas id="usageCouponRevenue"></canvas></div>
+    </section>
+    <section class="section usage-grid" style="margin-top:18px">
+      <div class="card"><h2>Horários mais populares</h2><canvas id="usagePopularHours"></canvas></div>
+      <div class="card"><h2>Valor de ociosidade por dia</h2><canvas id="usageIdleValueDaily"></canvas></div>
+    </section>
+
+    <!-- Pagamento | Clientes pizza -->
+    <section class="section" style="margin-top:18px">
+      <div class="card pie-card">
+        <h2>Forma de pagamento</h2>
+        <canvas id="paymentPie" aria-label="Forma de pagamento"></canvas>
+        <div class="pay-grid" id="payGrid"></div>
+      </div>
+      <div class="card pie-card">
+        <h2>Concentração por cliente</h2>
+        <canvas id="userPie" aria-label="Concentração por cliente"></canvas>
+      </div>
+    </section>
+
+    <!-- Mensal/acumulado | Base da análise -->
+    <section class="section">
+      <div class="card">
+        <h2>Mensal e acumulado</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Mês</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket médio</th><th>Ocup. até dia</th><th>Ocup. mês cheio</th></tr></thead>
+            <tbody id="monthlyTable"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Base da análise</h2>
+        <table><tbody id="baseTable"></tbody></table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card" style="grid-column:1/-1">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap">
+          <h2 style="margin:0;border:none;padding:0">Fechamento mensal salvo</h2>
+          <span id="monthClosingStatus" style="color:var(--p3-muted);font-size:12px"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Mes</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket medio</th><th>Primeira</th><th>Ultima</th><th>Fechado em</th></tr></thead>
+            <tbody id="monthClosingTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Clientes | Ociosidade -->
+    <section class="section">
+      <div class="card">
+        <h2>Clientes — receita e utilização</h2>
+        <div class="note" id="financialNote"></div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Cliente</th><th>Recargas</th><th>kWh</th><th>Receita / participação</th><th>R$/kWh medio</th><th>Última recarga</th></tr></thead>
+            <tbody id="clientsTable"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Alertas de ociosidade</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>ID</th><th>Cliente</th><th>Início</th><th>kWh</th><th>Receita</th><th>Ociosidade</th><th>Valor</th></tr></thead>
+            <tbody id="idleTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Avaliações dos clientes</h2>
+        <div class="kpis" id="reviewKpis" style="margin-top:0"></div>
+        <div style="overflow-x:auto;margin-top:14px">
+          <table>
+            <thead><tr><th>Avaliação</th><th>Quantidade</th><th>Participação</th><th>Comentários</th></tr></thead>
+            <tbody id="reviewsTable"></tbody>
+          </table>
+        </div>
+        <div class="ai-insights" id="reviewAiInsights"></div>
+      </div>
+    </section>
+
+    <!-- Diagnóstico técnico -->
+    <section class="section tech-section">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Diagnóstico técnico e operacional</h2>
+        <table>
+          <thead><tr><th>Indicador</th><th>Valor</th><th>Leitura</th></tr></thead>
+          <tbody id="techTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card connector-report" id="dcConnectorPanel" style="margin-top:18px;display:none">
+      <div class="connector-report-head">
+        <div>
+          <span class="connector-report-kicker">Leitura por plug</span>
+          <h2>Resultado e diagnóstico por conector DC</h2>
+          <p id="monthlyConnectorHelp">A separação usa somente o conector informado na planilha da plataforma.</p>
+        </div>
+        <label class="connector-report-select">Conector
+          <select class="ctl-select" id="monthlyConnectorSelector" onchange="applyMonthlyConnectorFilter()"></select>
+        </label>
+      </div>
+      <div class="connector-summary" id="dcConnectorSummary"></div>
+      <div style="overflow-x:auto;margin-top:14px">
+        <table class="connector-report-table">
+          <thead><tr><th>Conector DC</th><th>Tentativas</th><th>Recargas concluídas</th><th>Disponibilidade real</th><th>Energia entregue</th><th>Faturamento</th><th>Clientes</th><th>Última recarga</th><th></th></tr></thead>
+          <tbody id="dcConnectorTable"></tbody>
+        </table>
+      </div>
+      <div class="connector-diagnostics" id="dcConnectorDiagnostics"></div>
+    </section>
+
+  </div><!-- /tabMensal -->
+
+  <!-- ════════════════════════════════════════
+       TAB: ACUMULADO
+  ════════════════════════════════════════ -->
+  <div id="tabAcumulado" style="display:none">
+
+    <section class="visual-summary" id="accVisualSummary"></section>
+
+    <section class="grid kpis" style="margin-top:0" id="kpiAcc"></section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Resultado financeiro acumulado</h2>
+        <p class="sub" style="margin:-4px 0 0">Consolida cada mes com os parametros financeiros que estavam vigentes naquele periodo.</p>
+        <div class="finance-results" id="accFinancialKpis"></div>
+      </div>
+    </section>
+
+    <section class="section" id="generalP3ManagementSection" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Faturamento de gestao P3 por mes</h2>
+        <p class="sub">Controle mensal das receitas de gestao da P3 e dos royalties destinados a UBY. A base respeita a configuracao financeira de cada competencia.</p>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Competencia</th><th>Gestao P3</th><th>Royalty UBY</th><th>Sociedade P3</th><th>Receita P3 total</th><th>Unidades</th></tr></thead>
+            <tbody id="generalP3ManagementTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div class="acc-grid">
+      <div class="card"><h2>Payback - resultado acumulado</h2>
+        <canvas id="chartPaybackAccumulated" aria-label="Payback com resultado acumulado"></canvas></div>
+      <div class="card"><h2>Resultado operacional acumulado</h2>
+        <canvas id="chartAccumulatedResult" aria-label="Resultado operacional acumulado"></canvas></div>
+    </div>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Memoria financeira por mes</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Mes</th><th>Receita total</th><th>Custos operacionais</th><th>Resultado do mes</th><th>Resultado acumulado</th><th>Recuperado no payback</th><th>Saldo a recuperar</th></tr></thead>
+            <tbody id="accFinancialTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section weekday-report" id="weekdayOccupancyAcc"></section>
+
+    <div class="acc-grid">
+      <div class="card"><h2>Receita mensal (R$)</h2>
+        <canvas id="chartRevMonth" aria-label="Receita mensal"></canvas></div>
+      <div class="card"><h2>Energia mensal (kWh)</h2>
+        <canvas id="chartEnergyMonth" aria-label="Energia mensal"></canvas></div>
+      <div class="card"><h2>% Ocupação mensal</h2>
+        <canvas id="chartOccMonth" aria-label="Ocupação mensal"></canvas></div>
+      <div class="card"><h2>Recargas por mês</h2>
+        <canvas id="chartCountMonth" aria-label="Recargas por mês"></canvas></div>
+    </div>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Histórico mensal completo</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Mês</th><th>Recargas</th><th>Clientes</th><th>kWh</th><th>Receita</th><th>Ticket médio</th><th>Ocup. até dia</th><th>Ocup. mês cheio</th></tr></thead>
+            <tbody id="accMonthTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="margin-top:18px">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Ranking de usuários — acumulado</h2>
+        <div class="user-bars" id="userBarsAcc"></div>
+      </div>
+    </section>
+
+  </div><!-- /tabAcumulado -->
+
+  <!-- ════════════════════════════════════════
+       TAB: DETALHES
+  ════════════════════════════════════════ -->
+  <div id="tabFinanceiro" style="display:none">
+    <section class="hero">
+      <div>
+        <div class="brand">
+          <div class="logo-mark"><img src="assets/brand/v2/09_sobre_midnight.png" alt="UBY"></div>
+          <div>
+            <div class="brand-name">UBY Recharge</div>
+            <div class="brand-tag">Painel financeiro por ponto</div>
+          </div>
+        </div>
+        <h1>Financeiro de Recargas</h1>
+        <div class="meta" id="financeHeroMeta">Configure percentuais e custos do ponto.</div>
+      </div>
+      <div class="formula" id="financeFormula">Resultado liquido = gestao P3, app terceiros, custos e modelo da operacao.</div>
+    </section>
+
+    <section class="finance-command-center" aria-label="Central financeira">
+      <div class="finance-command-grid">
+        <div class="finance-command-field"><label for="financeWorkSelector">Obra / ponto</label><select class="ctl-select" id="financeWorkSelector" onchange="handleFinanceWorkChange(this.value)"></select></div>
+        <div class="finance-command-field"><label for="financeMonthSelector">Competencia</label><select class="ctl-select" id="financeMonthSelector" onchange="handleFinanceMonthChange()"></select></div>
+        <div class="finance-command-field"><label for="financePanelSelector">Quadro exibido</label><select class="ctl-select" id="financePanelSelector" onchange="showFinancePanel(this.value)"><option value="overview">Resultado</option><option value="premises">Premissas</option><option value="revenue">Receitas</option><option value="cost">Custos</option><option value="reports">Relatorios</option><option value="all">Painel completo</option></select></div>
+        <div class="finance-command-actions"><button class="btn-recalc" type="button" onclick="confirmFinanceMonthValues()">Salvar competencia</button></div>
+      </div>
+      <div class="finance-command-summary" id="financeCommandSummary"></div>
+    </section>
+
+    <section class="finance-month-panel" id="financeMonthPanel" data-finance-panel="premises">
+      <div class="finance-month-head">
+        <div>
+          <span class="finance-step-kicker">Competencia financeira</span>
+          <h2>Valores versionados por mes</h2>
+          <p>O mes novo parte da ultima configuracao salva. Alteracoes ficam somente na competencia selecionada e os meses anteriores permanecem preservados.</p>
+        </div>
+        <div class="finance-month-actions">
+          <button class="btn-recalc" type="button" onclick="restoreFinancePreviousMonth()">Restaurar mes anterior</button>
+          <button class="btn-recalc" type="button" onclick="confirmFinanceMonthValues()">Manter valores deste mes</button>
+        </div>
+      </div>
+      <div class="finance-month-status-grid">
+        <div class="finance-month-status"><span>Competencia</span><strong id="financeVersionMonth">-</strong><small>mes usado em todos os calculos e relatorios</small></div>
+        <div class="finance-month-status"><span>Base dos valores</span><strong id="financeVersionSource">-</strong><small id="financeVersionSourceHelp">carregando configuracao</small></div>
+        <div class="finance-month-status" id="financeVersionStateCard"><span>Situacao</span><strong id="financeVersionState">-</strong><small id="financeVersionChanges">sem alteracoes pendentes</small></div>
+        <div class="finance-month-status good"><span>Salvamento</span><strong id="financeVersionSaved">Automatico</strong><small id="financeVersionSavedAt">banco e copia local</small></div>
+      </div>
+    </section>
+
+    <section class="card finance-workbench" id="financeMonthlyPremises" data-finance-panel="premises">
+      <div class="finance-section-head">
+        <div>
+          <span class="finance-step-kicker">1. Premissas do mes</span>
+          <h2>Variaveis financeiras e operacionais</h2>
+          <p>Gestao, plataforma, energia, participacoes e metas seguem o mesmo controle mensal dos demais custos. A coluna anterior deixa claro o que foi mantido ou alterado.</p>
+        </div>
+      </div>
+      <div class="finance-ledger-wrap">
+        <table class="finance-ledger finance-variables-ledger">
+          <thead><tr><th>Grupo</th><th>Variavel</th><th>Regra</th><th>Valor do mes</th><th>Mes anterior</th><th>Situacao</th></tr></thead>
+          <tbody>
+            <tr data-finance-setting-key="operationModel" data-finance-setting-format="model"><td class="setting-group">Operacao</td><td class="setting-name">Modelo de faturamento</td><td class="setting-rule">Define a titularidade do ativo e quem recebe o resultado. O parceiro com gestao P3 e royalty UBY fica fora dos custos e da distribuicao da matriz.</td><td class="setting-value"><select class="ctl-select" id="financeOperationModel" onchange="handleFinanceSettingChange()"><option value="uby">Ativo UBY - operacao e investidores UBY</option><option value="p3_society">Ativo P3 em parceria - lucro liquido dividido</option><option value="hybrid">Ativo UBY hibrido AC/DC</option><option value="management_only">Gestao P3 - ativo do parceiro, sem UBY</option><option value="third_party_management">Parceiro - gestao P3 + royalty UBY (fora da matriz)</option></select></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="managementPct" data-finance-setting-format="pct"><td class="setting-group">Gestao</td><td class="setting-name">Gestao P3</td><td class="setting-rule">Percentual sobre o faturamento total: recargas, ociosidade e demais receitas reconhecidas.</td><td class="setting-value"><input class="ctl-input" id="financeMgmtPct" type="number" min="0" max="100" step="0.1" value="5" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="third_party_management" data-finance-setting-key="ubyRoyaltyPct" data-finance-setting-format="pct"><td class="setting-group">Marca</td><td class="setting-name">Royalty de marca UBY</td><td class="setting-rule">Percentual sobre o faturamento, separado da gestao P3 e da plataforma</td><td class="setting-value"><input class="ctl-input" id="financeUbyRoyaltyPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="legacy_tax" data-finance-setting-key="taxRatePct" data-finance-setting-format="pct"><td class="setting-group">Tributacao</td><td class="setting-name">Tributo por carregador — histórico</td><td class="setting-rule">Configuração preservada apenas para competências já cadastradas. Novos tributos devem ser lançados na Central Financeira, com destinos e rateio definidos.</td><td class="setting-value"><input class="ctl-input" id="financeTaxRatePct" type="number" min="0" max="100" step="0.01" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>Centralizado</span></td></tr>
+            <tr class="finance-model-row" data-models="p3_society" data-finance-setting-key="p3SocietyPct" data-finance-setting-format="pct"><td class="setting-group">Sociedade</td><td class="setting-name">Participacao P3 na parceria</td><td class="setting-rule">Percentual do investimento e do lucro liquido. Use 100% se o ativo P3 nao tiver socio.</td><td class="setting-value"><input class="ctl-input" id="financeP3SocietyPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="hybrid" data-finance-setting-key="p3AcEquityPct" data-finance-setting-format="pct"><td class="setting-group">Sociedade</td><td class="setting-name">Sociedade P3 em AC</td><td class="setting-rule">Percentual aplicado a operacao AC</td><td class="setting-value"><input class="ctl-input" id="financeP3AcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="hybrid" data-finance-setting-key="p3DcEquityPct" data-finance-setting-format="pct"><td class="setting-group">Sociedade</td><td class="setting-name">Sociedade P3 em DC</td><td class="setting-rule">Percentual aplicado a operacao DC</td><td class="setting-value"><input class="ctl-input" id="financeP3DcEquityPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="platformPct" data-finance-setting-format="pct"><td class="setting-group">Plataforma</td><td class="setting-name">App / plataforma de terceiros</td><td class="setting-rule">Retencao somente sobre receitas operacionais importadas: recargas e ociosidade. Nao incide sobre marketing, publicidade, patrocinios ou parcerias.</td><td class="setting-value"><input class="ctl-input" id="financePlatformPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="energyCostPerKWh" data-finance-setting-format="brl_kwh"><td class="setting-group">Energia</td><td class="setting-name">Composição mensal de energia</td><td class="setting-rule">Selecione o modelo e informe os dados da fatura deste mês. Copel e arrendamento formam um único custo de energia no resultado mensal.</td><td class="setting-value"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;min-width:560px"><label class="sub">MODELO DE COBRANÇA<select class="ctl-input" id="financeEnergyMode" onchange="handleFinanceEnergySettingChange()"><option value="copel">Somente Copel</option><option value="copel_lease">Copel + arrendamento</option></select></label><label class="sub">VALOR DA FATURA COPEL (R$)<input class="ctl-input" id="financeCopelAmount" type="number" min="0" step="0.01" placeholder="Ex.: 1250,50" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub">KWH DA FATURA COPEL<input class="ctl-input" id="financeCopelKWh" type="number" min="0" step="0.01" placeholder="Ex.: 1300" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub">VENCIMENTO COPEL (DIA)<input class="ctl-input" id="financeCopelDueDay" type="number" min="1" max="31" step="1" placeholder="Ex.: 25" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub" data-energy-lease-field>CRÉDITOS ABATIDOS (KWH)<input class="ctl-input" id="financeLeaseCreditedKWh" type="number" min="0" step="0.01" placeholder="Ex.: 10000" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub" data-energy-lease-field>PREÇO DO ARRENDAMENTO (R$/KWH)<input class="ctl-input" id="financeLeaseRate" type="number" min="0" step="0.0001" placeholder="Ex.: 0,08" oninput="handleFinanceEnergyDraftChange()"></label><label class="sub" data-energy-lease-field>VENCIMENTO ARRENDAMENTO (DIA)<input class="ctl-input" id="financeLeaseDueDay" type="number" min="1" max="31" step="1" value="10" placeholder="Ex.: 10" oninput="handleFinanceEnergyDraftChange()"></label></div><input id="financeEnergyCost" type="hidden" value="0"><small id="financeEnergyCompositionSummary" class="sub"></small></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="investmentValue" data-finance-setting-format="brl"><td class="setting-group">Capital</td><td class="setting-name">Investimento no ponto</td><td class="setting-rule">Base para ROI e payback</td><td class="setting-value"><input class="ctl-input" id="financeInvestmentValue" type="number" min="0" step="100" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="uby hybrid" data-finance-setting-key="investorQuotaPct" data-finance-setting-format="pct"><td class="setting-group">Investidores</td><td class="setting-name">Cotas dos investidores</td><td class="setting-rule">Percentual distribuivel aos cotistas</td><td class="setting-value"><input class="ctl-input" id="financeInvestorQuotaPct" type="number" min="0" max="100" step="0.1" value="100" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr class="finance-model-row" data-models="legacy_reserve" data-finance-setting-key="saRetentionPct" data-finance-setting-format="pct"><td class="setting-group">Retencao</td><td class="setting-name">Retenção S.A. por carregador — histórico</td><td class="setting-rule">Configuração preservada para leitura de competências já salvas. Reserva legal e expansão passam a ser tratadas no fechamento consolidado da UBY.</td><td class="setting-value"><input class="ctl-input" id="financeSaRetentionPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>Centralizado</span></td></tr>
+            <tr data-finance-setting-key="targetOccPct" data-finance-setting-format="pct"><td class="setting-group">Meta</td><td class="setting-name">Objetivo de ocupacao</td><td class="setting-rule">Meta mensal de utilizacao</td><td class="setting-value"><input class="ctl-input" id="financeTargetOccPct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="targetRevenuePerKWh" data-finance-setting-format="brl_kwh"><td class="setting-group">Meta</td><td class="setting-name">Preco objetivo</td><td class="setting-rule">Zero usa o preco medio real</td><td class="setting-value"><input class="ctl-input" id="financeTargetRevenuePerKWh" type="number" min="0" step="0.01" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="ownerEnergyRate" data-finance-setting-format="brl_kwh"><td class="setting-group">Parceiro</td><td class="setting-name">Energia para reembolso</td><td class="setting-rule">Inicia igual ao custo da energia; pode ser ajustado</td><td class="setting-value"><input class="ctl-input" id="ownerEnergyRate" type="number" min="0" step="0.01" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr data-finance-setting-key="ownerTransferMode" data-finance-setting-format="transfer"><td class="setting-group">Parceiro</td><td class="setting-name">Percentual da area</td><td class="setting-rule">Sempre aplicado sobre o faturamento total. A opcao legada apenas identifica qual percentual cadastrado deve ser preservado.</td><td class="setting-value"><select class="ctl-select" id="ownerTransferMode" onchange="handleFinanceSettingChange()"><option value="gross">Percentual sobre faturamento total</option><option value="net">Percentual legado sobre faturamento total</option></select></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr id="ownerRevenueShareRow" data-finance-setting-key="ownerRevenueSharePct" data-finance-setting-format="pct"><td class="setting-group">Parceiro</td><td class="setting-name">Participacao da area</td><td class="setting-rule">Percentual sobre o faturamento total, incluindo receitas extras.</td><td class="setting-value"><input class="ctl-input" id="ownerRevenueSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+            <tr id="ownerNetProfitShareRow" data-finance-setting-key="ownerNetProfitSharePct" data-finance-setting-format="pct"><td class="setting-group">Parceiro</td><td class="setting-name">Participacao da area (legado)</td><td class="setting-rule">Percentual preservado e aplicado sobre o faturamento total, incluindo receitas extras.</td><td class="setting-value"><input class="ctl-input" id="ownerNetProfitSharePct" type="number" min="0" max="100" step="0.1" value="0" oninput="handleFinanceSettingChange()"></td><td class="setting-previous" data-finance-setting-previous>-</td><td><span class="finance-setting-state" data-finance-setting-state>-</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card finance-workbench" id="financeRevenueSection" data-finance-panel="revenue">
+      <div class="finance-section-head">
+        <div>
+          <span class="finance-step-kicker">2. Receitas do mes</span>
+          <h2>Receitas adicionais do carregador</h2>
+          <p>O faturamento das recargas vem automaticamente da base. Cadastre abaixo estacionamento, publicidade, assinatura, conveniencia ou qualquer receita complementar da competencia. Para marketing e contratos que so entram no fechamento, selecione <strong>Receita nao operacional / fechamento mensal</strong>: ela entra no DRE do mes, mas nunca altera ocupacao, R$/kWh, faturamento de recargas ou projecoes.</p>
+        </div>
+        <button class="btn-recalc" type="button" onclick="addFinanceRule('revenue')">+ Adicionar receita</button>
+      </div>
+      <div class="finance-ledger-wrap" style="margin-bottom:14px">
+        <table class="finance-ledger">
+          <thead><tr><th colspan="2">Composicao da receita e distribuicao</th></tr></thead>
+          <tbody id="financeDistributionTable"></tbody>
+        </table>
+      </div>
+      <div class="finance-ledger-wrap">
+        <table class="finance-ledger">
+          <thead><tr><th>Usar</th><th>Item</th><th>Regra</th><th>Valor da regra</th><th>Receita realizada</th><th>R$/kWh inicial</th><th>R$/kWh atual</th><th>Mes anterior</th><th>Situacao</th><th></th></tr></thead>
+          <tbody id="financeRevenueRuleRows"></tbody>
+          <tfoot id="financeRevenueRuleTotals"></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="card finance-workbench" id="financeCostSection" data-finance-panel="cost">
+      <div class="finance-section-head">
+        <div>
+          <span class="finance-step-kicker">3. Custos do mes</span>
+          <h2>Custos operacionais do carregador</h2>
+          <p>Ative apenas os itens usados neste ponto. Cada custo fica salvo na competencia e mostra seu peso inicial e o valor efetivamente diluido por kWh.</p>
+        </div>
+        <button class="btn-recalc" type="button" onclick="addFinanceRule('cost')">+ Adicionar custo</button>
+      </div>
+      <div class="finance-basis-grid">
+        <div class="finance-basis-card">
+          <label>Base inicial de diluicao</label>
+          <input class="ctl-input" id="financePlanningKWh" type="number" min="0" step="10" value="0" oninput="handleFinanceRuleEditorChange()">
+          <small>kWh planejados no mes. Zero usa meta, mes anterior ou volume atual.</small>
+        </div>
+        <div class="finance-basis-card"><span>Base usada no calculo</span><strong id="financePlanningKWhResolved">0,00 kWh</strong><small id="financePlanningKWhSource">Defina uma base planejada.</small></div>
+        <div class="finance-basis-card"><span>Preco medio de venda</span><strong id="financeSalePriceKWh">R$ 0,00/kWh</strong><small>Real do periodo; usa objetivo quando ainda nao ha venda.</small></div>
+        <div class="finance-basis-card"><span>Energia vendida</span><strong id="financeActualKWh">0,00 kWh</strong><small>Base do custo efetivo diluido.</small></div>
+      </div>
+      <div class="finance-ledger-wrap">
+        <table class="finance-ledger">
+          <thead><tr><th>Usar</th><th>Item</th><th>Regra</th><th>Valor da regra</th><th>Custo realizado</th><th>R$/kWh inicial</th><th>R$/kWh atual</th><th>Mes anterior</th><th>Situacao</th><th></th></tr></thead>
+          <tbody id="financeCostRuleRows"></tbody>
+          <tfoot id="financeCostRuleTotals"></tfoot>
+        </table>
+      </div>
+      <div class="finance-empty-guidance" id="financePlanningGuidance" style="display:none"></div>
+    </section>
+
+    <section class="finance-section-divider" id="financeResultSection" data-finance-panel="overview">
+      <div class="finance-section-head">
+        <div><span class="finance-step-kicker">4. Resultado do mes</span><h2>Resultado financeiro consolidado</h2><p>Receitas, custos, participacoes, margem, custo por kWh, ponto de equilibrio, ROI e payback da competencia selecionada.</p></div>
+      </div>
+      <section class="grid kpis" id="financeKpis"></section>
+      <section class="finance-results" id="financeOperationalResults"></section>
+      <section class="section">
+        <div class="card">
+          <h2>Demonstrativo do resultado</h2>
+          <table><tbody id="financeResultTable"></tbody></table>
+        </div>
+        <div class="card">
+          <h2>Leitura executiva</h2>
+          <div class="note" id="financeNote"></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="finance-report-zone" id="financeReportSection" data-finance-panel="reports">
+      <section class="card finance-workbench">
+        <div class="finance-section-head">
+          <div>
+            <span class="finance-step-kicker">5. Relatorios e prestacao de contas</span>
+            <h2>Relatorios financeiros por publico</h2>
+            <p>O parceiro da area recebe faturamento, energia, tarifa e repasse. O investidor recebe o demonstrativo completo, custos diluidos, ocupacao, resultado, acumulado e evolucao mensal.</p>
+          </div>
+          <div class="finance-command-actions">
+            <button class="btn-recalc" type="button" onclick="saveCurrentFinanceReport('partial')">Salvar parcial</button>
+            <button class="btn-recalc" type="button" onclick="saveCurrentFinanceReport('closed')">Fechar e arquivar</button>
+            <button class="btn-recalc" type="button" onclick="generateCurrentOwnerAreaReport()">PDF dono da area</button>
+            <button class="btn-recalc" type="button" onclick="generateCurrentFinanceReport()">PDF investidor</button>
+          </div>
+        </div>
+        <div class="section" style="margin-top:0">
+          <div>
+            <div class="note">Os campos de energia e repasse foram centralizados em Premissas do mes. Para alterar o relatorio, edite a competencia no topo; meses anteriores nao serao recalculados com tarifas futuras.</div>
+          </div>
+          <div class="finance-ledger-wrap">
+            <table><tbody id="ownerAreaReportTable"></tbody></table>
+          </div>
+        </div>
+        <div class="report-library-toolbar">
+          <div><span class="finance-step-kicker">Historico da obra</span><h2 style="margin:0;border:0;padding:0">Relatorios de todas as competencias</h2></div>
+          <select class="ctl-select" id="financeReportStatusFilter" onchange="renderIndividualFinanceReportLibrary()"><option value="">Todos</option><option value="closed">Fechados</option><option value="partial">Parciais</option></select>
+        </div>
+        <div class="report-library" id="financeReportLibrary"><div class="report-library-empty">Carregando historico financeiro...</div></div>
+      </section>
+    </section>
+  </div><!-- /tabFinanceiro -->
+
+  <div id="tabDetalhes" style="display:none">
+    <div class="card" style="margin-top:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0;border:none;padding:0">Todas as recargas</h2>
+        <span id="detailCount" style="color:var(--p3-muted);font-size:12px"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Estação</th><th>Início</th><th>Usuário</th>
+              <th>Duração</th><th>kWh</th><th>Receita</th><th>Pagamento</th>
+              <th>Ociosidade</th><th>Avaliação</th>
+            </tr>
+          </thead>
+          <tbody id="detailTable"></tbody>
+        </table>
+      </div>
+      <div id="detailLoadMoreWrap" style="display:none;justify-content:center;margin-top:12px">
+        <button id="detailLoadMore" type="button" onclick="showMoreDetalhes()"
+          style="background:var(--p3-primary);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer">
+          Carregar mais
+        </button>
+      </div>
+    </div>
+  </div><!-- /tabDetalhes -->
+
+  <dialog class="station-layout-dialog" id="stationLayoutDialog">
+    <div class="station-layout-head">
+      <h2>Organizar planta e carregadores</h2>
+      <p>Use o mesmo nome de planta em estacoes que devem aparecer unificadas. Carregador fisico e plug/conector sao contados separadamente.</p>
+    </div>
+    <div class="station-layout-body">
+      <input type="hidden" id="stationLayoutWorkId">
+      <input type="hidden" id="stationLayoutSourceName">
+      <div class="station-layout-grid">
+        <label class="station-layout-field wide">Nome da planta unificada<input id="stationLayoutPlantName" type="text" placeholder="Ex.: Mercado Santarem - Sabara"></label>
+        <label class="station-layout-field">Carregadores AC<input id="stationLayoutAcChargers" type="number" min="0" step="1" value="0"></label>
+        <label class="station-layout-field">Plugs AC<input id="stationLayoutAcPlugs" type="number" min="0" step="1" value="0"></label>
+        <label class="station-layout-field">Carregadores DC<input id="stationLayoutDcChargers" type="number" min="0" step="1" value="0"></label>
+        <label class="station-layout-field">Plugs DC<input id="stationLayoutDcPlugs" type="number" min="0" step="1" value="0"></label>
+        <label class="station-layout-field wide">Início real da operação<input id="stationLayoutOperationStart" type="date"><small>Define a capacidade disponível a partir deste dia. Se vazio, a primeira recarga importada é usada como referência provisória.</small></label>
+        <div class="station-layout-divider">Horario disponivel para recargas</div>
+        <label class="station-layout-toggle wide"><input id="stationLayoutOpen24h" type="checkbox" checked onchange="toggleStationScheduleInputs()"> Aberto 24 horas nos dias selecionados</label>
+        <label class="station-layout-field">Abertura<input id="stationLayoutOpenTime" type="time" value="08:00"></label>
+        <label class="station-layout-field">Fechamento<input id="stationLayoutCloseTime" type="time" value="22:00"></label>
+        <div class="station-weekdays">
+          <label><input class="station-open-day" type="checkbox" value="1" checked>Seg</label>
+          <label><input class="station-open-day" type="checkbox" value="2" checked>Ter</label>
+          <label><input class="station-open-day" type="checkbox" value="3" checked>Qua</label>
+          <label><input class="station-open-day" type="checkbox" value="4" checked>Qui</label>
+          <label><input class="station-open-day" type="checkbox" value="5" checked>Sex</label>
+          <label><input class="station-open-day" type="checkbox" value="6" checked>Sab</label>
+          <label><input class="station-open-day" type="checkbox" value="0" checked>Dom</label>
+        </div>
+        <div class="station-layout-divider">Regra comercial de cortesia (opcional)</div>
+        <label class="station-layout-field">Tarifa comercial de referencia (R$/kWh)<input id="stationLayoutReferenceTariff" type="number" min="0" step="0.01" placeholder="Ex.: 1,79"></label>
+        <label class="station-layout-field">Tratamento financeiro da cortesia
+          <select id="stationLayoutCourtesyTreatment">
+            <option value="operational">Apenas informar uso de cortesia</option>
+            <option value="partner_absorbed">Custo absorvido pelo parceiro local</option>
+            <option value="uby_absorbed">Custo absorvido pela UBY</option>
+          </select>
+        </label>
+        <label class="station-layout-field wide">Responsável pelo benefício<input id="stationLayoutCourtesyResponsible" type="text" placeholder="Ex.: Dono do Posto Central JK"></label>
+        <label class="station-layout-field wide">Pessoas com recarga cortesia<textarea id="stationLayoutCourtesyUsers" placeholder="Um nome, e-mail ou telefone por linha. Ex.: Dono do posto"></textarea></label>
+      </div>
+    </div>
+    <div class="station-layout-actions">
+      <button class="btn-danger" type="button" onclick="document.getElementById('stationLayoutDialog').close()">Cancelar</button>
+      <button class="btn-recalc" type="button" onclick="saveStationLayoutConfiguration()">Salvar configuracao</button>
+    </div>
+  </dialog>
+
+  <dialog class="backup-history-dialog" id="backupHistoryDialog">
+    <div class="station-layout-head">
+      <h2>Histórico de backups por obra</h2>
+      <p id="backupHistoryTitle">Snapshots da base de recargas.</p>
+    </div>
+    <div class="backup-history-content">
+      <p class="backup-history-intro">Cada linha compara o snapshot com a base ativa. Ao restaurar, a base ativa é arquivada antes da troca, preservando um caminho de retorno.</p>
+      <div id="backupHistoryContent" aria-live="polite"></div>
+    </div>
+    <div class="station-layout-actions">
+      <button class="btn-danger" type="button" onclick="document.getElementById('backupHistoryDialog').close()">Fechar</button>
+      <button class="btn-recalc" type="button" onclick="openRechargeBackupHistory()">Atualizar</button>
+    </div>
+  </dialog>
+
+</main>
+
+<script src="sidebar.js"></script>
+<script src="backup_guard.js?v=20260714-integrity1"></script>
+<script src="finance_engine.js"></script>
+<script src="finance_reports.js?v=20260808-cost-baseline1"></script>
+<script src="supabase_config.js"></script>
+<script src="clube_uby_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ <script src="supabase_bridge.js?v=20260915-customer-phone-sync1"></script>
+<script src="recharge_runtime.js?v=20260716-architecture1"></script>
+<script src="auth.js"></script>
+<script src="app_data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="recargas_app.js?v=20260925-energy-inputs"></script>
+</body>
+</html>
