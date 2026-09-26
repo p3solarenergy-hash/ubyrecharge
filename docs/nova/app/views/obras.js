@@ -207,7 +207,7 @@
     target.innerHTML = `
       <p style="margin:0 0 12px"><a href="#/obras" style="font-weight:800;font-size:12px">← Obras</a></p>
       <div class="hero"><div><p class="eyebrow">Obra · ${esc(o.stage)}</p><h1>${esc(o.nome)}</h1><p class="lead">${esc(o.cliente)} · ${esc(o.local)}</p></div>
-        <div class="callout"><strong>${esc(o.status)} · ${s.pct}% concluída</strong><small>Para marcar tarefas, anexar documentos ou registrar pendências: <a href="${PUB}gestao_obra_ev_detalhe.html?obra=${encodeURIComponent(o.id)}" target="_blank" rel="noopener">editar na publicada ↗</a>${o.sheetUrl ? ` · <a href="${esc(o.sheetUrl)}" target="_blank" rel="noopener">planilha da obra ↗</a>` : ""} · <a href="#" id="openLegacyObra">ver página original</a></small></div></div>
+        <div class="callout"><strong>${esc(o.status)} · ${s.pct}% concluída</strong><small>Para marcar tarefas, anexar documentos ou registrar pendências: <a href="#" id="openLegacyObra">editar esta obra ✎</a> (grava na base real)${o.sheetUrl ? ` · <a href="${esc(o.sheetUrl)}" target="_blank" rel="noopener">planilha da obra ↗</a>` : ""}</small></div></div>
       <div class="toolbar"><div class="seg" id="obraTabs">${OBRA_TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
       ${body}`;
     target.querySelectorAll("#obraTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/obra/${encodeURIComponent(id)}/${b.dataset.tab}`));

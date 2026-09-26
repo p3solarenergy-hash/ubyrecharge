@@ -31,7 +31,7 @@
       window.UBY_READ_ONLY = !scope;
       window.UBY_WRITE_SCOPE = scope ? scope.name : "";
       window.UBY_SUPABASE_CLIENT = readOnlyClient(raw, scope);
-      if (scope) hideNonImportTabs();
+      if (scope && scope.name !== "obras") hideNonImportTabs();
     }
     return window.UBY_SUPABASE_CLIENT;
   }
@@ -57,6 +57,26 @@
     storage: { "finance-documents": ["upload", "remove"] },
     rpcs: []
   };
+  // NOVA PLATAFORMA (aprovado pelo usuário: "eu quero que tudo seja editavel
+  // diretamente na nova" e "pode gravar"): as telas de obras (cadastro, detalhe,
+  // mapa e tarefas) gravam registro a registro, como na plataforma atual.
+  // Sem exclusão de obras (só arquivar) e sem a sincronização em massa
+  // (migrateLocalToCloud: obra_snapshots/obra_fases/obra_tarefas seguem bloqueadas).
+  const OBRAS_SCOPE = {
+    name: "obras",
+    tables: {
+      obras: ["upsert"],
+      operational_tasks: ["upsert", "delete"],
+      obra_atividade: ["upsert"],
+      obra_mensagens: ["upsert"],
+      obra_documentos: ["upsert"],
+      app_audit_log: ["insert"]
+    },
+    storage: { "obra-documentos": ["upload"] },
+    rpcs: []
+  };
+  const OBRAS_PAGES = /\/legado\/(obra-ev\/(index\.html|gestao_obra_ev_detalhe\.html|mapa-implantacao\.html|engenharia\.html)?|tarefas\/(index\.html)?)$/;
+  const OBRAS_ROUTES = /^#\/((obras-classico|mapa-classico|engenharia|tarefas-classico)(\/|$)|abrir\/legado(%2F|\/)obra-ev(%2F|\/)gestao_obra_ev_detalhe)/i;
   function writeScope() {
     try {
       const embedded = window.self !== window.top;
@@ -64,6 +84,8 @@
       const hash = window.top.location.hash || "";
       if (embedded && params.get("nova_import") === "1" && /^#\/importar/.test(hash)) return IMPORT_SCOPE;
       if (embedded && params.get("nova_params") === "1" && /^#\/parametros/.test(hash)) return PARAMS_SCOPE;
+      const frameId = (window.frameElement && window.frameElement.id) || "";
+      if (embedded && frameId === "classicFrame" && OBRAS_PAGES.test(location.pathname) && OBRAS_ROUTES.test(hash)) return OBRAS_SCOPE;
       return null;
     } catch (_) { return null; }
   }

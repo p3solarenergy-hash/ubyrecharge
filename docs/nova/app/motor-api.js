@@ -617,7 +617,7 @@
           station: target.station || "Carregador não identificado", workName: target.workName || (target.targetCount > 1 ? `rateado para ${target.targetCount} carregadores` : ""),
           due: iso(scheduledPaymentDueDate(item, mk)), dueDay: item.dueDay, amount, status: status.key, statusLabel: status.label,
           paidAt: item.paymentLedger?.[mk]?.paidAt || "" };
-      });
+      }).concat(energyPayments(mk)).sort((a, b) => String(a.due).localeCompare(String(b.due)));
     const totals = list.reduce((acc, p) => { acc.total += p.amount; if (p.status === "paid") acc.paid += p.amount; else acc.pending += p.amount; if (p.status === "overdue") acc.overdue += p.amount; return acc; }, { total: 0, paid: 0, pending: 0, overdue: 0 });
     return { monthKey: mk, label: monthLabel(mk), list, totals };
   }
@@ -1086,7 +1086,7 @@
     const stamp = fv2Stamp();
     if (FV2.rows && FV2.stamp === stamp) return;
     FV2.stamp = stamp;
-    FV2.rowMonths.clear(); FV2.eligible.clear(); FV2.matrix.clear(); FV2.results.clear();
+    FV2.rowMonths.clear(); FV2.eligible.clear(); FV2.matrix.clear(); FV2.results.clear(); FV2.energy = new Map();
     FV2.unitData = getGeneralUnitData();
     FV2.rows = getUbyChargerRows(FV2.unitData).map((row, i) => ({ ...row, stationName: row.station, fv2Id: `${row.workId}::${normalizeStationForCompare(row.station || row.workName || "")}::${i}` }));
     FV2.rows.forEach(row => {
@@ -1209,11 +1209,57 @@
     });
   }
 
+  // Faturas de energia por período de leitura do carregador (Parâmetros e custos ·
+  // Faturas de energia). Ficam em financialSettings.chargers[estação].energyInvoices.
+  function fv2InvoiceList(workId, stationName, workName) {
+    const rec = allRechargeRecords[workId] || {};
+    const root = rec.financialSettings || rec.summary?.financialSettings || {};
+    const key = normalizeStationForCompare(canonicalStationNameForWork(workId, stationName || workName || "", workName));
+    const list = root?.chargers?.[key]?.energyInvoices;
+    return Array.isArray(list) ? list : [];
+  }
+  const localDay = c => {
+    const d = c?.startDate || parseDate(c?.startStr || "");
+    if (!d || Number.isNaN(d.getTime())) return "";
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  function dailyDelivered(charges) {
+    const out = {};
+    (charges || []).forEach(c => { const day = localDay(c); if (day) out[day] = (out[day] || 0) + n0(c.energyKWh); });
+    return out;
+  }
+  function fv2EnergyFor(row) {
+    if (!FV2.energy) FV2.energy = new Map();
+    if (FV2.energy.has(row.fv2Id)) return FV2.energy.get(row.fv2Id);
+    const list = fv2InvoiceList(row.workId, row.stationName || row.station, row.workName);
+    if (!list.length) { FV2.energy.set(row.fv2Id, null); return null; }
+    // A divisão pela energia entregue precisa do histórico completo; enquanto
+    // ele carrega, divide por dia (aproximado, marcado) e pede a carga completa.
+    const full = typeof overviewSessionsFullyHydrated !== "undefined" && !!overviewSessionsFullyHydrated;
+    if (!full) { try { loadFull(); } catch (_) {} }
+    const out = CORE().energyInvoiceMonths(list, full ? dailyDelivered(row.charges) : {});
+    out.partial = !full;
+    FV2.energy.set(row.fv2Id, out);
+    return out;
+  }
+
   function fv2Month(row, mk, fixes) {
     const k = `${row.fv2Id}|${mk}|${fixKey(fixes)}`;
     if (FV2.results.has(k)) return FV2.results.get(k);
     const charges = FV2.rowMonths.get(row.fv2Id)?.get(mk) || [];
-    const { settings, flags } = fv2Settings(row, mk, fixes);
+    const resolved = fv2Settings(row, mk, fixes);
+    const settings = resolved.settings;
+    let flags = resolved.flags;
+    let energyInvoice = null;
+    if (fixes.monthScope) {
+      const e = fv2EnergyFor(row);
+      if (e) {
+        energyInvoice = e.months[mk] || { cost: 0, total: 0, parts: [] };
+        flags = flags.filter(f => f !== "fatura-copiada" && f !== "fatura-herdada").concat("energia-por-fatura");
+        if (energyInvoice.estimatedCost > 0) flags.push("energia-estimada");
+        if (e.partial) flags.push("energia-parcial");
+      }
+    }
     const cfg = fv2Cfg(settings);
     const stationName = row.stationName || row.station;
     const courtesy = courtesyFinanceBreakdown(charges, stationAvailabilityFor(row.workId, stationName, row.workName), cfg.energyCostPerKWh);
@@ -1224,7 +1270,7 @@
       acRevenue: charges.filter(c => chargerKind(c) === "ac").reduce((s, c) => s + c.revenue, 0),
       dcRevenue: charges.filter(c => chargerKind(c) === "dc").reduce((s, c) => s + c.revenue, 0),
       courtesy: { treatment: courtesy.treatment, energy: courtesy.energy, energyCost: courtesy.energyCost, commercialEnergy: courtesy.commercialEnergy, charges: courtesy.charges, revenue: courtesy.revenue },
-      planning, matrixItems: fv2MatrixItems(row, mk, fixes)
+      planning, matrixItems: fv2MatrixItems(row, mk, fixes), energyInvoice
     }, fixes);
     result.flags = flags;
     result.sessions = charges.length;
@@ -1558,7 +1604,46 @@
     };
   }
 
-  window.UBY_MOTOR_API = { waitForReady, loadFull, status, months, monthName, command, companyResults, stations, stationDetail, works, usage, networkConfig,
+  // Faturas de energia de um carregador, com a divisão por competência de consumo.
+  // `draft` (opcional) simula uma lista ainda não gravada.
+  function energyInvoices(workId, station, draft) {
+    fv2Ensure();
+    const row = FV2.rows.find(r => String(r.workId) === String(workId) && normalizeStationForCompare(r.stationName || r.station || "") === normalizeStationForCompare(station || ""))
+      || FV2.rows.find(r => String(r.workId) === String(workId));
+    if (!row) return null;
+    const list = Array.isArray(draft) ? draft : fv2InvoiceList(row.workId, row.stationName || row.station, row.workName);
+    const daily = dailyDelivered(row.charges);
+    const fullHistory = typeof overviewSessionsFullyHydrated !== "undefined" && !!overviewSessionsFullyHydrated;
+    const res = CORE().energyInvoiceMonths(list, daily);
+    const monthly = {};
+    Object.keys(daily).forEach(d => { const mk = d.slice(0, 7); monthly[mk] = (monthly[mk] || 0) + daily[d]; });
+    return JSON.parse(JSON.stringify({ workId: row.workId, station: row.stationName || row.station, workName: row.workName, stored: fv2InvoiceList(row.workId, row.stationName || row.station, row.workName),
+      invoices: res.invoices, months: res.months, deliveredByMonth: monthly, lastDelivery: Object.keys(daily).sort().pop() || "", fullHistory }));
+  }
+  // Vencimentos das faturas de energia (Copel e arrendamento) no mês de pagamento.
+  function energyPayments(mk) {
+    fv2Ensure();
+    const out = [];
+    const seen = new Set();
+    FV2.rows.forEach(row => {
+      const list = fv2InvoiceList(row.workId, row.stationName || row.station, row.workName);
+      list.forEach(inv => {
+        const key = `${row.workId}|${inv.id}`;
+        if (seen.has(key)) return; seen.add(key);
+        const lease = n0(inv.leaseAmount) > 0 ? Math.round(n0(inv.leaseAmount) * 100) / 100 : Math.round(n0(inv.leaseKWh) * n0(inv.leaseRate) * 100) / 100;
+        [["Copel", n0(inv.copelAmount), inv.dueDate, inv.paidAt], ["Arrendamento de energia", lease, inv.leaseDueDate || inv.dueDate, inv.leasePaidAt || inv.paidAt]].forEach(([name, amount, due, paidAt]) => {
+          if (!(amount > 0) || !due || String(due).slice(0, 7) !== mk) return;
+          const overdue = !paidAt && new Date(`${due}T23:59:59`) < new Date();
+          out.push({ id: `energia-${inv.id}-${name}`, name: `${name} · fatura ${inv.ref || inv.start}`, category: "Energia", supplier: name === "Copel" ? "Copel" : "Arrendamento",
+            station: row.stationName || row.station, workName: row.workName, due, dueDay: Number(String(due).slice(8, 10)), amount,
+            status: paidAt ? "paid" : overdue ? "overdue" : "pending", statusLabel: paidAt ? "Pago" : overdue ? "Vencido" : "A pagar", paidAt: paidAt || "", source: "Fatura de energia" });
+        });
+      });
+    });
+    return out;
+  }
+
+  window.UBY_MOTOR_API = { waitForReady, energyInvoices, loadFull, status, months, monthName, command, companyResults, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,

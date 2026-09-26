@@ -125,7 +125,10 @@
     try { u = UBY.data("usage", { kind: "station", workId, station, monthKey: s.monthKey }).kpis; } catch (_) {}
     const model = f.model;
     const ec = s.energyComposition || {};
-    const energyNote = ec.totalCost > 0 ? `fatura ${ec.mode === "copel_lease" ? "Copel + arrendamento" : "Copel"}: ${fmt.brl(ec.copelCost)}${ec.leaseCost ? ` + ${fmt.brl(ec.leaseCost)}` : ""}` : `${fmt.kwh0(f.commercialEnergy || f.energy)} × ${fmt.brl(st.energyCostPerKWh || 0)}/kWh`;
+    const energyNote = ec.mode === "invoice"
+      ? [...(ec.parts || []).map(p => `fatura ${p.ref ? monthName(p.ref) : p.start} (consumo de ${fmt.date(p.from + "T12:00:00")} a ${fmt.date(p.to + "T12:00:00")}): Copel ${fmt.brl(p.copel)}${p.lease ? ` + arrendamento ${fmt.brl(p.lease)}` : ""}`),
+         ec.estimatedCost ? `ESTIMATIVA ${fmt.brl(ec.estimatedCost)} (${fmt.date(ec.estimatedFrom + "T12:00:00")} a ${fmt.date(ec.estimatedTo + "T12:00:00")}, ${fmt.kwh0(ec.estimatedDeliveredKWh)} entregues, tarifa da fatura ${ec.estimatedRef ? monthName(ec.estimatedRef) : "anterior"}) — acerta quando a próxima fatura for lançada` : ""].filter(Boolean).join(" · ") || "sem consumo no período"
+      : ec.totalCost > 0 ? `fatura ${ec.mode === "copel_lease" ? "Copel + arrendamento" : "Copel"}: ${fmt.brl(ec.copelCost)}${ec.leaseCost ? ` + ${fmt.brl(ec.leaseCost)}` : ""}` : `${fmt.kwh0(f.commercialEnergy || f.energy)} × ${fmt.brl(st.energyCostPerKWh || 0)}/kWh`;
     const opRevenue = s.revenueLines.filter(l => l.scope !== "non_operational"), mkt = s.revenueLines.filter(l => l.scope === "non_operational");
     const localCosts = s.costLines.filter(l => !l.matrix), matrix = s.costLines.filter(l => l.matrix);
     const dest = {

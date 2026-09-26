@@ -210,6 +210,11 @@
 
 <script src="sidebar.js"></script>
 <script src="backup_guard.js?v=20260714-integrity1"></script>
+<script src="supabase_config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_bridge.js?v=20260926-obras"></script>
+<script src="app_data.js"></script>
+<script src="app_store.js?v=20260819-no-empty-overwrite1"></script>
 <script>
 const themeKey="p3_obras_theme";const root=document.documentElement;const themeBtn=document.getElementById("themeToggle");function applyTheme(t){root.setAttribute("data-theme",t);themeBtn.textContent=t==="light"?"Lua":"Sol"}applyTheme(localStorage.getItem(themeKey)||"dark");themeBtn.onclick=()=>{const nxt=root.getAttribute("data-theme")==="light"?"dark":"light";localStorage.setItem(themeKey,nxt);applyTheme(nxt)};
 </script>
@@ -281,6 +286,30 @@ document.getElementById("search").addEventListener("input",renderList);
 document.getElementById("stageFilter").addEventListener("change",renderList);
 selectedId="";
 render();
+// NOVA PLATAFORMA: engenharia lê as obras da nuvem e grava o detalhe de volta
+// (antes só ficava no navegador). Só grava obras cujo detalhe veio da nuvem
+// nesta sessão, para nunca subir um rascunho local por cima da base oficial.
+(function(){
+  const cloudWorks=new Map();
+  const localSave=saveDetail;
+  saveDetail=function(id,detail){
+    localSave(id,detail);
+    const base=cloudWorks.get(id);
+    if(!base||!window.UBY_STORE?.saveDetail)return;
+    const card={...base,...cardFromDetail(id,detail),id};delete card.detail;
+    window.UBY_STORE.saveDetail(id,detail,card).then(r=>{if(r&&r.cloud)cloudWorks.set(id,{...card})}).catch(err=>alert("Alteração salva só neste navegador. Não foi possível gravar na base: "+err.message));
+  };
+  async function loadCloud(){
+    if(!window.UBY_STORE?.loadWorks)return;
+    const items=await window.UBY_STORE.loadWorks(null);
+    if(!Array.isArray(items))return;
+    const cards=[];
+    items.forEach(w=>{if(!w?.id)return;const {detail,...card}=w;cards.push(card);if(detail?.project&&Array.isArray(detail.phases)){localStorage.setItem(detailKey(w.id),JSON.stringify(detail));cloudWorks.set(w.id,card)}});
+    saveDashboard(cards);
+    render();
+  }
+  loadCloud().catch(err=>console.warn("Engenharia: não foi possível ler as obras da nuvem:",err.message));
+})();
 </script>
 </body>
 </html>

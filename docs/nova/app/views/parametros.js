@@ -377,9 +377,166 @@
           </div>
           ${inp("notes", "Observações")}
           ${field("Arquivo", `<input class="select" id="pmDocFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" style="width:100%;padding-top:6px">`)}
+          ${ui.docCopel ? `<div class="note" style="margin-top:8px;border-color:var(--uby-green, #1f9d55)"><strong>É uma fatura da Copel</strong><br>${esc(ui.docCopel.summary)}<br><button class="btn primary" id="pmDocToEnergy" type="button" style="margin-top:8px">Lançar em Faturas de energia →</button> <small>ou salve aqui só como documento.</small></div>` : ""}
           <button class="btn primary" id="pmDocSave" type="button" style="margin-top:12px" ${can}>Salvar documento</button>
         </section>
       </div>`;
+  }
+
+  // ---------- faturas de energia por período de leitura ----------
+  // Cada fatura (Copel + arrendamento) é lançada com as datas de leitura. O motor
+  // divide kWh e valor pelos meses de consumo, na proporção da energia entregue
+  // pelo carregador em cada dia; dias sem fatura entram como estimativa marcada.
+  const fmtDay = d => d ? fmt.date(`${d}T12:00:00`) : "—";
+  const addDay = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  function blankInvoice(prev) {
+    const start = prev?.end || "";
+    return { id: "", ref: "", start, end: "", readingStart: prev?.readingEnd ?? "", readingEnd: "", multiplier: prev?.multiplier || 40, kwh: "", copelAmount: "", leaseAmount: "", leaseKWh: "", leaseRate: "", dueDate: "", leaseDueDate: "", paidAt: "", leasePaidAt: "", notes: "" };
+  }
+  const leaseOf = i => Number(i.leaseAmount) > 0 ? Math.round(Number(i.leaseAmount) * 100) / 100 : Math.round((Number(i.leaseKWh) || 0) * (Number(i.leaseRate) || 0) * 100) / 100;
+  function cleanInvoice(f) {
+    const n = v => (v === "" || v === null || v === undefined ? "" : Number(v));
+    const kwh = n(f.kwh) !== "" ? Number(f.kwh) : (n(f.readingEnd) !== "" && n(f.readingStart) !== "" ? (Number(f.readingEnd) - Number(f.readingStart)) * (Number(f.multiplier) || 1) : 0);
+    return { id: f.id || `energia-${f.ref || f.start}-${Date.now().toString(36)}`, ref: f.ref || "", start: f.start, end: f.end,
+      readingStart: n(f.readingStart), readingEnd: n(f.readingEnd), multiplier: Number(f.multiplier) || 1, kwh: Math.max(0, kwh),
+      copelAmount: Math.round((Number(f.copelAmount) || 0) * 100) / 100, leaseAmount: Math.round((Number(f.leaseAmount) || 0) * 100) / 100, leaseKWh: Number(f.leaseKWh) || 0, leaseRate: Number(f.leaseRate) || 0,
+      dueDate: f.dueDate || "", leaseDueDate: f.leaseDueDate || "", paidAt: f.paidAt || "", leasePaidAt: f.leasePaidAt || "", notes: f.notes || "",
+      uc: f.uc || "", meter: f.meter || "", nfNumber: f.nfNumber || "", documentId: f.documentId || "" };
+  }
+  // Fatura lida do PDF da Copel → formulário. Acha o carregador pela unidade
+  // consumidora (UC) de faturas já lançadas; se a referência já existe, edita ela.
+  function applyCopelRead(res, file, chargers) {
+    const f = res.fields;
+    const api = UBY.state.api;
+    const all = chargers.map(c => ({ c, list: (() => { try { return api.energyInvoices(c.workId, c.station)?.stored || []; } catch (_) { return []; } })() }));
+    const byUc = f.uc ? all.find(x => x.list.some(i => String(i.uc || "") === f.uc)) : null;
+    if (byUc && byUc.c.key !== ui.enCharger && !ui.enDraft) { ui.enCharger = byUc.c.key; }
+    const [wid, st] = (ui.enCharger || "|").split("|");
+    const cur = ui.enDraft || (api.energyInvoices(wid, st)?.stored || []);
+    const same = cur.find(i => i.ref === f.ref && (!i.uc || !f.uc || String(i.uc) === f.uc));
+    const prevLease = cur.filter(i => Number(i.leaseAmount) > 0 && Number(i.leaseKWh) > 0).sort((a, b) => String(a.end).localeCompare(String(b.end))).pop();
+    const rate = prevLease ? Number(prevLease.leaseAmount) / Number(prevLease.leaseKWh) : 0;
+    const suggestedLease = f.compensatedKWh > 0 && rate > 0 ? Math.round(f.compensatedKWh * rate * 100) / 100 : "";
+    ui.enForm = {
+      ...(same || blankInvoice()), id: same?.id || "",
+      ref: f.ref, kwh: f.kwh, copelAmount: f.copelAmount, start: f.start, end: f.end, dueDate: f.dueDate,
+      readingStart: f.readingStart ?? "", readingEnd: f.readingEnd ?? "", multiplier: f.multiplier || 40, leaseKWh: f.compensatedKWh || 0,
+      leaseAmount: same && Number(same.leaseAmount) > 0 ? same.leaseAmount : suggestedLease,
+      uc: f.uc || "", meter: f.meter || "", nfNumber: f.nfNumber || "", documentId: same?.documentId || ""
+    };
+    ui.enPendingFile = file || null;
+    ui.enRead = {
+      ok: true, file: file?.name || "",
+      msg: `Fatura ${f.ref.slice(5)}/${f.ref.slice(0, 4)} · UC ${f.uc} · leitura ${f.start.split("-").reverse().join("/")} a ${f.end.split("-").reverse().join("/")} (${f.days} dias) · ${f.kwh} kWh · Copel R$ ${f.copelAmount.toFixed(2).replace(".", ",")} · vence ${f.dueDate.split("-").reverse().join("/")}${f.compensatedKWh ? ` · ${f.compensatedKWh} kWh compensados` : " · sem compensação"}${f.creditBalance ? ` · saldo de créditos ${f.creditBalance} kWh` : ""}`,
+      notes: [same ? "Esta referência já estava lançada: os campos foram atualizados com o PDF (confira e clique em Atualizar na lista)." : "",
+        byUc && byUc.c.key === ui.enCharger ? `Carregador identificado pela UC: ${byUc.c.station}.` : f.uc ? "UC ainda não vinculada: confira se o carregador selecionado é o certo." : "",
+        f.compensatedKWh ? (same && Number(same.leaseAmount) > 0 ? `Arrendamento mantido como estava: R$ ${Number(same.leaseAmount).toFixed(2).replace(".", ",")}.` : suggestedLease !== "" ? `Arrendamento sugerido: ${f.compensatedKWh} kWh × R$ ${rate.toFixed(4).replace(".", ",")} (tarifa da última fatura) = R$ ${String(suggestedLease).replace(".", ",")} — confira com o boleto do arrendamento.` : "Informe o valor do arrendamento (não vem na fatura da Copel).") : "",
+        ...(res.warnings || [])].filter(Boolean)
+    };
+  }
+  function invoiceProblems(inv, list) {
+    const out = [];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(inv.start) || !/^\d{4}-\d{2}-\d{2}$/.test(inv.end)) out.push("informe a leitura anterior e a leitura atual (datas)");
+    else if (inv.end <= inv.start) out.push("a data da leitura atual precisa ser depois da anterior");
+    if (!(inv.kwh > 0)) out.push("kWh consumido da fatura");
+    if (!(inv.copelAmount > 0) && !(leaseOf(inv) > 0)) out.push("valor da Copel ou do arrendamento");
+    const clash = list.find(o => o.id !== inv.id && o.start < inv.end && inv.start < o.end);
+    if (clash) out.push(`período sobreposto à fatura ${clash.ref || clash.start}`);
+    return out;
+  }
+  function energyTab(w, data) {
+    const api = UBY.state.api;
+    if (!api || typeof api.energyInvoices !== "function") return `<div class="note">O motor está recarregando. Abra esta aba de novo em alguns segundos.</div>`;
+    const list = data.chargers.filter(c => c.included || c.model);
+    if (!ui.enCharger) {
+      const withInv = list.find(c => { try { return (api.energyInvoices(c.workId, c.station)?.stored || []).length; } catch (_) { return false; } });
+      ui.enCharger = (withInv || list.find(c => c.included && ["uby", "hybrid"].includes(c.model)) || list[0] || {}).key || "";
+    }
+    const [workId, station] = (ui.enCharger || "|").split("|");
+    let info = null;
+    try { info = api.energyInvoices(workId, station, ui.enDraft || undefined); } catch (err) { return `<div class="note">Não consegui calcular: ${esc(err.message)}</div>`; }
+    if (!info) return `<div class="note">Carregador não encontrado no motor.</div>`;
+    const draft = ui.enDraft || info.stored;
+    const dirty = !!ui.enDraft;
+    const f = ui.enForm || (ui.enForm = blankInvoice(draft.slice().sort((a, b) => String(a.end).localeCompare(String(b.end))).pop()));
+    const preview = cleanInvoice(f);
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const inp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-ef="${k}" type="${type}" value="${esc(f[k] ?? "")}" ${extra} style="width:100%">`);
+    const byId = new Map(info.invoices.map(i => [i.id, i]));
+    const months = Object.keys(info.months).sort().reverse();
+    const groups = [["Operação UBY", c => c.included && ["uby", "hybrid"].includes(c.model)], ["Parceiros", c => c.included && c.model === "third_party_management"], ["Só gestão P3", c => c.included && ["management_only", "p3_society"].includes(c.model)], ["Fora da operação UBY", c => !c.included]];
+    return `
+      <div class="toolbar">
+        <select class="select" id="pmEnCharger" style="min-width:280px">${groups.map(([label, test]) => { const g = list.filter(test); return g.length ? `<optgroup label="${esc(label)}">${g.map(c => `<option value="${esc(c.key)}" ${c.key === ui.enCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</optgroup>` : ""; }).join("")}</select>
+        <span class="spacer"></span>
+        ${dirty ? `<button class="btn" id="pmEnDiscard" type="button">Descartar</button>` : ""}
+        <button class="btn primary" id="pmEnSave" type="button" ${dirty ? can : "disabled"}>Salvar faturas</button>
+      </div>
+      ${info.fullHistory ? "" : `<div class="note" style="margin-bottom:12px">O histórico completo ainda está carregando: a divisão abaixo pode mudar. Aguarde alguns segundos e troque de aba.</div>`}
+      ${dirty ? `<div class="note" style="margin-bottom:12px;border-color:var(--uby-amber)">Alterações ainda não salvas. A divisão por mês abaixo já mostra como vai ficar.</div>` : ""}
+      <section class="section"><div class="section-head"><div><p class="kicker">Como funciona</p><h2>Energia pela competência do consumo</h2>
+          <p>Lance cada fatura com as datas da leitura anterior e da atual (o dia da leitura atual já pertence à próxima fatura). O custo — Copel + arrendamento — entra no relatório do mês em que a energia foi consumida, não no mês do pagamento: o período é dividido entre os meses pela energia que este carregador entregou em cada dia. Dias depois da última fatura entram como <strong>estimativa</strong> (tarifa por kWh entregue da última fatura) até a próxima fatura ser lançada. O vencimento aparece em Pagamentos no mês em que vence. Com faturas lançadas, os campos de energia por competência deste carregador deixam de ser usados pelo motor.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Fatura</th><th>Período de leitura</th><th class="num">kWh medidor</th><th class="num">kWh entregue</th><th class="num">Copel</th><th class="num">Arrendamento</th><th class="num">Total</th><th class="num">R$/kWh entregue</th><th>Vencimento</th><th></th></tr></thead>
+          <tbody>${draft.slice().sort((a, b) => String(b.start).localeCompare(String(a.start))).map(i => { const c = byId.get(i.id) || {}; const lease = leaseOf(i); return `<tr>
+            <td><strong>${esc(i.ref ? (api.monthName?.(i.ref) || i.ref) : "—")}</strong>${i.notes ? `<small>${esc(i.notes)}</small>` : ""}</td>
+            <td>${fmtDay(i.start)} → ${fmtDay(i.end)}<small>${c.days || "—"} dia(s)${i.readingStart !== "" && i.readingEnd !== "" ? ` · leitura ${esc(i.readingStart)} → ${esc(i.readingEnd)} × ${esc(i.multiplier)}` : ""}</small></td>
+            <td class="num">${fmt.int(i.kwh)}</td><td class="num">${c.deliveredKWh !== undefined ? fmt.int(c.deliveredKWh) : "—"}<small>${c.deliveredKWh > 0 ? `perda ${fmt.pct1((i.kwh / c.deliveredKWh - 1) * 100)}` : ""}</small></td>
+            <td class="num">${fmt.brl(i.copelAmount)}</td><td class="num">${lease ? `${fmt.brl(lease)}${i.kwh > 0 ? `<small>${fmt.brl(lease / i.kwh)}/kWh medido</small>` : ""}` : "—"}</td>
+            <td class="num"><strong>${fmt.brl((Number(i.copelAmount) || 0) + lease)}</strong>${i.kwh > 0 ? `<small>${fmt.brl(((Number(i.copelAmount) || 0) + lease) / i.kwh)}/kWh medido</small>` : ""}</td><td class="num">${c.ratePerDelivered ? fmt.brl(c.ratePerDelivered) : "—"}</td>
+            <td>${fmtDay(i.dueDate)}<small>${i.paidAt ? `Copel paga ${fmtDay(i.paidAt)}` : "Copel a pagar"}${lease ? ` · arrend. ${i.leasePaidAt ? `pago ${fmtDay(i.leasePaidAt)}` : `a pagar${i.leaseDueDate ? ` ${fmtDay(i.leaseDueDate)}` : ""}`}` : ""}</small></td>
+            <td style="white-space:nowrap">${i.documentId ? `<button class="btn ghost" data-doc-open="${esc(i.documentId)}" type="button">PDF</button>` : ui.enFiles?.[i.id] ? `<small class="badge warn">PDF a enviar</small>` : ""}<button class="btn ghost" data-en-edit="${esc(i.id)}" type="button">Editar</button><button class="btn ghost" data-en-del="${esc(i.id)}" type="button" style="color:var(--uby-red)">Excluir</button></td></tr>`; }).join("") || `<tr><td colspan="10" class="empty">Nenhuma fatura lançada para este carregador. Enquanto isso, vale o custo por kWh da competência.</td></tr>`}</tbody></table></div>
+      </section>
+      <div class="split" style="margin-bottom:14px">
+        <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Resultado</p><h2>Energia por competência de consumo</h2><p>O que entra no relatório de cada mês.</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Competência</th><th>Origem</th><th class="num">kWh medidor</th><th class="num">Copel</th><th class="num">Arrendamento</th><th class="num">Estimativa</th><th class="num">Energia do mês</th></tr></thead>
+            <tbody>${months.map(mk => { const m = info.months[mk]; return `<tr>
+              <td><strong>${esc(api.monthName?.(mk) || mk)}</strong><small>${fmt.int(info.deliveredByMonth[mk] || 0)} kWh entregues</small></td>
+              <td style="white-space:normal">${m.parts.map(p => `<small>fatura ${esc(p.ref ? (api.monthName?.(p.ref) || p.ref) : p.start)}: ${fmtDay(p.from)} a ${fmtDay(p.to)} · ${fmt.pct1(p.share * 100)} · ${fmt.brl(p.total)}</small>`).join("")}${m.estimatedCost ? `<small><span class="badge warn">estimativa</span> ${fmtDay(m.estimatedFrom)} a ${fmtDay(m.estimatedTo)} · ${fmt.int(m.estimatedDeliveredKWh)} kWh entregues</small>` : ""}</td>
+              <td class="num">${fmt.int(m.kwh + m.estimatedKWh)}</td><td class="num">${fmt.brl(m.copel)}</td><td class="num">${fmt.brl(m.lease)}</td><td class="num">${m.estimatedCost ? fmt.brl(m.estimatedCost) : "—"}</td>
+              <td class="num"><strong>${fmt.brl(m.cost)}</strong></td></tr>`; }).join("") || `<tr><td colspan="7" class="empty">Sem faturas lançadas.</td></tr>`}</tbody></table></div>
+        </section>
+        <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">${f.id ? "Editando" : "Nova fatura"}</p><h2>${f.id ? `Fatura ${esc(f.ref || f.start)}` : "Lançar fatura de energia"}</h2><p>Lance o que veio na fatura: kWh consumido, valor da Copel, valor do arrendamento e as datas das leituras (a anterior já vem da última fatura). Médias por kWh e a divisão entre os meses são calculadas pela plataforma.</p></div></div>
+          <label class="imp-field" style="display:block;border:1.5px dashed var(--uby-line, #c9d6cf);border-radius:10px;padding:10px 12px;margin-bottom:10px;cursor:pointer">
+            <span style="font-size:12px;font-weight:800">📄 Ler fatura da Copel (PDF)</span>
+            <small style="display:block;color:var(--uby-muted)">Escolha o PDF baixado do site/app da Copel: datas das leituras, kWh, valor, vencimento e leituras do medidor são preenchidos sozinhos. O PDF fica guardado junto da fatura ao salvar.</small>
+            <input id="pmEnPdf" type="file" accept="application/pdf" style="margin-top:6px;width:100%">
+          </label>
+          ${ui.enRead ? `<div class="note" style="margin-bottom:10px;border-color:${ui.enRead.ok ? "var(--uby-green, #1f9d55)" : "var(--uby-red)"}"><strong>${ui.enRead.ok ? "Lido do PDF" : "Não consegui ler"}${ui.enRead.file ? ` · ${esc(ui.enRead.file)}` : ""}</strong><br>${esc(ui.enRead.msg || ui.enRead.error || "")}${(ui.enRead.notes || []).map(n => `<br>• ${esc(n)}`).join("")}</div>` : ""}
+          <div class="grid g2" style="gap:8px">
+            ${inp("ref", "Referência da fatura (mês)", "month")}${inp("kwh", `kWh consumido (da fatura)${f.readingStart !== "" && f.readingEnd !== "" && f.kwh === "" ? ` · pelas leituras: ${fmt.int(preview.kwh)}` : ""}`, "number", 'min="0" step="any"')}
+            ${inp("copelAmount", "Valor da Copel (R$)", "number", 'min="0" step="0.01"')}${inp("leaseAmount", "Valor do arrendamento (R$)", "number", 'min="0" step="0.01"')}
+            ${inp("start", "Leitura anterior em (data)", "date")}${inp("end", "Leitura atual em (data)", "date")}
+            ${inp("dueDate", "Vencimento da Copel", "date")}${inp("leaseDueDate", "Vencimento do arrendamento", "date")}
+          </div>
+          <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;font-weight:760">Opcional: leituras do medidor, pagamento e observações</summary>
+            <div class="grid g2" style="gap:8px;margin-top:8px">
+              ${inp("readingStart", "Leitura anterior (medidor)", "number", 'step="any"')}${inp("readingEnd", "Leitura atual (medidor)", "number", 'step="any"')}
+              ${inp("multiplier", "Constante do medidor", "number", 'min="1" step="any"')}${inp("leaseKWh", "kWh compensados (só informativo)", "number", 'min="0" step="any"')}
+              ${inp("paidAt", "Copel paga em", "date")}${inp("leasePaidAt", "Arrendamento pago em", "date")}
+            </div>
+            ${inp("notes", "Observações")}
+          </details>
+          ${(() => { const tot = preview.copelAmount + leaseOf(preview); return `<p class="source-line">Total desta fatura: <strong>${fmt.brl(tot)}</strong> · ${fmt.int(preview.kwh)} kWh${preview.kwh > 0 && tot > 0 ? ` · média <strong>${fmt.brl(tot / preview.kwh)}/kWh</strong> (Copel ${fmt.brl(preview.copelAmount / preview.kwh)} + arrendamento ${fmt.brl(leaseOf(preview) / preview.kwh)})` : ""}${preview.start && preview.end > preview.start ? ` · consumo de ${fmtDay(preview.start)} a ${fmtDay(addDay(preview.end, -1))}` : ""}</p>`; })()}
+          <div style="display:flex;gap:8px;margin-top:10px"><button class="btn primary" id="pmEnApply" type="button">${f.id ? "Atualizar na lista" : "Adicionar à lista"}</button>${f.id ? `<button class="btn" id="pmEnNew" type="button">Nova fatura</button>` : ""}</div>
+        </section>
+      </div>`;
+  }
+  // Grava só a lista de faturas do carregador: relê o registro na nuvem, troca
+  // energyInvoices daquela estação e mantém todo o resto como está na nuvem.
+  async function saveInvoices(w, workId, station, workName, list) {
+    const sb = w.UBY_SUPABASE.client();
+    const { data: row, error } = await sb.from("obra_recargas_base").select("resumo").eq("obra_id", workId).maybeSingle();
+    if (error || !row) throw new Error("Não consegui ler a configuração na nuvem. Nada foi gravado.");
+    const fs = JSON.parse(JSON.stringify(row.resumo?.financialSettings || {}));
+    const key = w.normalizeStationForCompare(w.canonicalStationNameForWork(workId, station, workName));
+    if (!key) throw new Error("Carregador sem identificação. Nada foi gravado.");
+    fs.chargers = fs.chargers || {};
+    fs.chargers[key] = { ...(fs.chargers[key] || {}), energyInvoices: list };
+    await w.UBY_SUPABASE.saveRechargeMetadata(workId, { workId, workName, financialSettings: fs });
+    // Mantém a cópia em memória da plataforma oculta igual à nuvem, para que um
+    // "Salvar competência" depois não grave uma versão sem as faturas.
+    w.eval(`(function(fs, id){ const r = allRechargeRecords[id]; if (r) { r.financialSettings = fs; r.summary = { ...(r.summary || {}), financialSettings: fs }; } if (String(currentWorkId) === id) financialSettings = fs; })(${JSON.stringify(fs)}, ${JSON.stringify(String(workId))})`);
+    return `${list.length} fatura(s) de energia salvas para ${station}`;
   }
 
   // ---------- fechamentos: aprovar (congela os números), pagar, reabrir ----------
@@ -487,13 +644,14 @@
   }
 
   // ---------- render ----------
-  const TAB_IDS = ["carregador", "operacao", "matriz", "pagamentos", "documentos", "cotas", "fechamentos"];
+  const TAB_IDS = ["carregador", "energia", "operacao", "matriz", "pagamentos", "documentos", "cotas", "fechamentos"];
   async function render(target, params = []) {
     if (TAB_IDS.includes(params[0])) {
       ui.tab = params[0];
       const ref = params[1] ? decodeURIComponent(params[1]) : "";
       if (ref && ui.tab === "carregador" && ref !== ui.charger) { ui.charger = ref; ui.edits = {}; ui.rules = null; }
       if (ref && ui.tab === "operacao") { ui.opCharger = ref; ui.opForm = null; }
+      if (ref && ui.tab === "energia" && ref !== ui.enCharger) { ui.enCharger = ref; ui.enDraft = null; ui.enForm = null; }
     }
     target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Abrindo parâmetros e custos</h2><p>Carregando a plataforma original com a base completa. Na primeira vez leva alguns segundos.</p></div>`;
     let w;
@@ -515,10 +673,19 @@
       }
     } else {
       data.months = (UBY.state.months && UBY.state.months.length ? UBY.state.months : (w.getMonths?.() || [])).slice();
+      if (ui.tab === "energia") {
+        // Depois de gravar, o motor principal recarrega: espera ele voltar com o histórico completo.
+        for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
+        try { await Promise.race([UBY.state.api.loadFull(), new Promise(r => setTimeout(r, 15000))]); } catch (_) {}
+      }
       if (ui.tab === "documentos") {
         const mk = ui.docMonth || data.months.at(-1) || "";
         ui.docMonth = mk;
-        try { data.docs = await w.UBY_SUPABASE.loadFinanceDocuments({ competenceKey: mk, limit: 200 }); data.docsError = ""; }
+        try {
+          const [matrixDocs, chargerDocs] = await Promise.all([w.UBY_SUPABASE.loadFinanceDocuments({ competenceKey: mk, limit: 200 }), w.UBY_SUPABASE.loadFinanceDocuments({ scope: "charger", competenceKey: mk, limit: 200 })]);
+          data.docs = [...(matrixDocs || []), ...(chargerDocs || [])].sort((a, b) => String(a.due_date || "9999").localeCompare(String(b.due_date || "9999")));
+          data.docsError = "";
+        }
         catch (err) { data.docs = []; data.docsError = err.message; }
       }
     }
@@ -527,8 +694,8 @@
       <div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
         <p class="lead">Modelo, splits, energia, capital, metas e regras de cada carregador por competência; custos centrais da matriz; calendário de pagamentos; rodadas e cotistas. As contas e a gravação são as mesmas da plataforma original.</p></div>
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
-      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["operacao", "Operação e carregadores"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
-      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : quotasTab(w)}
+      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["energia", "Faturas de energia"], ["operacao", "Operação e carregadores"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
+      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
@@ -548,6 +715,60 @@
     const $ = s => target.querySelector(s);
     const dirty = () => Object.keys(ui.edits).length || ui.rules;
     target.querySelectorAll("#pmTabs button").forEach(b => b.onclick = () => { ui.tab = b.dataset.v; draw(target, w); });
+    // --- faturas de energia ---
+    if ($("#pmEnCharger")) $("#pmEnCharger").onchange = e => { if (ui.enDraft && !confirm("Descartar as faturas não salvas?")) { e.target.value = ui.enCharger; return; } ui.enCharger = e.target.value; ui.enDraft = null; ui.enForm = null; ui.enRead = null; ui.enPendingFile = null; ui.enFiles = {}; draw(target, w); };
+    const enStored = () => { const [wid, st] = ui.enCharger.split("|"); return UBY.state.api.energyInvoices(wid, st)?.stored || []; };
+    target.querySelectorAll("[data-ef]").forEach(el => el.onchange = () => { ui.enForm[el.dataset.ef] = el.value; draw(target, w); });
+    target.querySelectorAll("[data-en-edit]").forEach(b => b.onclick = () => { const it = (ui.enDraft || enStored()).find(i => i.id === b.dataset.enEdit); if (it) { ui.enForm = { ...it }; draw(target, w); } });
+    target.querySelectorAll("[data-en-del]").forEach(b => b.onclick = () => {
+      const cur = ui.enDraft || enStored(); const it = cur.find(i => i.id === b.dataset.enDel);
+      if (!it || !confirm(`Tirar a fatura ${it.ref || it.start} da lista? (só grava ao clicar em Salvar faturas)`)) return;
+      ui.enDraft = cur.filter(i => i.id !== it.id); if (ui.enForm?.id === it.id) ui.enForm = null; draw(target, w);
+    });
+    if ($("#pmEnPdf")) $("#pmEnPdf").onchange = async e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      ui.enRead = { ok: true, file: file.name, msg: "Lendo o PDF…" }; draw(target, w);
+      const res = await window.UBY_COPEL.read(file);
+      if (!res.ok) { ui.enRead = { ok: false, file: file.name, error: res.error }; draw(target, w); return; }
+      applyCopelRead(res, file, data.chargers);
+      draw(target, w);
+    };
+    if ($("#pmEnNew")) $("#pmEnNew").onclick = () => { ui.enForm = null; ui.enRead = null; ui.enPendingFile = null; draw(target, w); };
+    if ($("#pmEnDiscard")) $("#pmEnDiscard").onclick = () => { ui.enDraft = null; ui.enForm = null; ui.enRead = null; ui.enPendingFile = null; ui.enFiles = {}; draw(target, w); };
+    if ($("#pmEnApply")) $("#pmEnApply").onclick = () => {
+      const cur = (ui.enDraft || enStored()).slice();
+      const inv = cleanInvoice(ui.enForm);
+      const problems = invoiceProblems(inv, cur);
+      if (problems.length) { alert(`Falta ou está errado:\n• ${problems.join("\n• ")}`); return; }
+      const idx = cur.findIndex(i => i.id === inv.id);
+      if (idx >= 0) cur[idx] = inv; else cur.push(inv);
+      if (ui.enPendingFile) { ui.enFiles = { ...(ui.enFiles || {}), [inv.id]: ui.enPendingFile }; ui.enPendingFile = null; }
+      ui.enDraft = cur.sort((a, b) => a.start.localeCompare(b.start)); ui.enForm = null; ui.enRead = null; draw(target, w);
+    };
+    if ($("#pmEnSave")) $("#pmEnSave").onclick = () => {
+      const c = data.chargers.find(x => x.key === ui.enCharger); if (!c || !ui.enDraft) return;
+      const list = ui.enDraft.map(i => ({ ...i }));
+      const files = ui.enFiles || {};
+      run(target, w, `Faturas de energia · ${c.station}`, async () => {
+        // Primeiro guarda os PDFs (privados, em Documentos do carregador); depois a lista com o vínculo.
+        let sent = 0;
+        for (const inv of list) {
+          const file = files[inv.id];
+          if (!file) continue;
+          const doc = await w.UBY_SUPABASE.createFinanceDocument({
+            scope: "charger", workId: c.workId, competenceKey: inv.ref || String(inv.end).slice(0, 7), supplier: "Copel", category: "Energia",
+            documentNumber: inv.nfNumber || "", documentType: "fatura", amount: Number(inv.copelAmount) || 0, dueDate: inv.dueDate || null,
+            status: inv.paidAt ? "paid" : "pending", notes: `Fatura de energia ${inv.ref || ""} · ${c.station}${inv.uc ? ` · UC ${inv.uc}` : ""} · leitura ${inv.start} a ${inv.end}`
+          }, file);
+          inv.documentId = doc?.id || inv.documentId || "";
+          sent++;
+        }
+        const msg = await saveInvoices(w, c.workId, c.station, c.workName, list);
+        ui.enDraft = null; ui.enForm = null; ui.enFiles = {}; ui.enRead = null;
+        return sent ? `${msg} · ${sent} PDF(s) guardado(s)` : msg;
+      });
+    };
     // --- por carregador ---
     if ($("#pmCharger")) $("#pmCharger").onchange = e => { if (dirty() && !confirm("Descartar as alterações não salvas?")) { e.target.value = ui.charger; return; } ui.charger = e.target.value; ui.edits = {}; ui.rules = null; draw(target, w); };
     if ($("#pmMonth")) $("#pmMonth").onchange = e => { if (dirty() && !confirm("Descartar as alterações não salvas?")) { e.target.value = ui.month; return; } ui.month = e.target.value; ui.edits = {}; ui.rules = null; draw(target, w); };
@@ -685,9 +906,30 @@
       if (!confirm("Excluir este documento e o arquivo anexado? Não dá para desfazer.")) return;
       run(target, w, "Excluir documento", async () => { const r = await w.UBY_SUPABASE.deleteFinanceDocument(b.dataset.docDel); if (!r?.deleted) throw new Error("documento não encontrado"); return "documento excluído"; });
     });
+    // Caixa de entrada: PDF da Copel é reconhecido e pode ir direto para Faturas de energia.
+    if ($("#pmDocFile")) $("#pmDocFile").onchange = async e => {
+      const file = e.target.files?.[0];
+      ui.docFile = file || null; ui.docCopel = null;
+      if (!file || !/pdf/i.test(file.type || file.name)) return;
+      const res = await window.UBY_COPEL.read(file);
+      if (!res.ok) return;
+      const f = res.fields;
+      const api = UBY.state.api;
+      const match = data.chargers.find(c => { try { return (api.energyInvoices(c.workId, c.station)?.stored || []).some(i => String(i.uc || "") === f.uc); } catch (_) { return false; } });
+      ui.docCopel = { res, file, summary: `Ref. ${f.ref.slice(5)}/${f.ref.slice(0, 4)} · UC ${f.uc}${match ? ` (${match.station})` : ""} · ${f.kwh} kWh · R$ ${f.copelAmount.toFixed(2).replace(".", ",")} · vence ${f.dueDate.split("-").reverse().join("/")}` };
+      ui.docForm = { ...ui.docForm, supplier: "Copel", category: "Energia", documentType: "fatura", documentNumber: f.nfNumber || "", amount: f.copelAmount, dueDate: f.dueDate, link: match ? `work|${match.workId}` : ui.docForm.link };
+      draw(target, w).then(() => { const inp = target.querySelector("#pmDocFile"); if (inp && ui.docFile) { try { const dt = new DataTransfer(); dt.items.add(ui.docFile); inp.files = dt.files; } catch (_) {} } });
+    };
+    if ($("#pmDocToEnergy")) $("#pmDocToEnergy").onclick = () => {
+      const { res, file } = ui.docCopel;
+      ui.docCopel = null; ui.docFile = null; ui.docForm = null;
+      ui.tab = "energia";
+      applyCopelRead(res, file, data.chargers);
+      draw(target, w);
+    };
     if ($("#pmDocSave")) $("#pmDocSave").onclick = () => {
       const df = ui.docForm;
-      const file = $("#pmDocFile")?.files?.[0] || null;
+      const file = $("#pmDocFile")?.files?.[0] || ui.docFile || null;
       if (!String(df.supplier || "").trim() || !(Number(df.amount) > 0)) { log("Documento: informe fornecedor e valor.", "bad"); draw(target, w); return; }
       const [kind, ref] = String(df.link || "").split("|");
       run(target, w, `Documento ${df.supplier}`, async () => {
@@ -696,7 +938,7 @@
           competenceKey: ui.docMonth, supplier: df.supplier, category: df.category, documentNumber: df.documentNumber, documentType: df.documentType,
           amount: Number(df.amount), dueDate: df.dueDate || null, status: df.status, installmentNumber: df.installmentNumber || null, installmentTotal: df.installmentTotal || null, notes: df.notes
         }, file);
-        ui.docForm = null;
+        ui.docForm = null; ui.docFile = null; ui.docCopel = null;
         return file ? `salvo com o arquivo ${file.name}` : "salvo sem arquivo";
       });
     };

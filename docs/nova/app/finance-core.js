@@ -57,6 +57,72 @@
     return { mode, copelCost, copelKWh: baseKWh, creditedKWh, leaseRatePerKWh: leaseRate, leaseCost, totalCost, costPerKWh: baseKWh > 0 ? totalCost / baseKWh : 0 };
   }
 
+  /*
+    Faturas de energia por período de leitura (Copel + arrendamento).
+    Cada fatura cobre [start, end): o dia da leitura final pertence à próxima.
+    O custo entra na competência do consumo, não na do pagamento: os kWh e o
+    valor são divididos pelos dias do período na proporção da energia que o
+    carregador entregou em cada dia (sem entrega no período inteiro: por dia).
+    Dias com entrega sem fatura lançada (ex.: fim do mês, fatura ainda não
+    chegou) entram como estimativa, pela tarifa por kWh entregue da fatura
+    mais próxima, e ficam marcados até a fatura chegar.
+    invoices: [{id, ref, start, end, kwh, copelAmount, leaseKWh, leaseRate}]
+    dailyKWh: { "AAAA-MM-DD": kWh entregue }
+  */
+  const addDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  function invoiceTotals(inv) {
+    // Arrendamento: vale o valor lançado em R$; sem ele, kWh compensados × tarifa.
+    const copel = pos(inv.copelAmount), leaseKWh = pos(inv.leaseKWh), leaseRate = pos(inv.leaseRate);
+    const lease = pos(inv.leaseAmount) > 0 ? Math.round(pos(inv.leaseAmount) * 100) / 100 : Math.round(leaseKWh * leaseRate * 100) / 100;
+    return { copel, lease, leaseKWh, leaseRate, total: copel + lease, kwh: pos(inv.kwh) };
+  }
+  function energyInvoiceMonths(invoices, dailyKWh = {}) {
+    const list = (invoices || []).filter(i => /^\d{4}-\d{2}-\d{2}$/.test(i.start || "") && /^\d{4}-\d{2}-\d{2}$/.test(i.end || "") && i.end > i.start)
+      .map(i => ({ ...i, ...invoiceTotals(i) })).sort((a, b) => a.start.localeCompare(b.start));
+    const months = {};
+    const month = mk => (months[mk] = months[mk] || { kwh: 0, copel: 0, lease: 0, leaseKWh: 0, total: 0, deliveredKWh: 0, parts: [], estimatedKWh: 0, estimatedCost: 0, estimatedDeliveredKWh: 0, estimatedFrom: "", estimatedTo: "" });
+    const covered = new Set();
+    list.forEach(inv => {
+      const days = [];
+      for (let d = inv.start; d < inv.end; d = addDays(d, 1)) { days.push(d); covered.add(d); }
+      const delivered = days.reduce((s, d) => s + pos(dailyKWh[d]), 0);
+      inv.days = days.length; inv.deliveredKWh = delivered;
+      inv.ratePerDelivered = delivered > 0 ? inv.total / delivered : 0;
+      inv.ratePerMetered = inv.kwh > 0 ? inv.total / inv.kwh : 0;
+      const byMonth = new Map();
+      days.forEach(d => { const mk = d.slice(0, 7); byMonth.set(mk, (byMonth.get(mk) || 0) + (delivered > 0 ? pos(dailyKWh[d]) : 1)); });
+      const keys = [...byMonth.keys()], weights = keys.map(k => byMonth.get(k));
+      const copel = allocate(inv.copel, weights), lease = allocate(inv.lease, weights);
+      const wsum = weights.reduce((s, x) => s + x, 0) || 1;
+      keys.forEach((mk, i) => {
+        const share = weights[i] / wsum;
+        if (!(share > 0)) return;
+        const m = month(mk);
+        const part = { id: inv.id, ref: inv.ref || "", start: inv.start, end: inv.end, share, kwh: inv.kwh * share, leaseKWh: inv.leaseKWh * share, copel: copel[i], lease: lease[i], total: copel[i] + lease[i],
+          deliveredKWh: delivered > 0 ? byMonth.get(mk) : 0, from: days.find(d => d.startsWith(mk)), to: days.filter(d => d.startsWith(mk)).pop() };
+        m.parts.push(part);
+        m.kwh += part.kwh; m.leaseKWh += part.leaseKWh; m.copel += part.copel; m.lease += part.lease; m.total += part.total; m.deliveredKWh += part.deliveredKWh;
+      });
+    });
+    if (list.length) {
+      Object.keys(dailyKWh).sort().forEach(d => {
+        const kwh = pos(dailyKWh[d]);
+        if (!(kwh > 0) || covered.has(d)) return;
+        const ref = list.filter(i => i.start <= d && i.ratePerDelivered > 0).pop() || list.find(i => i.ratePerDelivered > 0);
+        if (!ref) return;
+        const m = month(d.slice(0, 7));
+        m.estimatedDeliveredKWh += kwh;
+        m.estimatedCost += kwh * ref.ratePerDelivered;
+        m.estimatedKWh += ref.deliveredKWh > 0 ? kwh * ref.kwh / ref.deliveredKWh : 0;
+        m.estimatedRef = ref.ref || ref.id;
+        if (!m.estimatedFrom || d < m.estimatedFrom) m.estimatedFrom = d;
+        if (!m.estimatedTo || d > m.estimatedTo) m.estimatedTo = d;
+      });
+    }
+    Object.values(months).forEach(m => { m.estimatedCost = Math.round(m.estimatedCost * 100) / 100; m.cost = Math.round((m.total + m.estimatedCost) * 100) / 100; });
+    return { invoices: list, months };
+  }
+
   // ---------- rateio ao centavo (maior resto) ----------
   function allocate(amount, weights) {
     const cents = Math.round(pos(amount) * 100);
@@ -92,8 +158,14 @@
     const platform = revenue * num(cfg.platformPct) / 100;
     const ubyRoyalty = model === "third_party_management" ? revenue * num(cfg.ubyRoyaltyPct) / 100 : 0;
     const taxes = revenue * num(cfg.taxRatePct) / 100;
-    const comp = energyComposition(cfg);
-    let energyCost = comp.totalCost > 0 ? comp.totalCost : commercialEnergy * num(cfg.energyCostPerKWh);
+    // Com faturas por período de leitura, a energia da competência vem delas
+    // (parte das faturas + estimativa dos dias ainda sem fatura).
+    const inv = input.energyInvoice || null;
+    const comp = inv ? { mode: "invoice", copelCost: num(inv.copel), copelKWh: num(inv.kwh), creditedKWh: num(inv.leaseKWh), leaseRatePerKWh: 0, leaseCost: num(inv.lease),
+      invoiceCost: num(inv.total), estimatedCost: num(inv.estimatedCost), estimatedKWh: num(inv.estimatedKWh), estimatedDeliveredKWh: num(inv.estimatedDeliveredKWh),
+      estimatedFrom: inv.estimatedFrom || "", estimatedTo: inv.estimatedTo || "", estimatedRef: inv.estimatedRef || "", parts: inv.parts || [],
+      totalCost: num(inv.cost), costPerKWh: energy > 0 ? num(inv.cost) / energy : 0 } : energyComposition(cfg);
+    let energyCost = inv ? num(inv.cost) : comp.totalCost > 0 ? comp.totalCost : commercialEnergy * num(cfg.energyCostPerKWh);
     let courtesyInvoiceExcluded = 0;
     if (fixes.courtesyInvoice && comp.totalCost > 0 && courtesy.treatment === "partner_absorbed" && courtesy.energy > 0) {
       // A fatura cobre toda a energia do mês; a parte da cortesia absorvida pelo parceiro sai do custo UBY.
@@ -264,5 +336,5 @@
       totals: { preTax: sum("preTax"), taxes: sum("taxes"), taxBase: sum("taxBase"), result: sum("result"), distributable: sum("distributable"), investorPool: sum("investorPool"), legalReserve: sum("legalReserve"), expansionReserve: sum("expansionReserve"), carryOut: carry } };
   }
 
-  global.UBY_FINANCE_CORE = Object.freeze({ FIXES, FIXES_ON, FIXES_OFF, computeMonth, aggregate, network, allocate, evaluateRules, energyComposition, ADDITIVE });
+  global.UBY_FINANCE_CORE = Object.freeze({ FIXES, FIXES_ON, FIXES_OFF, computeMonth, aggregate, network, allocate, evaluateRules, energyComposition, energyInvoiceMonths, ADDITIVE });
 })(typeof window !== "undefined" ? window : globalThis);

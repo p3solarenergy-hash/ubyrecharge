@@ -29,10 +29,10 @@
     ] },
     { label: "GESTÃO DE OBRAS", items: [
       { id: "obras", icon: "⌑", label: "Obras, prazos e pendências", type: "view" },
-      { id: "obras-classico", icon: "✎", label: "Obras · cadastro e edição", type: "classic", src: LEGACY + "index.html" },
+      { id: "obras-classico", icon: "✎", label: "Obras · cadastro e edição", type: "classic", src: LEGACY + "index.html", writes: "obras" },
       { id: "mapa", icon: "⌖", label: "Mapa de implantação", type: "view" },
-      { id: "mapa-classico", icon: "✎", label: "Mapa · vínculos (edição)", type: "classic", src: LEGACY + "mapa-implantacao.html" },
-      { id: "engenharia", icon: "⚡", label: "Engenharia e concessionária", type: "classic", src: LEGACY + "engenharia.html" },
+      { id: "mapa-classico", icon: "✎", label: "Mapa · vínculos (edição)", type: "classic", src: LEGACY + "mapa-implantacao.html", writes: "obras" },
+      { id: "engenharia", icon: "⚡", label: "Engenharia e concessionária", type: "classic", src: LEGACY + "engenharia.html", writes: "obras" },
       { id: "analisadores", icon: "∿", label: "Analisadores de energia", type: "view" },
       { id: "mercado", icon: "◌", label: "Mercado EV", type: "view" }
     ] },
@@ -44,7 +44,7 @@
       { id: "auditoria", icon: "✓", label: "Auditoria do motor financeiro", type: "view" },
       { id: "operacao-uby", icon: "◆", label: "Relatórios antigos (consulta)", type: "classic", src: LEGACY + "recargas.html", tab: "uby" },
       { id: "tarefas", icon: "☰", label: "Tarefas", type: "view" },
-      { id: "tarefas-classico", icon: "✎", label: "Tarefas · edição", type: "classic", src: "legado/tarefas/index.html" }
+      { id: "tarefas-classico", icon: "✎", label: "Tarefas · edição", type: "classic", src: "legado/tarefas/index.html", writes: "obras" }
     ] }
   ];
   const ROUTES = Object.fromEntries(GROUPS.flatMap(g => g.items.map(item => [item.id, { ...item, group: g.label }])));
@@ -161,13 +161,17 @@
   function bootMotor() {
     const frame = $("#motorFrame");
     setStatus("Carregando motor…", "warn");
+    // Ao recarregar, o documento antigo continua no quadro até o novo começar:
+    // nunca aceitar o motor antigo (ele é descartado e suas promessas não terminam).
+    let previous = null;
+    try { previous = frame.contentWindow && frame.contentWindow.UBY_MOTOR_API; } catch (_) {}
     frame.src = LEGACY + "motor.html?t=" + Date.now();
     return new Promise((resolve, reject) => {
       const started = Date.now();
       const timer = setInterval(() => {
         let api = null;
         try { api = frame.contentWindow && frame.contentWindow.UBY_MOTOR_API; } catch (_) {}
-        if (api) { clearInterval(timer); resolve(api); }
+        if (api && api !== previous) { clearInterval(timer); resolve(api); }
         else if (Date.now() - started > 90000) { clearInterval(timer); reject(new Error("O motor não respondeu em 90 s.")); }
       }, 250);
     });
@@ -297,7 +301,7 @@
     // Página original específica (ex.: detalhe de uma obra). Só aceita páginas
     // da pasta legado/, sem subir diretórios.
     if (id === "abrir" && /^legado\/[\w\-./?=&%]+$/.test(params[0] || "") && !params[0].includes("..")) {
-      def = { id: "abrir", type: "classic", src: params[0], tab: params[1] || "", label: params[2] || "Tela original", group: params[3] || "GESTÃO DE OBRAS" };
+      def = { id: "abrir", type: "classic", src: params[0], writes: /^legado\/obra-ev\/gestao_obra_ev_detalhe\.html/.test(params[0]) ? "obras" : false, tab: params[1] || "", label: params[2] || "Tela original", group: params[3] || "GESTÃO DE OBRAS" };
     }
     state.route = def; state.params = params;
     document.body.classList.remove("menu-open");
@@ -352,8 +356,10 @@
   function openClassic(def) {
     $("#view").hidden = true;
     $("#classicWrap").classList.add("on");
-    // Barra informa quando a tela grava na base real (só importações).
-    $("#classicWrap").querySelector(".classic-bar span").innerHTML = def.writes
+    // Barra informa quando a tela grava na base real (importações e obras).
+    $("#classicWrap").querySelector(".classic-bar span").innerHTML = def.writes === "obras"
+      ? `<strong style="color:var(--uby-red)">Gravação ligada</strong> · <strong>${esc(def.label)}</strong> · cadastro, fases, tarefas, documentos e vínculos gravam na base real (a mesma da plataforma atual). Excluir obra fica bloqueado: use Arquivar.`
+      : def.writes
       ? `<strong style="color:var(--uby-red)">Gravação ligada</strong> · <strong>${esc(def.label)}</strong> · importar, desfazer, corrigir mês e restaurar backup gravam na base real (a mesma da plataforma atual). Todas as outras telas continuam só leitura.`
       : `Tela original · <strong>${esc(def.label)}</strong> · todas as funções e cálculos da plataforma, com as cores da nova. Gravações bloqueadas nesta versão local.`;
     const frame = $("#classicFrame");

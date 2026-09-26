@@ -59,7 +59,7 @@
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Gestão e governança · operational_tasks</p><h1>Tarefas</h1>
         <p class="lead">Central compartilhada de tarefas da equipe: prazos, responsáveis, prioridade e dependências externas.</p></div>
-        <div class="callout"><strong>Só leitura nesta versão</strong><small>Para criar, mudar a situação ou excluir: <a href="${PUB}" target="_blank" rel="noopener">abrir Tarefas na publicada ↗</a> · <a href="#/tarefas-classico">ver tela original</a></small></div></div>
+        <div class="callout"><strong>Editar tarefas</strong><small>Para criar, mudar a situação ou excluir: <a href="#/tarefas-classico">Tarefas · edição ✎</a> (grava na base real)</small></div></div>
       <section class="section"><div class="grid g5">
         ${kpi("Abertas", fmt.int(open.length), `${tasks.length} no total`, "", "lead")}
         ${kpi("Atrasadas", fmt.int(late.length), "vencidas e não concluídas", "", late.length ? "bad" : "")}
