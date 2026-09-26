@@ -85,14 +85,15 @@
       // Ranking de carregadores da operação UBY e parceiros; só gestão P3 e fora da UBY ficam no fim, fechados.
       const main = withOp.filter(u => u.op === "uby" || u.op === "partner").sort((a, b) => b[key] - a[key]);
       const others = withOp.filter(u => u.op === "p3" || u.op === "outside").sort((a, b) => b[key] - a[key]);
-      const maxRev = Math.max(...main.map(u => u.revenue), 0), maxEn = Math.max(...main.map(u => u.energy), 0);
-      const oMaxRev = Math.max(...others.map(u => u.revenue), 0), oMaxEn = Math.max(...others.map(u => u.energy), 0);
-      body = `${main.map(u => `<div class="co-group co-single">${unitLink(u)}${unitRows(u, maxRev, maxEn)}</div>`).join("") || `<div class="note">Nenhum carregador da operação UBY ou de parceiros com recarga no recorte.</div>`}
+      // Régua única: R$ e kWh no mesmo eixo, para a energia aparecer proporcional ao faturamento.
+      const scale = Math.max(...main.map(u => Math.max(u.revenue, u.energy)), 0);
+      const oScale = Math.max(...others.map(u => Math.max(u.revenue, u.energy)), 0);
+      body = `${main.map(u => `<div class="co-group co-single">${unitLink(u)}${unitRows(u, scale, scale)}</div>`).join("") || `<div class="note">Nenhum carregador da operação UBY ou de parceiros com recarga no recorte.</div>`}
         ${others.length ? `<div class="co-group co-muted"><button class="co-head" data-g="others" type="button"><span class="co-caret">${co.open.others ? "▾" : "▸"}</span><strong>Fora dos resultados UBY</strong><span class="badge neutral">${others.length} carregador(es)</span><small>só gestão P3 e não classificados · ${fmt.brl(others.reduce((s, u) => s + u.revenue, 0))}</small></button>
-          ${co.open.others ? `<div class="co-units">${others.map(u => `<div class="co-unit">${unitLink(u)}${unitRows(u, oMaxRev, oMaxEn)}</div>`).join("")}</div>` : ""}</div>` : ""}
-        <p class="source-line">Barras proporcionais ao carregador de maior ${key === "energy" ? "energia" : "faturamento"} do recorte. Variação contra o período anterior de mesmo tamanho.</p>`;
+          ${co.open.others ? `<div class="co-units">${others.map(u => `<div class="co-unit">${unitLink(u)}${unitRows(u, oScale, oScale)}</div>`).join("")}</div>` : ""}</div>` : ""}
+        <p class="source-line">Régua única: faturamento (R$) e energia (kWh) no mesmo eixo; 100% = maior valor do recorte. Assim a barra de energia fica proporcional ao preço cobrado (ex.: R$ 1,74/kWh → energia ≈ 57% do faturamento). Variação contra o período anterior de mesmo tamanho.</p>`;
     } else {
-      const maxRev = Math.max(...res.groups.map(g => g.revenue), 0), maxEn = Math.max(...res.groups.map(g => g.energy), 0);
+      const maxRev = Math.max(...res.groups.map(g => Math.max(g.revenue, g.energy)), 0), maxEn = maxRev;
       body = res.groups.map(g => {
         const open = !!co.open[g.id];
         const units = withOp.filter(u => u.op === g.id).sort((a, b) => b[key] - a[key]);
@@ -102,7 +103,7 @@
           <div class="co-row"><span class="co-lbl">Energia</span>${companyBar("en", g.energy, maxEn, `<strong>${fmt.kwh(g.energy)}</strong>${dd(g.energy, g.prevEnergy)}`)}</div>
           ${open ? `<div class="co-units">${units.map(u => `<div class="co-unit">${unitLink({ ...u, op: "" })}${unitRows(u, g.revenue, g.energy, true)}</div>`).join("")}</div>` : ""}
         </div>`;
-      }).join("") + `<p class="source-line">Barra da operação: proporção em relação à maior operação. Barra do carregador: participação dentro da operação. Variação contra o período anterior de mesmo tamanho.</p>`;
+      }).join("") + `<p class="source-line">Barra da operação: régua única (R$ e kWh no mesmo eixo, 100% = maior valor). Barra do carregador: participação dentro da operação. Variação contra o período anterior de mesmo tamanho.</p>`;
       if (!res.groups.length) body = `<div class="note">Nenhuma recarga no recorte escolhido.</div>`;
     }
 
@@ -183,11 +184,11 @@
         <div class="section-head"><div><p class="kicker">Fechamento por origem</p><h2>Rede consolidada</h2><p>Consolidação não apaga a diferença entre operação própria e parceiros.</p></div>
           <div class="meta">AC ${fmt.int(n.acdc.acCharges)} recargas · DC ${fmt.int(n.acdc.dcCharges)} recargas</div></div>
         <div class="grid g6">
+          ${kpi("Ocupação média", fmt.pct(n.occupancy), `faixa ${esc(n.occupancyBand)} (${esc(n.occupancyRange)})`, "", "lead big")}
           ${kpi("Faturamento consolidado", fmt.brl(n.revenue), "todas as operações visíveis", "", "lead big")}
           ${kpi("Faturamento próprio UBY", fmt.brl(n.ownRevenue), "DC + AC próprios")}
           ${kpi("Energia entregue", fmt.kwh0(n.energy), `${fmt.int(n.sessions)} recarga(s)`, "", "warn")}
           ${kpi("Clientes únicos", fmt.int(n.clients), "e-mail ou nome da sessão")}
-          ${kpi("Ocupação média", fmt.pct(n.occupancy), `faixa ${esc(n.occupancyBand)} (${esc(n.occupancyRange)})`)}
           ${kpi("Projeção do mês", fmt.brl(n.projectedRevenue), n.projectionMonth ? `${esc(UBY.state.api.monthName(n.projectionMonth))} · ${n.projectionUnits} unidade(s)` : "sem base para projetar")}
         </div>
       </section>

@@ -977,7 +977,15 @@
       scope: { kind, workId: scope.workId || "", station: scope.station || "", monthKey: mk, label: mk ? monthLabel(mk) : "Acumulado", months: monthList,
         power, bounds: bounds ? { start: iso(bounds.start), end: iso(bounds.end) } : null, stations: rows.length },
       totals: { sessions: charges.length, revenue: sumBy(charges, c => c.revenue), energy: sumBy(charges, c => c.energyKWh), idleValue: sumBy(charges, c => c.idleValue),
-        acdc: generalAcDcStats(charges) },
+        acdc: generalAcDcStats(charges),
+        // Ocupação do período: mesma regra do calendário (energia ÷ potência × horas disponíveis).
+        // Mesma regra do Comando: cada carregador com a própria potência e o próprio horário, somados.
+        ...(() => {
+          if (kpis) return { occupancy: kpis.occupancy, occupancyHours: kpis.occHours, power };
+          const occ = rows.filter(r => (r.charges || []).some(inMonth)).map(r => stationOccupancyForMonths({ ...r, stationName: r.stationName || r.station }, mk ? [mk] : monthList, "mtd"));
+          const maxKWh = sumBy(occ, o => o.maxKWh), energyOcc = sumBy(occ, o => o.energy);
+          return { occupancy: maxKWh > 0 ? energyOcc / maxKWh * 100 : null, occupancyHours: occ.length ? Math.max(...occ.map(o => o.hours)) : 0, power };
+        })() },
       kpis, weekday,
       recent: { labels: series.labels, count: series.count, energy: series.energy, revenue: series.revenue, idleValue: series.idleValue },
       hours: { labels: series.hourLabels, values: series.hourValues },

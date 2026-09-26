@@ -110,8 +110,9 @@
       ${u.kpis ? kpiBlock(u.kpis, station) : ""}
 
       <section class="section"><div class="section-head"><div><p class="kicker">Volume do período</p><h2>${esc(scopeLabel)}</h2></div><div class="meta">AC ${fmt.int(t.acdc.acCharges)} recargas · DC ${fmt.int(t.acdc.dcCharges)} recargas</div></div>
-        <div class="grid g5">
-          ${kpi("Faturamento", fmt.brl(t.revenue), "", "", "lead")}
+        <div class="grid g6">
+          ${kpi("Ocupação média", t.occupancy === null || t.occupancy === undefined ? "—" : fmt.pct(t.occupancy), t.power ? (ui.kind === "station" ? `${fmt.int(t.power)} kW · ${fmt.int(t.occupancyHours)} h disponíveis` : `${fmt.int(t.power)} kW · horário de cada carregador`) : "sem potência configurada", "", "lead big")}
+          ${kpi("Faturamento", fmt.brl(t.revenue), "", "", "lead big")}
           ${kpi("Recargas", fmt.int(t.sessions), "todas as tentativas")}
           ${kpi("Energia", fmt.kwh0(t.energy), "", "", "warn")}
           ${kpi("Carregadores AC / DC", `${t.acdc.acChargers} / ${t.acdc.dcChargers}`, "conectores ou estações únicas")}
