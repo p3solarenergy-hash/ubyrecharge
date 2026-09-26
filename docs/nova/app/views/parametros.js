@@ -284,7 +284,7 @@
     const p = w.loadNetworkDistribution();
     const e = ui.policyEdits || (ui.policyEdits = JSON.parse(JSON.stringify({
       quotaValue: p.quotaValue || 80000, distributionStartMonth: p.distributionStartMonth || "2026-06", legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct,
-      investorPct: p.investorPct, totalQuotas: p.totalQuotas, soldQuotas: p.soldQuotas, roundLabel: p.roundLabel,
+      investorPct: p.investorPct, totalQuotas: p.totalQuotas, soldQuotas: p.soldQuotas, roundLabel: p.roundLabel, taxRatePct: p.taxRatePct || 0, taxByMonth: { ...(p.taxByMonth || {}) },
       investors: (p.investors || []).map(i => ({ ...i, quotaValue: i.quotaValue || 0 }))
     })));
     const inp = (k, label, type = "number", extra = "") => field(label, `<input class="select" data-pol="${k}" type="${type}" value="${esc(e[k] ?? "")}" ${extra} style="width:100%">`);
@@ -297,6 +297,11 @@
           ${inp("investorPct", "Parte dos cotistas após reservas (%)", "number", 'min="0" max="100" step="0.1"')}${inp("totalQuotas", "Cotas da rodada atual", "number", 'min="1" step="1"')}
           ${inp("soldQuotas", "Cotas vendidas", "number", 'min="0" step="1"')}${inp("roundLabel", "Nome da rodada atual", "text")}
         </div>
+      </section>
+      <section class="section"><div class="section-head"><div><p class="kicker">Impostos da UBY</p><h2>Impostos sobre o faturamento</h2><p>Incidem sobre tudo o que a UBY faturou no mês (recargas e receitas dos ativos próprios + royalties) e saem do resultado antes das reservas e dos cotistas. Use o percentual e, quando a guia sair, lance o valor exato do mês — ele substitui o percentual naquela competência.</p></div></div>
+        <div class="grid g4" style="gap:8px">${inp("taxRatePct", "Alíquota sobre o faturamento (%)", "number", 'min="0" max="100" step="0.01"')}</div>
+        <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Competência</th><th class="num">Valor exato do imposto (R$)</th><th>Uso</th></tr></thead>
+          <tbody>${(UBY.state.months || []).slice().reverse().map(mk => { const v = e.taxByMonth[mk]; return `<tr><td>${esc(UBY.state.api?.monthName?.(mk) || mk)}</td><td class="num"><input class="select" type="number" min="0" step="0.01" data-tax-month="${esc(mk)}" value="${v === undefined ? "" : esc(v)}" placeholder="usar ${esc(e.taxRatePct || 0)}%" style="width:150px"></td><td><small>${v === undefined ? `alíquota de ${esc(e.taxRatePct || 0)}%` : "valor lançado"}</small></td></tr>`; }).join("")}</tbody></table></div>
       </section>
       <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Cotistas e valor pago por cota</h2><p>${quotasSum} cota(s) cadastradas. "Habilitado a partir de" define o primeiro mês em que o cotista participa.</p></div>
           <button class="btn" id="pmInvAdd" type="button">＋ Cotista</button></div>
@@ -341,7 +346,7 @@
       <div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
         <p class="lead">Modelo, splits, energia, capital, metas e regras de cada carregador por competência; custos centrais da matriz; calendário de pagamentos; rodadas e cotistas. As contas e a gravação são as mesmas da plataforma original.</p></div>
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
-      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["cotas", "Cotas e rodadas"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["cotas", "Cotas, impostos e rodadas"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
       ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
@@ -435,6 +440,7 @@
     };
     // --- cotas ---
     target.querySelectorAll("[data-pol]").forEach(el => el.onchange = () => { const k = el.dataset.pol; ui.policyEdits[k] = ["roundLabel", "distributionStartMonth"].includes(k) ? el.value : Number(el.value || 0); draw(target, w); });
+    target.querySelectorAll("[data-tax-month]").forEach(el => el.onchange = () => { const k = el.dataset.taxMonth; if (el.value === "") delete ui.policyEdits.taxByMonth[k]; else ui.policyEdits.taxByMonth[k] = Math.max(0, Number(el.value)); draw(target, w); });
     target.querySelectorAll("[data-inv]").forEach(el => el.onchange = () => { const [i, k] = el.dataset.inv.split("|"); ui.policyEdits.investors[Number(i)][k] = ["quotas", "quotaValue"].includes(k) ? Number(el.value || 0) : el.value; draw(target, w); });
     if ($("#pmInvAdd")) $("#pmInvAdd").onclick = () => { ui.policyEdits.investors.push({ name: "Novo cotista", quotas: 1, eligibleFrom: new Date().toISOString().slice(0, 7), status: "pendente", quotaValue: ui.policyEdits.quotaValue }); draw(target, w); };
     target.querySelectorAll("[data-inv-del]").forEach(b => b.onclick = () => { const i = Number(b.dataset.invDel); if (confirm(`Remover ${ui.policyEdits.investors[i].name} da lista de cotistas?`)) { ui.policyEdits.investors.splice(i, 1); draw(target, w); } });
@@ -445,7 +451,7 @@
       const next = { ...current, ...ui.policyEdits, investors: ui.policyEdits.investors.filter(i => String(i.name || "").trim() && Number(i.quotas) > 0) };
       const saved = w.saveNetworkDistribution(next);
       const fb = await awaitMatrixSave(w);
-      if (Number(saved.quotaValue) !== Number(next.quotaValue)) throw new Error("O valor da cota não foi aceito pela plataforma original.");
+      if (Number(saved.quotaValue) !== Number(next.quotaValue) || Number(saved.taxRatePct || 0) !== Number(next.taxRatePct || 0)) throw new Error("A política não foi aceita pela plataforma original (valor da cota ou impostos).");
       ui.policyEdits = null;
       return fb || "política salva na nuvem";
     });

@@ -460,7 +460,7 @@
 
   function financeMonths() { return financeContext().sourceMonths; }
 
-  function finance(monthKey) {
+  function financeLegacy(monthKey) {
     const { includedRows, sourceMonths } = financeContext();
     const isMonthView = !!monthKey && sourceMonths.includes(monthKey);
     const mk = isMonthView ? monthKey : "";
@@ -542,7 +542,7 @@
     };
   }
 
-  function investorDistribution() {
+  function investorDistributionLegacy() {
     const d = networkInvestorDistributionModel();
     return {
       valid: d.valid, totalAllocated: d.totalAllocated, totalPool: d.totalPool,
@@ -928,7 +928,7 @@
     courtesyCharges: r.courtesyCharges, courtesyEnergy: r.courtesyEnergy, courtesyCostExcluded: r.courtesyCostExcluded
   });
 
-  function stationFinance(workId, station, monthKey) {
+  function stationFinanceLegacy(workId, station, monthKey) {
     const row = getUbyChargerRows(getGeneralUnitData()).find(r => String(r.workId) === String(workId) && normalizeStationForCompare(r.station) === normalizeStationForCompare(station));
     if (!row) return null;
     const rowMonths = [...new Set((row.charges || []).map(chargeMonthKey).filter(k => k !== "unknown"))].filter(isPlausibleMonthKey).sort();
@@ -957,7 +957,7 @@
   }
 
   // Destinos do resultado (renderGeneralFinance + renderGeneralFinanceOverview).
-  function destinations() {
+  function destinationsLegacy() {
     const unitData = getGeneralUnitData();
     const active = unitData.filter(u => Array.isArray(u.charges) && u.charges.length && (Number(u.count) > 0 || Number(u.energy) > 0 || Number(u.revenue) > 0));
     const rows = generalFinanceByUnit(active).sort((a, b) => {
@@ -1241,24 +1241,25 @@
   function fv2Policy() {
     const p = loadNetworkDistribution();
     return { legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct, investorPct: p.investorPct,
-      quotaValue: p.quotaValue, distributionStartMonth: p.distributionStartMonth, investors: normalizeNetworkInvestors(p.investors) };
+      quotaValue: p.quotaValue, distributionStartMonth: p.distributionStartMonth, investors: normalizeNetworkInvestors(p.investors),
+      taxRatePct: p.taxRatePct || 0, taxByMonth: p.taxByMonth || {}, paymentLedger: p.paymentLedger || {} };
   }
   function fv2NetworkMonthly(fixes) {
     const included = FV2.rows.filter(r => r.included);
     return FV2.months.map(mk => {
-      let ownedNet = 0, royalties = 0;
+      let ownedNet = 0, royalties = 0, taxBase = 0;
       const rows = [];
       included.forEach(row => {
         const active = !!(rowFirstMonth(row) && mk >= rowFirstMonth(row));
         if (fixes.zeroSaleMonths && !active) return;
         const r = fv2Month(row, mk, fixes);
         const owned = r.operationModel === "uby" || r.operationModel === "hybrid";
-        if (owned) ownedNet += r.operationNet;
-        else if (r.operationModel === "third_party_management") royalties += r.ubyRoyalty;
+        if (owned) { ownedNet += r.operationNet; taxBase += r.totalRevenue; }
+        else if (r.operationModel === "third_party_management") { royalties += r.ubyRoyalty; taxBase += r.ubyRoyalty; }
         if (owned || r.operationModel === "third_party_management") rows.push({ station: row.stationName, active, model: r.operationModel, revenue: r.revenue, energyCost: r.energyCost,
           localExtraCosts: r.localExtraCosts, matrizCost: r.matrizCost, taxes: r.taxes, operationNet: r.operationNet, royalty: r.ubyRoyalty, flags: r.flags });
       });
-      return { monthKey: mk, ownedNet, royalties, rows };
+      return { monthKey: mk, ownedNet, royalties, taxBase, rows };
     });
   }
 
@@ -1313,7 +1314,7 @@
     const legacyNet = FV2.months.map(mk => ({ monthKey: mk, result: n0(networkUnifiedReportModel({ monthKey: mk }).result) }));
     const legacyNetMs = performance.now() - t2;
     const t3 = performance.now();
-    const v2Net = CORE().network(fv2NetworkMonthly(OFF), fv2Policy(), OFF).months;
+    const v2Net = CORE().network(fv2NetworkMonthly(OFF), { ...fv2Policy(), taxRatePct: 0, taxByMonth: {} }, OFF).months;
     const v2NetMs = performance.now() - t3;
     const netDiffs = legacyNet.map((m, i) => ({ monthKey: m.monthKey, legacy: m.result, v2: v2Net[i]?.result || 0 })).filter(m => Math.abs(m.legacy - m.v2) > 0.005);
     return { checked, fields: fields.length, diffs: diffs.slice(0, 200), diffCount: diffs.length, legacyMs, v2Ms, legacyNetMs, v2NetMs, netMonths: legacyNet.length, netDiffs };
@@ -1350,9 +1351,215 @@
       networkMonths: { before: base.network.months, after: allRun.network.months }, investors: { before: base.network.investors, after: allRun.network.investors } };
   }
 
+  // =====================================================================
+  // Financeiro oficial da nova — motor v2 com as correções aprovadas em
+  // 26/09/2026 ("se você tiver certeza que agora estão corretos pode seguir").
+  // Mesmo formato de saída das versões originais (…Legacy), para as telas.
+  // =====================================================================
+  const ON = () => CORE().FIXES_ON;
+  function fv2RowAgg(row, monthKey = "") {
+    const fixes = ON();
+    const months = fv2RowMonths(row, fixes, monthKey);
+    const results = months.map(mk => fv2Month(row, mk, fixes));
+    const f = CORE().aggregate(results, fixes, { months: results.length || 1 });
+    f.costs = f.energyCost + f.extraCosts + f.taxes;
+    return { row, months, results, f };
+  }
+  // Soma de vários carregadores: investimento soma; payback = investimento ÷ resultado médio mensal da carteira.
+  function fv2SumRows(list) {
+    const t = Object.fromEntries(CORE().ADDITIVE.map(k => [k, list.reduce((s, x) => s + n0(x.f[k]), 0)]));
+    t.investmentValue = list.reduce((s, x) => s + n0(x.f.investmentValue), 0);
+    t.paybackInvestmentValue = list.reduce((s, x) => s + n0(x.f.paybackInvestmentValue), 0);
+    const months = new Set(list.flatMap(x => x.months)).size || 1;
+    const base = t.paybackBase / months;
+    t.paybackMonths = t.paybackInvestmentValue > 0 && base > 0 ? t.paybackInvestmentValue / base : 0;
+    t.roiMonthly = t.paybackInvestmentValue > 0 ? base / t.paybackInvestmentValue * 100 : 0;
+    t.margin = t.totalRevenue ? t.ownResult / t.totalRevenue * 100 : 0;
+    t.costs = t.energyCost + t.extraCosts + t.taxes;
+    return t;
+  }
+  function fv2Network() { return CORE().network(fv2NetworkMonthly(ON()), fv2Policy(), ON()); }
+
+  function finance(monthKey) {
+    fv2Ensure();
+    const sourceMonths = FV2.months;
+    const isMonthView = !!monthKey && sourceMonths.includes(monthKey);
+    const mk = isMonthView ? monthKey : "";
+    const aggs = FV2.rows.filter(r => r.included).map(r => fv2RowAgg(r, mk)).filter(x => x.results.length)
+      .sort((a, b) => n0(b.f.operationNet) - n0(a.f.operationNet));
+    const isPartner = x => x.f.operationModel === "third_party_management";
+    const partnerRows = aggs.filter(isPartner), ownRows = aggs.filter(x => !isPartner(x));
+    const total = Object.fromEntries(FINANCE_FIELDS.map(f => [f, ownRows.reduce((s, x) => s + n0(x.f[f]), 0)]));
+    const partnerRoyalty = partnerRows.reduce((s, x) => s + n0(x.f.ubyRoyalty), 0);
+    const totalCostPerKWh = total.commercialEnergy > 0 ? total.totalOperatingCost / total.commercialEnergy : null;
+    const margin = total.totalRevenue > 0 ? total.operationNet / total.totalRevenue * 100 : 0;
+    const ubyNet = n0(total.ubyNet), profit = ubyNet > 0;
+    const saRet = profit ? Math.max(0, n0(total.saRetention)) : 0, investor = profit ? Math.max(0, n0(total.investorDistribution)) : 0;
+    const distribution = { ubyNet, hasProfit: profit, saRetention: saRet, investors: investor, retained: profit ? Math.max(0, n0(total.ubyRetained)) : 0,
+      quotaPct: (ubyNet - saRet) > 0 ? investor / (ubyNet - saRet) * 100 : 0 };
+
+    // DRE consolidada da rede: ativos UBY + royalties − impostos, com reservas e cotistas pela regra corrigida.
+    const ownedDre = aggs.filter(x => ["uby", "hybrid"].includes(x.f.operationModel));
+    const sumF = (list, k) => list.reduce((s, x) => s + n0(x.f[k]), 0);
+    const owned = Object.fromEntries(["revenue", "extraRevenue", "marketingRevenue", "energyCost", "extraCosts", "matrizCost", "matrizTaxCost", "taxes", "areaParticipation", "management", "platform", "operationNet", "ubyRoyalty"].map(k => [k, sumF(ownedDre, k)]));
+    const net = fv2Network();
+    const policy = loadNetworkDistribution();
+    const nm = isMonthView ? (net.months.find(m => m.monthKey === mk) || {}) : null;
+    const pick = k => (isMonthView ? n0(nm[k]) : n0(net.totals[k]));
+    const royalties = partnerRoyalty;
+    const operationalResult = n0(owned.operationNet);
+    const networkTaxes = pick("taxes");
+    const networkResult = operationalResult + royalties - networkTaxes;
+    const legalReserve = pick("legalReserve"), expansionReserve = pick("expansionReserve"), investorPool = pick("investorPool");
+    const soldQuotas = Math.min(n0(policy.soldQuotas), n0(policy.totalQuotas) || 1);
+    const networkRevenue = n0(owned.revenue) + n0(owned.extraRevenue) + n0(owned.marketingRevenue);
+    const dre = {
+      ownedCount: ownedDre.length, partnerCount: partnerRows.length,
+      rechargeRevenue: n0(owned.revenue), extraRevenue: n0(owned.extraRevenue), royalties, marketing: n0(owned.marketingRevenue),
+      networkRevenue, energyCost: n0(owned.energyCost), directOperation: Math.max(0, n0(owned.extraCosts) - n0(owned.matrizCost)),
+      taxes: n0(owned.taxes), matrizTaxCost: n0(owned.matrizTaxCost), otherMatriz: Math.max(0, n0(owned.matrizCost) - n0(owned.matrizTaxCost)), matrizCost: n0(owned.matrizCost),
+      management: n0(owned.management), platform: n0(owned.platform), areaParticipation: n0(owned.areaParticipation),
+      networkTaxes, networkTaxBase: pick("taxBase"), taxRatePct: n0(policy.taxRatePct),
+      operationalResult, networkResult, margin: networkRevenue ? networkResult / networkRevenue * 100 : 0,
+      distributable: pick("distributable"), lossCarried: isMonthView ? n0(nm.carryIn) : n0(net.totals.carryOut),
+      legalReserve, expansionReserve, reserve: legalReserve + expansionReserve, investorPool, soldQuotas, perQuota: soldQuotas > 0 ? investorPool / soldQuotas : 0,
+      policy: { roundLabel: policy.roundLabel, totalQuotas: n0(policy.totalQuotas), soldQuotas, investorPct: n0(policy.investorPct),
+        legalReservePct: n0(policy.legalReservePct), expansionReservePct: n0(policy.expansionReservePct), taxRatePct: n0(policy.taxRatePct) }
+    };
+    const accAggs = isMonthView ? FV2.rows.filter(r => r.included).map(r => fv2RowAgg(r, "")).filter(x => x.results.length && x.f.operationModel !== "third_party_management") : ownRows;
+    const monthly = sourceMonths.map(m => {
+      const rs = accAggs.flatMap(x => x.results.filter(r => r.monthKey === m));
+      const g = k => rs.reduce((s, r) => s + n0(r[k]), 0);
+      return { key: m, label: monthLabel(m), revenue: g("revenue"), cost: g("totalOperatingCost"), result: g("operationNet"), matrizCost: g("matrizCost"), energy: g("energy"),
+        costPerKWh: g("commercialEnergy") > 0 ? g("totalOperatingCost") / g("commercialEnergy") : null };
+    });
+    return {
+      engine: "v2", period: { monthKey: mk, label: isMonthView ? monthLabel(mk) : "Acumulado", months: sourceMonths },
+      total: { ...total, totalCostPerKWh, plannedCostPerKWh: null, margin, partnerRoyalty, partnerCount: partnerRows.length },
+      composition: [
+        { label: "Energia", value: total.energyCost, detail: "faturas de energia vinculadas às recargas" },
+        { label: "Gestão e plataforma", value: total.management + total.platform, detail: "gestão P3 e tecnologia da operação" },
+        { label: "Operação por carregador", value: Math.max(total.extraCosts - total.matrizCost, 0), detail: "despesas próprias dos ativos, sem matriz" },
+        { label: "Custos da matriz rateados", value: total.matrizCost, detail: "custos compartilhados distribuídos aos destinos" }
+      ],
+      distribution, dre, monthly,
+      rows: aggs.map(x => {
+        const f = x.f, row = x.row;
+        return { workId: row.workId, workName: row.workName, station: row.stationName || row.station, kind: row.kind, partner: isPartner(x),
+          model: f.operationModel, modelLabel: operationModelLabel(f.operationModel), months: x.results.length,
+          revenue: f.revenue, extraRevenue: f.extraRevenue, marketingRevenue: f.marketingRevenue, totalRevenue: f.totalRevenue, energy: f.energy,
+          energyCost: f.energyCost, extraCosts: f.extraCosts, matrizCost: f.matrizCost, taxes: f.taxes, management: f.management, platform: f.platform,
+          areaParticipation: f.areaParticipation, ubyRoyalty: f.ubyRoyalty, totalOperatingCost: f.totalOperatingCost, operationNet: f.operationNet,
+          operationMargin: f.operationMargin, totalCostPerKWh: f.totalCostPerKWh, resultPerKWh: f.resultPerKWh,
+          courtesyCharges: f.courtesyCharges, courtesyEnergy: f.courtesyEnergy, courtesyCostExcluded: f.courtesyCostExcluded };
+      })
+    };
+  }
+
+  function investorDistribution() {
+    fv2Ensure();
+    const net = fv2Network();
+    const policy = fv2Policy();
+    const idx = net.months.map((m, i) => (m.inDistribution ? i : -1)).filter(i => i >= 0);
+    const months = idx.map(i => {
+      const m = net.months[i];
+      const eligibleQuotas = policy.investors.filter(inv => inv.eligibleFrom <= m.monthKey).reduce((s, inv) => s + n0(inv.quotas), 0);
+      return { key: m.monthKey, label: monthLabel(m.monthKey), taxBase: m.taxBase, taxes: m.taxes, taxSource: m.taxSource, preTax: m.preTax, result: m.result,
+        carryIn: m.carryIn, carryOut: m.carryOut, distributable: m.distributable, legalReserve: m.legalReserve, expansionReserve: m.expansionReserve,
+        investorPool: m.investorPool, eligibleQuotas, perQuota: eligibleQuotas && m.investorPool > 0 ? m.investorPool / eligibleQuotas : 0,
+        status: policy.paymentLedger?.[m.monthKey]?.status || "pendente" };
+    });
+    const investors = net.investors.map(inv => ({ name: inv.name, quotas: inv.quotas, eligibleFrom: inv.eligibleFrom, status: inv.status,
+      allocations: idx.map(i => inv.allocations[i]), due: inv.due, quotaValue: n0(inv.quotaValue) || net.quotaValue,
+      investment: inv.investment, returnRate: inv.returnRate, annualized: inv.annualized, paybackYears: inv.paybackYears }));
+    const totalAllocated = investors.reduce((s, i) => s + i.due, 0);
+    const totalPool = months.filter(m => m.eligibleQuotas > 0).reduce((s, m) => s + m.investorPool, 0);
+    return { engine: "v2", valid: Math.abs(totalAllocated - totalPool) < 0.02, totalAllocated, totalPool, months, investors,
+      quotaValue: net.quotaValue, distributionStartMonth: net.distributionStartMonth, taxRatePct: n0(policy.taxRatePct),
+      totals: { taxes: months.reduce((s, m) => s + m.taxes, 0), preTax: months.reduce((s, m) => s + m.preTax, 0), result: months.reduce((s, m) => s + m.result, 0) } };
+  }
+
+  function stationFinance(workId, station, monthKey) {
+    fv2Ensure();
+    const row = FV2.rows.find(r => String(r.workId) === String(workId) && normalizeStationForCompare(r.station) === normalizeStationForCompare(station));
+    if (!row) return null;
+    const fixes = ON();
+    const rowMonths = fv2RowMonths(row, fixes, "");
+    const mk = rowMonths.includes(monthKey) ? monthKey : rowMonths.at(-1) || "";
+    const v2Pick = r => ({ model: r.operationModel, revenue: r.revenue, extraRevenue: r.extraRevenue, marketingRevenue: r.marketingRevenue, totalRevenue: r.totalRevenue,
+      energy: r.energy, commercialEnergy: r.commercialEnergy, energyCost: r.energyCost, taxes: r.taxes, localExtraCosts: r.localExtraCosts, matrizCost: r.matrizCost,
+      matrizTaxCost: r.matrizTaxCost, matrizCash: r.matrizCash, management: r.management, platform: r.platform, ubyRoyalty: r.ubyRoyalty, areaParticipation: r.areaParticipation,
+      areaSharePct: r.areaSharePct, totalOperatingCost: r.totalOperatingCost, operationNet: r.operationNet, operationMargin: r.operationMargin, totalCostPerKWh: r.totalCostPerKWh,
+      resultPerKWh: r.energy > 0 ? r.operationNet / r.energy : null, ubyNet: r.ubyNet, p3OperationalResult: r.p3OperationalResult, p3SocietyProfit: r.p3SocietyProfit,
+      partnerShare: r.partnerShare, saRetention: r.saRetention, investorDistribution: r.investorDistribution, partnerInvestorDistribution: r.partnerInvestorDistribution,
+      ubyRetained: r.ubyRetained, investmentValue: r.investmentValue, paybackInvestmentValue: r.paybackInvestmentValue, paybackBase: r.paybackBase,
+      courtesyCharges: r.courtesyCharges, courtesyEnergy: r.courtesyEnergy, courtesyCostExcluded: r.courtesyCostExcluded });
+    const monthly = rowMonths.map(m => ({ key: m, label: monthLabel(m), ...v2Pick(fv2Month(row, m, fixes)) }));
+    const v = mk ? fv2Month(row, mk, fixes) : null;
+    const legacy = mk ? financeForRowMonth(row, mk).result : null; // só métricas de planejamento (break-even, custo variável, meta)
+    const acc = CORE().aggregate(rowMonths.map(m => fv2Month(row, m, fixes)), fixes, { months: rowMonths.length || 1 });
+    const cfg = mk ? { ...defaultFinanceSettings(), ...fv2Settings(row, mk, fixes).settings } : {};
+    const finance = v ? { ...(legacy ? pickFinance(legacy) : {}), ...v2Pick(v), paybackMonths: acc.paybackMonths, roiMonthly: acc.roiMonthly, energyRate: legacy?.energyRate, taxRatePct: n0(cfg.taxRatePct) } : null;
+    return {
+      engine: "v2", workId: row.workId, workName: row.workName, station: row.station, kind: row.kind, included: row.included, monthKey: mk, label: mk ? monthLabel(mk) : "—",
+      months: rowMonths.map(m => ({ key: m, label: monthLabel(m) })), modelLabel: v ? operationModelLabel(v.operationModel) : "",
+      flags: v ? v.flags || [] : [], finance,
+      settings: v ? { managementPct: n0(cfg.managementPct), platformPct: n0(cfg.platformPct), taxRatePct: n0(cfg.taxRatePct), ubyRoyaltyPct: n0(cfg.ubyRoyaltyPct),
+        energyCostPerKWh: n0(cfg.energyCostPerKWh), investmentValue: n0(cfg.investmentValue), saRetentionPct: n0(cfg.saRetentionPct), investorQuotaPct: n0(cfg.investorQuotaPct),
+        p3SocietyPct: n0(cfg.p3SocietyPct), energyBillingMode: cfg.energyBillingMode || "" } : null,
+      energyComposition: v?.energyComposition ? JSON.parse(JSON.stringify(v.energyComposition)) : null,
+      costLines: v ? [
+        ...v.costRuleDetails.filter(d => d.enabled !== false && (n0(d.actual) || n0(d.planned))).map(d => ({ label: d.label, rule: d.displayRule || "", actual: n0(d.actual), planned: n0(d.planned), perKWh: v.energy > 0 ? n0(d.actual) / v.energy : null, matrix: false })),
+        ...v.matrixItems.map(i => ({ label: /tribut|impost|taxa/i.test(`${i.category || ""} ${i.label || ""}`) ? `Tributo centralizado — ${i.label}` : i.label, rule: i.rule || "Rateio da matriz", actual: n0(i.amount), planned: n0(i.amount), perKWh: v.energy > 0 ? n0(i.amount) / v.energy : null, matrix: true }))
+      ] : [],
+      revenueLines: v ? v.revenueRuleDetails.filter(d => d.enabled !== false && (n0(d.actual) || n0(d.planned))).map(d => ({ label: d.label, rule: d.displayRule || "", actual: n0(d.actual), planned: n0(d.planned), scope: d.scope || "" })) : [],
+      planning: legacy?.planning ? { planningKWh: legacy.planning.planningKWh, planningRevenue: legacy.planning.planningRevenue, salePricePerKWh: legacy.planning.salePricePerKWh,
+        targetOccPct: legacy.planning.targetOccPct, realOccPct: legacy.planning.realOccPct } : null,
+      monthly
+    };
+  }
+
+  function destinations() {
+    fv2Ensure();
+    const aggs = FV2.rows.filter(r => (r.charges || []).length).map(r => fv2RowAgg(r, "")).filter(x => x.results.length)
+      .map(x => ({ ...x, outcome: financeUnitOutcome(x.f) }))
+      .sort((a, b) => (Math.abs(b.outcome.value - a.outcome.value) > 0.009 ? b.outcome.value - a.outcome.value : n0(b.f.revenue) - n0(a.f.revenue)));
+    const m = x => x.f.operationModel;
+    const UBY_MODELS = ["uby", "hybrid", "third_party_management"];
+    const total = fv2SumRows(aggs), ubyTotal = fv2SumRows(aggs.filter(x => UBY_MODELS.includes(m(x)))), ownTotal = fv2SumRows(aggs.filter(x => ["uby", "hybrid"].includes(m(x))));
+    const unit = (x, value) => ({ workId: x.row.workId, workName: x.row.workName, station: x.row.stationName || x.row.workName, model: m(x), modelLabel: operationModelLabel(m(x)), value: n0(value) });
+    const byMonth = new Map();
+    aggs.forEach(x => x.results.forEach(r => {
+      const item = byMonth.get(r.monthKey) || { key: r.monthKey, label: monthLabel(r.monthKey), management: 0, ubyRoyalty: 0, p3SocietyProfit: 0 };
+      item.management += n0(r.management); item.ubyRoyalty += n0(r.ubyRoyalty); item.p3SocietyProfit += n0(r.p3SocietyProfit);
+      byMonth.set(r.monthKey, item);
+    }));
+    return {
+      engine: "v2",
+      total: { revenue: total.revenue, extraRevenue: total.extraRevenue, platform: total.platform, ubyRoyalty: total.ubyRoyalty, costs: total.costs, areaParticipation: total.areaParticipation,
+        totalOperatingCost: total.totalOperatingCost, management: total.management, p3SocietyProfit: total.p3SocietyProfit, p3Gross: total.p3Gross, ubyNet: total.ubyNet,
+        saRetention: total.saRetention, investorDistribution: total.investorDistribution, partnerInvestorDistribution: total.partnerInvestorDistribution, ubyRetained: total.ubyRetained,
+        investmentValue: total.investmentValue, paybackMonths: total.paybackMonths, roiMonthly: total.roiMonthly, margin: total.margin, courtesyEnergy: total.courtesyEnergy, courtesyCostExcluded: total.courtesyCostExcluded },
+      uby: { revenue: ubyTotal.revenue, totalOperatingCost: ubyTotal.totalOperatingCost, ubyNet: ubyTotal.ubyNet, ubyRoyalty: ubyTotal.ubyRoyalty, saRetention: ubyTotal.saRetention,
+        investorDistribution: ubyTotal.investorDistribution, ubyRetained: ubyTotal.ubyRetained, management: ubyTotal.management, platform: ubyTotal.platform, areaParticipation: ubyTotal.areaParticipation,
+        investmentValue: ownTotal.investmentValue, paybackMonths: ownTotal.paybackMonths, roiMonthly: ownTotal.roiMonthly, units: aggs.filter(x => UBY_MODELS.includes(m(x))).length },
+      groups: {
+        uby: aggs.filter(x => UBY_MODELS.includes(m(x))).map(x => unit(x, x.f.ubyNet)),
+        p3: aggs.filter(x => n0(x.f.p3OperationalResult) > 0).map(x => unit(x, x.f.p3OperationalResult)),
+        investors: aggs.filter(x => ["uby", "hybrid"].includes(m(x)) && n0(x.f.investorDistribution) > 0).map(x => unit(x, x.f.investorDistribution)),
+        partners: aggs.filter(x => ["p3_society", "management_only", "third_party_management"].includes(m(x)) && n0(x.f.partnerInvestorDistribution) > 0).map(x => unit(x, x.f.partnerInvestorDistribution))
+      },
+      units: aggs.map(x => ({ workId: x.row.workId, workName: x.row.workName, station: x.row.stationName || x.row.workName, model: m(x), ubyAsset: UBY_MODELS.includes(m(x)),
+        modelLabel: operationModelLabel(m(x)), revenue: x.f.revenue, totalOperatingCost: x.f.totalOperatingCost, outcomeLabel: x.outcome.label, outcome: x.outcome.value,
+        destination: x.outcome.destination, investmentValue: x.f.investmentValue, paybackMonths: x.f.paybackMonths, roiMonthly: x.f.roiMonthly, margin: x.f.margin, months: x.results.length })),
+      management: [...byMonth.values()].sort((a, b) => b.key.localeCompare(a.key))
+    };
+  }
+
   window.UBY_MOTOR_API = { waitForReady, loadFull, status, months, monthName, command, companyResults, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
-    customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact };
+    customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,
+    financeLegacy, investorDistributionLegacy, stationFinanceLegacy, destinationsLegacy };
   document.dispatchEvent(new CustomEvent("uby:motor-api-ready"));
 })();

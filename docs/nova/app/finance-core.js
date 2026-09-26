@@ -221,9 +221,17 @@
     const legalPct = num(policy.legalReservePct), expPct = num(policy.expansionReservePct), invPct = num(policy.investorPct);
     const start = policy.distributionStartMonth || "2026-06";
     const quotaValue = num(policy.quotaValue) || 80000;
+    // Impostos da UBY sobre tudo o que foi faturado no mês (ativos próprios + royalties):
+    // percentual da política ou valor exato lançado para a competência (guia paga).
+    const taxPct = num(policy.taxRatePct);
+    const taxByMonth = policy.taxByMonth && typeof policy.taxByMonth === "object" ? policy.taxByMonth : {};
     let carry = 0;
     const months = (monthly || []).map(m => {
-      const result = num(m.ownedNet) + num(m.royalties);
+      const taxBase = num(m.taxBase);
+      const manual = taxByMonth[m.monthKey] !== undefined && taxByMonth[m.monthKey] !== null && taxByMonth[m.monthKey] !== "";
+      const taxes = manual ? num(taxByMonth[m.monthKey]) : taxBase * taxPct / 100;
+      const preTax = num(m.ownedNet) + num(m.royalties);
+      const result = preTax - taxes;
       const carryIn = carry;
       let distributable;
       if (fixes.lossCarry) {
@@ -235,7 +243,7 @@
       }
       const legalReserve = distributable * legalPct / 100, expansionReserve = distributable * expPct / 100;
       const investorPool = (distributable - legalReserve - expansionReserve) * invPct / 100;
-      return { monthKey: m.monthKey, ownedNet: num(m.ownedNet), royalties: num(m.royalties), rows: m.rows || [], result, carryIn, carryOut: carry, distributable, legalReserve, expansionReserve, investorPool, inDistribution: m.monthKey >= start };
+      return { monthKey: m.monthKey, ownedNet: num(m.ownedNet), royalties: num(m.royalties), rows: m.rows || [], taxBase, taxes, taxSource: manual ? "valor lançado" : (taxPct ? `${taxPct}% do faturamento` : "sem imposto lançado"), preTax, result, carryIn, carryOut: carry, distributable, legalReserve, expansionReserve, investorPool, inDistribution: m.monthKey >= start };
     });
     const all = policy.investors || [];
     const investors = all.map(inv => {
@@ -253,7 +261,7 @@
     });
     const sum = k => months.reduce((s, m) => s + num(m[k]), 0);
     return { months, investors, quotaValue, distributionStartMonth: start,
-      totals: { result: sum("result"), distributable: sum("distributable"), investorPool: sum("investorPool"), legalReserve: sum("legalReserve"), expansionReserve: sum("expansionReserve"), carryOut: carry } };
+      totals: { preTax: sum("preTax"), taxes: sum("taxes"), taxBase: sum("taxBase"), result: sum("result"), distributable: sum("distributable"), investorPool: sum("investorPool"), legalReserve: sum("legalReserve"), expansionReserve: sum("expansionReserve"), carryOut: carry } };
   }
 
   global.UBY_FINANCE_CORE = Object.freeze({ FIXES, FIXES_ON, FIXES_OFF, computeMonth, aggregate, network, allocate, evaluateRules, energyComposition, ADDITIVE });

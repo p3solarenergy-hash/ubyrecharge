@@ -5783,6 +5783,9 @@ function normalizeNetworkDistribution(raw = {}) {
     policyVersion: base.policyVersion,
     quotaValue: Number(raw.quotaValue) > 0 ? Number(raw.quotaValue) : base.quotaValue,
     distributionStartMonth: /^\d{4}-\d{2}$/.test(String(raw.distributionStartMonth || '')) ? String(raw.distributionStartMonth) : base.distributionStartMonth,
+    // Impostos da UBY sobre o faturamento: percentual e valores exatos por competência.
+    taxRatePct: Math.min(100, Math.max(0, Number(raw.taxRatePct || 0))),
+    taxByMonth: raw.taxByMonth && typeof raw.taxByMonth === 'object' && !Array.isArray(raw.taxByMonth) ? Object.fromEntries(Object.entries(raw.taxByMonth).filter(([k, v]) => /^\d{4}-\d{2}$/.test(k) && v !== '' && v !== null && Number.isFinite(Number(v))).map(([k, v]) => [k, Math.max(0, Number(v))])) : {},
     legalReservePurpose: base.legalReservePurpose,
     expansionReservePurpose: base.expansionReservePurpose,
     investors: normalizeNetworkInvestors(raw.investors),

@@ -286,13 +286,21 @@
           ${group("Resultado final da rede")}
           ${line("Resultado operacional UBY", d.operationalResult)}
           ${line("+ Royalties UBY", d.royalties)}
-          </tbody><tfoot><tr><td>= Resultado consolidado antes da distribuição</td><td class="num">${signed(d.networkResult)}</td></tr></tfoot>
+          ${line(`− Impostos sobre o faturamento${d.taxRatePct ? ` (${fmt.pct1(d.taxRatePct)} ou valor lançado)` : ""}`, d.networkTaxes || 0, d.networkTaxes ? `base: ${fmt.brl(d.networkTaxBase || 0)} faturados pela UBY no período` : "ainda não lançados — cadastre em Parâmetros e custos → Cotas, impostos e rodadas")}
+          </tbody><tfoot><tr><td>= Resultado consolidado antes da distribuição</td><td class="num">${signed(d.networkResult)}</td></tr></tfoot><tbody>
+          ${group("Destinação do resultado")}
+          ${d.lossCarried ? line("Prejuízo de meses anteriores compensado", d.lossCarried, "o lucro só é distribuído depois de cobrir prejuízos acumulados") : ""}
+          ${line("Resultado distribuível", d.distributable || 0)}
+          ${line(`− Reserva legal S.A. (${fmt.pct1(p.legalReservePct)})`, d.legalReserve)}
+          ${line(`− Fundo de expansão (${fmt.pct1(p.expansionReservePct)})`, d.expansionReserve)}
+          </tbody><tfoot><tr><td>= Pool dos cotistas (${fmt.pct1(p.investorPct)} após reservas)</td><td class="num">${fmt.brl(d.investorPool)}</td></tr></tfoot>
         </table></div></section>
-        <section class="section"><div class="section-head"><div><p class="kicker">Política da rodada</p><h2>${esc(p.roundLabel || "Rodada")}</h2><p>Parâmetros salvos na plataforma. Edição no modo clássico.</p></div></div>
+        <section class="section"><div class="section-head"><div><p class="kicker">Política da rodada</p><h2>${esc(p.roundLabel || "Rodada")}</h2><p>Parâmetros salvos na plataforma. Edite em <a href="#/parametros">Parâmetros e custos → Cotas, impostos e rodadas</a>.</p></div></div>
           <div class="grid g2">
             ${mini("Cotas emitidas", fmt.int(p.totalQuotas))}${mini("Cotas vendidas", fmt.int(p.soldQuotas))}
             ${mini("% cotistas", fmt.pct1(p.investorPct))}${mini("% reserva legal S.A.", fmt.pct1(p.legalReservePct))}
             ${mini("% fundo expansão", fmt.pct1(p.expansionReservePct))}${mini("Valor por cota", fmt.brl(d.perQuota), "no período")}
+            ${mini("Impostos sobre faturamento", p.taxRatePct ? fmt.pct1(p.taxRatePct) : "—", p.taxRatePct ? "ou valor lançado no mês" : "não cadastrado")}${mini("Impostos no período", fmt.brl(d.networkTaxes || 0))}
           </div>
           <div class="note" style="margin-top:12px">Prévia gerencial: confirme documentos, impostos e aprovação do fechamento antes de pagar ou contabilizar distribuição.</div>
         </section>
@@ -358,14 +366,18 @@
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Rodada 1 · apuração por competência</p><h2>Distribuição por período de aporte</h2><p>Cada mês é dividido só entre as cotas habilitadas no primeiro dia do mês, sem proporcionalidade retroativa.</p></div>
           <div class="meta">${inv.valid ? '<span class="badge ok">conferência fecha</span>' : '<span class="badge bad">conferência não fecha</span>'}<br>alocado ${fmt.brl(inv.totalAllocated)} · pool ${fmt.brl(inv.totalPool)}</div></div>
-        <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Resultado</th><th class="num">Reserva legal S.A.</th><th class="num">Fundo expansão</th><th class="num">Pool cotistas</th><th class="num">Cotas habilitadas</th><th class="num">Por cota</th><th>Pagamento</th></tr></thead>
-          <tbody>${inv.months.map(m => `<tr><td><strong>${esc(m.label)}</strong></td><td class="num">${signed(m.result)}</td><td class="num">${fmt.brl(m.legalReserve)}</td><td class="num">${fmt.brl(m.expansionReserve)}</td><td class="num">${fmt.brl(m.investorPool)}</td><td class="num">${m.eligibleQuotas}</td><td class="num">${fmt.brl(m.perQuota)}</td>
-            <td><span class="badge ${m.status === "pago" || m.status === "paid" ? "ok" : m.status === "aprovado" ? "dc" : "neutral"}">${esc(m.status)}</span></td></tr>`).join("") || `<tr><td colspan="8" class="empty">Sem competências apuradas.</td></tr>`}</tbody></table></div>
+        <div class="toolbar" style="margin-bottom:10px"><strong style="font-size:12px">Relatórios de repasse</strong>
+          <select class="select" id="repMonth">${inv.months.slice().reverse().map(m => `<option value="${esc(m.key)}">${esc(m.label)}</option>`).join("")}</select>
+          <button class="btn primary" id="repMonthBtn" type="button" ${inv.months.length ? "" : "disabled"}>Gerar relatório da competência</button>
+          <span class="spacer"></span><small>${inv.taxRatePct ? `Impostos: ${fmt.pct1(inv.taxRatePct)} do faturamento (ou valor lançado no mês)` : `<span class="badge warn">impostos ainda não cadastrados</span> <a href="#/parametros">cadastrar</a>`}</small></div>
+        <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Antes dos impostos</th><th class="num">Impostos</th><th class="num">Resultado</th><th class="num">Prejuízo compensado</th><th class="num">Reserva legal S.A.</th><th class="num">Fundo expansão</th><th class="num">Pool cotistas</th><th class="num">Cotas habilitadas</th><th class="num">Por cota</th><th>Pagamento</th></tr></thead>
+          <tbody>${inv.months.map(m => `<tr><td><strong>${esc(m.label)}</strong></td><td class="num">${signed(m.preTax ?? m.result)}</td><td class="num">${m.taxes ? fmt.brl(m.taxes) : "—"}<small>${esc(m.taxSource || "")}</small></td><td class="num">${signed(m.result)}</td><td class="num">${m.carryIn < 0 ? signed(m.carryIn) : "—"}</td><td class="num">${fmt.brl(m.legalReserve)}</td><td class="num">${fmt.brl(m.expansionReserve)}</td><td class="num">${fmt.brl(m.investorPool)}</td><td class="num">${m.eligibleQuotas}</td><td class="num">${fmt.brl(m.perQuota)}</td>
+            <td><span class="badge ${m.status === "pago" || m.status === "paid" ? "ok" : m.status === "aprovado" ? "dc" : "neutral"}">${esc(m.status)}</span></td></tr>`).join("") || `<tr><td colspan="11" class="empty">Sem competências apuradas.</td></tr>`}</tbody></table></div>
       </section>
       <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Apuração por cotista</h2><p>Cada cotista usa o valor da cota da própria rodada (padrão ${fmt.brl(inv.quotaValue || 80000)}); a distribuição por cota é igual para todas. Distribuição a partir de ${esc(UBY.state.api.monthName(inv.distributionStartMonth || "2026-06"))}. Payback indicativo pelo retorno anualizado.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th class="num">Cotas</th><th class="num">Valor da cota</th><th class="num">Investido</th><th>Início</th>${inv.months.map(m => `<th class="num">${esc(m.label)}</th>`).join("")}<th class="num">Total devido</th><th class="num">Retorno acum.</th><th class="num">Payback</th><th>Situação</th></tr></thead>
+        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th class="num">Cotas</th><th class="num">Valor da cota</th><th class="num">Investido</th><th>Início</th>${inv.months.map(m => `<th class="num">${esc(m.label)}</th>`).join("")}<th class="num">Total devido</th><th class="num">Retorno acum.</th><th class="num">Payback</th><th>Situação</th><th></th></tr></thead>
           <tbody>${inv.investors.map(i => `<tr><td><strong>${esc(i.name)}</strong></td><td class="num">${i.quotas}</td><td class="num">${fmt.brl(i.quotaValue || inv.quotaValue || 80000)}</td><td class="num">${fmt.brl(i.investment)}</td><td>${esc(i.eligibleFrom ? UBY.state.api.monthName(i.eligibleFrom) : "—")}</td>${i.allocations.map(a => `<td class="num">${fmt.brl(a)}</td>`).join("")}
-            <td class="num"><strong>${fmt.brl(i.due)}</strong></td><td class="num">${fmt.pct(i.returnRate * 100)}</td><td class="num">${i.paybackYears ? `${fmt.n1(i.paybackYears)} anos` : "—"}</td><td>${esc(i.status)}</td></tr>`).join("") || `<tr><td colspan="${9 + inv.months.length}" class="empty">Nenhum cotista cadastrado.</td></tr>`}</tbody></table></div>
+            <td class="num"><strong>${fmt.brl(i.due)}</strong></td><td class="num">${fmt.pct(i.returnRate * 100)}</td><td class="num">${i.paybackYears ? `${fmt.n1(i.paybackYears)} anos` : "—"}</td><td>${esc(i.status)}</td><td><button class="btn ghost" data-extrato="${esc(i.name)}" type="button">Extrato</button></td></tr>`).join("") || `<tr><td colspan="${10 + inv.months.length}" class="empty">Nenhum cotista cadastrado.</td></tr>`}</tbody></table></div>
       </section>`;
   }
 
@@ -402,6 +414,8 @@
     });
 
     const stSel = target.querySelector("#finStation"); if (stSel) stSel.onchange = e => { ui.station = e.target.value; render(target, ["estacao"]); };
+    const repBtn = target.querySelector("#repMonthBtn"); if (repBtn) repBtn.onclick = () => UBY.reports.competencia(target.querySelector("#repMonth").value);
+    target.querySelectorAll("[data-extrato]").forEach(b => b.onclick = () => UBY.reports.cotista(b.dataset.extrato));
     target.querySelectorAll("#repFilter button").forEach(b => b.onclick = () => { ui.reportsFilter = b.dataset.v; render(target, ["fechamentos"]); });
     const repOutside = target.querySelector("#repOutside"); if (repOutside) repOutside.onchange = e => { ui.includeOutside = e.target.checked; render(target, ["fechamentos"]); };
     if (tab === "estacao") {
