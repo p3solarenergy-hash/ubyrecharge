@@ -5748,10 +5748,14 @@ function normalizeNetworkInvestors(raw) {
   if (!Array.isArray(raw) || !raw.length) return fallback;
   return raw.map((item, index) => ({
     name: safeText(item?.name || fallback[index]?.name || `Cotista ${index + 1}`).slice(0, 120),
-    quotas: Math.max(0, Math.round(Number(item?.quotas ?? fallback[index]?.quotas ?? 0))),
+    // NOVA PLATAFORMA: cotas podem ser fracionadas (valor investido ÷ valor da cota).
+    quotas: Math.max(0, Math.round(Number(item?.quotas ?? fallback[index]?.quotas ?? 0) * 10000) / 10000),
     eligibleFrom: /^\d{4}-\d{2}$/.test(String(item?.eligibleFrom || '')) ? String(item.eligibleFrom) : (fallback[index]?.eligibleFrom || '2099-12'),
     status: ['pendente', 'aprovado', 'pago'].includes(item?.status) ? item.status : 'pendente',
-    quotaValue: Number(item?.quotaValue) > 0 ? Number(item.quotaValue) : (Number(fallback[index]?.quotaValue) > 0 ? Number(fallback[index].quotaValue) : 0)
+    quotaValue: Number(item?.quotaValue) > 0 ? Number(item.quotaValue) : (Number(fallback[index]?.quotaValue) > 0 ? Number(fallback[index].quotaValue) : 0),
+    // Data do aporte e valor investido informados na tela nova; o resto é calculado.
+    investedAt: /^\d{4}-\d{2}-\d{2}$/.test(String(item?.investedAt || '')) ? String(item.investedAt) : '',
+    investment: Number(item?.investment) > 0 ? Math.round(Number(item.investment) * 100) / 100 : 0
   })).filter(item => item.name && item.quotas > 0);
 }
 

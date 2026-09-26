@@ -381,15 +381,31 @@
       </div>`;
   }
 
+  // Cotista: a partir da data do aporte e do valor investido, calcula cotas e o mês de entrada.
+  const nextMonthKey = mk => { const [y, m] = mk.split("-").map(Number); const d = new Date(y, m, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+  function deriveInvestor(i, defaultQuota) {
+    const quotaValue = Number(i.quotaValue) || Number(defaultQuota) || 80000;
+    const investedAt = /^\d{4}-\d{2}-\d{2}$/.test(String(i.investedAt || "")) ? i.investedAt : "";
+    const eligibleFrom = investedAt ? (investedAt.slice(8) === "01" ? investedAt.slice(0, 7) : nextMonthKey(investedAt.slice(0, 7))) : (i.eligibleFrom || "");
+    const investment = Number(i.investment) > 0 ? Math.round(Number(i.investment) * 100) / 100 : Math.round(Number(i.quotas || 0) * quotaValue * 100) / 100;
+    const quotas = Math.round(investment / quotaValue * 10000) / 10000;
+    return { ...i, quotaValue, investedAt, investment, quotas, eligibleFrom };
+  }
+
   function quotasTab(w) {
     const p = w.loadNetworkDistribution();
     const e = ui.policyEdits || (ui.policyEdits = JSON.parse(JSON.stringify({
       quotaValue: p.quotaValue || 80000, distributionStartMonth: p.distributionStartMonth || "2026-06", legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct,
       investorPct: p.investorPct, totalQuotas: p.totalQuotas, soldQuotas: p.soldQuotas, roundLabel: p.roundLabel, taxRatePct: p.taxRatePct || 0, taxByMonth: { ...(p.taxByMonth || {}) },
-      investors: (p.investors || []).map(i => ({ ...i, quotaValue: i.quotaValue || 0 }))
+      investors: (p.investors || []).map(i => {
+        const qv = Number(i.quotaValue) || Number(p.quotaValue) || 80000;
+        return { ...i, quotaValue: qv, investedAt: i.investedAt || (i.eligibleFrom ? `${i.eligibleFrom}-01` : ""), investment: Number(i.investment) || Math.round(Number(i.quotas || 0) * qv * 100) / 100 };
+      })
     })));
     const inp = (k, label, type = "number", extra = "") => field(label, `<input class="select" data-pol="${k}" type="${type}" value="${esc(e[k] ?? "")}" ${extra} style="width:100%">`);
-    const quotasSum = e.investors.reduce((s, i) => s + Number(i.quotas || 0), 0);
+    const derived = e.investors.map(i => deriveInvestor(i, e.quotaValue));
+    const quotasSum = derived.reduce((s, i) => s + Number(i.quotas || 0), 0);
+    const investedSum = derived.reduce((s, i) => s + Number(i.investment || 0), 0);
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Política de distribuição</p><h2>Rodadas, valor da cota e reservas</h2><p>O valor padrão da cota vale para cotistas sem valor próprio. Cada cotista pode ter o valor da sua rodada (ex.: rodada 1 a R$ 80 mil, novas a R$ 100 mil). A distribuição por cota é igual para todas; o valor pago muda o investido, o retorno e o payback.</p></div></div>
         <div class="grid g4" style="gap:8px">
@@ -404,17 +420,18 @@
         <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Competência</th><th class="num">Valor exato do imposto (R$)</th><th>Uso</th></tr></thead>
           <tbody>${(UBY.state.months || []).slice().reverse().map(mk => { const v = e.taxByMonth[mk]; return `<tr><td>${esc(UBY.state.api?.monthName?.(mk) || mk)}</td><td class="num"><input class="select" type="number" min="0" step="0.01" data-tax-month="${esc(mk)}" value="${v === undefined ? "" : esc(v)}" placeholder="usar ${esc(e.taxRatePct || 0)}%" style="width:150px"></td><td><small>${v === undefined ? `alíquota de ${esc(e.taxRatePct || 0)}%` : "valor lançado"}</small></td></tr>`; }).join("")}</tbody></table></div>
       </section>
-      <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Cotistas e valor pago por cota</h2><p>${quotasSum} cota(s) cadastradas. "Habilitado a partir de" define o primeiro mês em que o cotista participa.</p></div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Cotistas: data do aporte e valor investido</h2><p>Informe só a data do aporte e o valor investido. A plataforma calcula as cotas (valor ÷ valor da cota da rodada, fixado na entrada do cotista) e o mês em que ele passa a participar: aporte no dia 1º entra no próprio mês; em qualquer outro dia, entra no mês seguinte. ${fmt.n1(quotasSum)} cota(s) · ${fmt.brl(investedSum)} investidos.</p></div>
           <button class="btn" id="pmInvAdd" type="button">＋ Cotista</button></div>
-        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th class="num">Cotas</th><th>Habilitado a partir de</th><th class="num">Valor pago por cota (R$)</th><th class="num">Investido</th><th>Situação</th><th></th></tr></thead>
-          <tbody>${e.investors.map((i, k) => `<tr>
+        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th>Data do aporte</th><th class="num">Valor investido (R$)</th><th class="num">Valor da cota</th><th class="num">Cotas</th><th>Participa a partir de</th><th>Situação</th><th></th></tr></thead>
+          <tbody>${e.investors.map((i, k) => { const d = derived[k]; return `<tr>
             <td><input class="select" data-inv="${k}|name" value="${esc(i.name)}" style="width:100%"></td>
-            <td class="num"><input class="select" type="number" min="0" step="1" data-inv="${k}|quotas" value="${esc(i.quotas)}" style="width:80px"></td>
-            <td><input class="select" type="month" data-inv="${k}|eligibleFrom" value="${esc(i.eligibleFrom)}"></td>
-            <td class="num"><input class="select" type="number" min="0" step="1000" data-inv="${k}|quotaValue" value="${esc(i.quotaValue || "")}" placeholder="padrão ${esc(e.quotaValue)}" style="width:130px"></td>
-            <td class="num">${fmt.brl(Number(i.quotas || 0) * (Number(i.quotaValue) || Number(e.quotaValue) || 0))}</td>
+            <td><input class="select" type="date" data-inv="${k}|investedAt" value="${esc(i.investedAt || "")}"></td>
+            <td class="num"><input class="select" type="number" min="0" step="0.01" data-inv="${k}|investment" value="${esc(i.investment || "")}" style="width:140px"></td>
+            <td class="num">${fmt.brl(d.quotaValue)}<small>da rodada</small></td>
+            <td class="num"><strong>${fmt.n1(d.quotas)}</strong></td>
+            <td><strong>${esc(d.eligibleFrom ? (UBY.state.api?.monthName?.(d.eligibleFrom) || d.eligibleFrom) : "—")}</strong>${d.investedAt && d.investedAt.slice(8) !== "01" ? "<small>aporte após o dia 1º</small>" : ""}</td>
             <td><select class="select" data-inv="${k}|status">${["pendente", "aprovado", "pago"].map(s => `<option ${i.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></td>
-            <td><button class="btn ghost" data-inv-del="${k}" type="button">✕</button></td></tr>`).join("") || `<tr><td colspan="7" class="empty">Nenhum cotista.</td></tr>`}</tbody></table></div>
+            <td><button class="btn ghost" data-inv-del="${k}" type="button">✕</button></td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">Nenhum cotista.</td></tr>`}</tbody></table></div>
         <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="pmPolSave" type="button" ${canWrite(w) && !busy ? "" : "disabled"}>Salvar política e cotistas</button><button class="btn" id="pmPolReset" type="button">Descartar</button></div>
       </section>`;
   }
@@ -636,14 +653,15 @@
     // --- cotas ---
     target.querySelectorAll("[data-pol]").forEach(el => el.onchange = () => { const k = el.dataset.pol; ui.policyEdits[k] = ["roundLabel", "distributionStartMonth"].includes(k) ? el.value : Number(el.value || 0); draw(target, w); });
     target.querySelectorAll("[data-tax-month]").forEach(el => el.onchange = () => { const k = el.dataset.taxMonth; if (el.value === "") delete ui.policyEdits.taxByMonth[k]; else ui.policyEdits.taxByMonth[k] = Math.max(0, Number(el.value)); draw(target, w); });
-    target.querySelectorAll("[data-inv]").forEach(el => el.onchange = () => { const [i, k] = el.dataset.inv.split("|"); ui.policyEdits.investors[Number(i)][k] = ["quotas", "quotaValue"].includes(k) ? Number(el.value || 0) : el.value; draw(target, w); });
-    if ($("#pmInvAdd")) $("#pmInvAdd").onclick = () => { ui.policyEdits.investors.push({ name: "Novo cotista", quotas: 1, eligibleFrom: new Date().toISOString().slice(0, 7), status: "pendente", quotaValue: ui.policyEdits.quotaValue }); draw(target, w); };
+    target.querySelectorAll("[data-inv]").forEach(el => el.onchange = () => { const [i, k] = el.dataset.inv.split("|"); ui.policyEdits.investors[Number(i)][k] = k === "investment" ? Number(el.value || 0) : el.value; draw(target, w); });
+    if ($("#pmInvAdd")) $("#pmInvAdd").onclick = () => { const qv = Number(ui.policyEdits.quotaValue) || 80000; ui.policyEdits.investors.push({ name: "Novo cotista", investedAt: new Date().toISOString().slice(0, 10), investment: qv, quotaValue: qv, status: "pendente" }); draw(target, w); };
     target.querySelectorAll("[data-inv-del]").forEach(b => b.onclick = () => { const i = Number(b.dataset.invDel); if (confirm(`Remover ${ui.policyEdits.investors[i].name} da lista de cotistas?`)) { ui.policyEdits.investors.splice(i, 1); draw(target, w); } });
     if ($("#pmPolReset")) $("#pmPolReset").onclick = () => { ui.policyEdits = null; draw(target, w); };
     if ($("#pmPolSave")) $("#pmPolSave").onclick = () => run(target, w, "Política de cotas", async () => {
       await resyncMatrix(w);
       const current = w.loadNetworkDistribution();
-      const next = { ...current, ...ui.policyEdits, investors: ui.policyEdits.investors.filter(i => String(i.name || "").trim() && Number(i.quotas) > 0) };
+      const investors = ui.policyEdits.investors.map(i => deriveInvestor(i, ui.policyEdits.quotaValue)).filter(i => String(i.name || "").trim() && Number(i.quotas) > 0 && i.eligibleFrom);
+      const next = { ...current, ...ui.policyEdits, investors };
       const saved = w.saveNetworkDistribution(next);
       const fb = await awaitMatrixSave(w);
       if (Number(saved.quotaValue) !== Number(next.quotaValue) || Number(saved.taxRatePct || 0) !== Number(next.taxRatePct || 0)) throw new Error("A política não foi aceita pela plataforma original (valor da cota ou impostos).");

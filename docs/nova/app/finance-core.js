@@ -253,7 +253,7 @@
         return eligibleQuotas && mo.investorPool > 0 ? mo.investorPool / eligibleQuotas * num(inv.quotas) : 0;
       });
       const due = allocations.reduce((s, x) => s + x, 0);
-      const investment = num(inv.quotas) * (num(inv.quotaValue) || quotaValue);
+      const investment = num(inv.investment) || num(inv.quotas) * (num(inv.quotaValue) || quotaValue);
       const activeMonths = months.filter(mo => mo.inDistribution && mo.monthKey >= inv.eligibleFrom && mo.investorPool > 0).length;
       const returnRate = investment ? due / investment : 0;
       const annualized = activeMonths ? returnRate / activeMonths * 12 : 0;
