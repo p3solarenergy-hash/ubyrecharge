@@ -18,8 +18,8 @@
           <span>Energia ${c.hasBase ? pctText(c.current.energy, c.previous.energy) : "sem base"}</span>
           <span>Recargas ${c.hasBase ? pctText(c.current.count, c.previous.count) : "sem base"}</span></div>
         ${b.sessions || b.chargers ? `<div class="grid ${isDc ? "g3" : "g4"}">
-          ${mini(`Ocupação ${kindLabel(kind)}`, fmt.pct(b.occupancy), `${b.chargers} carregador(es) próprio(s)`, d(c.current.energy, c.previous.energy))}
-          ${mini(`Faturamento ${kindLabel(kind)}`, fmt.brl(b.revenue), `${fmt.int(b.sessions)} recarga(s)`, d(c.current.revenue, c.previous.revenue))}
+          ${mini(`Ocupação ${kindLabel(kind)}`, fmt.pct(b.occupancy), `${b.chargers} carregador(es) próprio(s)`, d(c.current.energy, c.previous.energy), "lead")}
+          ${mini(`Faturamento ${kindLabel(kind)}`, fmt.brl(b.revenue), `${fmt.int(b.sessions)} recarga(s)`, d(c.current.revenue, c.previous.revenue), "lead")}
           ${mini(`Energia ${kindLabel(kind)}`, fmt.kwh(b.energy), "energia entregue", d(c.current.energy, c.previous.energy))}
           ${mini(`Clientes ${kindLabel(kind)}`, fmt.int(b.clients), "clientes atendidos", d(c.current.clients, c.previous.clients))}
           ${mini("R$ médio / recarga", fmt.brl(b.avgTicket), `${fmt.int(b.validSessions)} válida(s)`, d(c.current.avgTicket, c.previous.avgTicket))}

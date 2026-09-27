@@ -556,6 +556,33 @@
     };
     const id = String(workId || "geral");
     const mutationIntent = String(payload?.mutationIntent || "save");
+    // NOVA PLATAFORMA — trava contra perda de base: uma gravação comum (importar
+    // planilha, salvar, fechar mês) nunca pode tirar planilhas já salvas nem
+    // encolher as recargas. Só remover arquivo, corrigir mês e desfazer podem.
+    const shrinkAllowed = new Set(["explicit_empty_replace", "month_correction", "undo_import", "remove_file"]);
+    if (!shrinkAllowed.has(mutationIntent)) {
+      const { data: current, error: currentError } = await sb.from("obra_recargas_base").select("arquivos,resumo").eq("obra_id", id).maybeSingle();
+      if (currentError) throw new Error(`Não consegui conferir a base atual na nuvem (${currentError.message}). Nada foi gravado.`);
+      // Uma planilha nova do mesmo mês e da mesma estação substitui a anterior (é o
+      // uso normal: a exportação diária da Spott). Bloqueia só quando some a
+      // cobertura de um mês/estação que já estava salvo.
+      const norm = v => String(v || "").trim().toLowerCase();
+      const coverKey = f => (f && typeof f === "object") ? `${norm(f.month)}|${norm(f.station)}` : "";
+      const nameKey = f => norm(f && typeof f === "object" ? (f.name || f.fileName || f.nome) : f);
+      const incomingCover = new Set(files.map(coverKey).filter(k => k !== "|"));
+      const incomingNames = new Set(files.map(nameKey));
+      const lost = (Array.isArray(current?.arquivos) ? current.arquivos : [])
+        .filter(f => { const c = coverKey(f); return c && c !== "|" ? !incomingCover.has(c) : !incomingNames.has(nameKey(f)); })
+        .map(f => (f && typeof f === "object") ? `${f.name || "planilha"}${f.month ? ` (${f.month})` : ""}` : String(f));
+      if (lost.length) {
+        throw new Error(`Gravação bloqueada para proteger a base: ela deixaria sem planilha ${lost.length} mês(es) já salvos (${lost.slice(0, 3).join(", ")}${lost.length > 3 ? "…" : ""}). Recarregue a página (Ctrl+F5) e importe de novo. Nada foi gravado.`);
+      }
+      const existingCount = Number(current?.resumo?.charges || 0);
+      // Folga de 10%: limpeza de linhas repetidas pode reduzir um pouco; base parcial reduz muito.
+      if (existingCount > 0 && charges.length < existingCount * 0.9) {
+        throw new Error(`Gravação bloqueada para proteger a base: a nuvem tem ${existingCount} recarga(s) e esta gravação deixaria ${charges.length}. Recarregue a página (Ctrl+F5) e importe de novo. Nada foi gravado.`);
+      }
+    }
     const { data: atomicResult, error: atomicError } = await sb.rpc("save_recharge_base_atomic", {
       p_obra_id: id,
       p_files: files,

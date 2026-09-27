@@ -32,10 +32,11 @@
 
       <section class="section">
         <div class="section-head"><div><p class="kicker">Rede de recargas</p><h2>Resultado da operação UBY</h2></div><a class="btn" href="#/comando">Abrir comando da rede →</a></div>
-        <div class="grid g5">
+        <div class="grid g6">
+          ${kpi("Ocupação média", fmt.pct(n.occupancy), `faixa ${esc(n.occupancyBand)} (${esc(n.occupancyRange)})`, "", "lead big")}
           ${kpi("Faturamento consolidado", fmt.brl(n.revenue), `próprio ${fmt.brl(n.ownRevenue)}`, "", "lead big")}
-          ${kpi("Faturamento DC próprio", fmt.brl(dc.revenue), `${dc.chargers} carregador(es)`, delta(c.current.revenue, c.previous.revenue, { hasBase: c.hasBase }))}
           ${kpi("Ocupação DC", fmt.pct(dc.occupancy), "leitura principal da rede rápida", delta(c.current.energy, c.previous.energy, { hasBase: c.hasBase }))}
+          ${kpi("Faturamento DC próprio", fmt.brl(dc.revenue), `${dc.chargers} carregador(es)`, delta(c.current.revenue, c.previous.revenue, { hasBase: c.hasBase }))}
           ${kpi("Recargas", fmt.int(n.sessions), `${fmt.int(n.clients)} clientes`, "", "")}
           ${kpi("Projeção do mês", fmt.brl(n.projectedRevenue), `${n.projectionUnits} unidade(s) com base`)}
         </div>

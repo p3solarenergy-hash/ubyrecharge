@@ -34,8 +34,10 @@
         <input class="search" id="unitSearch" placeholder="Buscar estação ou obra" value="${esc(ui.search)}">
       </div>
 
-      <div class="grid g4" style="margin-bottom:16px">
-        ${kpi("Faturamento", fmt.brl(tot.revenue), `${rows.length} estação(ões) no filtro`, "", "lead")}
+      <div class="grid g5" style="margin-bottom:16px">
+        ${(() => { const cap = rows.reduce((s, r) => s + (Number(r.power) || 0) * (Number(r.hours) || 0), 0); const used = rows.reduce((s, r) => s + (Number(r.occupancy) || 0) / 100 * (Number(r.power) || 0) * (Number(r.hours) || 0), 0);
+          return kpi("Ocupação média", cap > 0 ? fmt.pct(used / cap * 100) : "—", "ponderada pela potência e horário de cada estação", "", "lead big"); })()}
+        ${kpi("Faturamento", fmt.brl(tot.revenue), `${rows.length} estação(ões) no filtro`, "", "lead big")}
         ${kpi("Recargas", fmt.int(tot.sessions), "todas as tentativas registradas")}
         ${kpi("Energia", fmt.kwh0(tot.energy), "", "", "warn")}
         ${kpi("Falhas", fmt.int(tot.failures), "com status de falha", "", tot.failures ? "bad" : "")}
@@ -80,11 +82,11 @@
           <p style="margin:10px 0 0"><a class="btn primary link-btn" href="#/importar/${encodeURIComponent(d.workId)}/${month || new Date().toISOString().slice(0, 7)}/${encodeURIComponent(location.hash)}/${encodeURIComponent(d.station)}">⇪ Importar planilha desta estação</a></p></div></div>
 
       <div class="grid g6" style="margin-bottom:18px">
+        ${kpi("Ocupação", fmt.pct(d.occupancy), `${esc(d.band)} · ${fmt.n1(d.hours)} h disponíveis`, "", "lead big")}
         ${kpi("Faturamento", fmt.brl(m.revenue), `R$/kWh ${fmt.brl(m.revenuePerKwh)}`, "", "lead big")}
-        ${kpi("Recargas", fmt.int(m.sessions), `${fmt.int(m.valid)} válidas`)}
+        ${kpi("Recargas", fmt.int(m.sessions), `${fmt.int(m.valid)} válidas · tempo médio ${esc(m.avgDuration)}`)}
         ${kpi("Energia", fmt.kwh(m.energy), `${fmt.n1(m.avgKwh)} kWh/recarga válida`, "", "warn")}
-        ${kpi("Clientes", fmt.int(m.clients), `ticket ${fmt.brl(m.avgTicket)}`)}
-        ${kpi("Tempo médio", esc(m.avgDuration), `ociosidade ${fmt.brl(m.idleValue)}`)}
+        ${kpi("Clientes", fmt.int(m.clients), `ticket ${fmt.brl(m.avgTicket)} · ociosidade ${fmt.brl(m.idleValue)}`)}
         ${kpi("Falhas", fmt.int(m.failed), `${fmt.int(m.shortOrZero)} curtas/zeradas`, "", m.failed ? "bad" : "")}
       </div>
 

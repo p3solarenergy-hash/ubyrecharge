@@ -88,8 +88,8 @@
   function kpi(label, value, sub = "", extra = "", cls = "") {
     return `<article class="kpi ${cls}"><span class="k">${esc(label)}</span><strong class="v" title="${esc(String(value).replace(/<[^>]+>/g, ""))}">${value}</strong>${sub ? `<span class="s">${sub}</span>` : ""}${extra}</article>`;
   }
-  function mini(label, value, sub = "", extra = "") {
-    return `<div class="mini"><span class="k">${esc(label)}</span><strong class="v" title="${esc(String(value).replace(/<[^>]+>/g, ""))}">${value}</strong>${sub ? `<span class="s">${sub}</span>` : ""}${extra}</div>`;
+  function mini(label, value, sub = "", extra = "", cls = "") {
+    return `<div class="mini ${cls}"><span class="k">${esc(label)}</span><strong class="v" title="${esc(String(value).replace(/<[^>]+>/g, ""))}">${value}</strong>${sub ? `<span class="s">${sub}</span>` : ""}${extra}</div>`;
   }
 
   // ---------- gráficos ----------
