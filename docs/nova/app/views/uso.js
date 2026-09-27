@@ -16,7 +16,7 @@
           <div class="meta">${fmt.dt(k.window.start)} até ${fmt.dt(k.window.end)}${k.window.live ? "<br>leitura atualizada até agora" : ""}<br>comparação: ${esc(k.comparison.label)}</div></div>
         <div class="grid g6" style="margin-bottom:10px">
           ${kpi("Ocupação real", fmt.pct(k.occupancy), `anterior ${fmt.pct(k.prevOccupancy)}`, "", "lead big")}
-          ${kpi("Faturamento", fmt.brl(k.revenue), `${fmt.int(k.sessions)} recarga(s)`, d(k.revenue, k.prev.revenue))}
+          ${kpi("Faturamento", fmt.brl(k.revenue), `${fmt.int(k.sessions)} recarga(s)`, d(k.revenue, k.prev.revenue), "lead big")}
           ${kpi("Energia", fmt.kwh(k.energy), `${fmt.int(k.clients)} cliente(s)`, d(k.energy, k.prev.energy), "warn")}
           ${kpi("Projeção do mês", fmt.brl(k.projection), `${fmt.kwh0(k.projectionEnergy)} no ritmo atual`, d(k.projection, k.prev.projection))}
           ${kpi("Ociosidade", fmt.brl(k.idleValue), "valor parado após recarga", d(k.idleValue, k.prev.idleValue, true))}
@@ -109,16 +109,16 @@
 
       ${u.kpis ? kpiBlock(u.kpis, station) : ""}
 
-      <section class="section"><div class="section-head"><div><p class="kicker">Volume do período</p><h2>${esc(scopeLabel)}</h2></div><div class="meta">AC ${fmt.int(t.acdc.acCharges)} recargas · DC ${fmt.int(t.acdc.dcCharges)} recargas</div></div>
-        <div class="grid g6">
-          ${kpi("Ocupação média", t.occupancy === null || t.occupancy === undefined ? "—" : fmt.pct(t.occupancy), t.power ? (ui.kind === "station" ? `${fmt.int(t.power)} kW · ${fmt.int(t.occupancyHours)} h disponíveis` : `${fmt.int(t.power)} kW · horário de cada carregador`) : "sem potência configurada", "", "lead big")}
-          ${kpi("Faturamento", fmt.brl(t.revenue), "", "", "lead big")}
+      ${ui.kind === "station" && u.kpis ? "" : `
+      <section class="section"><div class="section-head"><div><p class="kicker">Volume do período</p><h2>${esc(scopeLabel)}</h2></div>
+          <div class="meta">${t.acdc.acChargers} AC · ${t.acdc.dcChargers} DC carregador(es)<br>AC ${fmt.int(t.acdc.acCharges)} · DC ${fmt.int(t.acdc.dcCharges)} recargas${t.idleValue > 0 ? `<br>ociosidade ${fmt.brl(t.idleValue)}` : ""}</div></div>
+        <div class="grid g4">
+          ${kpi("Ocupação média", t.occupancy === null || t.occupancy === undefined ? "—" : fmt.pct(t.occupancy), t.occupancy === null || t.occupancy === undefined ? "atualize a página (Ctrl+F5)" : `${fmt.int(t.power)} kW · horário de cada carregador`, "", "lead big")}
+          ${kpi("Faturamento", fmt.brl(t.revenue), `${fmt.brl(t.sessions ? t.revenue / t.sessions : 0)} por recarga`, "", "lead big")}
           ${kpi("Recargas", fmt.int(t.sessions), "todas as tentativas")}
-          ${kpi("Energia", fmt.kwh0(t.energy), "", "", "warn")}
-          ${kpi("Carregadores AC / DC", `${t.acdc.acChargers} / ${t.acdc.dcChargers}`, "conectores ou estações únicas")}
-          ${kpi("Ociosidade", fmt.brl(t.idleValue), `${fmt.int(u.idleCount)} sessão(ões) com 1 min ou mais parado`)}
+          ${kpi("Energia", fmt.kwh0(t.energy), t.energy > 0 ? `${fmt.brl(t.revenue / t.energy)}/kWh em média` : "", "", "warn")}
         </div>
-      </section>
+      </section>`}
 
       <section class="section"><div class="section-head"><div><p class="kicker">Calendário</p><h2>Faturamento e ocupação por dia</h2><p>Cada dia mostra faturamento, recargas, energia e a ocupação do dia (energia ÷ potência × horas disponíveis do dia). Passe o mouse para ver o detalhe.</p></div>
           <div class="seg" id="calMode">${[["rev", "Cor por faturamento"], ["occ", "Cor por ocupação"]].map(([v, l]) => `<button data-v="${v}" class="${ui.calMode === v ? "on" : ""}">${l}</button>`).join("")}</div></div>
