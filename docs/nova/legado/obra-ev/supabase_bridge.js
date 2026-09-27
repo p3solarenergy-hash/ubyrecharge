@@ -549,13 +549,23 @@
     if (!user) throw new Error("Entre no Supabase antes de salvar recargas.");
     const files = Array.isArray(payload?.files) ? payload.files : [];
     const charges = Array.isArray(payload?.charges) ? payload.charges : [];
-    const summary = {
+    let summary = {
       ...(payload?.summary || {}),
       monthlyClosings: payload?.monthlyClosings || payload?.summary?.monthlyClosings || {},
       financialSettings: payload?.financialSettings || payload?.summary?.financialSettings || {}
     };
     const id = String(workId || "geral");
     const mutationIntent = String(payload?.mutationIntent || "save");
+    // Parâmetros/faturas salvos por outra pessoa enquanto esta tela importava não
+    // podem ser apagados pela importação: junta o resumo com o da nuvem.
+    if (summaryBases.has(id)) {
+      const { data: cur, error: curError } = await sb.from("obra_recargas_base").select("resumo").eq("obra_id", id).maybeSingle();
+      if (curError) throw new Error(`Não consegui conferir a base atual na nuvem (${curError.message}). Nada foi gravado.`);
+      if (cur) summary = mergeOrThrow(summaryBases.get(id), summary, cur.resumo || {}, "a base de recargas desta obra");
+    }
+    // O banco (gatilho guard_recharge_base_shrink) só aceita encolher a base
+    // quando a operação declara que é remoção/correção/desfazer.
+    summary.lastMutationIntent = mutationIntent;
     // NOVA PLATAFORMA — trava contra perda de base: uma gravação comum (importar
     // planilha, salvar, fechar mês) nunca pode tirar planilhas já salvas nem
     // encolher as recargas. Só remover arquivo, corrigir mês e desfazer podem.
@@ -591,6 +601,7 @@
       p_mutation_intent: mutationIntent
     });
     if (!atomicError) {
+      rememberSummary(id, summary);
       return {
         cloud: true,
         files: Number(atomicResult?.files ?? files.length),
@@ -624,6 +635,7 @@
       updated_at: new Date().toISOString()
     }, { onConflict: "obra_id" });
     if (error) throw error;
+    rememberSummary(id, summary);
     await insertAuditLog(sb, user, {
       entidadeId: String(workId || "geral"),
       acao: "save_recharge_base",
@@ -635,6 +647,64 @@
       }
     });
     return { cloud: true, files: files.length, charges: charges.length, normalizedCharges, history: Boolean(previous) };
+  }
+
+  // NOVA PLATAFORMA — duas pessoas (ou duas abas) salvando ao mesmo tempo.
+  // Guardamos a versão de cada bloco como foi LIDA da nuvem (base). Na gravação
+  // relemos a nuvem e juntamos campo a campo: o que esta tela mudou em relação à
+  // base entra; o que só a outra pessoa mudou é mantido. Se as duas mudaram o
+  // mesmo campo para valores diferentes, nada é gravado e a tela avisa.
+  const summaryBases = new Map();
+  let matrixBase = null;
+  const jclone = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+  const byIdList = v => Array.isArray(v) && v.every(i => isObj(i) && i.id !== undefined && i.id !== null && i.id !== "") && new Set(v.map(i => String(i.id))).size === v.length;
+  const VOLATILE = new Set(["updatedAt", "lastMutationIntent"]);
+  function merge3(base, local, cloud, path, conflicts) {
+    if (same(local, cloud)) return jclone(local);
+    if (same(local, base)) return jclone(cloud);   // só a nuvem mudou
+    if (same(cloud, base)) return jclone(local);   // só esta tela mudou
+    if (isObj(local) && isObj(cloud)) {
+      const b = isObj(base) ? base : {};
+      const out = {};
+      new Set([...Object.keys(cloud), ...Object.keys(local)]).forEach(k => {
+        const has = o => Object.prototype.hasOwnProperty.call(o, k);
+        if (VOLATILE.has(k)) { out[k] = jclone(has(local) ? local[k] : cloud[k]); return; }
+        const v = merge3(b[k], has(local) ? local[k] : undefined, has(cloud) ? cloud[k] : undefined, path ? `${path}.${k}` : k, conflicts);
+        if (v !== undefined) out[k] = v;
+      });
+      return out;
+    }
+    // Listas com id (custos da matriz, cotistas…): junta item a item pelo id.
+    if (byIdList(local) && byIdList(cloud) && (base === undefined || byIdList(base))) {
+      const map = list => new Map((Array.isArray(list) ? list : []).map(i => [String(i.id), i]));
+      const B = map(base), L = map(local), C = map(cloud);
+      const out = [];
+      [...new Set([...L.keys(), ...C.keys()])].forEach(key => {
+        const v = merge3(B.get(key), L.get(key), C.get(key), `${path}[${key}]`, conflicts);
+        if (v !== undefined) out.push(v);
+      });
+      return out;
+    }
+    conflicts.push(path || "(registro)");
+    return jclone(local);
+  }
+  function mergeOrThrow(base, local, cloud, label) {
+    if (base === undefined || base === null) return local;
+    const conflicts = [];
+    const merged = merge3(base, local, cloud || {}, "", conflicts);
+    if (conflicts.length) {
+      const err = new Error(`Outra pessoa (ou outra aba) alterou ${label} ao mesmo tempo, nos mesmos campos (${conflicts.slice(0, 4).join(", ")}${conflicts.length > 4 ? "…" : ""}). Nada foi gravado. Recarregue a página para ver a versão atual e refaça a alteração.`);
+      err.code = "UBY_CONFLICT";
+      err.conflicts = conflicts;
+      throw err;
+    }
+    return merged;
+  }
+  function rememberSummary(obraId, resumo) {
+    if (obraId === undefined || obraId === null) return;
+    summaryBases.set(String(obraId), jclone(resumo || {}));
   }
 
   async function saveRechargeMetadata(workId, payload = {}) {
@@ -651,19 +721,22 @@
     if (readError) throw readError;
     const existingSummary = existing?.resumo || {};
     const incomingSummary = payload?.summary || {};
-    const summary = {
-      ...existingSummary,
-      workId: existingSummary.workId || payload?.workId || id,
-      workName: existingSummary.workName || payload?.workName || incomingSummary.workName || "",
-      monthlyClosings: payload?.monthlyClosings || incomingSummary.monthlyClosings || existingSummary.monthlyClosings || {},
-      financialSettings: payload?.financialSettings || incomingSummary.financialSettings || existingSummary.financialSettings || {},
-      matrizCosts: payload?.matrizCosts || incomingSummary.matrizCosts || existingSummary.matrizCosts || [],
-      stationAvailability: payload?.stationAvailability || incomingSummary.stationAvailability || existingSummary.stationAvailability || {},
-      operationalPowerKw: Number(payload?.operationalPowerKw || incomingSummary.operationalPowerKw || existingSummary.operationalPowerKw || 0),
-      ubyOperationOverrides: payload?.ubyOperationOverrides || incomingSummary.ubyOperationOverrides || existingSummary.ubyOperationOverrides || {},
-      ubyAreaAccounting: payload?.ubyAreaAccounting || incomingSummary.ubyAreaAccounting || existingSummary.ubyAreaAccounting || {},
+    const build = from => ({
+      ...from,
+      workId: from.workId || payload?.workId || id,
+      workName: from.workName || payload?.workName || incomingSummary.workName || "",
+      monthlyClosings: payload?.monthlyClosings || incomingSummary.monthlyClosings || from.monthlyClosings || {},
+      financialSettings: payload?.financialSettings || incomingSummary.financialSettings || from.financialSettings || {},
+      matrizCosts: payload?.matrizCosts || incomingSummary.matrizCosts || from.matrizCosts || [],
+      stationAvailability: payload?.stationAvailability || incomingSummary.stationAvailability || from.stationAvailability || {},
+      operationalPowerKw: Number(payload?.operationalPowerKw || incomingSummary.operationalPowerKw || from.operationalPowerKw || 0),
+      ubyOperationOverrides: payload?.ubyOperationOverrides || incomingSummary.ubyOperationOverrides || from.ubyOperationOverrides || {},
+      ubyAreaAccounting: payload?.ubyAreaAccounting || incomingSummary.ubyAreaAccounting || from.ubyAreaAccounting || {},
       updatedAt: new Date().toISOString()
-    };
+    });
+    // Versão desta tela = o que ela leu (base) + o que ela enviou; junta com a nuvem atual.
+    const base = summaryBases.get(id);
+    const summary = base ? mergeOrThrow(base, build(base), existingSummary, "a configuração deste carregador") : build(existingSummary);
     const updatedAt = new Date().toISOString();
     if (existing) {
       const { error: updateError } = await sb
@@ -681,6 +754,7 @@
         .upsert({ obra_id: id, arquivos: [], recargas: [], resumo: summary, updated_at: updatedAt }, { onConflict: "obra_id" });
       if (insertError) throw insertError;
     }
+    rememberSummary(id, summary);
     await insertAuditLog(sb, user, {
       entidadeId: id,
       acao: "save_recharge_metadata",
@@ -706,6 +780,7 @@
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
+    matrixBase = jclone(data.payload || {});
     return {
       matrizCosts: Array.isArray(data.payload?.matrizCosts) ? data.payload.matrizCosts : [],
       networkDistribution: data.payload?.networkDistribution && typeof data.payload.networkDistribution === 'object' ? data.payload.networkDistribution : {},
@@ -748,22 +823,24 @@
     const user = await currentUser();
     if (!user) throw new Error("Entre no Supabase antes de salvar a matriz financeira.");
     let resolvedDistribution = networkDistribution && typeof networkDistribution === 'object' ? networkDistribution : null;
+    const { data: existing, error: existingError } = await sb
+      .from("uby_financial_matrix")
+      .select("payload")
+      .eq("id", "shared-costs")
+      .maybeSingle();
+    if (existingError) throw new Error(`Não consegui conferir a matriz na nuvem (${existingError.message}). Nada foi gravado.`);
     // Clientes com a versão anterior só enviam custos. Preserve a política de
     // cotas já salva em vez de sobrescrever o JSON compartilhado com vazio.
     if (!resolvedDistribution) {
-      const { data: existing, error: existingError } = await sb
-        .from("uby_financial_matrix")
-        .select("payload")
-        .eq("id", "shared-costs")
-        .maybeSingle();
-      if (existingError) throw existingError;
       resolvedDistribution = existing?.payload?.networkDistribution && typeof existing.payload.networkDistribution === 'object'
         ? existing.payload.networkDistribution : {};
     }
-    const payload = {
+    let payload = {
       matrizCosts: Array.isArray(matrizCosts) ? matrizCosts : [],
       networkDistribution: resolvedDistribution
     };
+    // Junta com o que outra pessoa gravou desde a leitura (custos por id, cotas, fechamentos).
+    if (matrixBase && existing?.payload) payload = mergeOrThrow(matrixBase, payload, existing.payload, "a matriz de custos / cotas");
     const { data, error } = await sb
       .from("uby_financial_matrix")
       .upsert({
@@ -775,6 +852,7 @@
       .select("id,updated_at")
       .single();
     if (error) throw error;
+    matrixBase = jclone(payload);
     await insertAuditLog(sb, user, {
       entidadeTipo: "uby_financial_matrix",
       entidadeId: "shared-costs",
@@ -928,6 +1006,7 @@
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
+    rememberSummary(data.obra_id, data.resumo);
     return {
       workId: data.obra_id,
       files: data.arquivos || [],
@@ -950,6 +1029,7 @@
       .neq("obra_id", "__uby_matriz_financeira__")
       .order("updated_at", { ascending: false });
     if (error) throw error;
+    (data || []).forEach(row => rememberSummary(row.obra_id, row.resumo));
     return (data || []).map(row => ({
       workId: row.obra_id,
       files: row.arquivos || [],
@@ -972,6 +1052,7 @@
       .neq("obra_id", "__uby_matriz_financeira__")
       .order("updated_at", { ascending: false });
     if (error) throw error;
+    (data || []).forEach(row => rememberSummary(row.obra_id, row.resumo));
     return (data || []).map(row => ({
       workId: row.obra_id,
       files: row.arquivos || [],
@@ -1299,6 +1380,7 @@
   }
 
   window.UBY_SUPABASE = {
+    _merge3: (base, local, cloud) => { const conflicts = []; const merged = merge3(base, local, cloud, "", conflicts); return { merged, conflicts }; },
     configured,
     client,
     collectLocalState,
