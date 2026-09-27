@@ -165,6 +165,26 @@
     const energyMode = ui.edits.financeEnergyMode ?? ctl("financeEnergyMode") ?? "copel";
     const rules = ui.rules || { cost: f.cost, revenue: f.revenue };
     const dirty = Object.keys(ui.edits).length > 0 || !!ui.rules;
+    // Números oficiais (motor v2: relatórios, financeiro e fechamentos) e faturas de energia.
+    const [wid, st] = String(ui.charger || "|").split("|");
+    const api = UBY.state.api;
+    let off = null, inv = null;
+    try { const s = api?.stationFinance?.(wid, st, ui.month); if (s && s.finance) off = { ...s, operating: s.monthKey === ui.month }; } catch (_) {}
+    try { inv = api?.energyInvoices?.(wid, st) || null; } catch (_) {}
+    const hasInv = !!(inv && (inv.stored || []).length);
+    const invMonth = hasInv ? inv.months?.[ui.month] : null;
+    const firstOp = off?.monthly?.[0]?.key || "";
+    const mName = m => api?.monthName?.(m) || m;
+    const officialCards = off && off.operating
+      ? [kpi("Receita", fmt.brl(off.finance.totalRevenue || off.finance.revenue), "oficial desta competência"), kpi("Custos totais", fmt.brl(off.finance.totalOperatingCost), hasInv ? "energia pelas faturas por leitura" : ""),
+         kpi("Resultado", fmt.brl(off.finance.operationNet), "o mesmo dos relatórios e fechamentos", "", "lead"), (() => { const op = f.summary.find(m => /opera/i.test(m.label)); return kpi("Operação", esc(op?.value || "—"), `${fmt.kwh(off.finance.energy)} entregues`); })()].join("")
+      : [kpi("Receita", fmt.brl(0), "sem operação nesta competência"), kpi("Custos totais", fmt.brl(0), "não entram no resultado oficial"), kpi("Resultado", "fora do resultado", firstOp ? `operação começou em ${mName(firstOp)}` : "sem operação", "", "lead"), kpi("Operação", "0 recargas", "")].join("");
+    const energyInvoiceBox = () => `<div class="note" style="border-color:var(--uby-green, #1f9d55)"><strong>Energia desta competência vem das Faturas de energia</strong>
+        ${invMonth && (invMonth.parts.length || invMonth.estimatedCost) ? `<br>${invMonth.parts.map(p => `fatura ${esc(mName(p.ref) || p.start)}: consumo de ${fmtDay(p.from)} a ${fmtDay(p.to)} · Copel ${fmt.brl(p.copel)}${p.lease ? ` + arrendamento ${fmt.brl(p.lease)}` : ""}`).join("<br>")}
+          ${invMonth.estimatedCost ? `<br><span class="badge warn">estimativa</span> ${fmtDay(invMonth.estimatedFrom)} a ${fmtDay(invMonth.estimatedTo)}: ${fmt.brl(invMonth.estimatedCost)} (até a próxima fatura ser lançada)` : ""}
+          <br><strong>Energia do mês: ${fmt.brl(invMonth.cost)}</strong>` : `<br>Nenhum consumo deste carregador cai nesta competência.`}
+        <br><small>Os campos de energia por competência deixam de ser usados para este carregador.</small>
+        <br><a class="btn" href="#/parametros/energia/${encodeURIComponent(ui.charger)}" style="margin-top:8px;display:inline-flex">Abrir Faturas de energia →</a></div>`;
     const ruleRows = (kind, arr) => arr.map((r, i) => `<tr>
         <td><input type="checkbox" data-rule="${kind}|${i}|enabled" ${r.enabled ? "checked" : ""}></td>
         <td><input class="select" data-rule="${kind}|${i}|label" value="${esc(r.label)}" style="width:100%"></td>
@@ -182,13 +202,16 @@
         <button class="btn" id="pmDiscard" type="button" ${dirty ? "" : "disabled"}>Descartar</button>
         <button class="btn primary" id="pmSave" type="button" ${dirty && canWrite(w) && !busy ? "" : "disabled"}>Salvar competência</button>
       </div>
-      <div class="grid g5" style="margin-bottom:14px">${f.summary.map((m, i) => kpi(m.label, esc(m.value), esc(m.sub || ""), "", i === 2 ? "lead" : "")).join("")}${kpi("Base desta competência", esc(f.versionSource || "—"), esc(f.versionHelp || ""))}</div>
-      ${dirty ? `<div class="note" style="margin-bottom:12px">Alterações ainda não salvas. "Simular resultado" recalcula os cartões acima com os valores novos, sem gravar.</div>` : ""}
+      ${dirty
+        ? `<div class="grid g5" style="margin-bottom:14px">${f.summary.map((m, i) => kpi(m.label, esc(m.value), esc(m.sub || ""), "", i === 2 ? "lead" : "")).join("")}${kpi("Base desta competência", esc(f.versionSource || "—"), esc(f.versionHelp || ""))}</div>
+           <div class="note" style="margin-bottom:12px">Simulação das alterações ainda não salvas (conta da tela original${hasInv ? ", sem as faturas de energia por leitura" : ""}). Depois de salvar, os cartões voltam a mostrar o resultado oficial.</div>`
+        : `<div class="grid g5" style="margin-bottom:14px">${officialCards}${kpi("Base desta competência", esc(f.versionSource || "—"), esc(f.versionHelp || ""))}</div>
+           ${off && !off.operating ? `<div class="note" style="margin-bottom:12px">Este carregador ainda não operava em ${esc(mName(ui.month))}${firstOp ? ` (primeira competência com recarga: ${esc(mName(firstOp))})` : ""}. Os parâmetros abaixo ficam guardados, mas esta competência não entra no resultado oficial, nos relatórios nem na distribuição.</div>` : ""}`}
       <div class="grid g2" style="gap:14px">${f.rows.filter(r => modelVisible(r, model, transfer) && r.controls.length).map(r => `
-        <section class="section" style="margin:0"><div class="section-head" style="margin-bottom:8px"><div><p class="kicker">${esc(r.group)}</p><h2 style="font-size:14px">${esc(r.name)}</h2><p>${esc(r.rule)}</p></div>
-          <div class="meta">anterior<br><strong>${esc(r.previous || "—")}</strong></div></div>
-          <div class="grid ${r.controls.length > 2 ? "g3" : "g2"}" style="gap:8px">${r.controls.filter(c => !c.leaseOnly || energyMode === "copel_lease").map(c => control(c, r)).join("")}</div>
-          ${r.key === "energyCostPerKWh" ? `<p class="source-line">${esc(f.energySummary)}</p>` : ""}</section>`).join("")}</div>
+        <section class="section" style="margin:0"><div class="section-head" style="margin-bottom:8px"><div><p class="kicker">${esc(r.group)}</p><h2 style="font-size:14px">${esc(r.name)}</h2><p>${esc(r.key === "energyCostPerKWh" && hasInv ? "Custo de energia pelas faturas da Copel e do arrendamento, dividido pelo mês de consumo." : r.rule)}</p></div>
+          ${r.key === "energyCostPerKWh" && hasInv ? "" : `<div class="meta">anterior<br><strong>${esc(r.previous || "—")}</strong></div>`}</div>
+          ${r.key === "energyCostPerKWh" && hasInv ? energyInvoiceBox() : `<div class="grid ${r.controls.length > 2 ? "g3" : "g2"}" style="gap:8px">${r.controls.filter(c => !c.leaseOnly || energyMode === "copel_lease").map(c => control(c, r)).join("")}</div>
+          ${r.key === "energyCostPerKWh" ? `<p class="source-line">${esc(f.energySummary)}</p>` : ""}`}</section>`).join("")}</div>
       <section class="section" style="margin-top:14px"><div class="section-head"><div><p class="kicker">Regras do carregador</p><h2>Custos e receitas adicionais</h2><p>Valem nesta competência. "Avulso no mês" não é reaproveitado nos meses seguintes pelo motor novo.</p></div>
           <div><button class="btn" data-rule-add="cost" type="button">＋ Custo</button> <button class="btn" data-rule-add="revenue" type="button">＋ Receita</button></div></div>
         <h3 style="margin:4px 0 6px">Custos</h3>
@@ -664,6 +687,9 @@
     const data = { chargers: chargers(w), months: [], form: null };
     const writable = canWrite(w);
     if (ui.tab === "carregador") {
+      // Resultado oficial por competência precisa do histórico completo no motor principal.
+      for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
+      try { await Promise.race([UBY.state.api.loadFull(), new Promise(r => setTimeout(r, 15000))]); } catch (_) {}
       if (!ui.charger) ui.charger = (data.chargers.find(c => c.included && ["uby", "hybrid"].includes(c.model)) || data.chargers[0] || {}).key || "";
       if (ui.charger) {
         const opened = await openCharger(w, ui.charger, ui.month);
