@@ -143,26 +143,119 @@
     return `<strong>${d >= 0 ? "+" : ""}${fmt.pct1(d)}</strong>`;
   }
 
-  function dailySection(daily) {
-    if (!daily.hasData) return `<section class="section"><div class="section-head"><div><p class="kicker">Resultado do dia</p><h2>Resultado diário da rede</h2></div></div><div class="note">Nenhum movimento registrado no período selecionado. Ausência de dado não é tratada como zero.</div></section>`;
-    const day = daily.day, prev = daily.previous;
-    const has = !!prev;
-    const label = prev ? `vs ${prev.label}` : "";
-    const d = (cur, p, opts = {}) => delta(cur, p || 0, { hasBase: has, label, ...opts });
-    const when = new Date(day.date);
-    return `
-      <section class="section">
-        <div class="section-head"><div><p class="kicker">Resultado do dia</p><h2>Resultado diário da rede</h2><p>Último dia com movimento no período. Falhas contam à parte e não inflam recargas, faturamento ou energia.</p></div>
-          <div class="meta">Regra: sessões válidas (isExecutedCharge)<br>Operação UBY incluída no painel</div></div>
-        <div class="daily-strip">
-          <div class="daily-date"><small>${when.toLocaleDateString("pt-BR", { weekday: "long" })}</small><strong>${when.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}</strong><span>${prev ? `comparado a ${esc(prev.label)}` : "sem dia anterior na série"}</span></div>
-          ${kpi("Faturamento do dia", fmt.brl(day.revenue), "", d(day.revenue, prev?.revenue), "lead")}
-          ${kpi("Recargas válidas", fmt.int(day.sessions), "", d(day.sessions, prev?.sessions))}
-          ${kpi("Energia entregue", fmt.kwh(day.energy), "", d(day.energy, prev?.energy), "warn")}
-          ${kpi("Clientes", fmt.int(day.clients), `${fmt.int(day.newClients)} novo(s)`, d(day.clients, prev?.clients))}
-          ${kpi("Falhas registradas", fmt.int(day.failures), "tentativas com falha", d(day.failures, prev?.failures, { inverse: true }), day.failures ? "bad" : "")}
+  // ---------- Acompanhamento do dia por carregador (ondas de ocupação e faturamento) ----------
+  const dt = { scope: "uby", day: "" };
+  const hourLabel = h => `${String(h).padStart(2, "0")}h`;
+
+  // Curva suave (Catmull-Rom → Bézier) presa entre o topo e a base do gráfico.
+  function smoothPath(pts, top, base) {
+    if (!pts.length) return "";
+    const cl = v => Math.min(Math.max(v, top), base);
+    let p = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, cl(p1[1] + (p2[1] - p0[1]) / 6)];
+      const c2 = [p2[0] - (p3[0] - p1[0]) / 6, cl(p2[1] - (p3[1] - p1[1]) / 6)];
+      p += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return p;
+  }
+
+  function dayWave(hourly, scale, nowHour, big) {
+    const W = 240, H = big ? 64 : 44, top = 4, base = H - 2;
+    const last = Math.min(24, Math.ceil(nowHour));
+    const x = i => (i + 0.5) / 24 * W;
+    const yRev = v => base - (scale.rev > 0 ? v / scale.rev : 0) * (base - top);
+    const yOcc = v => base - Math.min(v, 100) / 100 * (base - top);
+    const upto = hourly.slice(0, last);
+    const revPts = [[0, base], ...upto.map((h, i) => [x(i), yRev(h.revenue)]), [last / 24 * W, upto.length ? yRev(upto.at(-1).revenue) : base]];
+    const occPts = [[0, base], ...upto.map((h, i) => [x(i), yOcc(h.use)]), [last / 24 * W, upto.length ? yOcc(upto.at(-1).use) : base]];
+    const rev = smoothPath(revPts, top, base), occ = smoothPath(occPts, top, base);
+    const endX = (last / 24 * W).toFixed(1);
+    const tips = hourly.map((h, i) => `<rect x="${(i / 24 * W).toFixed(1)}" y="0" width="${(W / 24).toFixed(2)}" height="${H}" fill="transparent"><title>${hourLabel(i)}–${hourLabel(i + 1)} · em uso ${fmt.pct(h.use)} da hora · ${fmt.brl(h.revenue)} · ${fmt.kwh(h.energy)}</title></rect>`).join("");
+    return `<svg class="dt-wave ${big ? "big" : ""}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Ocupação e faturamento por hora">
+      ${[6, 12, 18].map(h => `<line x1="${h / 24 * W}" x2="${h / 24 * W}" y1="${top}" y2="${base}" class="dt-gridline"/>`).join("")}
+      <line x1="0" x2="${W}" y1="${base}" y2="${base}" class="dt-base"/>
+      ${rev ? `<path d="${rev} L${endX},${base} L0,${base} Z" class="dt-rev-area"/><path d="${rev}" class="dt-rev"/>` : ""}
+      ${occ ? `<path d="${occ}" class="dt-occ"/>` : ""}
+      ${last < 24 ? `<rect x="${endX}" y="${top}" width="${(W - last / 24 * W).toFixed(1)}" height="${base - top}" class="dt-future"/><line x1="${endX}" x2="${endX}" y1="${top}" y2="${base}" class="dt-now"/>` : ""}
+      ${tips}</svg>
+      <div class="dt-hours"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>24h</span></div>`;
+  }
+
+  // Colunas conforme a quantidade: até 5 numa linha só; 6 ou mais em linhas de 4 (ou de 5 quando fecha certo).
+  const dtCols = n => n <= 5 ? Math.max(n, 1) : (n % 5 === 0 ? 5 : 4);
+
+  function drawDayTrack(box, defaultDay) {
+    if (!box) return;
+    const res = UBY.data("dayTracking", dt.day || defaultDay || "");
+    if (!res.day) { box.innerHTML = `<div class="note">Nenhuma recarga registrada para acompanhar por dia.</div>`; return; }
+    const day = res.day;
+    const list = res.units.filter(u => dt.scope === "geral" || u.group === "uby" || u.group === "partner");
+    // Comparação sempre com o dia anterior do calendário (mesma base dos cartões e da rede).
+    const prevDate = fromYmd(day.key); prevDate.setDate(prevDate.getDate() - 1);
+    const prevTxt = prevDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    const dd = (cur, prev, opts = {}) => delta(cur, prev || 0, { hasBase: true, label: `vs ${prevTxt}`, ...opts });
+    const net = res.network[dt.scope === "geral" ? "geral" : "uby"];
+    const nd = net.day, np = net.previous || {};
+    const sumH = (i, k) => list.reduce((s, u) => s + u.hourly[i][k], 0);
+    // Rede: % dos carregadores em uso naquela hora (minutos ocupados ÷ carregadores × 60).
+    const totalHourly = Array.from({ length: 24 }, (_, i) => ({ revenue: sumH(i, "revenue"), energy: sumH(i, "energy"),
+      use: list.length ? sumH(i, "busyMin") / (list.length * 60) * 100 : 0 }));
+    const tot = k => list.reduce((s, u) => s + Number(u[k] || 0), 0);
+    const totOcc = tot("maxKWh") > 0 ? tot("energy") / tot("maxKWh") * 100 : 0;
+    const totPrevOcc = tot("prevMaxKWh") > 0 ? tot("prevEnergy") / tot("prevMaxKWh") * 100 : 0;
+    // Escala comum entre os carregadores: a onda mais alta é a do carregador que mais rendeu naquela hora.
+    const scale = { rev: Math.max(...list.flatMap(u => u.hourly.map(h => h.revenue)), 0) };
+    const tScale = { rev: Math.max(...totalHourly.map(h => h.revenue), 0) };
+    const when = fromYmd(day.key);
+    const badge = u => u.group === "partner" ? `<span class="badge partner">Parceiro</span>` : u.group === "p3" ? `<span class="badge neutral">Só gestão P3</span>` : u.group === "outside" ? `<span class="badge neutral">Fora da UBY</span>` : "";
+    const lastTxt = u => u.lastStart ? `última às ${new Date(u.lastStart).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "sem recarga no dia";
+
+    const card = u => `<article class="dt-card ${u.sessions ? "" : "dt-idle"}">
+        <a class="dt-name" href="#/unidades/${encodeURIComponent(u.workId)}/${encodeURIComponent(u.station)}"><span class="badge ${u.kind === "ac" ? "ac" : "dc"}">${u.kind === "ac" ? "AC" : "DC"}</span> <strong>${esc(u.station)}</strong> ${badge(u)}</a>
+        <div class="dt-nums">
+          <div><small>Ocupação</small><strong class="dt-o">${fmt.pct1(u.occupancy)}</strong>${dd(u.occupancy, u.prevOccupancy)}</div>
+          <div><small>Faturamento</small><strong class="dt-r">${fmt.brl(u.revenue)}</strong>${dd(u.revenue, u.prevRevenue)}</div>
         </div>
-      </section>`;
+        ${dayWave(u.hourly, scale, day.nowHour, false)}
+        <div class="dt-foot">${fmt.int(u.valid)} recarga(s) · ${fmt.kwh(u.energy)}${u.failures ? ` · <span class="dt-bad">${u.failures} falha(s)</span>` : ""} · ${lastTxt(u)}</div>
+      </article>`;
+
+    box.innerHTML = `
+      <div class="section-head"><div><p class="kicker">Resultado do dia</p><h2>Resultado diário da rede</h2>
+          <p>Números do dia e a curva hora a hora da rede; abaixo, cada carregador. Falhas contam à parte e não inflam recargas, faturamento ou energia.</p></div>
+        <div class="meta">Regra: sessões válidas (isExecutedCharge)<br>${dt.scope === "uby" ? "Rede UBY: operação própria + parceiros" : "Geral: todos os carregadores"}</div></div>
+      <div class="toolbar" style="margin-bottom:12px">
+        <div class="seg" id="dtScope">${[["uby", "Rede UBY"], ["geral", "Geral"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${dt.scope === v ? "on" : ""}">${l}</button>`).join("")}</div>
+        <div class="seg"><button type="button" id="dtPrev" ${day.prevKey ? "" : "disabled"} title="Dia anterior com recarga">‹</button><button type="button" id="dtNext" ${day.nextKey ? "" : "disabled"} title="Próximo dia com recarga">›</button></div>
+        <input class="select" type="date" id="dtDay" value="${esc(day.key)}" min="${esc(res.dayKeys[0] || "")}" max="${esc(res.dayKeys.at(-1) || "")}">
+        <span class="spacer"></span>
+        <span class="dt-legend"><i class="dt-lg-rev"></i>Faturamento <i class="dt-lg-occ"></i>Em uso na hora</span>
+      </div>
+      <div class="daily-strip dt-strip">
+        <div class="daily-date"><small>${esc(when.toLocaleDateString("pt-BR", { weekday: "long" }))}${day.isToday ? " · até agora" : ""}</small><strong>${esc(when.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" }))}</strong><span>comparado a ${esc(prevTxt)}</span></div>
+        ${kpi("Ocupação do dia", fmt.pct1(totOcc), `${fmt.int(list.filter(u => u.sessions).length)} de ${fmt.int(list.length)} carregador(es) com recarga`, dd(totOcc, totPrevOcc), "lead dt-kpi-occ")}
+        ${kpi("Faturamento do dia", fmt.brl(nd.revenue), "", dd(nd.revenue, np.revenue), "lead")}
+        ${kpi("Recargas válidas", fmt.int(nd.sessions), "", dd(nd.sessions, np.sessions))}
+        ${kpi("Energia entregue", fmt.kwh(nd.energy), "", dd(nd.energy, np.energy), "warn")}
+        ${kpi("Clientes", fmt.int(nd.clients), `${fmt.int(nd.newClients)} novo(s)`, dd(nd.clients, np.clients))}
+        ${kpi("Falhas registradas", fmt.int(nd.failures), "tentativas com falha", dd(nd.failures, np.failures, { inverse: true }), nd.failures ? "bad" : "")}
+      </div>
+      ${list.length ? `<div class="dt-card dt-total">
+          <div class="dt-name"><strong>${dt.scope === "uby" ? "Rede UBY" : "Todos os carregadores"} · hora a hora</strong> <small>faturamento somado e média de tempo em uso dos carregadores</small></div>
+          ${dayWave(totalHourly, tScale, day.nowHour, true)}
+        </div>
+        <h3 class="dt-sub">Por carregador <small>mesma escala em todos os cartões · clique no nome para abrir o carregador</small></h3>
+        <div class="dt-grid ${dtCols(list.length) > 3 ? "dt-many" : ""}" style="--dt-cols:${dtCols(list.length)}">${list.map(card).join("")}</div>` : `<div class="note">Nenhum carregador ${dt.scope === "uby" ? "da rede UBY " : ""}com recarga neste dia ou no anterior.</div>`}
+      <p class="source-line">Ocupação do dia = energia ÷ (potência × horas disponíveis da estação no dia${day.isToday ? ", até agora" : ""}), mesma regra do motor. Por hora: valor de cada recarga válida distribuído entre início e fim; linha = parte da hora com carro conectado (na rede, média dos carregadores). Passe o mouse no gráfico para ver cada hora. ${dt.scope === "uby" ? "“Geral” inclui também só gestão P3 e carregadores fora da UBY." : ""}</p>`;
+
+    const redraw = () => drawDayTrack(box, defaultDay);
+    box.querySelectorAll("#dtScope button").forEach(b => b.onclick = () => { dt.scope = b.dataset.v; redraw(); });
+    const go = k => { if (k) { dt.day = k; redraw(); } };
+    box.querySelector("#dtPrev").onclick = () => go(day.prevKey);
+    box.querySelector("#dtNext").onclick = () => go(day.nextKey);
+    box.querySelector("#dtDay").onchange = e => go(e.target.value);
   }
 
   function render(target) {
@@ -178,7 +271,7 @@
           <small>${fmt.int(n.chargers)} carregador(es) UBY em ${fmt.int(n.units)} unidade(s). DC entra por padrão; ajustes manuais da plataforma são respeitados.${full ? "" : " Histórico completo ainda carregando: comparativos podem mudar em instantes."}</small></div>
       </div>
 
-      ${dailySection(r.daily)}
+      <section class="section" id="dayTrackSection"></section>
 
       <section class="section">
         <div class="section-head"><div><p class="kicker">Fechamento por origem</p><h2>Rede consolidada</h2><p>Consolidação não apaga a diferença entre operação própria e parceiros.</p></div>
@@ -268,6 +361,7 @@
       </section>`;
 
     target.querySelectorAll("tr[data-unit]").forEach(tr => tr.addEventListener("click", () => UBY.go(`#/unidades/${encodeURIComponent(tr.dataset.unit)}/${encodeURIComponent(tr.dataset.station)}`)));
+    drawDayTrack(target.querySelector("#dayTrackSection"), r.daily.hasData ? r.daily.day.key : "");
     drawCompany(target.querySelector("#companySection"));
     drawCharts(r);
   }

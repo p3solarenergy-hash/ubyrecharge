@@ -332,6 +332,100 @@
     return { bounds, groups, range: { start: iso(start), end: iso(end), prevStart: iso(prevStart), prevEnd: iso(prevEnd) } };
   }
 
+  // ---------------------------------------------------------------------
+  // Acompanhamento do dia por carregador: ocupação e faturamento hora a hora.
+  // dayKey 'YYYY-MM-DD' (padrão = último dia com recarga). Ocupação do dia com a
+  // mesma regra do motor (energia ÷ potência × horas disponíveis da estação no dia,
+  // até agora se for hoje). Curva horária: energia e receita de cada sessão válida
+  // espalhadas entre início e fim; ocupação da hora = kWh da hora ÷ potência.
+  // ---------------------------------------------------------------------
+  function dayTracking(dayKey) {
+    const rows = getUbyChargerRows(getGeneralUnitData());
+    const valid = d => d instanceof Date && !Number.isNaN(d.getTime());
+    const dayKeys = [...new Set(rows.flatMap(row => row.charges || []).map(c => c.startDate).filter(valid)
+      .map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`))].sort();
+    const key = dayKey && /^\d{4}-\d{2}-\d{2}$/.test(dayKey) ? dayKey : dayKeys.at(-1);
+    if (!key) return { dayKeys, day: null, units: [] };
+    const [y, m, d] = key.split("-").map(Number);
+    const dayStart = new Date(y, m - 1, d), dayEnd = new Date(y, m - 1, d + 1);
+    const prevStart = new Date(y, m - 1, d - 1);
+    const now = new Date();
+    const isToday = now >= dayStart && now < dayEnd;
+    const capEnd = isToday ? now : dayEnd;
+    const monthKey = key.slice(0, 7);
+    const inDay = (c, a, b) => valid(c.startDate) && c.startDate >= a && c.startDate < b;
+
+    const spread = (charges, power) => {
+      const hours = Array.from({ length: 24 }, () => ({ revenue: 0, energy: 0, busyMin: 0 }));
+      charges.filter(isExecutedCharge).forEach(c => {
+        const start = c.startDate;
+        const end = valid(c.endDate) && c.endDate > start ? c.endDate : new Date(start.getTime() + Math.max(durToHours(c.duration), 1 / 60) * 3_600_000);
+        const total = end - start;
+        for (let h = start.getHours(); h < 24; h++) {
+          const hs = new Date(y, m - 1, d, h), he = new Date(y, m - 1, d, h + 1);
+          if (hs >= end) break;
+          const ov = Math.min(end, he) - Math.max(start, hs);
+          if (ov <= 0) continue;
+          const share = ov / total;
+          hours[h].revenue += Number(c.revenue || 0) * share;
+          hours[h].energy += Number(c.energyKWh || 0) * share;
+          hours[h].busyMin += ov / 60000;
+        }
+      });
+      // use = % da hora com carro conectado (tempo); occupancy = kWh da hora ÷ potência (regra de energia).
+      return hours.map(x => ({ revenue: x.revenue, energy: x.energy, busyMin: Math.min(x.busyMin, 60),
+        use: Math.min(x.busyMin, 60) / 60 * 100, occupancy: power > 0 ? Math.min(x.energy / power * 100, 100) : 0 }));
+    };
+
+    const GROUP = u => !u.included ? "outside" : u.model === "third_party_management" ? "partner"
+      : ["management_only", "p3_society"].includes(u.model) ? "p3" : "uby";
+
+    const units = rows.map(row => {
+      const all = (row.charges || []).map(hydrateCharge);
+      const today = all.filter(c => inDay(c, dayStart, dayEnd));
+      const before = all.filter(c => inDay(c, prevStart, dayStart));
+      if (!today.length && !before.length) return null;
+      const station = row.stationName || row.station;
+      const cur = summarizeUbyChargerRow(row, today), prev = summarizeUbyChargerRow(row, before);
+      const clean = cleanOperationStats(today);
+      const config = stationAvailabilityFor(row.workId, station, row.workName);
+      const power = Number(workPowerById(row.workId) || 0);
+      const hoursAvail = stationAvailableHours(config, dayStart, capEnd);
+      const prevHours = stationAvailableHours(config, prevStart, dayStart);
+      const model = row.included ? normalizeOperationModel(financeSettingsForUbyRow(row, monthKey).operationModel) : "";
+      const u = { workId: row.workId, workName: row.workName, station, kind: row.kind, included: row.included, model, power,
+        revenue: cur.revenue, energy: cur.energy, sessions: cur.count, valid: clean.executed.length, failures: clean.failed.length,
+        clients: cur.clients, hoursAvail, maxKWh: power * hoursAvail,
+        occupancy: power * hoursAvail > 0 ? cur.energy / (power * hoursAvail) * 100 : 0,
+        prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count, prevMaxKWh: power * prevHours,
+        prevOccupancy: power * prevHours > 0 ? prev.energy / (power * prevHours) * 100 : 0,
+        lastStart: iso(today.map(c => c.startDate).filter(valid).sort((a, b) => b - a)[0] || null),
+        hourly: spread(today, power) };
+      u.group = GROUP(u);
+      return u;
+    }).filter(Boolean).sort((a, b) => b.revenue - a.revenue);
+
+    // Números do dia da rede por escopo, com a mesma regra do Resultado do dia
+    // (dailyOperationalRows: só sessões válidas; falhas à parte; cliente novo pelo histórico).
+    const rowGroup = row => {
+      const model = row.included ? normalizeOperationModel(financeSettingsForUbyRow(row, monthKey).operationModel) : "";
+      return GROUP({ included: row.included, model });
+    };
+    const networkFor = test => {
+      const history = rows.filter(row => test(rowGroup(row))).flatMap(row => (row.charges || []).map(hydrateCharge));
+      const scoped = history.filter(c => inDay(c, prevStart, dayEnd));
+      const days = dailySeries(scoped, history);
+      const pick = k => { const r = days.find(x => x.key === k); return r ? { revenue: r.revenue, energy: r.energy, sessions: r.sessions, clients: r.clients, newClients: r.newClients, failures: r.failures } : null; };
+      const prevKeyDay = `${prevStart.getFullYear()}-${String(prevStart.getMonth() + 1).padStart(2, "0")}-${String(prevStart.getDate()).padStart(2, "0")}`;
+      return { day: pick(key) || { revenue: 0, energy: 0, sessions: 0, clients: 0, newClients: 0, failures: 0 }, previous: pick(prevKeyDay) };
+    };
+    const network = { uby: networkFor(g => g === "uby" || g === "partner"), geral: networkFor(() => true) };
+
+    const idx = dayKeys.indexOf(key);
+    return { dayKeys, network, day: { key, date: iso(dayStart), isToday, nowHour: isToday ? now.getHours() + now.getMinutes() / 60 : 24,
+      prevKey: idx > 0 ? dayKeys[idx - 1] : null, nextKey: idx >= 0 && idx < dayKeys.length - 1 ? dayKeys[idx + 1] : null }, units };
+  }
+
   // Serie diaria com a mesma regra de dailyOperationalRows (falhas separadas).
   function dailySeries(charges, history = charges) {
     return dailyOperationalRows(charges, history).map(row => ({
@@ -1815,7 +1909,7 @@
     return out;
   }
 
-  window.UBY_MOTOR_API = { waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, stations, stationDetail, works, usage, networkConfig,
+  window.UBY_MOTOR_API = { waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,

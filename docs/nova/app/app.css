@@ -385,6 +385,52 @@ html[data-theme="night"]{--uby-rev:#00FF85;--uby-energy:#00E5FF}
 .co-caret{display:inline-grid;place-items:center;width:22px;height:22px;border:1px solid var(--uby-line-strong);border-radius:6px;color:var(--uby-muted);font-size:10px}
 .co-row{margin:3px 0}
 .co-lbl{color:var(--uby-muted);font-size:10.5px}
+/* Acompanhamento do dia (Comando): cartões com onda de faturamento e linha de ocupação */
+.dt-grid{display:grid;grid-template-columns:repeat(var(--dt-cols,4),minmax(0,1fr));gap:10px;align-items:stretch}
+@media(max-width:1180px){.dt-grid.dt-many{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:860px){.dt-grid.dt-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.dt-grid.dt-grid{grid-template-columns:minmax(0,1fr)}}
+.dt-card{border:1px solid var(--uby-line);border-radius:12px;background:var(--uby-surface);padding:11px 12px 9px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.dt-card.dt-total{margin-top:10px;border-color:var(--uby-line-strong);background:linear-gradient(180deg,var(--uby-green-soft),transparent 75%),var(--uby-surface)}
+.dt-card.dt-total .dt-wave.big{height:84px}
+.dt-card.dt-idle{opacity:.6}
+.dt-name{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;color:var(--uby-ink);text-decoration:none;font-size:12px;min-width:0;min-height:22px}
+.dt-name .badge{flex-shrink:0}
+.dt-total .dt-name{flex-wrap:wrap}
+.dt-name strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto}
+.dt-name small{color:var(--uby-muted);font-size:10.5px}
+a.dt-name:hover strong{text-decoration:underline}
+.dt-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dt-nums>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dt-nums .delta{align-self:flex-start;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-nums small{color:var(--uby-muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.dt-nums strong{font-size:18px;line-height:1.1;font-weight:800}
+.dt-total .dt-nums strong{font-size:22px}
+.dt-o{color:var(--uby-blue)}
+.dt-r{color:var(--uby-green)}
+.dt-wave{width:100%;height:44px;display:block;overflow:visible}
+.dt-wave.big{height:64px}
+.dt-gridline{stroke:var(--uby-line);stroke-width:1;stroke-dasharray:2 3;vector-effect:non-scaling-stroke}
+.dt-base{stroke:var(--uby-line-strong);stroke-width:1;vector-effect:non-scaling-stroke}
+.dt-rev-area{fill:var(--uby-green);opacity:.14}
+.dt-rev{fill:none;stroke:var(--uby-green);stroke-width:1.6;vector-effect:non-scaling-stroke;opacity:.85}
+.dt-occ{fill:none;stroke:var(--uby-blue);stroke-width:1.4;vector-effect:non-scaling-stroke;stroke-dasharray:3 2;opacity:.9}
+.dt-future{fill:var(--uby-surface-soft);opacity:.55}
+.dt-now{stroke:var(--uby-amber);stroke-width:1;vector-effect:non-scaling-stroke}
+.dt-hours{display:flex;justify-content:space-between;color:var(--uby-muted);font-size:9px;margin-top:-3px}
+.dt-foot{color:var(--uby-muted);font-size:10.5px;margin-top:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-bad{color:var(--uby-red);font-weight:700}
+.dt-legend{display:inline-flex;align-items:center;gap:6px;color:var(--uby-muted);font-size:11px}
+.dt-legend i{display:inline-block;width:16px;height:0;border-top:2px solid var(--uby-green);margin-left:6px}
+.dt-legend i.dt-lg-occ{border-top:2px dashed var(--uby-blue)}
+.daily-strip.dt-strip{grid-template-columns:1fr repeat(6,minmax(0,1fr))}
+.dt-strip .kpi .v{font-size:18px}
+.dt-strip .kpi{padding:12px 11px}
+.dt-kpi-occ .v,html[data-theme="night"] .kpi.lead.dt-kpi-occ .v{color:var(--uby-blue)}
+.dt-sub{margin:16px 0 8px;font-size:13px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.dt-sub small{color:var(--uby-muted);font-weight:500;font-size:10.5px}
+@media(max-width:1280px){.daily-strip.dt-strip{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:860px){.daily-strip.dt-strip{grid-template-columns:1fr 1fr}}
 .co-track{height:10px;border-radius:99px;background:var(--uby-surface-soft);overflow:hidden}
 .co-fill{display:block;height:100%;border-radius:99px}
 .co-fill.rev{background:var(--uby-rev)}
