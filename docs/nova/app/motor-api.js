@@ -17,6 +17,41 @@
   let readyPromise = null;
   let fullPromise = null;
 
+  // ---------------------------------------------------------------------
+  // Velocidade (27/09/2026). Nada muda nos números — conferido com a
+  // fotografia completa da API (ferramentas/snapshot-api.js) antes e depois.
+  // 1) getUbyChargerRows(unitData) era refeito a cada chamada (~1 s cada) e a
+  //    matriz o chamava por carregador × mês (23 s). Guardamos o resultado
+  //    enquanto a base não muda (mesmo unitData e mesma versão das recargas).
+  // 2) Este motor roda escondido: as telas antigas que ele desenhava sozinho
+  //    (novos clientes, operação UBY, visão geral, gráficos…) não são vistas por
+  //    ninguém e custavam ~20 s a cada carga. Aqui viram "não desenhar".
+  // ---------------------------------------------------------------------
+  (function speedUp() {
+    const originalRows = window.getUbyChargerRows;
+    if (typeof originalRows === "function") {
+      const memo = new WeakMap();
+      window.getUbyChargerRows = function (unitData = getGeneralUnitData()) {
+        const version = typeof rechargeRecordsVersion !== "undefined" ? rechargeRecordsVersion : 0;
+        const hit = unitData && typeof unitData === "object" ? memo.get(unitData) : null;
+        if (hit && hit.version === version) return hit.rows.slice();
+        const rows = originalRows.call(this, unitData);
+        if (unitData && typeof unitData === "object") memo.set(unitData, { version, rows });
+        return rows.slice();
+      };
+    }
+    if (!/\/motor\.html$/.test(location.pathname)) return;
+    const skip = Object.getOwnPropertyNames(window).filter(name => {
+      if (!/^render[A-Z]/.test(name) || name === "renderFinanceOnly") return false;
+      try { return typeof window[name] === "function"; } catch (_) { return false; }
+    });
+    skip.forEach(name => {
+      const original = window[name];
+      window[name] = function () { return original.constructor.name === "AsyncFunction" ? Promise.resolve() : undefined; };
+    });
+    window.UBY_ENGINE_SKIPPED_RENDERS = skip.length;
+  })();
+
   const iso = date => (date instanceof Date && !Number.isNaN(date.getTime())) ? date.toISOString() : null;
   const sumBy = (list, fn) => list.reduce((sum, item) => sum + Number(fn(item) || 0), 0);
   const clientsOf = charges => new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;

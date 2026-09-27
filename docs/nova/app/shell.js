@@ -178,20 +178,26 @@
 
   async function connect() {
     try {
+      const mark = n => { try { performance.mark("uby:" + n); } catch (_) {} };
       const api = await bootMotor();
+      mark("motor");
       state.api = api;
       setStatus("Lendo Supabase…", "warn");
       await api.waitForReady();
+      mark("pronto");
       refreshMeta();
       setStatus(`Mês atual carregado · ${fmt.int(state.status.charges)} sessões`, "warn");
       rerender();
+      mark("tela1");
       setStatus("Carregando histórico completo…", "warn");
       await api.loadFull();
+      mark("historico");
       state.full = true;
       state.cache.clear();
       refreshMeta();
       setStatus(`Dados reais · ${fmt.int(state.status.charges)} sessões · ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`, "");
       rerender();
+      mark("tela2");
     } catch (err) {
       console.error(err);
       setStatus("Falha ao ler dados", "err");
@@ -223,7 +229,12 @@
   // Resultado memorizado por período: o motor calcula uma vez por troca de filtro.
   function data(method, ...args) {
     const key = `${method}|${JSON.stringify(args)}|${state.full}`;
-    if (!state.cache.has(key)) state.cache.set(key, clone(state.api[method](...args)));
+    if (!state.cache.has(key)) {
+      const t0 = performance.now();
+      state.cache.set(key, clone(state.api[method](...args)));
+      const ms = performance.now() - t0;
+      (state.timings = state.timings || []).push({ method, ms: Math.round(ms) });
+    }
     return state.cache.get(key);
   }
   function periodArg() { return state.period; }
