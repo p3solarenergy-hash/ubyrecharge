@@ -17,7 +17,10 @@
       target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Lendo relatórios dos analisadores</h2></div>`;
       if (!loading) {
         loading = true;
-        UBY.legacyRead(BASE + "dashboard.html", w => w.eval("RELATORIOS"), 600)
+        // Lê a lista direto do texto da página (instantâneo); se a página mudar
+        // de formato, cai para a leitura antiga (abrir a página escondida).
+        UBY.legacyConst(BASE + "dashboard.html", "RELATORIOS")
+          .catch(() => UBY.legacyRead(BASE + "dashboard.html", w => w.eval("RELATORIOS"), 600))
           .then(d => { data = d; }).catch(err => { error = err.message; })
           .finally(() => { loading = false; if (location.hash.startsWith("#/analisadores")) render(target); });
       }

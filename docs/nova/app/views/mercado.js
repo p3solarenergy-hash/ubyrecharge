@@ -41,6 +41,21 @@
     return { pages, charts, updated: txt(d.querySelector(".hmeta")), estados: w.eval("ESTADOS"), nacional: w.eval("MERCADO_NACIONAL") };
   }
 
+  // Dados prontos em app/data/mercado.json (gerados desta mesma leitura). Valem
+  // enquanto a página original não mudar (mesma impressão digital); se mudar,
+  // lê a página como antes.
+  async function load() {
+    try {
+      const [snap, html] = await Promise.all([
+        fetch("app/data/mercado.json", { cache: "no-cache" }).then(r => (r.ok ? r.json() : null)),
+        fetch(SRC, { cache: "no-cache" }).then(r => r.text())
+      ]);
+      if (snap && snap.sourceHash && snap.sourceHash === await UBY.sha1(html) && snap.data?.pages?.length) return snap.data;
+    } catch (_) {}
+    return UBY.legacyRead(SRC, reader, 2500);
+  }
+  UBY.mercadoReader = reader;
+
   const rich = s => esc(s).replace(/&lt;(\/?)(strong|em|b)&gt;/g, "<$1$2>");
   const richBody = s => rich(String(s).replace(/<(?!\/?(strong|em|b)>)[^>]+>/g, ""));
   const fmtKpi = k => k.fmt === "p" ? `${fmt.int(k.value)}%` : k.fmt === "r" ? fmt.n1(k.value) : fmt.int(k.value);
@@ -91,7 +106,7 @@
       target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Lendo o painel de mercado</h2></div>`;
       if (!loading) {
         loading = true;
-        UBY.legacyRead(SRC, reader, 2500).then(d => { data = d; }).catch(err => { error = err.message; })
+        load().then(d => { data = d; }).catch(err => { error = err.message; })
           .finally(() => { loading = false; if (location.hash.startsWith("#/mercado")) render(target); });
       }
       return;

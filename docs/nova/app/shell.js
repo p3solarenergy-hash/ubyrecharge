@@ -270,6 +270,33 @@
     return obrasPromise;
   }
 
+  // Lê uma constante de dados (const NOME = [...] / {...}) direto do texto de uma
+  // página original, sem abrir a página: instantâneo e sem tempo de espera.
+  async function legacyConst(src, name) {
+    const text = await (await fetch(src, { cache: "no-cache" })).text();
+    const at = text.search(new RegExp(`(?:const|let|var)\\s+${name}\\s*=\\s*[\\[{]`));
+    if (at < 0) throw new Error(`${name} não encontrado em ${src}`);
+    let i = text.indexOf("=", at) + 1;
+    while (/\s/.test(text[i])) i += 1;
+    const start = i;
+    let depth = 0, quote = "";
+    for (; i < text.length; i += 1) {
+      const c = text[i];
+      if (quote) { if (c === "\\") i += 1; else if (c === quote) quote = ""; continue; }
+      if (c === "/" && text[i + 1] === "/") { i = text.indexOf("\n", i); if (i < 0) break; continue; }
+      if (c === "/" && text[i + 1] === "*") { i = text.indexOf("*/", i + 2) + 1; continue; }
+      if (c === "'" || c === '"' || c === "`") { quote = c; continue; }
+      if (c === "[" || c === "{") depth += 1;
+      else if (c === "]" || c === "}") { depth -= 1; if (depth === 0) break; }
+    }
+    const literal = text.slice(start, i + 1);
+    return JSON.parse(JSON.stringify(new Function(`"use strict"; return (${literal});`)()));
+  }
+  async function sha1(text) {
+    const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
   // Lê dados prontos de uma página original (abre invisível, executa `reader`
   // no contexto dela, devolve uma cópia e fecha). Usado por Analisadores e Mercado.
   function legacyRead(src, reader, settleMs = 1500) {
@@ -465,6 +492,6 @@
   const modelLabel = model => MODEL_LABELS[model] || "Ativo UBY";
   const isUbyModel = model => UBY_MODELS.includes(model || "uby");
 
-  window.UBY = { start, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, legacyRead, rerender, modelLabel, isUbyModel,
+  window.UBY = { start, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel,
     register: (id, view) => { VIEWS[id] = view; }, go: hash => { location.hash = hash; }, ROUTES };
 })();
