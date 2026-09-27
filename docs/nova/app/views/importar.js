@@ -124,6 +124,9 @@
   // elimina duplicadas e revalida o Local; depois conferimos que cada recarga chegou.
   ui.auto = { groups: [], errors: [], running: false };
 
+  // Planilha pela extensão, pelo tipo, ou nome sem extensão (alguns celulares entregam assim).
+  const isSheetFile = f => /\.(xlsx|xls|csv)$/i.test(f.name) || /sheet|excel|csv/i.test(f.type || "") || !/\.[a-z0-9]{2,5}$/i.test(f.name);
+
   function localKey(w, v) { return w.normalizeStationForCompare(v || ""); }
 
   // Obras em que cada Local (nome bruto da planilha) já tem recargas gravadas.
@@ -158,24 +161,50 @@
     return { workId: id, auto: true, how: official && n ? "Mapa oficial do motor + histórico confirmam esta obra" : official ? "Mapa oficial do motor" : "Histórico: este Local só foi gravado nesta obra" };
   }
 
+  // Leitores por plataforma. Spott: layout "spott" do motor. Move: é o layout padrão
+  // (Recarga(ID), Estação na coluna B, "Início - Fim" na M), um arquivo com todas as
+  // estações; lida pelas MESMAS colunas que parseRechargeRow usa para o padrão UBY.
+  function autoReader(w, rows) {
+    const layout = w.detectRechargeLayout(rows || []);
+    if (layout.type === "spott") {
+      const c = layout.cols;
+      return { platform: "Spott", headerRow: layout.headerRow,
+        local: r => w.rowCellText(r, c.station),
+        date: r => w.parseDate(w.rowCellText(r, c.startLocal)),
+        // Mesma regra do motor (markDistinctRepeatedRows): só é a mesma recarga se a linha
+        // for idêntica em motorista, início, fim, carregador, energia, valor, status e duração.
+        id: r => [c.email, c.driver, c.startLocal, c.endLocal, c.endCharge, c.charger, c.energy, c.totalValue, c.status, c.duration].map(i => w.rowCellText(r, i)).join("|"),
+        kwh: r => Number(w.parseNumber(w.readCell(r, c.energy))) || 0,
+        brl: r => Number(w.parseNumber(w.readCell(r, c.totalValue))) || 0 };
+    }
+    const h = rows?.[0] || [], col = names => w.findColumnIndex(h, names);
+    if (layout.type === "uby" && col(["Recarga(ID)"]) === 0 && col(["Estação", "Estacao"]) === 1 && col(["Início - Fim", "Inicio - Fim"]) === 12
+      && col(["Energia(kWh)"]) === 14 && col(["Receita(R$)"]) === 18) {
+      return { platform: "Move", headerRow: 0,
+        local: r => String(r[1] || "").trim(),
+        date: r => w.parseDate(w.splitDateRange(r[12], r[13])[0]),
+        id: r => String(r[0] ?? "").trim() || JSON.stringify(r),
+        kwh: r => Number(w.parseNumber(r[14])) || 0,
+        brl: r => Number(w.parseNumber(r[18])) || 0 };
+    }
+    return null;
+  }
+
   async function analyzeSpott(w, file, works, hist) {
     const rows = await w.rechargeRowsFromFileBuffer(await file.arrayBuffer(), /\.csv$/i.test(file.name));
-    const layout = w.detectRechargeLayout(rows || []);
-    if (layout.type !== "spott") return { file: file.name, error: "não é uma lista de transações da Spott. Planilhas da Move/Go Grid continuam na área \"Planilha de recargas\" abaixo." };
-    const c = layout.cols, head = rows.slice(0, layout.headerRow + 1), byKey = new Map();
-    for (let i = layout.headerRow + 1; i < rows.length; i++) {
+    const rd = autoReader(w, rows);
+    if (!rd) return { file: file.name, error: "não reconheci como relatório da Spott nem da Move. Planilhas da Go Grid continuam na área \"Planilha de recargas\" abaixo." };
+    const head = rows.slice(0, rd.headerRow + 1), byKey = new Map();
+    for (let i = rd.headerRow + 1; i < rows.length; i++) {
       const r = rows[i];
       if (!r || !w.rowHasData(r)) continue;
-      const local = w.rowCellText(r, c.station);
-      const mk = w.monthKey(w.parseDate(w.rowCellText(r, c.startLocal)));
+      const local = rd.local(r);
+      const mk = w.monthKey(rd.date(r));
       const k = local + "\u0000" + mk;
       if (!byKey.has(k)) byKey.set(k, { local, month: mk, rows: [], ids: new Set(), charges: 0, energy: 0, revenue: 0, uEnergy: 0, uRevenue: 0 });
       const g = byKey.get(k);
       g.rows.push(r); g.charges++;
-      // Mesma regra do motor (markDistinctRepeatedRows): só é a mesma recarga se a linha
-      // for idêntica em motorista, início, fim, carregador, energia, valor, status e duração.
-      const rowId = [c.email, c.driver, c.startLocal, c.endLocal, c.endCharge, c.charger, c.energy, c.totalValue, c.status, c.duration].map(i => w.rowCellText(r, i)).join("|");
-      const kwh = Number(w.parseNumber(w.readCell(r, c.energy))) || 0, brl = Number(w.parseNumber(w.readCell(r, c.totalValue))) || 0;
+      const rowId = rd.id(r), kwh = rd.kwh(r), brl = rd.brl(r);
       g.energy += kwh; g.revenue += brl;
       if (!g.ids.has(rowId)) { g.ids.add(rowId); g.uEnergy += kwh; g.uRevenue += brl; }
     }
@@ -201,7 +230,7 @@
           part = new File([X.write(wb, { type: "array", bookType: "xlsx" })], `${base} (${tag}).xlsx`,
             { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         }
-        return { source: file.name, local: g.local, month: g.month === "unknown" ? "" : g.month, charges: g.charges, unique: g.ids.size, uEnergy: g.uEnergy, uRevenue: g.uRevenue,
+        return { source: file.name, platform: rd.platform, local: g.local, month: g.month === "unknown" ? "" : g.month, charges: g.charges, unique: g.ids.size, uEnergy: g.uEnergy, uRevenue: g.uRevenue,
           energy: g.energy, revenue: g.revenue, ...routeLocal(w, g.local, hist, works), part, status: "pronto", msg: "" };
       })
     };
@@ -214,7 +243,7 @@
     const a = ui.auto;
     window.UBY_SPOTT_STATE = {
       running: a.running, errors: [...a.errors], at: new Date().toISOString(),
-      groups: a.groups.map(g => ({ source: g.source, local: g.local, month: g.month, workId: g.workId, auto: !!g.auto, how: g.how,
+      groups: a.groups.map(g => ({ source: g.source, platform: g.platform, local: g.local, month: g.month, workId: g.workId, auto: !!g.auto, how: g.how,
         charges: g.charges, unique: g.unique, energy: g.uEnergy, revenue: g.uRevenue, status: g.status, msg: g.msg }))
     };
   }
@@ -229,21 +258,21 @@
       : (!g.workId || !g.month) ? `<span class="badge bad">escolha</span>` : `<span class="badge neutral">pronto</span>`;
     const ready = a.groups.filter(g => g.status === "pronto" && g.workId && g.month).length;
     const rows = a.groups.map((g, i) => `<tr>
-        <td><strong>${esc(g.local || "Local ausente")}</strong><br><small style="color:var(--uby-muted)">${esc(g.source)}</small></td>
+        <td><strong>${esc(g.local || "Local ausente")}</strong><br><small style="color:var(--uby-muted)">${esc(g.platform || "")} · ${esc(g.source)}</small></td>
         <td>${g.status === "pronto" ? `<select class="select" data-auto-work="${i}" style="min-width:180px"><option value="">— escolher obra —</option>${works.map(x => `<option value="${esc(x.id)}" ${x.id === g.workId ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select>` : esc(label(g.workId) || "—")}${g.how ? `<br><small style="white-space:normal;color:${g.workId ? "var(--uby-muted)" : "var(--uby-red)"}">${g.auto ? "✓ " : ""}${esc(g.how)}</small>` : ""}</td>
         <td>${g.status === "pronto" && !g.month ? `<input class="select" type="month" data-auto-month="${i}">` : esc(g.month ? monthName(g.month) : "—")}</td>
         <td class="num">${g.charges}</td><td class="num">${fmt.kwh(g.energy)}</td><td class="num">${fmt.brl(g.revenue)}</td>
         <td>${badge(g)}${g.msg ? `<br><small style="white-space:normal">${esc(g.msg)}</small>` : ""}</td>
         <td>${g.status === "pronto" ? `<button class="btn" data-auto-skip="${i}" title="Não importar esta linha">✕</button>` : ""}</td></tr>`).join("");
     return `<section class="section" style="margin-bottom:18px">
-      <div class="section-head"><div><p class="kicker">Automático · Spott</p><h2>Importação automática da Spott</h2>
-        <p>Arraste de uma vez todas as listas de transações exportadas da Spott (um arquivo por local, de qualquer mês). A plataforma identifica a obra pelo Local e o mês pelas datas, mostra o resumo e importa tudo em "Consolidar" (sem duplicar recargas).</p></div></div>
+      <div class="section-head"><div><p class="kicker">Automático · Spott e Move</p><h2>Importação automática (Spott e Move)</h2>
+        <p>Arraste de uma vez as listas de transações da Spott (um arquivo por local ou um com todos) e o relatório de recargas da Move (um arquivo com todas as estações). A plataforma separa por Local/Estação e mês, identifica a obra de cada um, mostra o resumo e importa tudo em "Consolidar" (sem duplicar recargas).</p></div></div>
       <label id="autoDrop" style="display:grid;place-items:center;gap:6px;padding:26px 16px;border:2px dashed var(--uby-green);border-radius:12px;background:var(--uby-surface-soft);cursor:pointer;text-align:center;${a.running ? "opacity:.5;pointer-events:none" : ""}">
-        <span style="font-size:24px">⇪</span><strong>Arraste aqui os arquivos da Spott</strong><small>.xlsx, .xls ou .csv · pode soltar vários de uma vez</small>
+        <span style="font-size:24px">⇪</span><strong>Arraste aqui os arquivos da Spott e da Move</strong><small>.xlsx, .xls ou .csv · pode soltar vários de uma vez</small>
         <input type="file" id="autoFile" accept=".xlsx,.xls,.csv" multiple hidden>
       </label>
       ${a.errors.map(e => `<div class="note" style="margin-top:10px">${esc(e)}</div>`).join("")}
-      ${a.groups.length ? `<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Local Spott</th><th>Obra</th><th>Mês</th><th class="num">Recargas</th><th class="num">Energia</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${a.groups.length ? `<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Local / Estação</th><th>Obra</th><th>Mês</th><th class="num">Recargas</th><th class="num">Energia</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
           <button class="btn primary" id="autoRun" ${ready && !a.running ? "" : "disabled"}>${a.running ? "Importando…" : `Importar ${ready} ${ready === 1 ? "planilha" : "planilhas"}`}</button>
           <button class="btn" id="autoClear" ${a.running ? "disabled" : ""}>Limpar lista</button>
@@ -328,12 +357,16 @@
     paintStatus(target, w);
 
     const $ = s => target.querySelector(s);
+    // Celular: o seletor do Android apaga arquivos cujo tipo não bate com o "accept"
+    // (download da Spott/Move costuma vir como tipo genérico). No toque, libera todos;
+    // a leitura abaixo continua aceitando só planilhas.
+    if (matchMedia("(pointer: coarse)").matches) target.querySelectorAll('input[type="file"]').forEach(el => el.removeAttribute("accept"));
     $("#impWork").onchange = async e => { ui.work = e.target.value; $("#impStatus").innerHTML = `<div class="note">Carregando a base completa da obra…</div>`; await selectWork(w, ui.work); draw(target, w, works); };
     $("#impMonth").onchange = e => { ui.month = e.target.value; };
     $("#impMode").onchange = e => { ui.mode = e.target.value; };
 
     const runRecharge = async fileList => {
-      const arr = [...fileList].filter(f => /\.(xlsx|xls|csv)$/i.test(f.name));
+      const arr = [...fileList].filter(isSheetFile);
       if (!arr.length) { $("#impStatus").innerHTML = `<div class="note">Arquivo não reconhecido. Envie .xlsx, .xls ou .csv.</div>`; return; }
       if (!ui.month) { $("#impStatus").innerHTML = `<div class="note">Escolha o mês da planilha.</div>`; return; }
       if (ui.mode === "replace" && !confirm(`Substituir o mês ${ui.month} completo desta obra pela planilha "${arr[0].name}"?\n\nO mês atual fica salvo no histórico de backups.`)) return;
@@ -366,7 +399,7 @@
     drop.ondrop = e => { e.preventDefault(); drop.style.borderColor = ""; runRecharge(e.dataTransfer.files); };
 
     const runClients = async fileList => {
-      const arr = [...fileList].filter(f => /\.(xlsx|xls|csv)$/i.test(f.name));
+      const arr = [...fileList].filter(isSheetFile);
       if (!arr.length) return;
       $("#cliDrop").style.opacity = ".5";
       try {
@@ -393,8 +426,8 @@
     // Importação automática Spott
     const a = ui.auto, adrop = $("#autoDrop"), label = id => works.find(x => x.id === id)?.label || id;
     const addSpott = async fileList => {
-      const arr = [...fileList].filter(f => /\.(xlsx|xls|csv)$/i.test(f.name));
-      if (!arr.length) return;
+      const arr = [...fileList].filter(isSheetFile);
+      if (!arr.length) { a.errors = [`Arquivo não reconhecido (${[...fileList].map(f => f.name).join(", ")}). Envie a planilha .xlsx, .xls ou .csv exportada da Spott ou da Move.`]; draw(target, w, works); return; }
       a.errors = [];
       adrop.innerHTML = `<div class="spinner"></div><strong>Lendo ${arr.length} ${arr.length === 1 ? "arquivo" : "arquivos"}…</strong>`;
       const hist = localHistory(w);
@@ -433,7 +466,7 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
       const todo = a.groups.filter(g => g.status === "pronto" && g.workId && g.month);
       if (!todo.length) { publishState(); return; }
       const obras = new Set(todo.map(g => g.workId)).size;
-      if (!robot && !confirm(`Importar ${todo.length} planilha(s) da Spott em ${obras} obra(s), no modo "Consolidar no mês"?\n\nRecargas que já estão na base são reconhecidas e não duplicam. Cada importação pode ser desfeita no histórico de backups.`)) return;
+      if (!robot && !confirm(`Importar ${todo.length} planilha(s) (${[...new Set(todo.map(g => g.platform))].join(" e ")}) em ${obras} obra(s), no modo "Consolidar no mês"?\n\nRecargas que já estão na base são reconhecidas e não duplicam. Cada importação pode ser desfeita no histórico de backups.`)) return;
       a.running = true;
       let okCount = 0;
       for (const g of todo) {
@@ -468,8 +501,8 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
           }
           g.status = bad ? "erro" : "ok"; g.msg = msg;
           if (!bad) okCount++;
-          log(`Spott ${g.local} ${g.month} → ${msg}`, bad ? "bad" : "ok");
-        } catch (err) { g.status = "erro"; g.msg = err.message; log(`Spott ${g.local} ${g.month} → ${err.message}`, "bad"); }
+          log(`${g.platform} ${g.local} ${g.month} → ${msg}`, bad ? "bad" : "ok");
+        } catch (err) { g.status = "erro"; g.msg = err.message; log(`${g.platform} ${g.local} ${g.month} → ${err.message}`, "bad"); }
       }
       a.running = false;
       publishState();
