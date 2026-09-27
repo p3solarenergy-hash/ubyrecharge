@@ -199,7 +199,49 @@
       <div class="note">O resultado da rede já considera energia, custos dos carregadores, custos centrais, gestão, impostos sobre o faturamento e a compensação de prejuízos anteriores. Reserva legal e fundo de expansão são descontados antes do pool dos cotistas.${i.paybackYears ? ` Payback indicativo no ritmo atual: ${fmt.n1(i.paybackYears)} anos.` : ""}</div>${foot()}`;
   }
 
+  // ---------------------------------------------------------------- área (dono do local)
+  // Prestação de contas ao parceiro da área: reembolso da energia (kWh vendidos ×
+  // tarifa, quando o ponto usa a energia do local) + participação sobre o faturamento.
+  function pageArea(workId, station, mk) {
+    const a = UBY.state.api.areaAccount(workId, station);
+    if (!a || !a.months.length) return `${header("Prestação de contas do ponto", "Sem competência com operação para este ponto.", "pendente")}${foot()}`;
+    const m = a.months.find(x => x.key === mk) || a.months[a.months.length - 1];
+    const upTo = a.months.filter(x => x.key <= m.key);
+    // Acumulado pela soma dos valores exatos, arredondada uma vez (como nos relatórios já enviados).
+    const sum = k => { const exact = { reimbursement: "reimbursementExact", area: "areaExact" }[k]; return Math.round(upTo.reduce((s, x) => s + n(exact && x[exact] !== undefined ? x[exact] : x[k]), 0) * 100) / 100; };
+    const d = iso => iso ? fmt.date(iso) : "—";
+    return `<div class="sub" style="margin-bottom:10px"><strong>UBY RECHARGE LTDA</strong> · CNPJ 66.737.561/0001-86 · Londrina - PR</div>
+      ${header("Prestação de contas do ponto", `${esc(a.workName)} · parceiro da área: <strong>${esc(a.config.payee)}</strong><br>Período do relatório: <strong>${d(m.periodStart)} a ${d(m.periodEnd)}</strong> · competência ${esc(m.label)}`, m.paidAt ? "pago" : "aprovado")}
+      <div class="kpis">
+        ${kpi("Faturamento do período", fmt.brl(m.revenue))}${kpi(a.config.reimburseEnergy ? "Energia vendida" : "Energia entregue", fmt.kwh(m.energy))}
+        ${kpi("Reembolso de energia", m.reimbursement ? fmt.brl(m.reimbursement) : "—", a.config.reimburseEnergy ? "" : "ponto com padrão próprio")}${kpi("Total para a área", fmt.brl(m.total), m.paidAt ? `pago em ${fmt.date(m.paidAt + "T12:00:00")}` : `vence em ${fmt.date(m.due + "T12:00:00")}`, true)}
+      </div>
+      <h2>Composição do fechamento</h2>
+      <table><tbody>
+        ${a.config.reimburseEnergy ? `<tr class="g"><td colspan="2">Energia</td></tr>
+        <tr><td>Energia vendida no período</td><td class="n">${fmt.kwh(m.energy)}</td></tr>
+        <tr><td>Tarifa de energia</td><td class="n">${fmt.brl(m.rate)}/kWh</td></tr>
+        <tr class="t"><td>Reembolso de energia</td><td class="n">${fmt.brl(m.reimbursement)}</td></tr>` : ""}
+        <tr class="g"><td colspan="2">Participação da área</td></tr>
+        <tr><td>Regra de repasse</td><td class="n">Faturamento bruto</td></tr>
+        <tr><td>Percentual contratado</td><td class="n">${fmt.pct(m.areaPct)}</td></tr>
+        <tr><td>Base do percentual</td><td class="n">${fmt.brl(m.revenue)}</td></tr>
+        <tr class="t"><td>Participação</td><td class="n">${fmt.brl(m.area)}</td></tr>
+        <tr class="t"><td>Total a repassar no período</td><td class="n">${fmt.brl(m.total)}</td></tr>
+      </tbody></table>
+      <h2>Acumulado do ponto</h2>
+      <div class="sub">Do início da operação até este fechamento</div>
+      <div class="kpis">${kpi("Faturamento acumulado", fmt.brl(sum("revenue")))}${kpi("Energia acumulada", fmt.kwh(sum("energy")))}${kpi("Energia reembolsada", fmt.brl(sum("reimbursement")))}${kpi("Total acumulado para a área", fmt.brl(sum("total")), "", true)}</div>
+      <h2>Linha do tempo mensal</h2>
+      <table><thead><tr><th>Período</th><th class="n">Faturamento</th><th class="n">Energia</th><th class="n">R$/kWh</th><th class="n">% área</th><th class="n">Participação</th><th class="n">Total área</th><th>Situação</th></tr></thead><tbody>
+        ${upTo.map(x => `<tr class="${x.key === m.key ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.brl(x.revenue)}</td><td class="n">${fmt.kwh(x.energy)}</td><td class="n">${x.reimbursement ? `${fmt.brl(x.rate)}/kWh` : "—"}</td><td class="n">${fmt.pct(x.areaPct)}</td><td class="n">${fmt.brl(x.area)}</td><td class="n">${fmt.brl(x.total)}</td><td>${x.paidAt ? `pago ${fmt.date(x.paidAt + "T12:00:00")}` : esc(x.status)}</td></tr>`).join("")}
+      </tbody></table>
+      <div class="note">Relatório destinado ao parceiro da área. ${a.config.reimburseEnergy ? "O reembolso de energia corresponde aos kWh vendidos no ponto multiplicados pela tarifa de energia do mês. " : ""}Conferir tarifa de energia, percentual contratual e documentos fiscais antes do envio final.</div>
+      <div class="sign"><div>Responsável · UBY Recharge</div><div>${esc(a.config.payee)}</div></div>${foot()}`;
+  }
+
   function build(kind, o = {}) {
+    if (kind === "area") return doc(`Prestação de contas ${o.station} ${monthName(o.month)}`, [pageArea(o.workId, o.station, o.month)]);
     if (kind === "unificado") return doc(`Relatório unificado ${monthName(o.month)}`, [pageUnificado(o.month)]);
     if (kind === "carregador") return doc(`Relatório ${o.station} ${monthName(o.month)}`, [pageCarregador(o.workId, o.station, o.month)]);
     if (kind === "todos") {
@@ -217,6 +259,7 @@
     competencia: mk => open(build("unificado", { month: mk })),
     carregador: (workId, station, mk) => open(build("carregador", { workId, station, month: mk })),
     todosCarregadores: mk => open(build("todos", { month: mk })),
-    cotista: name => open(build("cotista", { name }))
+    cotista: name => open(build("cotista", { name })),
+    area: (workId, station, mk) => open(build("area", { workId, station, month: mk }))
   };
 })();

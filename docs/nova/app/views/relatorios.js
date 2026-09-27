@@ -9,6 +9,7 @@
   const TYPES = [
     ["unificado", "Unificado da operação", "Rede inteira: operação por carregador, DRE, impostos, reservas, compensação de prejuízo e repasse de cada cotista."],
     ["carregador", "Individual por carregador", "Um ponto: operação, resultado detalhado (energia, custos, matriz, gestão, área) e destinação conforme o modelo — UBY, parceiro, só gestão ou sociedade."],
+    ["area", "Prestação de contas à área", "Para o dono do local: reembolso da energia (kWh vendidos × tarifa, quando o ponto usa a energia do local), participação sobre o faturamento, acumulado e linha do tempo."],
     ["todos", "Todos os carregadores", "Um relatório individual por carregador, todos no mesmo documento (uma página cada)."],
     ["cotista", "Extrato do cotista", "Mês a mês de um cotista: pool, cotas habilitadas, valor por cota, repasse, retorno e payback."],
     ["cotistas", "Extratos de todos os cotistas", "Um extrato por cotista no mesmo documento."]
@@ -21,7 +22,7 @@
     if (!ui.month && ui.kind !== "unificado") ui.month = months[0] || "";
     if (!ui.station && stations.length) { const first = stations.find(s => UBY.isUbyModel(s.model)) || stations[0]; ui.station = `${first.workId}|${first.station}`; }
     if (!ui.investor && inv.investors.length) ui.investor = inv.investors[0].name;
-    const needsMonth = ["unificado", "carregador", "todos"].includes(ui.kind);
+    const needsMonth = ["unificado", "carregador", "todos", "area"].includes(ui.kind);
     const allowAcc = ui.kind === "unificado";
     const type = TYPES.find(t => t[0] === ui.kind);
 
@@ -35,7 +36,7 @@
       <section class="section"><div class="section-head"><div><p class="kicker">${esc(type[1])}</p><h2>O que entra</h2><p>${esc(type[2])}</p></div></div>
         <div class="toolbar" style="margin:0;flex-wrap:wrap;gap:10px">
           ${needsMonth ? `<label>Competência <select class="select" id="repMonth">${allowAcc ? `<option value="" ${ui.month === "" ? "selected" : ""}>Acumulado</option>` : ""}${months.map(m => `<option value="${m}" ${m === ui.month ? "selected" : ""}>${esc(UBY.state.api.monthName(m))}</option>`).join("")}</select></label>` : ""}
-          ${ui.kind === "carregador" ? `<label>Carregador <select class="select" id="repStation">
+          ${ui.kind === "carregador" || ui.kind === "area" ? `<label>Carregador <select class="select" id="repStation">
             <optgroup label="Operação UBY e parceiros">${stations.filter(s => UBY.isUbyModel(s.model)).map(s => `<option value="${esc(`${s.workId}|${s.station}`)}" ${ui.station === `${s.workId}|${s.station}` ? "selected" : ""}>${esc(s.station)}</option>`).join("")}</optgroup>
             <optgroup label="Fora da UBY (só gestão P3 / sociedade)">${stations.filter(s => !UBY.isUbyModel(s.model)).map(s => `<option value="${esc(`${s.workId}|${s.station}`)}" ${ui.station === `${s.workId}|${s.station}` ? "selected" : ""}>${esc(s.station)}</option>`).join("")}</optgroup></select></label>` : ""}
           ${ui.kind === "todos" ? `<label><input type="checkbox" id="repOutside" ${ui.includeOutside ? "checked" : ""}> incluir carregadores fora da UBY</label>` : ""}

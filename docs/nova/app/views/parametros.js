@@ -547,6 +547,11 @@
   // Grava só a lista de faturas do carregador: relê o registro na nuvem, troca
   // energyInvoices daquela estação e mantém todo o resto como está na nuvem.
   async function saveInvoices(w, workId, station, workName, list) {
+    await saveChargerField(w, workId, station, workName, "energyInvoices", list);
+    return `${list.length} fatura(s) de energia salvas para ${station}`;
+  }
+  // Grava um campo do carregador (faturas, repasse à área…) relendo a nuvem antes.
+  async function saveChargerField(w, workId, station, workName, field, value) {
     const sb = w.UBY_SUPABASE.client();
     const { data: row, error } = await sb.from("obra_recargas_base").select("resumo").eq("obra_id", workId).maybeSingle();
     if (error || !row) throw new Error("Não consegui ler a configuração na nuvem. Nada foi gravado.");
@@ -554,12 +559,58 @@
     const key = w.normalizeStationForCompare(w.canonicalStationNameForWork(workId, station, workName));
     if (!key) throw new Error("Carregador sem identificação. Nada foi gravado.");
     fs.chargers = fs.chargers || {};
-    fs.chargers[key] = { ...(fs.chargers[key] || {}), energyInvoices: list };
+    fs.chargers[key] = { ...(fs.chargers[key] || {}), [field]: value };
     await w.UBY_SUPABASE.saveRechargeMetadata(workId, { workId, workName, financialSettings: fs });
     // Mantém a cópia em memória da plataforma oculta igual à nuvem, para que um
     // "Salvar competência" depois não grave uma versão sem as faturas.
     w.eval(`(function(fs, id){ const r = allRechargeRecords[id]; if (r) { r.financialSettings = fs; r.summary = { ...(r.summary || {}), financialSettings: fs }; } if (String(currentWorkId) === id) financialSettings = fs; })(${JSON.stringify(fs)}, ${JSON.stringify(String(workId))})`);
-    return `${list.length} fatura(s) de energia salvas para ${station}`;
+    return true;
+  }
+
+  // ---------- repasse à área (dono do local) ----------
+  // Participação da área sobre o faturamento e, quando o ponto ainda usa a energia
+  // do local, o reembolso dos kWh vendidos × tarifa do mês (Por carregador · energia).
+  function areaTab(w, data) {
+    const api = UBY.state.api;
+    if (!api || typeof api.areaAccount !== "function") return `<div class="note">O motor está recarregando. Abra esta aba de novo em alguns segundos.</div>`;
+    const list = data.chargers.filter(c => c.included);
+    if (!ui.arCharger) ui.arCharger = (list.find(c => /malassise/.test(c.workId)) || list[0] || {}).key || "";
+    const [workId, station] = (ui.arCharger || "|").split("|");
+    const a = api.areaAccount(workId, station);
+    if (!a) return `<div class="note">Carregador não encontrado no motor.</div>`;
+    const f = ui.arForm || (ui.arForm = { reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, dueDay: a.config.dueDay });
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const today = new Date().toISOString().slice(0, 10);
+    const dirty = f.reimburseEnergy !== a.config.reimburseEnergy || f.payee !== a.config.payee || Number(f.dueDay) !== Number(a.config.dueDay) || !a.config.configured;
+    const st = s => `<span class="badge ${s === "pago" ? "ok" : s === "vencido" ? "bad" : "warn"}">${esc(s)}</span>`;
+    return `
+      <div class="toolbar"><select class="select" id="pmArCharger" style="min-width:280px">${list.map(c => `<option value="${esc(c.key)}" ${c.key === ui.arCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</select>
+        <span class="spacer"></span><button class="btn" id="pmArReport" type="button">Prestação de contas (relatório)</button></div>
+      <div class="split" style="margin-bottom:14px">
+        <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Regra do repasse</p><h2>${esc(a.station)}</h2>
+            <p>Todo mês o dono do local recebe a participação da área sobre o faturamento bruto${f.reimburseEnergy ? " e o reembolso da energia: kWh vendidos × tarifa do mês" : ""}. O percentual e a tarifa de cada competência ficam em "Por carregador".</p></div></div>
+          <div class="grid g2" style="gap:8px">
+            ${field("Quem recebe", `<input class="select" data-ar="payee" value="${esc(f.payee || "")}" style="width:100%">`)}
+            ${field("Dia do vencimento (mês seguinte)", `<input class="select" type="number" min="1" max="28" data-ar="dueDay" value="${esc(f.dueDay)}" style="width:100%">`)}
+          </div>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12.5px"><input type="checkbox" data-ar="reimburseEnergy" ${f.reimburseEnergy ? "checked" : ""}> Reembolsar a energia ao dono do local (o ponto ainda usa o padrão/energia do local)</label>
+          <p class="source-line">Quando o ponto tiver padrão próprio, desmarque: a energia passa a vir das Faturas de energia e o repasse fica só com a participação.</p>
+          <button class="btn primary" id="pmArSave" type="button" style="margin-top:8px" ${dirty ? can : "disabled"}>${a.config.configured ? "Salvar regra" : "Ativar repasse deste carregador"}</button>
+        </section>
+        <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Acumulado</p><h2>Do início da operação até hoje</h2></div></div>
+          <div class="grid g2">${kpi("Faturamento", fmt.brl(a.totals.revenue), `${fmt.kwh(a.totals.energy)} vendidos`)}${kpi("Total para a área", fmt.brl(a.totals.total), `pago ${fmt.brl(a.totals.paid)}`, "", "lead")}
+            ${kpi("Energia reembolsada", fmt.brl(a.totals.reimbursement), a.config.reimburseEnergy ? "kWh vendidos × tarifa" : "não reembolsa")}${kpi("Participação da área", fmt.brl(a.totals.area), "sobre o faturamento bruto")}</div>
+        </section>
+      </div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Por competência</p><h2>Repasses ao local</h2><p>${a.config.configured ? `Vence no dia ${a.config.dueDay} do mês seguinte e aparece em Pagamentos.` : "Ative o repasse acima para ele aparecer em Pagamentos."}</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Faturamento</th><th class="num">kWh vendidos</th><th class="num">Tarifa</th><th class="num">Reembolso energia</th><th class="num">% área</th><th class="num">Participação</th><th class="num">Total ao local</th><th>Vencimento</th><th>Situação</th><th></th></tr></thead>
+          <tbody>${a.months.slice().reverse().map(m => `<tr><td><strong>${esc(m.label)}</strong><small>${fmt.date(m.periodStart)} a ${fmt.date(m.periodEnd)}</small></td>
+            <td class="num">${fmt.brl(m.revenue)}</td><td class="num">${fmt.kwh(m.energy)}</td><td class="num">${m.reimbursement ? `${fmt.brl(m.rate)}/kWh` : "—"}</td><td class="num">${m.reimbursement ? fmt.brl(m.reimbursement) : "—"}</td>
+            <td class="num">${fmt.pct1(m.areaPct)}</td><td class="num">${fmt.brl(m.area)}</td><td class="num"><strong>${fmt.brl(m.total)}</strong></td><td>${fmt.date(m.due + "T12:00:00")}</td>
+            <td>${st(m.status)}${m.paidAt ? `<small>em ${fmt.date(m.paidAt + "T12:00:00")}</small>` : ""}</td>
+            <td style="white-space:nowrap">${a.config.configured ? (m.paidAt ? `<button class="btn ghost" data-ar-unpay="${esc(m.key)}" type="button" ${can}>Desfazer</button>` : `<input class="select" type="date" data-ar-date="${esc(m.key)}" value="${today}" style="width:140px"> <button class="btn primary" data-ar-pay="${esc(m.key)}" type="button" ${can}>Marcar pago</button>`) : ""}
+              <button class="btn ghost" data-ar-rep="${esc(m.key)}" type="button">Relatório</button></td></tr>`).join("") || `<tr><td colspan="11" class="empty">Sem competências com operação.</td></tr>`}</tbody></table></div>
+      </section>`;
   }
 
   // ---------- fechamentos: aprovar (congela os números), pagar, reabrir ----------
@@ -667,7 +718,7 @@
   }
 
   // ---------- render ----------
-  const TAB_IDS = ["carregador", "energia", "operacao", "matriz", "pagamentos", "documentos", "cotas", "fechamentos"];
+  const TAB_IDS = ["carregador", "energia", "area", "operacao", "matriz", "pagamentos", "documentos", "cotas", "fechamentos"];
   async function render(target, params = []) {
     if (TAB_IDS.includes(params[0])) {
       ui.tab = params[0];
@@ -699,7 +750,7 @@
       }
     } else {
       data.months = (UBY.state.months && UBY.state.months.length ? UBY.state.months : (w.getMonths?.() || [])).slice();
-      if (ui.tab === "energia") {
+      if (ui.tab === "energia" || ui.tab === "area") {
         // Depois de gravar, o motor principal recarrega: espera ele voltar com o histórico completo.
         for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
         try { await Promise.race([UBY.state.api.loadFull(), new Promise(r => setTimeout(r, 15000))]); } catch (_) {}
@@ -720,8 +771,8 @@
       <div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
         <p class="lead">Modelo, splits, energia, capital, metas e regras de cada carregador por competência; custos centrais da matriz; calendário de pagamentos; rodadas e cotistas. As contas e a gravação são as mesmas da plataforma original.</p></div>
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
-      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["energia", "Faturas de energia"], ["operacao", "Operação e carregadores"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
-      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : quotasTab(w)}
+      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["energia", "Faturas de energia"], ["area", "Repasse à área"], ["operacao", "Operação e carregadores"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
+      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "area" ? areaTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
@@ -741,6 +792,18 @@
     const $ = s => target.querySelector(s);
     const dirty = () => Object.keys(ui.edits).length || ui.rules;
     target.querySelectorAll("#pmTabs button").forEach(b => b.onclick = () => { ui.tab = b.dataset.v; draw(target, w); });
+    // --- repasse à área ---
+    if ($("#pmArCharger")) $("#pmArCharger").onchange = e => { ui.arCharger = e.target.value; ui.arForm = null; draw(target, w); };
+    target.querySelectorAll("[data-ar]").forEach(el => el.onchange = () => { ui.arForm[el.dataset.ar] = el.type === "checkbox" ? el.checked : el.dataset.ar === "dueDay" ? Number(el.value || 10) : el.value; draw(target, w); });
+    const arCtx = () => { const c = data.chargers.find(x => x.key === ui.arCharger); const a = UBY.state.api.areaAccount(c.workId, c.station); return { c, a }; };
+    const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, dueDay: a.config.dueDay, paid: { ...(a.config.paid || {}) } });
+      run(target, w, `${label} · ${c.station}`, async () => { await saveChargerField(w, c.workId, c.station, c.workName, "areaAccount", next); ui.arForm = null; return "salvo"; }); };
+    if ($("#pmArSave")) $("#pmArSave").onclick = () => arSave("Regra do repasse à área", cfg => ({ ...cfg, reimburseEnergy: !!ui.arForm.reimburseEnergy, payee: String(ui.arForm.payee || "").trim() || cfg.payee, dueDay: Math.min(Math.max(Number(ui.arForm.dueDay) || 10, 1), 28) }));
+    target.querySelectorAll("[data-ar-pay]").forEach(b => b.onclick = () => { const mk = b.dataset.arPay; const d = target.querySelector(`[data-ar-date="${mk}"]`)?.value || new Date().toISOString().slice(0, 10); arSave(`Repasse ${mk} pago em ${d}`, cfg => ({ ...cfg, paid: { ...cfg.paid, [mk]: d } })); });
+    target.querySelectorAll("[data-ar-unpay]").forEach(b => b.onclick = () => { const mk = b.dataset.arUnpay; if (!confirm("Desfazer o pagamento deste repasse?")) return; arSave(`Repasse ${mk} reaberto`, cfg => { const paid = { ...cfg.paid }; delete paid[mk]; return { ...cfg, paid }; }); });
+    const arReport = mk => { const { c } = arCtx(); UBY.reports.area(c.workId, c.station, mk); };
+    if ($("#pmArReport")) $("#pmArReport").onclick = () => arReport("");
+    target.querySelectorAll("[data-ar-rep]").forEach(b => b.onclick = () => arReport(b.dataset.arRep));
     // --- faturas de energia ---
     if ($("#pmEnCharger")) $("#pmEnCharger").onchange = e => { if (ui.enDraft && !confirm("Descartar as faturas não salvas?")) { e.target.value = ui.enCharger; return; } ui.enCharger = e.target.value; ui.enDraft = null; ui.enForm = null; ui.enRead = null; ui.enPendingFile = null; ui.enFiles = {}; draw(target, w); };
     const enStored = () => { const [wid, st] = ui.enCharger.split("|"); return UBY.state.api.energyInvoices(wid, st)?.stored || []; };

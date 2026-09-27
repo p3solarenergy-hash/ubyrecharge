@@ -617,7 +617,7 @@
           station: target.station || "Carregador não identificado", workName: target.workName || (target.targetCount > 1 ? `rateado para ${target.targetCount} carregadores` : ""),
           due: iso(scheduledPaymentDueDate(item, mk)), dueDay: item.dueDay, amount, status: status.key, statusLabel: status.label,
           paidAt: item.paymentLedger?.[mk]?.paidAt || "" };
-      }).concat(energyPayments(mk)).sort((a, b) => String(a.due).localeCompare(String(b.due)));
+      }).concat(energyPayments(mk), areaPayments(mk)).sort((a, b) => String(a.due).localeCompare(String(b.due)));
     const totals = list.reduce((acc, p) => { acc.total += p.amount; if (p.status === "paid") acc.paid += p.amount; else acc.pending += p.amount; if (p.status === "overdue") acc.overdue += p.amount; return acc; }, { total: 0, paid: 0, pending: 0, overdue: 0 });
     return { monthKey: mk, label: monthLabel(mk), list, totals };
   }
@@ -1731,6 +1731,67 @@
     return JSON.parse(JSON.stringify({ workId: row.workId, station: row.stationName || row.station, workName: row.workName, stored: fv2InvoiceList(row.workId, row.stationName || row.station, row.workName),
       invoices: res.invoices, months: res.months, deliveredByMonth: monthly, lastDelivery: Object.keys(daily).sort().pop() || "", fullHistory }));
   }
+  // Repasse à área (dono do local): participação sobre o faturamento e, quando o
+  // ponto ainda usa a energia do local, o reembolso dos kWh vendidos × tarifa do mês.
+  // Configuração em financialSettings.chargers[estação].areaAccount.
+  function fv2AreaConfig(row) {
+    const rec = allRechargeRecords[row.workId] || {};
+    const root = rec.financialSettings || rec.summary?.financialSettings || {};
+    const key = normalizeStationForCompare(canonicalStationNameForWork(row.workId, row.stationName || row.station || row.workName || "", row.workName));
+    const c = root?.chargers?.[key]?.areaAccount;
+    return c && typeof c === "object" ? c : null;
+  }
+  const nextMonth = mk => { const [y, m] = mk.split("-").map(Number); const d = new Date(y, m, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+  function areaAccountRow(row) {
+    const fixes = ON();
+    const cfg = fv2AreaConfig(row) || {};
+    const reimburse = !!cfg.reimburseEnergy;
+    const dueDay = Math.min(Math.max(Number(cfg.dueDay) || 10, 1), 28);
+    const months = fv2RowMonths(row, fixes, "").map(mk => {
+      const r = fv2Month(row, mk, fixes);
+      const charges = FV2.rowMonths.get(row.fv2Id)?.get(mk) || [];
+      const dates = charges.map(c => c.startDate).filter(d => d instanceof Date && !Number.isNaN(d.getTime())).sort((a, b) => a - b);
+      const [y, m] = mk.split("-").map(Number);
+      const monthStart = new Date(y, m - 1, 1), monthEnd = new Date(y, m, 0);
+      const first = dates[0] && dates[0] > monthStart && mk === rowFirstMonth(row) ? dates[0] : monthStart;
+      const energy = n0(r.commercialEnergy ?? r.energy);
+      const reimbursement = reimburse ? Math.round(n0(r.energyCost) * 100) / 100 : 0;
+      const area = Math.round(n0(r.areaParticipation) * 100) / 100;
+      const due = `${nextMonth(mk)}-${String(dueDay).padStart(2, "0")}`;
+      const paidAt = cfg.paid?.[mk] || "";
+      return { key: mk, label: monthLabel(mk), periodStart: iso(first), periodEnd: iso(monthEnd), revenue: n0(r.totalRevenue), energy, rate: energy > 0 ? n0(r.energyCost) / energy : 0,
+        // Total = soma dos valores exatos, arredondada uma vez (como nas prestações de contas já enviadas).
+        reimbursement, reimbursementExact: reimburse ? n0(r.energyCost) : 0, areaExact: n0(r.areaParticipation), areaPct: n0(r.areaSharePct), areaMode: "gross", area, total: Math.round(((reimburse ? n0(r.energyCost) : 0) + n0(r.areaParticipation)) * 100) / 100, due, paidAt,
+        status: paidAt ? "pago" : (new Date(`${due}T23:59:59`) < new Date() ? "vencido" : "a pagar") };
+    }).filter(m => m.total > 0 || m.revenue > 0);
+    const sum = k => months.reduce((s, m) => s + n0(m[k]), 0);
+    return { workId: row.workId, workName: row.workName, station: row.stationName || row.station, kind: row.kind,
+      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, dueDay, paid: cfg.paid || {}, configured: !!fv2AreaConfig(row) },
+      months, totals: { revenue: sum("revenue"), energy: sum("energy"), reimbursement: sum("reimbursement"), area: sum("area"), total: sum("total"),
+        paid: months.filter(m => m.paidAt).reduce((s, m) => s + m.total, 0) } };
+  }
+  function areaAccount(workId, station) {
+    fv2Ensure();
+    const row = FV2.rows.find(r => String(r.workId) === String(workId) && normalizeStationForCompare(r.stationName || r.station || "") === normalizeStationForCompare(station || ""))
+      || FV2.rows.find(r => String(r.workId) === String(workId));
+    return row ? JSON.parse(JSON.stringify(areaAccountRow(row))) : null;
+  }
+  const fmtPctPlain = v => `${String(Math.round(n0(v) * 100) / 100).replace(".", ",")}%`;
+  function areaPayments(mk) {
+    fv2Ensure();
+    const out = [];
+    FV2.rows.filter(r => r.included && fv2AreaConfig(r)).forEach(row => {
+      const acc = areaAccountRow(row);
+      acc.months.filter(m => String(m.due).slice(0, 7) === mk && m.total > 0).forEach(m => {
+        out.push({ id: `area-${row.workId}-${m.key}`, name: `Repasse à área · ${acc.config.payee} · ${m.label}`, category: "Repasse à área", supplier: acc.config.payee,
+          station: acc.station, workName: row.workName, due: m.due, dueDay: acc.config.dueDay, amount: m.total,
+          status: m.paidAt ? "paid" : m.status === "vencido" ? "overdue" : "pending", statusLabel: m.paidAt ? "Pago" : m.status === "vencido" ? "Vencido" : "A pagar",
+          paidAt: m.paidAt, source: `Repasse à área (${m.reimbursement ? "energia + " : ""}${fmtPctPlain(m.areaPct)} do faturamento)` });
+      });
+    });
+    return out;
+  }
+
   // Vencimentos das faturas de energia (Copel e arrendamento) no mês de pagamento.
   function energyPayments(mk) {
     fv2Ensure();
@@ -1754,7 +1815,7 @@
     return out;
   }
 
-  window.UBY_MOTOR_API = { waitForReady, energyInvoices, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, stations, stationDetail, works, usage, networkConfig,
+  window.UBY_MOTOR_API = { waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,
