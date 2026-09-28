@@ -114,12 +114,12 @@
     target.querySelectorAll("#sessFilter button").forEach(b => b.onclick = () => { ui.sessionFilter = b.dataset.v; renderDetail(target, workId, station); });
     const opts = UBY.baseChartOptions;
     UBY.chart("chUnitDaily", {
-      type: "bar",
+      type: "line",
       data: { labels: d.days.map(x => x.label), datasets: [
-        { label: "Faturamento (R$)", data: d.days.map(x => x.revenue), backgroundColor: "#187457", borderRadius: 3, yAxisID: "y" },
-        { type: "line", label: "Falhas", data: d.days.map(x => x.failures), borderColor: "#b75450", backgroundColor: "#b75450", pointRadius: 2, yAxisID: "y1" }
+        { label: "Faturamento (R$)", data: d.days.map(x => x.revenue), borderColor: "rgba(24,116,87,.85)", backgroundColor: "rgba(24,116,87,.14)", borderWidth: 1.8, fill: "origin", pointRadius: 0, pointHoverRadius: 3, cubicInterpolationMode: "monotone", yAxisID: "y" },
+        { label: "Falhas", data: d.days.map(x => x.failures), borderColor: "rgba(183,84,80,.55)", backgroundColor: "rgba(183,84,80,.55)", borderWidth: 1.4, borderDash: [4, 3], pointRadius: 0, pointHoverRadius: 3, cubicInterpolationMode: "monotone", yAxisID: "y1" }
       ] },
-      options: opts({ scales: { ...opts().scales, y1: { position: "right", grid: { display: false }, ticks: { precision: 0, font: { size: 10 }, color: "#b75450" } } } })
+      options: opts({ scales: { ...opts().scales, y: { ...opts().scales.y, beginAtZero: true }, y1: { beginAtZero: true, suggestedMax: Math.max(3, ...d.days.map(x => x.failures || 0)) * 3, position: "right", grid: { display: false }, ticks: { precision: 0, font: { size: 10 }, color: "rgba(183,84,80,.6)" } } } })
     });
   }
 
