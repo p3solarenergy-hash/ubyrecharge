@@ -1504,10 +1504,15 @@
     const stationName = row.stationName || row.station;
     const courtesy = courtesyFinanceBreakdown(charges, stationAvailabilityFor(row.workId, stationName, row.workName), cfg.energyCostPerKWh);
     const planning = financePlanningContext(charges, mk, cfg, row.charges || [], workPowerById(row.workId));
-    // Valor do repasse ao local ajustado à mão em Parâmetros · Área (substitui o calculado no resultado).
+    // Valor do repasse ao local ajustado à mão em Parâmetros · Área (substitui o calculado no resultado);
+    // saldo levado de um mês para o seguinte ou zerado também entra aqui.
     const areaCfg = fv2AreaConfig(row);
-    const areaAdj = areaCfg?.adjust?.[mk];
-    const areaAdjust = areaAdj && Number.isFinite(Number(areaAdj.total)) ? { total: Number(areaAdj.total), reimburse: !!areaCfg.reimburseEnergy } : null;
+    const aa = areaAdjustState(areaCfg, mk);
+    // Pago com valor informado → fica o pago; valor lançado → lançado + saldo; senão calculado + saldo.
+    const areaAdjust = !aa.touched ? null
+      : aa.paidAmount !== null ? { total: aa.paidAmount, reimburse: !!areaCfg?.reimburseEnergy }
+      : aa.own !== null ? { total: aa.own + aa.carryIn, reimburse: !!areaCfg?.reimburseEnergy }
+      : { total: null, extra: aa.carryIn, reimburse: !!areaCfg?.reimburseEnergy };
     const result = CORE().computeMonth({
       monthKey: mk, model: cfg.operationModel, cfg,
       revenue: charges.reduce((s, c) => s + c.revenue, 0), energy: charges.reduce((s, c) => s + c.energyKWh, 0),
@@ -1875,6 +1880,22 @@
     return c && typeof c === "object" ? c : null;
   }
   const nextMonth = mk => { const [y, m] = mk.split("-").map(Number); const d = new Date(y, m, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+  const prevMonth = mk => { const [y, m] = mk.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+  // Estado do repasse de um mês. adjust[mês] = { total, note }: valor do próprio mês lançado à mão
+  // (own = null → vale o calculado). paidInfo[mês] = { amount, due, diff, diffMode }: valor
+  // efetivamente pago; a diferença (devido − pago, gravada no pagamento) vai ao mês seguinte
+  // (diffMode "next") ou é zerada ("drop"). Pago = valor que fica no resultado do mês.
+  function areaAdjustState(cfg, mk) {
+    const adj = cfg?.adjust?.[mk];
+    const own = adj && adj.total !== null && adj.total !== "" && Number.isFinite(Number(adj.total)) ? Math.round(Number(adj.total) * 100) / 100 : null;
+    const pm = prevMonth(mk);
+    const prevInfo = cfg?.paidInfo?.[pm];
+    const carryIn = cfg?.paid?.[pm] && prevInfo?.diffMode === "next" ? Math.round(n0(prevInfo.diff) * 100) / 100 : 0;
+    const info = cfg?.paid?.[mk] && cfg?.paidInfo?.[mk] && Number.isFinite(Number(cfg.paidInfo[mk].amount)) ? cfg.paidInfo[mk] : null;
+    const paidAmount = info ? Math.round(Number(info.amount) * 100) / 100 : null;
+    return { own, carryIn, carryFrom: carryIn ? pm : "", paidAmount, diff: info ? n0(info.diff) : 0, diffMode: info?.diffMode || "",
+      note: adj?.note || "", touched: !!adj || carryIn !== 0 || paidAmount !== null };
+  }
   function areaAccountRow(row) {
     const fixes = ON();
     const cfg = fv2AreaConfig(row) || {};
@@ -1896,17 +1917,22 @@
       const paidAt = cfg.paid?.[mk] || "";
       // Total = soma dos valores exatos, arredondada uma vez (como nas prestações de contas já enviadas).
       const computedTotal = Math.round(((reimburse ? n0(r.energyCost) : 0) + areaCalc) * 100) / 100;
-      // Ajuste manual do valor a repassar (cfg.adjust[mês] = { total, note }): substitui o calculado.
-      const adj = cfg.adjust?.[mk];
-      const total = adj && Number.isFinite(Number(adj.total)) ? Math.round(Number(adj.total) * 100) / 100 : computedTotal;
+      // Valor do mês (calculado ou lançado à mão) + saldo do mês anterior = devido; se já foi pago
+      // com valor informado, o total é o pago e a diferença vai ao mês seguinte ou é zerada.
+      const aa = areaAdjustState(cfg, mk);
+      const own = aa.own === null ? computedTotal : aa.own;
+      const dueAmount = Math.round((own + aa.carryIn) * 100) / 100;
+      const total = aa.paidAmount !== null ? aa.paidAmount : dueAmount;
+      const status = paidAt ? "pago" : total < 0 ? "saldo negativo" : !(total > 0) ? "sem repasse" : (new Date(`${due}T23:59:59`) < new Date() ? "vencido" : "a pagar");
       return { key: mk, label: monthLabel(mk), periodStart: iso(first), periodEnd: iso(monthEnd), revenue: n0(r.totalRevenue), energy, rate: energy > 0 ? n0(r.energyCost) / energy : 0,
         reimbursement, reimbursementExact: reimburse ? n0(r.energyCost) : 0, areaExact: areaCalc, areaPct: n0(r.areaSharePct), areaMode: "gross", area, total, due, paidAt,
-        computedTotal, adjusted: !!adj, adjustment: Math.round((total - computedTotal) * 100) / 100, adjustNote: adj?.note || "",
-        status: paidAt ? "pago" : (new Date(`${due}T23:59:59`) < new Date() ? "vencido" : "a pagar") };
-    }).filter(m => m.total > 0 || m.revenue > 0);
+        computedTotal, own, dueAmount, adjusted: aa.own !== null, adjustment: Math.round((own - computedTotal) * 100) / 100, adjustNote: aa.note,
+        carryIn: aa.carryIn, carryFrom: aa.carryFrom, carryFromLabel: aa.carryFrom ? monthLabel(aa.carryFrom) : "",
+        paidAmount: aa.paidAmount, paidDiff: aa.paidAmount !== null ? aa.diff : 0, paidDiffMode: aa.diffMode, status };
+    }).filter(m => m.total !== 0 || m.revenue > 0);
     const sum = k => months.reduce((s, m) => s + n0(m[k]), 0);
     return { workId: row.workId, workName: row.workName, station: row.stationName || row.station, kind: row.kind,
-      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, adjust: cfg.adjust || {}, configured: !!fv2AreaConfig(row) },
+      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, paidInfo: cfg.paidInfo || {}, adjust: cfg.adjust || {}, configured: !!fv2AreaConfig(row) },
       months, totals: { revenue: sum("revenue"), energy: sum("energy"), reimbursement: sum("reimbursement"), area: sum("area"), total: sum("total"),
         paid: months.filter(m => m.paidAt).reduce((s, m) => s + m.total, 0) } };
   }
@@ -2057,7 +2083,38 @@
     return { generatedAt: now.toISOString(), today: ymd(today), bills, totals, nextBill, items, counts, lastRecharge: newest ? new Date(newest).toISOString() : null };
   }
 
-  window.UBY_MOTOR_API = { alerts, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
+  // Contas pagas (controle): tudo o que foi marcado como pago — custos da matriz e pagamentos
+  // programados, faturas de energia (Copel e arrendamento), repasses às áreas e distribuição aos
+  // cotistas — com data, valor e origem. Percorre as competências com operação até o mês seguinte.
+  function paidBills() {
+    fv2Ensure();
+    const cur = monthKey(new Date());
+    const months = [...new Set([...(FV2.months || []), cur, nextMonth(cur)])].filter(isPlausibleMonthKey).sort();
+    const out = [];
+    const seen = new Set();
+    months.forEach(mk => {
+      let list = [];
+      try { list = payments(mk).list; } catch (_) { return; }
+      list.forEach(p => {
+        if (p.status !== "paid") return;
+        const key = `${p.id}|${mk}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push({ id: key, paidAt: String(p.paidAt || "").slice(0, 10), due: String(p.due || "").slice(0, 10), name: p.name, category: p.category || "", supplier: p.supplier || "",
+          source: p.source || "", station: p.station || "", workName: p.workName || "", amount: Number(p.amount) || 0, monthKey: mk });
+      });
+    });
+    let inv = null;
+    try { inv = investorDistribution(); } catch (_) {}
+    (inv?.months || []).filter(m => m.paidAt).forEach(m => {
+      out.push({ id: `cotistas|${m.key}`, paidAt: String(m.paidAt).slice(0, 10), due: "", name: `Distribuição aos cotistas · ${m.label}`, category: "Cotistas", supplier: `${m.eligibleQuotas} cota(s)`,
+        source: "Fechamento aprovado", station: "Rede UBY", workName: "", amount: Number(m.snapshot?.investorPool ?? m.investorPool) || 0, monthKey: m.key });
+    });
+    out.sort((a, b) => String(b.paidAt).localeCompare(String(a.paidAt)) || b.amount - a.amount);
+    return { list: out, total: out.reduce((s, p) => s + p.amount, 0) };
+  }
+
+  window.UBY_MOTOR_API = { alerts, paidBills, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,

@@ -228,6 +228,8 @@
         <tr><td>Base do percentual</td><td class="n">${fmt.brl(m.revenue)}</td></tr>
         <tr class="t"><td>Participação</td><td class="n">${fmt.brl(m.area)}</td></tr>
         ${m.adjusted && m.adjustment ? `<tr><td>Ajuste${m.adjustNote ? ` · ${esc(m.adjustNote)}` : ""}</td><td class="n">${fmt.brl(m.adjustment)}</td></tr>` : ""}
+        ${m.carryIn ? `<tr><td>Diferença do pagamento de ${esc(m.carryFromLabel)}</td><td class="n">${fmt.brl(m.carryIn)}</td></tr>` : ""}
+        ${m.paidAmount !== null && m.paidAmount !== undefined && m.paidDiff ? `<tr><td>Devido ${fmt.brl(m.dueAmount)} · diferença ${m.paidDiffMode === "next" ? "levada ao mês seguinte" : "zerada"}</td><td class="n">${fmt.brl(-m.paidDiff)}</td></tr>` : ""}
         <tr class="t"><td>Total a repassar no período</td><td class="n">${fmt.brl(m.total)}</td></tr>
       </tbody></table>
       <h2>Acumulado do ponto</h2>

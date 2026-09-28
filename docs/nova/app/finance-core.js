@@ -196,7 +196,9 @@
     // Ajuste manual do repasse ao local (valor final pago): a diferença entra na participação
     // da área; o reembolso de energia, quando há, já está no custo de energia.
     const adj = input.areaAdjust;
-    const areaParticipation = areaEligible && adj && Number.isFinite(Number(adj.total)) ? num(adj.total) - (adj.reimburse ? energyCost : 0) : areaParticipationCalc;
+    // adj.total null = vale o calculado; adj.extra = saldo trazido do mês anterior.
+    const areaParticipation = !areaEligible || !adj ? areaParticipationCalc
+      : (adj.total !== null && adj.total !== undefined && Number.isFinite(Number(adj.total)) ? num(adj.total) - (adj.reimburse ? energyCost : 0) : areaParticipationCalc + num(adj.extra));
     const operationNet = preAreaNet - areaParticipation;
 
     const splitNet = part => {

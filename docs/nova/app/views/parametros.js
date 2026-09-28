@@ -582,7 +582,7 @@
     const can = canWrite(w) && !busy ? "" : "disabled";
     const today = new Date().toISOString().slice(0, 10);
     const dirty = f.reimburseEnergy !== a.config.reimburseEnergy || f.payee !== a.config.payee || (f.payeeEmail || "") !== (a.config.payeeEmail || "") || Number(f.dueDay) !== Number(a.config.dueDay) || !a.config.configured;
-    const st = s => `<span class="badge ${s === "pago" ? "ok" : s === "vencido" ? "bad" : "warn"}">${esc(s)}</span>`;
+    const st = s => `<span class="badge ${s === "pago" ? "ok" : s === "vencido" ? "bad" : s === "sem repasse" ? "neutral" : "warn"}">${esc(s)}</span>`;
     return `
       <div class="toolbar"><select class="select" id="pmArCharger" style="min-width:280px">${list.map(c => `<option value="${esc(c.key)}" ${c.key === ui.arCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</select>
         <span class="spacer"></span><button class="btn" id="pmArReport" type="button">Prestação de contas (relatório)</button></div>
@@ -607,13 +607,19 @@
         <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Faturamento</th><th class="num">kWh vendidos</th><th class="num">Tarifa</th><th class="num">Reembolso energia</th><th class="num">% área</th><th class="num">Participação</th><th class="num">Total ao local</th><th>Vencimento</th><th>Situação</th><th></th></tr></thead>
           <tbody>${a.months.slice().reverse().map(m => `<tr><td><strong>${esc(m.label)}</strong><small>${fmt.date(m.periodStart)} a ${fmt.date(m.periodEnd)}</small></td>
             <td class="num">${fmt.brl(m.revenue)}</td><td class="num">${fmt.kwh(m.energy)}</td><td class="num">${m.reimbursement ? `${fmt.brl(m.rate)}/kWh` : "—"}</td><td class="num">${m.reimbursement ? fmt.brl(m.reimbursement) : "—"}</td>
-            <td class="num">${fmt.pct1(m.areaPct)}</td><td class="num">${fmt.brl(m.area)}</td><td class="num"><strong>${fmt.brl(m.total)}</strong>${m.adjusted ? `<small>ajustado · calculado ${fmt.brl(m.computedTotal)}${m.adjustNote ? ` · ${esc(m.adjustNote)}` : ""}</small>` : ""}</td><td>${fmt.date(m.due + "T12:00:00")}</td>
+            <td class="num">${fmt.pct1(m.areaPct)}</td><td class="num">${fmt.brl(m.area)}</td><td class="num"><strong>${fmt.brl(m.total)}</strong>${m.adjusted ? `<small>ajustado · calculado ${fmt.brl(m.computedTotal)}${m.adjustNote ? ` · ${esc(m.adjustNote)}` : ""}</small>` : ""}${m.carryIn ? `<small>inclui diferença de ${esc(m.carryFromLabel)}: ${fmt.brl(m.carryIn)}</small>` : ""}${m.paidAmount !== null && m.paidDiff ? `<small>devido ${fmt.brl(m.dueAmount)} · diferença ${fmt.brl(m.paidDiff)} ${m.paidDiffMode === "next" ? "levada ao mês seguinte" : "zerada"}</small>` : ""}</td><td>${fmt.date(m.due + "T12:00:00")}</td>
             <td>${st(m.status)}${m.paidAt ? `<small>em ${fmt.date(m.paidAt + "T12:00:00")}</small>` : ""}</td>
-            <td style="white-space:nowrap">${a.config.configured ? (m.paidAt ? `<button class="btn ghost" data-ar-unpay="${esc(m.key)}" type="button" ${can}>Desfazer</button>` : `<input class="select" type="date" data-ar-date="${esc(m.key)}" value="${today}" style="width:140px"> <button class="btn primary" data-ar-pay="${esc(m.key)}" type="button" ${can}>Marcar pago</button> <button class="btn ghost" data-ar-adj="${esc(m.key)}" type="button" ${can}>Ajustar valor</button>`) : ""}
+            <td style="white-space:nowrap">${a.config.configured ? (m.paidAt ? `<button class="btn ghost" data-ar-unpay="${esc(m.key)}" type="button" ${can}>Desfazer</button>` : `${m.total > 0 ? `<button class="btn primary" data-ar-pay-open="${esc(m.key)}" type="button" ${can}>Marcar pago</button> ` : ""}<button class="btn ghost" data-ar-adj="${esc(m.key)}" type="button" ${can}>Ajustar valor</button>`) : ""}
               <button class="btn ghost" data-ar-rep="${esc(m.key)}" type="button">Relatório</button></td></tr>
+            ${ui.arPay === m.key && !m.paidAt ? `<tr><td colspan="11"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+              ${field("Pago em", `<input class="select" type="date" data-ar-date="${esc(m.key)}" value="${today}" style="width:150px">`)}
+              ${field(`Valor pago (devido ${fmt.brl(m.dueAmount)})`, `<input class="select" type="number" step="0.01" data-ar-pay-amount data-due="${esc(m.dueAmount.toFixed(2))}" value="${esc(m.dueAmount.toFixed(2))}" style="width:160px">`)}
+              ${field("Se o valor pago for diferente do devido", `<select class="select" data-ar-pay-diff style="width:260px"><option value="next">Levar a diferença para o mês seguinte</option><option value="drop">Zerar a diferença</option></select>`)}
+              <button class="btn primary" data-ar-pay="${esc(m.key)}" type="button" ${can}>Confirmar pagamento</button>
+              <button class="btn ghost" data-ar-pay-cancel type="button">Cancelar</button></div></td></tr>` : ""}
             ${ui.arAdjust === m.key ? `<tr><td colspan="11"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
-              ${field(`Valor final a repassar em ${m.label} (R$)`, `<input class="select" type="number" step="0.01" min="0" data-ar-adj-total value="${esc(m.total.toFixed(2))}" style="width:160px">`)}
-              ${field("Motivo do ajuste", `<input class="select" data-ar-adj-note value="${esc(m.adjustNote)}" placeholder="ex.: desconto combinado, arredondamento" style="width:320px">`)}
+              ${field(`Valor final a repassar em ${m.label} (R$)`, `<input class="select" type="number" step="0.01" data-ar-adj-total value="${esc(m.own.toFixed(2))}" style="width:160px">`)}
+              ${field("Motivo do ajuste", `<input class="select" data-ar-adj-note value="${esc(m.adjustNote)}" placeholder="ex.: desconto combinado, arredondamento" style="width:300px">`)}
               <button class="btn primary" data-ar-adj-save="${esc(m.key)}" type="button" ${can}>Salvar ajuste</button>
               ${m.adjusted ? `<button class="btn ghost" data-ar-adj-clear="${esc(m.key)}" type="button" ${can}>Voltar ao calculado (${fmt.brl(m.computedTotal)})</button>` : ""}
               <button class="btn ghost" data-ar-adj-cancel type="button">Cancelar</button></div></td></tr>` : ""}`).join("") || `<tr><td colspan="11" class="empty">Sem competências com operação.</td></tr>`}</tbody></table></div>
@@ -848,17 +854,31 @@
     if ($("#pmArCharger")) $("#pmArCharger").onchange = e => { ui.arCharger = e.target.value; ui.arForm = null; draw(target, w); };
     target.querySelectorAll("[data-ar]").forEach(el => el.onchange = () => { ui.arForm[el.dataset.ar] = el.type === "checkbox" ? el.checked : el.dataset.ar === "dueDay" ? Number(el.value || 10) : el.value; draw(target, w); });
     const arCtx = () => { const c = data.chargers.find(x => x.key === ui.arCharger); const a = UBY.state.api.areaAccount(c.workId, c.station); return { c, a }; };
-    const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, paid: { ...(a.config.paid || {}) }, adjust: { ...(a.config.adjust || {}) } });
+    const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, paid: { ...(a.config.paid || {}) }, paidInfo: { ...(a.config.paidInfo || {}) }, adjust: { ...(a.config.adjust || {}) } });
       run(target, w, `${label} · ${c.station}`, async () => { await saveChargerField(w, c.workId, c.station, c.workName, "areaAccount", next); ui.arForm = null; return "salvo"; }); };
     if ($("#pmArSave")) $("#pmArSave").onclick = () => arSave("Regra do repasse à área", cfg => ({ ...cfg, reimburseEnergy: !!ui.arForm.reimburseEnergy, payee: String(ui.arForm.payee || "").trim() || cfg.payee, payeeEmail: String(ui.arForm.payeeEmail || "").trim().toLowerCase(), dueDay: Math.min(Math.max(Number(ui.arForm.dueDay) || 10, 1), 28) }));
-    target.querySelectorAll("[data-ar-pay]").forEach(b => b.onclick = () => { const mk = b.dataset.arPay; const d = target.querySelector(`[data-ar-date="${mk}"]`)?.value || new Date().toISOString().slice(0, 10); arSave(`Repasse ${mk} pago em ${d}`, cfg => ({ ...cfg, paid: { ...cfg.paid, [mk]: d } })); });
-    target.querySelectorAll("[data-ar-unpay]").forEach(b => b.onclick = () => { const mk = b.dataset.arUnpay; if (!confirm("Desfazer o pagamento deste repasse?")) return; arSave(`Repasse ${mk} reaberto`, cfg => { const paid = { ...cfg.paid }; delete paid[mk]; return { ...cfg, paid }; }); });
-    target.querySelectorAll("[data-ar-adj]").forEach(b => b.onclick = () => { ui.arAdjust = ui.arAdjust === b.dataset.arAdj ? "" : b.dataset.arAdj; draw(target, w); });
+    target.querySelectorAll("[data-ar-pay-open]").forEach(b => b.onclick = () => { ui.arPay = ui.arPay === b.dataset.arPayOpen ? "" : b.dataset.arPayOpen; ui.arAdjust = ""; draw(target, w); });
+    target.querySelectorAll("[data-ar-pay-cancel]").forEach(b => b.onclick = () => { ui.arPay = ""; draw(target, w); });
+    target.querySelectorAll("[data-ar-pay]").forEach(b => b.onclick = () => {
+      const mk = b.dataset.arPay;
+      const d = target.querySelector(`[data-ar-date="${mk}"]`)?.value || new Date().toISOString().slice(0, 10);
+      const input = target.querySelector("[data-ar-pay-amount]");
+      const due = Number(input?.dataset.due || 0);
+      const amount = Math.round(Number(String(input?.value || "").replace(",", ".")) * 100) / 100;
+      if (!Number.isFinite(amount) || amount < 0) { alert("Informe o valor pago."); return; }
+      const diff = Math.round((due - amount) * 100) / 100;
+      const diffMode = target.querySelector("[data-ar-pay-diff]")?.value === "drop" ? "drop" : "next";
+      ui.arPay = "";
+      const label = diff ? `Repasse ${mk} pago ${fmt.brl(amount)} em ${d} · diferença ${fmt.brl(diff)} ${diffMode === "next" ? "para o mês seguinte" : "zerada"}` : `Repasse ${mk} pago em ${d}`;
+      arSave(label, cfg => ({ ...cfg, paid: { ...cfg.paid, [mk]: d }, paidInfo: { ...cfg.paidInfo, [mk]: { amount, due, diff, diffMode } } }));
+    });
+    target.querySelectorAll("[data-ar-unpay]").forEach(b => b.onclick = () => { const mk = b.dataset.arUnpay; if (!confirm("Desfazer o pagamento deste repasse? A diferença levada ao mês seguinte também sai.")) return; arSave(`Repasse ${mk} reaberto`, cfg => { const paid = { ...cfg.paid }, paidInfo = { ...cfg.paidInfo }; delete paid[mk]; delete paidInfo[mk]; return { ...cfg, paid, paidInfo }; }); });
+    target.querySelectorAll("[data-ar-adj]").forEach(b => b.onclick = () => { ui.arAdjust = ui.arAdjust === b.dataset.arAdj ? "" : b.dataset.arAdj; ui.arPay = ""; draw(target, w); });
     target.querySelectorAll("[data-ar-adj-cancel]").forEach(b => b.onclick = () => { ui.arAdjust = ""; draw(target, w); });
     target.querySelectorAll("[data-ar-adj-save]").forEach(b => b.onclick = () => {
       const mk = b.dataset.arAdjSave;
       const total = Number(String(target.querySelector("[data-ar-adj-total]")?.value || "").replace(",", "."));
-      if (!Number.isFinite(total) || total < 0) { alert("Informe um valor válido."); return; }
+      if (!Number.isFinite(total)) { alert("Informe um valor válido."); return; }
       const note = String(target.querySelector("[data-ar-adj-note]")?.value || "").trim();
       ui.arAdjust = "";
       arSave(`Repasse ${mk} ajustado para ${fmt.brl(total)}`, cfg => ({ ...cfg, adjust: { ...cfg.adjust, [mk]: { total: Math.round(total * 100) / 100, note } } }));
