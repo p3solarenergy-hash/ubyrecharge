@@ -113,10 +113,20 @@
 
     target.querySelectorAll("#sessFilter button").forEach(b => b.onclick = () => { ui.sessionFilter = b.dataset.v; renderDetail(target, workId, station); });
     const opts = UBY.baseChartOptions;
+    // Degradê vertical do faturamento: azul embaixo, verde no topo (cores do tema night quando ativo).
+    const revGradient = (alphaLow, alphaHigh) => ({ chart }) => {
+      const area = chart.chartArea;
+      if (!area) return null;
+      const night = document.documentElement.dataset.theme === "night";
+      const g = chart.ctx.createLinearGradient(0, area.bottom, 0, area.top);
+      g.addColorStop(0, night ? `rgba(0,229,255,${alphaLow})` : `rgba(61,111,142,${alphaLow})`);
+      g.addColorStop(.7, night ? `rgba(0,224,122,${alphaHigh})` : `rgba(24,116,87,${alphaHigh})`);
+      return g;
+    };
     UBY.chart("chUnitDaily", {
       type: "line",
       data: { labels: d.days.map(x => x.label), datasets: [
-        { label: "Faturamento (R$)", data: d.days.map(x => x.revenue), borderColor: "rgba(24,116,87,.85)", backgroundColor: "rgba(24,116,87,.14)", borderWidth: 1.8, fill: "origin", pointRadius: 0, pointHoverRadius: 3, cubicInterpolationMode: "monotone", yAxisID: "y" },
+        { label: "Faturamento (R$)", data: d.days.map(x => x.revenue), borderColor: revGradient(.9, 1), backgroundColor: revGradient(.02, .32), borderWidth: 2.4, fill: "origin", pointRadius: 0, pointHoverRadius: 4, cubicInterpolationMode: "monotone", yAxisID: "y" },
         { label: "Falhas", data: d.days.map(x => x.failures), borderColor: "rgba(183,84,80,.55)", backgroundColor: "rgba(183,84,80,.55)", borderWidth: 1.4, borderDash: [4, 3], pointRadius: 0, pointHoverRadius: 3, cubicInterpolationMode: "monotone", yAxisID: "y1" }
       ] },
       options: opts({ scales: { ...opts().scales, y: { ...opts().scales.y, beginAtZero: true }, y1: { beginAtZero: true, suggestedMax: Math.max(3, ...d.days.map(x => x.failures || 0)) * 3, position: "right", grid: { display: false }, ticks: { precision: 0, font: { size: 10 }, color: "rgba(183,84,80,.6)" } } } })
