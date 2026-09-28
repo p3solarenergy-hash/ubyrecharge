@@ -578,10 +578,10 @@
     const [workId, station] = (ui.arCharger || "|").split("|");
     const a = api.areaAccount(workId, station);
     if (!a) return `<div class="note">Carregador não encontrado no motor.</div>`;
-    const f = ui.arForm || (ui.arForm = { reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, dueDay: a.config.dueDay });
+    const f = ui.arForm || (ui.arForm = { reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay });
     const can = canWrite(w) && !busy ? "" : "disabled";
     const today = new Date().toISOString().slice(0, 10);
-    const dirty = f.reimburseEnergy !== a.config.reimburseEnergy || f.payee !== a.config.payee || Number(f.dueDay) !== Number(a.config.dueDay) || !a.config.configured;
+    const dirty = f.reimburseEnergy !== a.config.reimburseEnergy || f.payee !== a.config.payee || (f.payeeEmail || "") !== (a.config.payeeEmail || "") || Number(f.dueDay) !== Number(a.config.dueDay) || !a.config.configured;
     const st = s => `<span class="badge ${s === "pago" ? "ok" : s === "vencido" ? "bad" : "warn"}">${esc(s)}</span>`;
     return `
       <div class="toolbar"><select class="select" id="pmArCharger" style="min-width:280px">${list.map(c => `<option value="${esc(c.key)}" ${c.key === ui.arCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</select>
@@ -592,6 +592,7 @@
           <div class="grid g2" style="gap:8px">
             ${field("Quem recebe", `<input class="select" data-ar="payee" value="${esc(f.payee || "")}" style="width:100%">`)}
             ${field("Dia do vencimento (mês seguinte)", `<input class="select" type="number" min="1" max="28" data-ar="dueDay" value="${esc(f.dueDay)}" style="width:100%">`)}
+            ${field("E-mail de quem recebe (acesso à prestação de contas)", `<input class="select" type="email" data-ar="payeeEmail" value="${esc(f.payeeEmail || "")}" placeholder="opcional" style="width:100%">`)}
           </div>
           <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12.5px"><input type="checkbox" data-ar="reimburseEnergy" ${f.reimburseEnergy ? "checked" : ""}> Reembolsar a energia ao dono do local (o ponto ainda usa o padrão/energia do local)</label>
           <p class="source-line">Quando o ponto tiver padrão próprio, desmarque: a energia passa a vir das Faturas de energia e o repasse fica só com a participação.</p>
@@ -645,21 +646,64 @@
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Governança</p><h2>Fechamentos da distribuição</h2>
           <p>Aprovar uma competência congela os números daquele mês (resultado, impostos, reservas, pool e o repasse de cada cotista). Se a base mudar depois — planilha nova, parâmetro, custo —, a tela mostra a diferença entre o aprovado e o atual. Depois do pagamento, marque como pago com a data.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Resultado</th><th class="num">Impostos</th><th class="num">Pool cotistas</th><th class="num">Por cota</th><th>Situação</th><th>Aprovação</th><th></th></tr></thead>
+        <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Resultado</th><th class="num">Impostos</th><th class="num">Pool cotistas</th><th class="num">Por cota</th><th>Situação</th><th>Aprovação</th><th>Documentos publicados</th><th></th></tr></thead>
           <tbody>${inv.months.map((m, idx) => { const diff = closingDiff(inv, idx); return `<tr>
             <td><strong>${esc(m.label)}</strong></td><td class="num">${fmt.brl(m.result)}</td><td class="num">${m.taxes ? fmt.brl(m.taxes) : `<span class="badge warn">sem imposto</span>`}</td>
             <td class="num">${fmt.brl(m.investorPool)}</td><td class="num">${fmt.brl(m.perQuota)}</td><td>${badge(m.status)}</td>
             <td style="white-space:normal;min-width:220px">${m.approvedAt ? `<small>aprovado ${fmt.dt(m.approvedAt)}${m.approvedBy ? ` por ${esc(m.approvedBy)}` : ""}${m.paidAt ? ` · pago em ${fmt.date(m.paidAt + "T12:00:00")}` : ""}</small>` : "<small>—</small>"}
               ${diff.length ? `<div class="note" style="margin-top:6px;border-color:var(--uby-red)"><strong>Mudou depois da aprovação</strong><br>${diff.map(esc).join("<br>")}</div>` : ""}</td>
+            <td style="white-space:normal;min-width:170px">${docsCell(m.key)}</td>
             <td style="white-space:nowrap">
               <button class="btn ghost" data-close-report="${esc(m.key)}" type="button">Relatório</button>
+              ${m.status !== "pendente" ? `<button class="btn" data-publish="${esc(m.key)}" type="button" ${can}>${(ui.docs || []).some(d => d.competencia === m.key && d.tipo === "fechamento" && !d.revogado_em) ? "Publicar nova versão" : "Publicar documentos"}</button>` : ""}
               ${m.status === "pendente" ? `<button class="btn primary" data-close="${esc(m.key)}|approve" type="button" ${can}>Aprovar</button>` : ""}
               ${m.status === "aprovado" ? `<input class="select" type="date" data-paid-date="${esc(m.key)}" value="${today}" style="width:140px"> <button class="btn primary" data-close="${esc(m.key)}|pay" type="button" ${can}>Marcar pago</button>` : ""}
               ${m.status === "aprovado" && diff.length ? `<button class="btn" data-close="${esc(m.key)}|approve" type="button" ${can}>Aprovar números atuais</button>` : ""}
               ${m.status !== "pendente" ? `<button class="btn ghost" data-close="${esc(m.key)}|reopen" type="button" ${can}>Reabrir</button>` : ""}
-            </td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">Nenhuma competência de distribuição.</td></tr>`}</tbody></table></div>
+            </td></tr>`; }).join("") || `<tr><td colspan="9" class="empty">Nenhuma competência de distribuição.</td></tr>`}</tbody></table></div>
         <p class="source-line">Cada competência é dividida só entre as cotas habilitadas no primeiro dia do mês. Aprove em ordem: o prejuízo de um mês é compensado nos seguintes.</p>
+        <p class="source-line">Publicar documentos guarda de forma definitiva o relatório do fechamento, o extrato de cada cotista com e-mail cadastrado e a prestação de contas de cada área com e-mail. Cotistas e áreas com acesso veem só os próprios documentos. Um documento publicado não muda: se o mês for reaprovado, publique uma nova versão. ${ui.docsError ? `<strong>${esc(ui.docsError)}</strong>` : ""}</p>
       </section>`;
+  }
+  // Documentos já publicados por competência (lidos da tabela uby_documentos).
+  function docsCell(mk) {
+    if (ui.docsError) return "<small>—</small>";
+    if (!ui.docs) return "<small>lendo…</small>";
+    const list = ui.docs.filter(d => d.competencia === mk && !d.revogado_em);
+    if (!list.length) return "<small>nenhum</small>";
+    const lastV = Math.max(...list.filter(d => d.tipo === "fechamento").map(d => d.versao), 0);
+    const who = list.filter(d => d.tipo !== "fechamento").map(d => d.destinatario_nome || d.destinatario_email);
+    return `<span class="badge ok">fechamento${lastV ? ` v${lastV}` : ""}</span>${who.length ? `<small>${esc([...new Set(who)].join(", "))}</small>` : ""}`;
+  }
+  async function loadDocs(w) {
+    try { ui.docs = await w.UBY_SUPABASE.listDocuments({ limit: 300 }); ui.docsError = ""; }
+    catch (err) { ui.docs = []; ui.docsError = err.code === "UBY_NO_DOCS_TABLE" ? err.message : `Não consegui ler os documentos publicados (${err.message}).`; }
+  }
+  async function publishClosing(w, mk) {
+    const inv = UBY.data("investorDistribution");
+    const m = inv.months.find(x => x.key === mk);
+    if (!m || m.status === "pendente") throw new Error("Aprove a competência antes de publicar.");
+    const label = m.label;
+    const snap = m.snapshot || null;
+    const published = [];
+    await w.UBY_SUPABASE.publishDocument({ tipo: "fechamento", competencia: mk, titulo: `Fechamento ${label}`, html: UBY.reports.build("unificado", { month: mk }),
+      dados: { status: m.status, approvedAt: m.approvedAt, approvedBy: m.approvedBy, paidAt: m.paidAt, snapshot: snap } });
+    published.push("fechamento");
+    const policy = w.loadNetworkDistribution();
+    for (const i of (policy.investors || []).filter(x => x.email && x.eligibleFrom <= mk)) {
+      await w.UBY_SUPABASE.publishDocument({ tipo: "cotista", competencia: mk, titulo: `Extrato ${i.name} · ${label}`, destinatarioEmail: i.email, destinatarioNome: i.name,
+        html: UBY.reports.build("cotista", { name: i.name }), dados: { quotas: i.quotas, value: (snap?.investors || []).find(x => x.name === i.name)?.value ?? null } });
+      published.push(i.name);
+    }
+    for (const st of UBY.data("financeStations")) {
+      const a = UBY.state.api.areaAccount(st.workId, st.station);
+      if (!a?.config?.configured || !a.config.payeeEmail) continue;
+      await w.UBY_SUPABASE.publishDocument({ tipo: "area", competencia: mk, titulo: `Prestação de contas ${a.station} · ${label}`, destinatarioEmail: a.config.payeeEmail, destinatarioNome: a.config.payee,
+        html: UBY.reports.build("area", { workId: st.workId, station: st.station, month: mk }), dados: { station: a.station, workId: st.workId } });
+      published.push(a.config.payee);
+    }
+    await loadDocs(w);
+    return `${published.length} documento(s) publicado(s): ${published.join(", ")}`;
   }
 
   // Cotista: a partir da data do aporte e do valor investido, calcula cotas e o mês de entrada.
@@ -703,16 +747,17 @@
       </section>
       <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Cotistas: data do aporte e valor investido</h2><p>Informe só a data do aporte e o valor investido. A plataforma calcula as cotas (valor ÷ valor da cota da rodada, fixado na entrada do cotista) e o mês em que ele passa a participar: aporte no dia 1º entra no próprio mês; em qualquer outro dia, entra no mês seguinte. ${fmt.n1(quotasSum)} cota(s) · ${fmt.brl(investedSum)} investidos.</p></div>
           <button class="btn" id="pmInvAdd" type="button">＋ Cotista</button></div>
-        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th>Data do aporte</th><th class="num">Valor investido (R$)</th><th class="num">Valor da cota</th><th class="num">Cotas</th><th>Participa a partir de</th><th>Situação</th><th></th></tr></thead>
+        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th>E-mail (acesso aos extratos)</th><th>Data do aporte</th><th class="num">Valor investido (R$)</th><th class="num">Valor da cota</th><th class="num">Cotas</th><th>Participa a partir de</th><th>Situação</th><th></th></tr></thead>
           <tbody>${e.investors.map((i, k) => { const d = derived[k]; return `<tr>
             <td><input class="select" data-inv="${k}|name" value="${esc(i.name)}" style="width:100%"></td>
+            <td><input class="select" type="email" data-inv="${k}|email" value="${esc(i.email || "")}" placeholder="opcional" style="width:100%"></td>
             <td><input class="select" type="date" data-inv="${k}|investedAt" value="${esc(i.investedAt || "")}"></td>
             <td class="num"><input class="select" type="number" min="0" step="0.01" data-inv="${k}|investment" value="${esc(i.investment || "")}" style="width:140px"></td>
             <td class="num">${fmt.brl(d.quotaValue)}<small>da rodada</small></td>
             <td class="num"><strong>${fmt.n1(d.quotas)}</strong></td>
             <td><strong>${esc(d.eligibleFrom ? (UBY.state.api?.monthName?.(d.eligibleFrom) || d.eligibleFrom) : "—")}</strong>${d.investedAt && d.investedAt.slice(8) !== "01" ? "<small>aporte após o dia 1º</small>" : ""}</td>
             <td><select class="select" data-inv="${k}|status">${["pendente", "aprovado", "pago"].map(s => `<option ${i.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></td>
-            <td><button class="btn ghost" data-inv-del="${k}" type="button">✕</button></td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">Nenhum cotista.</td></tr>`}</tbody></table></div>
+            <td><button class="btn ghost" data-inv-del="${k}" type="button">✕</button></td></tr>`; }).join("") || `<tr><td colspan="9" class="empty">Nenhum cotista.</td></tr>`}</tbody></table></div>
         <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="pmPolSave" type="button" ${canWrite(w) && !busy ? "" : "disabled"}>Salvar política e cotistas</button><button class="btn" id="pmPolReset" type="button">Descartar</button></div>
       </section>`;
   }
@@ -796,9 +841,9 @@
     if ($("#pmArCharger")) $("#pmArCharger").onchange = e => { ui.arCharger = e.target.value; ui.arForm = null; draw(target, w); };
     target.querySelectorAll("[data-ar]").forEach(el => el.onchange = () => { ui.arForm[el.dataset.ar] = el.type === "checkbox" ? el.checked : el.dataset.ar === "dueDay" ? Number(el.value || 10) : el.value; draw(target, w); });
     const arCtx = () => { const c = data.chargers.find(x => x.key === ui.arCharger); const a = UBY.state.api.areaAccount(c.workId, c.station); return { c, a }; };
-    const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, dueDay: a.config.dueDay, paid: { ...(a.config.paid || {}) } });
+    const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, paid: { ...(a.config.paid || {}) } });
       run(target, w, `${label} · ${c.station}`, async () => { await saveChargerField(w, c.workId, c.station, c.workName, "areaAccount", next); ui.arForm = null; return "salvo"; }); };
-    if ($("#pmArSave")) $("#pmArSave").onclick = () => arSave("Regra do repasse à área", cfg => ({ ...cfg, reimburseEnergy: !!ui.arForm.reimburseEnergy, payee: String(ui.arForm.payee || "").trim() || cfg.payee, dueDay: Math.min(Math.max(Number(ui.arForm.dueDay) || 10, 1), 28) }));
+    if ($("#pmArSave")) $("#pmArSave").onclick = () => arSave("Regra do repasse à área", cfg => ({ ...cfg, reimburseEnergy: !!ui.arForm.reimburseEnergy, payee: String(ui.arForm.payee || "").trim() || cfg.payee, payeeEmail: String(ui.arForm.payeeEmail || "").trim().toLowerCase(), dueDay: Math.min(Math.max(Number(ui.arForm.dueDay) || 10, 1), 28) }));
     target.querySelectorAll("[data-ar-pay]").forEach(b => b.onclick = () => { const mk = b.dataset.arPay; const d = target.querySelector(`[data-ar-date="${mk}"]`)?.value || new Date().toISOString().slice(0, 10); arSave(`Repasse ${mk} pago em ${d}`, cfg => ({ ...cfg, paid: { ...cfg.paid, [mk]: d } })); });
     target.querySelectorAll("[data-ar-unpay]").forEach(b => b.onclick = () => { const mk = b.dataset.arUnpay; if (!confirm("Desfazer o pagamento deste repasse?")) return; arSave(`Repasse ${mk} reaberto`, cfg => { const paid = { ...cfg.paid }; delete paid[mk]; return { ...cfg, paid }; }); });
     const arReport = mk => { const { c } = arCtx(); UBY.reports.area(c.workId, c.station, mk); };
@@ -1033,6 +1078,12 @@
     };
     // --- fechamentos ---
     target.querySelectorAll("[data-close-report]").forEach(b => b.onclick = () => UBY.reports.competencia(b.dataset.closeReport));
+    if (ui.tab === "fechamentos" && !ui.docs && !ui.docsLoading) { ui.docsLoading = true; loadDocs(w).finally(() => { ui.docsLoading = false; draw(target, w); }); }
+    target.querySelectorAll("[data-publish]").forEach(b => b.onclick = () => {
+      const mk = b.dataset.publish;
+      if (!confirm(`Publicar os documentos de ${UBY.state.api.monthName(mk)}? Eles ficam guardados de forma definitiva (não podem ser alterados, só substituídos por uma nova versão).`)) return;
+      run(target, w, `Documentos ${UBY.state.api.monthName(mk)}`, () => publishClosing(w, mk));
+    });
     target.querySelectorAll("[data-close]").forEach(b => b.onclick = () => {
       const [mk, action] = b.dataset.close.split("|");
       let inv;

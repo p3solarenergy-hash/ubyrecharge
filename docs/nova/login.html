@@ -22,7 +22,7 @@
       <img src="assets/brand.svg" alt="UBY Recharge">
       <p class="eyebrow">Plataforma UBY · versão local</p>
       <h1>Entrar</h1>
-      <p style="margin:0;font-size:12.5px">Use o mesmo e-mail e senha da plataforma publicada. O acesso é validado no Supabase e nesta versão local nenhuma alteração é gravada na base.</p>
+      <p style="margin:0;font-size:12.5px">Use seu e-mail e senha de acesso. Cotistas e áreas parceiras entram direto nos próprios documentos.</p>
       <form id="loginForm">
         <label>E-mail<input id="email" type="email" autocomplete="username" required></label>
         <label>Senha<input id="password" type="password" autocomplete="current-password" required></label>
@@ -33,8 +33,8 @@
   </main>
   <script src="legado/obra-ev/supabase_config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="legado/obra-ev/supabase_bridge.js?v=nova1"></script>
-  <script src="legado/obra-ev/auth.js?v=nova1"></script>
+  <script src="legado/obra-ev/supabase_bridge.js?v=nova2"></script>
+  <script src="legado/obra-ev/auth.js?v=nova2"></script>
   <script>
     (function () {
       const form = document.getElementById("loginForm");
@@ -45,8 +45,8 @@
         error.classList.remove("on");
         button.disabled = true; button.textContent = "Validando…";
         try {
-          await window.UBY_AUTH.login(document.getElementById("email").value, document.getElementById("password").value);
-          location.replace("index.html#/comando");
+          const session = await window.UBY_AUTH.login(document.getElementById("email").value, document.getElementById("password").value);
+          location.replace(session && (session.role === "cotista" || session.role === "area") ? "portal.html" : "index.html#/comando");
         } catch (err) {
           error.textContent = err.message || "Não foi possível entrar.";
           error.classList.add("on");

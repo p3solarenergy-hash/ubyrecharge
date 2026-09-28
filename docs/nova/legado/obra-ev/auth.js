@@ -14,12 +14,17 @@
 
   const roleModules = {
     admin: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "documents", "analyzers", "market", "recargas", "tasks", "backup", "login"],
-    engenharia: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "analyzers", "market", "recargas", "login"]
+    engenharia: ["home", "dashboard", "detail", "engineering", "utility", "budgets", "analyzers", "market", "recargas", "login"],
+    // NOVA PLATAFORMA: cotista e área só acessam "Meus documentos" (portal.html).
+    cotista: ["portal", "login"],
+    area: ["portal", "login"]
   };
 
   const fallbackProfiles = {
     admin: { id: "admin", label: "Admin", role: "admin", modules: roleModules.admin },
-    engenharia: { id: "engenharia", label: "Engenharia", role: "engineering", modules: roleModules.engenharia }
+    engenharia: { id: "engenharia", label: "Engenharia", role: "engineering", modules: roleModules.engenharia },
+    cotista: { id: "cotista", label: "Cotista", role: "cotista", modules: roleModules.cotista },
+    area: { id: "area", label: "Área parceira", role: "area", modules: roleModules.area }
   };
 
   function loginUrl(target) {
@@ -32,13 +37,14 @@
   }
 
   function publicProfile(profile) {
-    const perfil = profile?.perfil === "engenharia" ? "engenharia" : "admin";
+    const perfil = ["engenharia", "cotista", "area"].includes(profile?.perfil) ? profile.perfil : "admin";
     const base = fallbackProfiles[perfil];
     return {
       id: profile?.id || base.id,
       email: profile?.email || "",
       label: profile?.nome || profile?.email || base.label,
-      role: perfil === "admin" ? "admin" : "engineering",
+      role: base.role,
+      vinculo: profile?.vinculo || "",
       modules: base.modules,
       authenticated: true
     };

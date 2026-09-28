@@ -23,6 +23,7 @@
         var s = JSON.parse(localStorage.getItem("uby-auth-session-v1") || "null");
         var valid = s && s.email && s.loginAt && (Date.now() - new Date(s.loginAt).getTime()) < 12 * 3600 * 1000;
         if (!valid) location.replace("login.html");
+        else if (s.role === "cotista" || s.role === "area") location.replace("portal.html");
       } catch (e) { location.replace("login.html"); }
     })();
     // Tema escolhido (claro ou night) antes de pintar a tela.
@@ -66,7 +67,7 @@
   <iframe id="motorFrame" title="Motor de cálculo" aria-hidden="true" tabindex="-1"></iframe>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="app/shell.js?v=11"></script>
+  <script src="app/shell.js?v=12"></script>
   <script src="app/views/resumo.js?v=2"></script>
   <script src="app/views/modelo.js?v=1"></script>
   <script src="app/views/comando.js?v=8"></script>
@@ -86,9 +87,10 @@
   <script src="app/views/mercado.js?v=2"></script>
   <script src="app/views/auditoria.js?v=1"></script>
   <script src="app/copel-reader.js?v=1"></script>
-  <script src="app/views/parametros.js?v=15"></script>
+  <script src="app/views/parametros.js?v=16"></script>
   <script src="app/reports.js?v=6"></script>
   <script src="app/views/relatorios.js?v=2"></script>
+  <script src="app/views/arquivo.js?v=1"></script>
   <script src="app/mobile.js?v=1"></script>
   <script>UBY.start();</script>
 </body>

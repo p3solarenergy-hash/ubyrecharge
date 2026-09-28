@@ -53,7 +53,7 @@
   // pagamentos e cotas (uby_financial_matrix). Nada de sessões, obras, RPCs ou arquivos.
   const PARAMS_SCOPE = {
     name: "parametros",
-    tables: { obra_recargas_base: ["update"], uby_financial_matrix: ["upsert"], app_audit_log: ["insert"], uby_finance_documents: ["insert", "delete"] },
+    tables: { obra_recargas_base: ["update"], uby_financial_matrix: ["upsert"], app_audit_log: ["insert"], uby_finance_documents: ["insert", "delete"], uby_documentos: ["insert", "update"] },
     storage: { "finance-documents": ["upload", "remove"] },
     rpcs: []
   };
@@ -1316,6 +1316,59 @@
     return { report: saved, unchanged: false };
   }
 
+  // NOVA PLATAFORMA — documentos publicados (fechamentos, extratos de cotista e
+  // prestações de contas à área). Imutáveis no banco (banco/02_*.sql); cotista e
+  // área só leem os endereçados ao próprio e-mail (regra no banco, não na tela).
+  const DOC_COLUMNS = "id,tipo,competencia,titulo,destinatario_email,destinatario_nome,dados,versao,criado_por_email,criado_em,revogado_em";
+  async function listDocuments(filters = {}) {
+    const sb = client();
+    if (!sb || !(await currentUser())) return [];
+    let query = sb.from("uby_documentos").select(filters.withHtml ? `${DOC_COLUMNS},html` : DOC_COLUMNS).order("competencia", { ascending: false }).order("criado_em", { ascending: false });
+    if (filters.tipo) query = query.eq("tipo", String(filters.tipo));
+    if (filters.competencia) query = query.eq("competencia", String(filters.competencia));
+    if (filters.id) query = query.eq("id", String(filters.id));
+    const { data, error } = await query.limit(Math.min(500, Number(filters.limit || 300)));
+    if (error) {
+      if (/uby_documentos|relation|schema cache/i.test(error.message || "")) { const e = new Error("O arquivo de documentos ainda não foi ativado no banco (rodar banco/02_documentos_e_perfis_27092026.sql)."); e.code = "UBY_NO_DOCS_TABLE"; throw e; }
+      throw error;
+    }
+    return data || [];
+  }
+  async function documentHtml(id) {
+    const rows = await listDocuments({ id, withHtml: true, limit: 1 });
+    if (!rows[0]) throw new Error("Documento não encontrado ou sem acesso.");
+    return rows[0];
+  }
+  async function publishDocument(doc = {}) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre na plataforma antes de publicar.");
+    if (!["fechamento", "cotista", "area"].includes(doc.tipo) || !/^\d{4}-\d{2}$/.test(String(doc.competencia || "")) || !doc.html) throw new Error("Documento incompleto. Nada foi publicado.");
+    const email = doc.destinatarioEmail ? String(doc.destinatarioEmail).trim().toLowerCase() : null;
+    let q = sb.from("uby_documentos").select("versao").eq("tipo", doc.tipo).eq("competencia", doc.competencia).order("versao", { ascending: false }).limit(1);
+    q = email ? q.eq("destinatario_email", email) : q.is("destinatario_email", null);
+    const { data: last, error: lastError } = await q;
+    if (lastError) throw lastError;
+    const versao = (Number(last?.[0]?.versao) || 0) + 1;
+    const { data, error } = await sb.from("uby_documentos").insert({
+      tipo: doc.tipo, competencia: doc.competencia, titulo: String(doc.titulo || ""), destinatario_email: email,
+      destinatario_nome: String(doc.destinatarioNome || ""), html: String(doc.html), dados: doc.dados || {}, versao
+    }).select(DOC_COLUMNS).single();
+    if (error) throw error;
+    await insertAuditLog(sb, user, { modulo: "financeiro", entidadeTipo: "uby_documentos", entidadeId: data.id, acao: "publish_document", resumo: { tipo: doc.tipo, competencia: doc.competencia, versao, destinatario: email || "" } });
+    return data;
+  }
+  async function revokeDocument(id) {
+    const sb = client();
+    const user = await currentUser();
+    if (!sb || !user) throw new Error("Entre na plataforma antes de revogar.");
+    const { error } = await sb.from("uby_documentos").update({ revogado_em: new Date().toISOString(), revogado_por_email: user.email || "" }).eq("id", String(id));
+    if (error) throw error;
+    await insertAuditLog(sb, user, { modulo: "financeiro", entidadeTipo: "uby_documentos", entidadeId: String(id), acao: "revoke_document", resumo: {} });
+    return true;
+  }
+
   async function loadRechargeHistory(workId, options = {}) {
     const sb = client();
     if (!sb) throw new Error('Supabase ainda nao configurado.');
@@ -1382,6 +1435,7 @@
   }
 
   window.UBY_SUPABASE = {
+    listDocuments, documentHtml, publishDocument, revokeDocument,
     _merge3: (base, local, cloud) => { const conflicts = []; const merged = merge3(base, local, cloud, "", conflicts); return { merged, conflicts }; },
     configured,
     client,

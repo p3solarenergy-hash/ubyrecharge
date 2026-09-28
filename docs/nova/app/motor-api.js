@@ -1895,7 +1895,7 @@
     }).filter(m => m.total > 0 || m.revenue > 0);
     const sum = k => months.reduce((s, m) => s + n0(m[k]), 0);
     return { workId: row.workId, workName: row.workName, station: row.stationName || row.station, kind: row.kind,
-      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, dueDay, paid: cfg.paid || {}, configured: !!fv2AreaConfig(row) },
+      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, configured: !!fv2AreaConfig(row) },
       months, totals: { revenue: sum("revenue"), energy: sum("energy"), reimbursement: sum("reimbursement"), area: sum("area"), total: sum("total"),
         paid: months.filter(m => m.paidAt).reduce((s, m) => s + m.total, 0) } };
   }

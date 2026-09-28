@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<script src="app/storage-ns.js?v=2"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#173c30">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>UBY Recharge — Meus documentos</title>
+  <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="app/app.css?v=9">
+  <style>
+    body{background:var(--uby-bg,#f3f5f1)}
+    .portal{max-width:1100px;margin:0 auto;padding:24px 16px 40px}
+    .portal-top{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+    .portal-top img{height:34px}
+    .doc-list{display:grid;gap:8px}
+    .doc-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .viewer{margin-top:18px}
+    .viewer iframe{width:100%;height:80vh;border:1px solid var(--uby-line,#dfe6e0);border-radius:12px;background:#fff}
+  </style>
+</head>
+<body>
+  <main class="portal">
+    <div class="portal-top">
+      <img src="assets/brand.svg" alt="UBY Recharge">
+      <div style="display:flex;gap:8px;align-items:center"><span id="who" class="pill"></span><button class="btn" id="logout" type="button">Sair</button></div>
+    </div>
+    <section class="section"><div class="section-head"><div><p class="kicker">Área do cotista e parceiros</p><h2>Meus documentos</h2>
+      <p>Fechamentos aprovados pela UBY: extratos de cotista e prestações de contas à área. Cada documento é a versão final publicada e não muda depois de publicado.</p></div></div>
+      <div id="list" class="doc-list"><div class="loading"><div class="spinner"></div><h2>Lendo seus documentos</h2></div></div>
+    </section>
+    <section class="section viewer" id="viewer" hidden>
+      <div class="section-head"><div><h2 id="docTitle"></h2><p id="docMeta"></p></div>
+        <div style="display:flex;gap:8px"><button class="btn primary" id="print" type="button">Imprimir / salvar PDF</button><button class="btn" id="close" type="button">Fechar</button></div></div>
+      <iframe id="frame" title="Documento" sandbox="allow-same-origin allow-modals"></iframe>
+    </section>
+  </main>
+  <script src="legado/obra-ev/supabase_config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="legado/obra-ev/supabase_bridge.js?v=nova2"></script>
+  <script src="legado/obra-ev/auth.js?v=nova2"></script>
+  <script>
+    (function () {
+      "use strict";
+      const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const monthName = mk => { const [y, m] = String(mk).split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); };
+      const TYPE = { fechamento: "Fechamento da rede", cotista: "Extrato do cotista", area: "Prestação de contas à área" };
+      const session = window.UBY_AUTH.current();
+      if (!session) { location.replace("login.html"); return; }
+      document.getElementById("who").textContent = session.label || session.email;
+      document.getElementById("logout").onclick = () => window.UBY_AUTH.logout("login.html");
+      const list = document.getElementById("list");
+      async function load() {
+        try {
+          const docs = (await window.UBY_SUPABASE.listDocuments({ limit: 200 })).filter(d => !d.revogado_em);
+          // Só a versão mais recente de cada documento.
+          const latest = new Map();
+          docs.forEach(d => { const k = `${d.tipo}|${d.competencia}|${d.destinatario_email || ""}`; if (!latest.has(k) || latest.get(k).versao < d.versao) latest.set(k, d); });
+          const rows = [...latest.values()].sort((a, b) => b.competencia.localeCompare(a.competencia));
+          list.innerHTML = rows.length ? rows.map(d => `<div class="list-row doc-row"><span><strong>${esc(d.titulo || TYPE[d.tipo])}</strong><br><small>${esc(TYPE[d.tipo] || d.tipo)} · ${esc(monthName(d.competencia))} · publicado em ${esc(new Date(d.criado_em).toLocaleDateString("pt-BR"))}${d.versao > 1 ? ` · versão ${d.versao}` : ""}</small></span>
+            <button class="btn" type="button" data-open="${esc(d.id)}">Abrir</button></div>`).join("")
+            : `<div class="note">Ainda não há documentos publicados para o seu e-mail (${esc(session.email)}). Eles aparecem aqui assim que a UBY aprova e publica o fechamento do mês.</div>`;
+          list.querySelectorAll("[data-open]").forEach(b => b.onclick = () => open(b.dataset.open));
+        } catch (err) {
+          list.innerHTML = `<div class="note">Não foi possível ler os documentos agora (${esc(err.message)}). Tente de novo mais tarde.</div>`;
+        }
+      }
+      async function open(id) {
+        const viewer = document.getElementById("viewer");
+        viewer.hidden = false;
+        document.getElementById("docTitle").textContent = "Abrindo…";
+        const d = await window.UBY_SUPABASE.documentHtml(id);
+        document.getElementById("docTitle").textContent = d.titulo || TYPE[d.tipo];
+        document.getElementById("docMeta").textContent = `${TYPE[d.tipo] || d.tipo} · ${monthName(d.competencia)} · versão ${d.versao}`;
+        document.getElementById("frame").srcdoc = d.html;
+        viewer.scrollIntoView({ behavior: "smooth" });
+      }
+      document.getElementById("print").onclick = () => { try { document.getElementById("frame").contentWindow.print(); } catch (_) { window.print(); } };
+      document.getElementById("close").onclick = () => { document.getElementById("viewer").hidden = true; };
+      load();
+    })();
+  </script>
+</body>
+</html>

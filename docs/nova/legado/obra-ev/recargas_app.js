@@ -5804,7 +5804,9 @@ function normalizeNetworkInvestors(raw) {
     quotaValue: Number(item?.quotaValue) > 0 ? Number(item.quotaValue) : (Number(fallback[index]?.quotaValue) > 0 ? Number(fallback[index].quotaValue) : 0),
     // Data do aporte e valor investido informados na tela nova; o resto é calculado.
     investedAt: /^\d{4}-\d{2}-\d{2}$/.test(String(item?.investedAt || '')) ? String(item.investedAt) : '',
-    investment: Number(item?.investment) > 0 ? Math.round(Number(item.investment) * 100) / 100 : 0
+    investment: Number(item?.investment) > 0 ? Math.round(Number(item.investment) * 100) / 100 : 0,
+    // E-mail de acesso do cotista aos próprios extratos (documentos publicados).
+    email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(item?.email || '').trim()) ? String(item.email).trim().toLowerCase() : ''
   })).filter(item => item.name && item.quotas > 0);
 }
 
