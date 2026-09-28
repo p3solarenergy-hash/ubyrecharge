@@ -46,6 +46,10 @@
       { id: "operacao-uby", icon: "◆", label: "Relatórios antigos (consulta)", type: "classic", src: LEGACY + "recargas.html", tab: "uby" },
       { id: "tarefas", icon: "☰", label: "Tarefas", type: "view" },
       { id: "tarefas-classico", icon: "✎", label: "Tarefas · edição", type: "classic", src: "legado/tarefas/index.html", writes: "obras" }
+    ] },
+    // A P3 é prestadora de serviço da UBY: sempre depois da UBY.
+    { label: "P3 · PRESTADORA", items: [
+      { id: "p3", icon: "◈", label: "P3 Solar · gestão", type: "view" }
     ] }
   ];
   const ROUTES = Object.fromEntries(GROUPS.flatMap(g => g.items.map(item => [item.id, { ...item, group: g.label }])));
