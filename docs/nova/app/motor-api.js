@@ -677,9 +677,9 @@
       valid: d.valid, totalAllocated: d.totalAllocated, totalPool: d.totalPool,
       months: d.months.map(m => ({ key: m.monthKey, label: monthLabel(m.monthKey), result: m.result, legalReserve: m.legalReserve, expansionReserve: m.expansionReserve,
         investorPool: m.investorPool, eligibleQuotas: m.eligibleQuotas, perQuota: m.valuePerQuota, status: m.payment?.status || "pendente" })),
-      quotaValue: Number(loadNetworkDistribution().quotaValue) || 80000, distributionStartMonth: loadNetworkDistribution().distributionStartMonth || "2026-06",
+      quotaValue: Number(loadNetworkDistribution().quotaValue) || window.UBY_CONFIG.quotaValueDefault, distributionStartMonth: loadNetworkDistribution().distributionStartMonth || window.UBY_CONFIG.distributionStartDefault,
       investors: d.investors.map(i => ({ name: i.name, quotas: i.quotas, eligibleFrom: i.eligibleFrom, status: i.status, allocations: i.allocations, due: i.due,
-        quotaValue: Number(i.quotaValue) || Number(loadNetworkDistribution().quotaValue) || 80000,
+        quotaValue: Number(i.quotaValue) || Number(loadNetworkDistribution().quotaValue) || window.UBY_CONFIG.quotaValueDefault,
         investment: i.investment, returnRate: i.returnRate, annualized: i.annualized, paybackYears: i.paybackYears }))
     };
   }

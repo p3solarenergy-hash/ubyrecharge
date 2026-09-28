@@ -709,7 +709,7 @@
   // Cotista: a partir da data do aporte e do valor investido, calcula cotas e o mês de entrada.
   const nextMonthKey = mk => { const [y, m] = mk.split("-").map(Number); const d = new Date(y, m, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
   function deriveInvestor(i, defaultQuota) {
-    const quotaValue = Number(i.quotaValue) || Number(defaultQuota) || 80000;
+    const quotaValue = Number(i.quotaValue) || Number(defaultQuota) || window.UBY_CONFIG.quotaValueDefault;
     const investedAt = /^\d{4}-\d{2}-\d{2}$/.test(String(i.investedAt || "")) ? i.investedAt : "";
     const eligibleFrom = investedAt ? (investedAt.slice(8) === "01" ? investedAt.slice(0, 7) : nextMonthKey(investedAt.slice(0, 7))) : (i.eligibleFrom || "");
     const investment = Number(i.investment) > 0 ? Math.round(Number(i.investment) * 100) / 100 : Math.round(Number(i.quotas || 0) * quotaValue * 100) / 100;
@@ -720,10 +720,10 @@
   function quotasTab(w) {
     const p = w.loadNetworkDistribution();
     const e = ui.policyEdits || (ui.policyEdits = JSON.parse(JSON.stringify({
-      quotaValue: p.quotaValue || 80000, distributionStartMonth: p.distributionStartMonth || "2026-06", legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct,
+      quotaValue: p.quotaValue || window.UBY_CONFIG.quotaValueDefault, distributionStartMonth: p.distributionStartMonth || window.UBY_CONFIG.distributionStartDefault, legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct,
       investorPct: p.investorPct, totalQuotas: p.totalQuotas, soldQuotas: p.soldQuotas, roundLabel: p.roundLabel, taxRatePct: p.taxRatePct || 0, taxByMonth: { ...(p.taxByMonth || {}) },
       investors: (p.investors || []).map(i => {
-        const qv = Number(i.quotaValue) || Number(p.quotaValue) || 80000;
+        const qv = Number(i.quotaValue) || Number(p.quotaValue) || window.UBY_CONFIG.quotaValueDefault;
         return { ...i, quotaValue: qv, investedAt: i.investedAt || (i.eligibleFrom ? `${i.eligibleFrom}-01` : ""), investment: Number(i.investment) || Math.round(Number(i.quotas || 0) * qv * 100) / 100 };
       })
     })));
@@ -1119,7 +1119,7 @@
     target.querySelectorAll("[data-pol]").forEach(el => el.onchange = () => { const k = el.dataset.pol; ui.policyEdits[k] = ["roundLabel", "distributionStartMonth"].includes(k) ? el.value : Number(el.value || 0); draw(target, w); });
     target.querySelectorAll("[data-tax-month]").forEach(el => el.onchange = () => { const k = el.dataset.taxMonth; if (el.value === "") delete ui.policyEdits.taxByMonth[k]; else ui.policyEdits.taxByMonth[k] = Math.max(0, Number(el.value)); draw(target, w); });
     target.querySelectorAll("[data-inv]").forEach(el => el.onchange = () => { const [i, k] = el.dataset.inv.split("|"); ui.policyEdits.investors[Number(i)][k] = k === "investment" ? Number(el.value || 0) : el.value; draw(target, w); });
-    if ($("#pmInvAdd")) $("#pmInvAdd").onclick = () => { const qv = Number(ui.policyEdits.quotaValue) || 80000; ui.policyEdits.investors.push({ name: "Novo cotista", investedAt: new Date().toISOString().slice(0, 10), investment: qv, quotaValue: qv, status: "pendente" }); draw(target, w); };
+    if ($("#pmInvAdd")) $("#pmInvAdd").onclick = () => { const qv = Number(ui.policyEdits.quotaValue) || window.UBY_CONFIG.quotaValueDefault; ui.policyEdits.investors.push({ name: "Novo cotista", investedAt: new Date().toISOString().slice(0, 10), investment: qv, quotaValue: qv, status: "pendente" }); draw(target, w); };
     target.querySelectorAll("[data-inv-del]").forEach(b => b.onclick = () => { const i = Number(b.dataset.invDel); if (confirm(`Remover ${ui.policyEdits.investors[i].name} da lista de cotistas?`)) { ui.policyEdits.investors.splice(i, 1); draw(target, w); } });
     if ($("#pmPolReset")) $("#pmPolReset").onclick = () => { ui.policyEdits = null; draw(target, w); };
     if ($("#pmPolSave")) $("#pmPolSave").onclick = () => run(target, w, "Política de cotas", async () => {

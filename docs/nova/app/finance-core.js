@@ -291,8 +291,10 @@
   */
   function network(monthly, policy = {}, fixes = FIXES_OFF) {
     const legalPct = num(policy.legalReservePct), expPct = num(policy.expansionReservePct), invPct = num(policy.investorPct);
-    const start = policy.distributionStartMonth || "2026-06";
-    const quotaValue = num(policy.quotaValue) || 80000;
+    const defaults = global.UBY_CONFIG;
+    if (!defaults) throw new Error("app/config.js não foi carregado (padrões da plataforma).");
+    const start = policy.distributionStartMonth || defaults.distributionStartDefault;
+    const quotaValue = num(policy.quotaValue) || defaults.quotaValueDefault;
     // Impostos da UBY sobre tudo o que foi faturado no mês (ativos próprios + royalties):
     // percentual da política ou valor exato lançado para a competência (guia paga).
     const taxPct = num(policy.taxRatePct);
