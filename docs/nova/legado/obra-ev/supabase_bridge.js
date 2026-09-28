@@ -84,6 +84,15 @@
     tables: { uby_financial_matrix: ["upsert"], app_audit_log: ["insert"] },
     rpcs: []
   };
+  // NOVA PLATAFORMA (usuário: "15. arrume" — backups sem depender da antiga):
+  // restaurar uma versão da base de recargas (RPC atômica, que guarda a versão
+  // atual antes) ou uma versão da matriz financeira (o gatilho do banco guarda a
+  // atual no histórico). Só no quadro oculto da tela Backups (#/backups).
+  const BACKUPS_SCOPE = {
+    name: "backups",
+    tables: { uby_financial_matrix: ["upsert"], app_audit_log: ["insert"] },
+    rpcs: ["restore_recharge_snapshot_atomic"]
+  };
   const OBRAS_PAGES = /\/legado\/(obra-ev\/(index\.html|gestao_obra_ev_detalhe\.html|mapa-implantacao\.html|engenharia\.html)?|tarefas\/(index\.html)?)$/;
   const OBRAS_ROUTES = /^#\/((obras-classico|mapa-classico|engenharia|tarefas-classico)(\/|$)|abrir\/legado(%2F|\/)obra-ev(%2F|\/)gestao_obra_ev_detalhe)/i;
   function writeScope() {
@@ -95,6 +104,7 @@
       if (embedded && params.get("nova_params") === "1" && /^#\/parametros/.test(hash)) return PARAMS_SCOPE;
       const frameId = (window.frameElement && window.frameElement.id) || "";
       if (embedded && frameId === "classicFrame" && OBRAS_PAGES.test(location.pathname) && OBRAS_ROUTES.test(hash)) return OBRAS_SCOPE;
+      if (embedded && frameId === "backupsFrame" && /\/legado\/obra-ev\/backups-gravacao\.html$/.test(location.pathname) && params.get("nova_backups") === "1" && /^#\/backups(\/|$)/.test(hash)) return BACKUPS_SCOPE;
       // Obras editadas na tela nova (#/obras): quadro de edição dedicado.
       if (embedded && frameId === "obrasEditFrame" && /\/legado\/obra-ev\/motor-obras\.html$/.test(location.pathname) && params.get("nova_obras") === "1" && /^#\/obras(\/|$)/.test(hash)) return OBRAS_SCOPE;
       if (embedded && frameId === "clubFrame" && /\/legado\/obra-ev\/clube-gravacao\.html$/.test(location.pathname) && /^#\/clube(\/|$)/.test(hash)) return CLUB_SCOPE;
@@ -1359,6 +1369,46 @@
     await insertAuditLog(sb, user, { modulo: "financeiro", entidadeTipo: "uby_documentos", entidadeId: data.id, acao: "publish_document", resumo: { tipo: doc.tipo, competencia: doc.competencia, versao, destinatario: email || "" } });
     return data;
   }
+  // Versões anteriores da matriz financeira (gatilho do banco, banco/01_*.sql).
+  async function listMatrixHistory(matrixId = "shared-costs", limit = 60) {
+    const sb = client();
+    if (!sb || !(await currentUser())) return [];
+    const { data, error } = await sb.from("uby_financial_matrix_historico").select("id,matrix_id,acao,payload,updated_at_anterior,usuario_email,created_at")
+      .eq("matrix_id", String(matrixId)).order("created_at", { ascending: false }).limit(Math.min(200, Number(limit) || 60));
+    if (error) {
+      if (/uby_financial_matrix_historico|relation|schema cache/i.test(error.message || "")) { const e = new Error("O histórico da matriz ainda não foi ativado no banco (rodar banco/01_protecao_27092026.sql)."); e.code = "UBY_NO_MATRIX_HISTORY"; throw e; }
+      throw error;
+    }
+    return data || [];
+  }
+  async function restoreMatrixVersion(historyId) {
+    const sb = client();
+    const user = await currentUser();
+    if (!sb || !user) throw new Error("Entre na plataforma antes de restaurar.");
+    const { data: ver, error } = await sb.from("uby_financial_matrix_historico").select("id,matrix_id,payload,created_at").eq("id", historyId).maybeSingle();
+    if (error || !ver) throw new Error("Versão não encontrada. Nada foi restaurado.");
+    if (!ver.payload || typeof ver.payload !== "object") throw new Error("Versão vazia. Nada foi restaurado.");
+    const { error: upError } = await sb.from("uby_financial_matrix").upsert({ id: ver.matrix_id, payload: ver.payload, updated_by: user.id, updated_at: new Date().toISOString() }, { onConflict: "id" });
+    if (upError) throw upError;
+    await insertAuditLog(sb, user, { modulo: "financeiro", entidadeTipo: "uby_financial_matrix", entidadeId: ver.matrix_id, acao: "restore_matrix_version", resumo: { historyId, versionFrom: ver.created_at } });
+    return { matrixId: ver.matrix_id, restoredFrom: ver.created_at };
+  }
+  // Backup diário automático (obra_snapshots, origem automatic_daily_database_backup).
+  async function listPlatformSnapshots(limit = 30) {
+    const sb = client();
+    if (!sb || !(await currentUser())) return [];
+    const { data, error } = await sb.from("obra_snapshots").select("id,origin,keys_count,created_at").order("created_at", { ascending: false }).limit(Math.min(120, Number(limit) || 30));
+    if (error) throw error;
+    return data || [];
+  }
+  async function platformSnapshot(id) {
+    const sb = client();
+    if (!sb || !(await currentUser())) throw new Error("Entre na plataforma.");
+    const { data, error } = await sb.from("obra_snapshots").select("id,origin,created_at,payload").eq("id", String(id)).maybeSingle();
+    if (error || !data) throw new Error("Backup não encontrado.");
+    return data;
+  }
+
   async function revokeDocument(id) {
     const sb = client();
     const user = await currentUser();
@@ -1435,7 +1485,7 @@
   }
 
   window.UBY_SUPABASE = {
-    listDocuments, documentHtml, publishDocument, revokeDocument,
+    listDocuments, documentHtml, publishDocument, revokeDocument, listMatrixHistory, restoreMatrixVersion, listPlatformSnapshots, platformSnapshot,
     _merge3: (base, local, cloud) => { const conflicts = []; const merged = merge3(base, local, cloud, "", conflicts); return { merged, conflicts }; },
     configured,
     client,

@@ -11,7 +11,8 @@
       { id: "lancamentos", icon: "＋", label: "Central de lançamentos", type: "view" },
       // Única área com gravação liberada: importações (ver supabase_bridge.js).
       { id: "importar", icon: "⇪", label: "Importar planilhas", type: "view" },
-      { id: "importar-original", icon: "⟲", label: "Importação · backups e opções avançadas", type: "classic", src: LEGACY + "recargas.html?nova_import=1", tab: "detalhes", writes: true }
+      { id: "backups", icon: "⛁", label: "Backups e restauração", type: "view" },
+      { id: "importar-original", icon: "⟲", label: "Importação · opções avançadas (original)", type: "classic", src: LEGACY + "recargas.html?nova_import=1", tab: "detalhes", writes: true }
     ] },
     { label: "VISÃO E ESTRUTURA", items: [
       { id: "avisos", icon: "🔔", label: "Avisos e contas a vencer", type: "view" },
