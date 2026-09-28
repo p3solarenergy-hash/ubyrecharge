@@ -15,7 +15,7 @@
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Poppins:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="app/app.css?v=8">
+  <link rel="stylesheet" href="app/app.css?v=9">
   <script>
     // Sem sessao, vai direto para o login novo.
     (function () {
@@ -47,7 +47,7 @@
         <div class="top-actions">
           <label id="periodWrap" hidden><select class="select" id="periodSelect" aria-label="Período" autocomplete="off"></select></label>
           <a class="btn primary hide-sm link-btn" href="#/lancamentos">＋ Lançar</a>
-          <span class="pill ro hide-sm" title="Nenhuma gravação é enviada ao Supabase a partir desta versão local."><i class="dot"></i>Somente leitura</span>
+          <a class="btn alert-bell" id="alertBell" href="#/avisos" title="Avisos e contas a vencer" aria-label="Avisos e contas a vencer">🔔<b hidden>0</b></a>
           <span class="pill warn hide-sm" id="dataStatus"><i class="dot"></i><span>Conectando…</span></span>
           <button class="btn" id="refreshButton" type="button" title="Recarregar dados do Supabase">↻</button>
         </div>
@@ -66,7 +66,7 @@
   <iframe id="motorFrame" title="Motor de cálculo" aria-hidden="true" tabindex="-1"></iframe>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="app/shell.js?v=9"></script>
+  <script src="app/shell.js?v=10"></script>
   <script src="app/views/resumo.js?v=2"></script>
   <script src="app/views/modelo.js?v=1"></script>
   <script src="app/views/comando.js?v=8"></script>
@@ -79,6 +79,7 @@
   <script src="app/views/uso.js?v=4"></script>
   <script src="app/views/configuracao.js?v=2"></script>
   <script src="app/views/tarefas.js?v=2"></script>
+  <script src="app/views/avisos.js?v=1"></script>
   <script src="app/views/mapa.js?v=1"></script>
   <script src="app/views/importar.js?v=5"></script>
   <script src="app/views/analisadores.js?v=2"></script>

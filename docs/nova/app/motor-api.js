@@ -1944,7 +1944,109 @@
     return out;
   }
 
-  window.UBY_MOTOR_API = { waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
+  // ---------------------------------------------------------------------
+  // Central de avisos (27/09/2026). Contas a pagar em primeiro lugar (usuário:
+  // "crie mais na parte de contas a vencer"), depois operação e fechamentos.
+  // Só lê o que as outras telas já calculam (payments, investorDistribution, v2).
+  // ---------------------------------------------------------------------
+  function alerts(nowIso) {
+    fv2Ensure();
+    const now = nowIso ? new Date(nowIso) : new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const DAY = 86400000;
+    const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const mkOf = d => ymd(d).slice(0, 7);
+    const addMonths = (mk, n) => { const [y, m] = mk.split("-").map(Number); return mkOf(new Date(y, m - 1 + n, 1)); };
+    const cur = mkOf(today);
+    const prev = addMonths(cur, -1);
+    const n1 = v => String(Math.round(v * 10) / 10).replace(".", ",");
+    const items = [];
+    const add = (level, kind, title, detail, link, extra = {}) => items.push({ id: `${kind}-${items.length}`, level, kind, title, detail, link, ...extra });
+
+    // 1) Contas: 3 meses para trás (vencidas e não marcadas como pagas) até o próximo mês.
+    const bills = [];
+    const seen = new Set();
+    [-3, -2, -1, 0, 1].forEach(off => {
+      const mk = addMonths(cur, off);
+      let list = [];
+      try { list = payments(mk).list; } catch (_) { return; }
+      list.forEach(p => {
+        if (p.status === "paid" || !(Number(p.amount) > 0)) return;
+        const key = `${p.id}|${mk}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const raw = String(p.due || "");
+        const due = raw.length === 10 ? new Date(`${raw}T12:00:00`) : new Date(raw);
+        if (Number.isNaN(due.getTime())) return;
+        const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+        const days = Math.round((dueDay - today) / DAY);
+        if (days > 45) return;
+        const bucket = days < 0 ? "vencida" : days === 0 ? "hoje" : days <= 3 ? "3dias" : days <= 7 ? "7dias" : mkOf(dueDay) === cur ? "mes" : "proximo";
+        bills.push({ id: p.id, name: p.name, category: p.category, supplier: p.supplier, station: p.station, workName: p.workName, source: p.source,
+          amount: Number(p.amount) || 0, dueDate: ymd(dueDay), days, bucket, monthKey: mk });
+      });
+    });
+    bills.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || b.amount - a.amount);
+    const BUCKETS = ["vencida", "hoje", "3dias", "7dias", "mes", "proximo"];
+    const totals = Object.fromEntries(BUCKETS.map(b => [b, { count: 0, amount: 0 }]));
+    bills.forEach(b => { totals[b.bucket].count += 1; totals[b.bucket].amount += b.amount; });
+    const nextBill = bills.find(b => b.days >= 0) || null;
+
+    // 2) Distribuição aos cotistas: aprovada e ainda não paga; meses sem imposto lançado.
+    let inv = null;
+    try { inv = investorDistribution(); } catch (_) {}
+    (inv?.months || []).forEach(m => {
+      if (m.status === "aprovado" && !m.paidAt && m.investorPool > 0) {
+        add("atencao", "cotistas", `Distribuição de ${m.label} aprovada e não paga`, `${m.eligibleQuotas} cota(s) · R$ ${n1(m.perQuota)} por cota`, "#/parametros/fechamentos", { amount: m.investorPool });
+      }
+      if (m.key <= prev && /sem imposto/.test(m.taxSource || "") && m.status !== "pago") {
+        add("atencao", "fechamento", `Impostos de ${m.label} não lançados`, "O resultado dos cotistas sai sem imposto até ser lançado em Parâmetros → Cotas, impostos e rodadas.", "#/parametros/cotas");
+      }
+    });
+    const prevMonth = (inv?.months || []).find(m => m.key === prev);
+    if (prevMonth && prevMonth.status === "pendente" && today.getDate() >= 5) {
+      add(today.getDate() >= 15 ? "atencao" : "info", "fechamento", `Fechamento de ${prevMonth.label} ainda não aprovado`, "Aprovar congela os números do mês para relatórios e pagamentos.", "#/parametros/fechamentos");
+    }
+
+    // 3) Faturas de energia do mês passado que ainda são estimativa.
+    FV2.rows.filter(r => r.included).forEach(row => {
+      try {
+        const res = fv2Month(row, prev, ON());
+        if ((res.flags || []).includes("energia-estimada") && res.sessions > 0) {
+          add("info", "energia", `Fatura de energia de ${monthLabel(prev)} não lançada · ${row.stationName || row.station}`, "O custo de energia dos dias sem fatura está estimado. Lance a fatura (pode ler o PDF da Copel).", "#/parametros/energia");
+        }
+      } catch (_) {}
+    });
+
+    // 4) Importações e carregadores parados.
+    const lastOf = row => (row.charges || []).reduce((t, c) => Math.max(t, (c.endDate || c.startDate)?.getTime?.() || 0), 0);
+    const active = FV2.rows.filter(r => r.included && (r.charges || []).length);
+    const newest = active.reduce((t, r) => Math.max(t, lastOf(r)), 0);
+    const hoursNet = newest ? (now - newest) / 3600000 : null;
+    if (hoursNet !== null && hoursNet > 24) {
+      add(hoursNet > 48 ? "critico" : "atencao", "importacao", `Nenhuma recarga nova há ${Math.round(hoursNet)} h`, "As planilhas do dia provavelmente não foram importadas (Spott/Move). Importar em Entrada de dados → Importar planilhas.", "#/importar");
+    } else {
+      active.forEach(row => {
+        const last = lastOf(row);
+        if (!last) return;
+        const recent = row.charges.filter(c => (c.startDate?.getTime?.() || 0) > now - 30 * DAY).length / 30;
+        const limit = recent >= 3 ? 24 : recent >= 1 ? 48 : 96;
+        const hours = (now - last) / 3600000;
+        if (hours > limit) {
+          add(hours > limit * 2 ? "critico" : "atencao", "carregador", `${row.stationName || row.station} sem recargas há ${Math.round(hours)} h`,
+            `Média de ${n1(recent)} recarga(s) por dia nos últimos 30 dias. Confira se o carregador está ligado e disponível.`, `#/unidades/${encodeURIComponent(row.workId)}/${encodeURIComponent(row.stationName || row.station)}`);
+        }
+      });
+    }
+
+    const billLevel = b => (b.bucket === "vencida" || b.bucket === "hoje") ? "critico" : (b.bucket === "3dias" || b.bucket === "7dias") ? "atencao" : "info";
+    const counts = { critico: 0, atencao: 0, info: 0 };
+    bills.forEach(b => { counts[billLevel(b)] += 1; });
+    items.forEach(i => { counts[i.level] += 1; });
+    return { generatedAt: now.toISOString(), today: ymd(today), bills, totals, nextBill, items, counts, lastRecharge: newest ? new Date(newest).toISOString() : null };
+  }
+
+  window.UBY_MOTOR_API = { alerts, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,

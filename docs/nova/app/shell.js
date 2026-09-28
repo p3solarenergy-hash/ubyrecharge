@@ -14,6 +14,7 @@
       { id: "importar-original", icon: "⟲", label: "Importação · backups e opções avançadas", type: "classic", src: LEGACY + "recargas.html?nova_import=1", tab: "detalhes", writes: true }
     ] },
     { label: "VISÃO E ESTRUTURA", items: [
+      { id: "avisos", icon: "🔔", label: "Avisos e contas a vencer", type: "view" },
       { id: "resumo", icon: "⌂", label: "Resumo executivo", type: "view", period: true },
       { id: "modelo", icon: "◇", label: "Modelo operacional", type: "view" }
     ] },
@@ -198,11 +199,28 @@
       setStatus(`Dados reais · ${fmt.int(state.status.charges)} sessões · ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`, "");
       rerender();
       mark("tela2");
+      updateBell();
     } catch (err) {
       console.error(err);
       setStatus("Falha ao ler dados", "err");
       renderError(err);
     }
+  }
+
+  // Sino do topo: número de avisos urgentes + atenção (contas vencidas, que vencem
+  // em até 7 dias, carregadores parados, fechamentos). Clique abre #/avisos.
+  function updateBell() {
+    const bell = document.getElementById("alertBell");
+    if (!bell || !state.api?.alerts) return;
+    try {
+      const a = data("alerts");
+      const n = a.counts.critico + a.counts.atencao;
+      const badge = bell.querySelector("b");
+      badge.textContent = n > 99 ? "99+" : String(n);
+      badge.hidden = !n;
+      bell.classList.toggle("urgent", a.counts.critico > 0);
+      bell.title = `${a.counts.critico} urgente(s) · ${a.counts.atencao} de atenção${a.nextBill ? ` · próxima conta ${a.nextBill.dueDate.split("-").reverse().join("/")}` : ""}`;
+    } catch (err) { console.warn("[avisos]", err.message); }
   }
 
   function refreshMeta() {

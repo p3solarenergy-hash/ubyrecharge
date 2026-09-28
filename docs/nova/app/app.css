@@ -551,3 +551,8 @@ html[data-theme="night"] .tabbar{background:rgba(12,26,48,.97)}
 html[data-theme="night"] .tabbar .on{color:#F5F7FA}
 html[data-theme="night"] .tabbar .on i{color:var(--uby-forest)}
 html[data-theme="night"] .install-btn{color:var(--uby-forest);border-color:rgba(0,255,133,.35)}
+
+/* Sino de avisos (27/09/2026) */
+.alert-bell{position:relative;text-decoration:none}
+.alert-bell b{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--uby-amber);color:#1b1b1b;font-size:10px;line-height:18px;text-align:center}
+.alert-bell.urgent b{background:var(--uby-red);color:#fff}
