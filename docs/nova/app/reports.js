@@ -227,6 +227,7 @@
         <tr><td>Percentual contratado</td><td class="n">${fmt.pct(m.areaPct)}</td></tr>
         <tr><td>Base do percentual</td><td class="n">${fmt.brl(m.revenue)}</td></tr>
         <tr class="t"><td>Participação</td><td class="n">${fmt.brl(m.area)}</td></tr>
+        ${m.adjusted && m.adjustment ? `<tr><td>Ajuste${m.adjustNote ? ` · ${esc(m.adjustNote)}` : ""}</td><td class="n">${fmt.brl(m.adjustment)}</td></tr>` : ""}
         <tr class="t"><td>Total a repassar no período</td><td class="n">${fmt.brl(m.total)}</td></tr>
       </tbody></table>
       <h2>Acumulado do ponto</h2>

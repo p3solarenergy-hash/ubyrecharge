@@ -1504,13 +1504,17 @@
     const stationName = row.stationName || row.station;
     const courtesy = courtesyFinanceBreakdown(charges, stationAvailabilityFor(row.workId, stationName, row.workName), cfg.energyCostPerKWh);
     const planning = financePlanningContext(charges, mk, cfg, row.charges || [], workPowerById(row.workId));
+    // Valor do repasse ao local ajustado à mão em Parâmetros · Área (substitui o calculado no resultado).
+    const areaCfg = fv2AreaConfig(row);
+    const areaAdj = areaCfg?.adjust?.[mk];
+    const areaAdjust = areaAdj && Number.isFinite(Number(areaAdj.total)) ? { total: Number(areaAdj.total), reimburse: !!areaCfg.reimburseEnergy } : null;
     const result = CORE().computeMonth({
       monthKey: mk, model: cfg.operationModel, cfg,
       revenue: charges.reduce((s, c) => s + c.revenue, 0), energy: charges.reduce((s, c) => s + c.energyKWh, 0),
       acRevenue: charges.filter(c => chargerKind(c) === "ac").reduce((s, c) => s + c.revenue, 0),
       dcRevenue: charges.filter(c => chargerKind(c) === "dc").reduce((s, c) => s + c.revenue, 0),
       courtesy: { treatment: courtesy.treatment, energy: courtesy.energy, energyCost: courtesy.energyCost, commercialEnergy: courtesy.commercialEnergy, charges: courtesy.charges, revenue: courtesy.revenue },
-      planning, matrixItems: fv2MatrixItems(row, mk, fixes), energyInvoice
+      planning, matrixItems: fv2MatrixItems(row, mk, fixes), energyInvoice, areaAdjust
     }, fixes);
     result.flags = flags;
     result.sessions = charges.length;
@@ -1885,17 +1889,24 @@
       const first = dates[0] && dates[0] > monthStart && mk === rowFirstMonth(row) ? dates[0] : monthStart;
       const energy = n0(r.commercialEnergy ?? r.energy);
       const reimbursement = reimburse ? Math.round(n0(r.energyCost) * 100) / 100 : 0;
-      const area = Math.round(n0(r.areaParticipation) * 100) / 100;
+      // Base calculada (% × faturamento); o ajuste manual, se houver, fica em total/adjustment.
+      const areaCalc = n0(r.areaParticipationCalc ?? r.areaParticipation);
+      const area = Math.round(areaCalc * 100) / 100;
       const due = `${nextMonth(mk)}-${String(dueDay).padStart(2, "0")}`;
       const paidAt = cfg.paid?.[mk] || "";
+      // Total = soma dos valores exatos, arredondada uma vez (como nas prestações de contas já enviadas).
+      const computedTotal = Math.round(((reimburse ? n0(r.energyCost) : 0) + areaCalc) * 100) / 100;
+      // Ajuste manual do valor a repassar (cfg.adjust[mês] = { total, note }): substitui o calculado.
+      const adj = cfg.adjust?.[mk];
+      const total = adj && Number.isFinite(Number(adj.total)) ? Math.round(Number(adj.total) * 100) / 100 : computedTotal;
       return { key: mk, label: monthLabel(mk), periodStart: iso(first), periodEnd: iso(monthEnd), revenue: n0(r.totalRevenue), energy, rate: energy > 0 ? n0(r.energyCost) / energy : 0,
-        // Total = soma dos valores exatos, arredondada uma vez (como nas prestações de contas já enviadas).
-        reimbursement, reimbursementExact: reimburse ? n0(r.energyCost) : 0, areaExact: n0(r.areaParticipation), areaPct: n0(r.areaSharePct), areaMode: "gross", area, total: Math.round(((reimburse ? n0(r.energyCost) : 0) + n0(r.areaParticipation)) * 100) / 100, due, paidAt,
+        reimbursement, reimbursementExact: reimburse ? n0(r.energyCost) : 0, areaExact: areaCalc, areaPct: n0(r.areaSharePct), areaMode: "gross", area, total, due, paidAt,
+        computedTotal, adjusted: !!adj, adjustment: Math.round((total - computedTotal) * 100) / 100, adjustNote: adj?.note || "",
         status: paidAt ? "pago" : (new Date(`${due}T23:59:59`) < new Date() ? "vencido" : "a pagar") };
     }).filter(m => m.total > 0 || m.revenue > 0);
     const sum = k => months.reduce((s, m) => s + n0(m[k]), 0);
     return { workId: row.workId, workName: row.workName, station: row.stationName || row.station, kind: row.kind,
-      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, configured: !!fv2AreaConfig(row) },
+      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, adjust: cfg.adjust || {}, configured: !!fv2AreaConfig(row) },
       months, totals: { revenue: sum("revenue"), energy: sum("energy"), reimbursement: sum("reimbursement"), area: sum("area"), total: sum("total"),
         paid: months.filter(m => m.paidAt).reduce((s, m) => s + m.total, 0) } };
   }

@@ -192,7 +192,11 @@
     const preAreaNet = totalRevenue - management - platform - ubyRoyalty - costs;
     const areaEligible = model === "uby" || model === "hybrid";
     const areaSharePct = cfg.ownerTransferMode === "net" ? num(cfg.ownerNetProfitSharePct) : num(cfg.ownerRevenueSharePct);
-    const areaParticipation = areaEligible ? totalRevenue * areaSharePct / 100 : 0;
+    const areaParticipationCalc = areaEligible ? totalRevenue * areaSharePct / 100 : 0;
+    // Ajuste manual do repasse ao local (valor final pago): a diferença entra na participação
+    // da área; o reembolso de energia, quando há, já está no custo de energia.
+    const adj = input.areaAdjust;
+    const areaParticipation = areaEligible && adj && Number.isFinite(Number(adj.total)) ? num(adj.total) - (adj.reimburse ? energyCost : 0) : areaParticipationCalc;
     const operationNet = preAreaNet - areaParticipation;
 
     const splitNet = part => {
@@ -235,7 +239,7 @@
       revenue, chargingRevenue: revenue, energy, commercialEnergy, acRevenue, dcRevenue,
       extraRevenue, marketingRevenue, totalRevenue,
       management, platform, ubyRoyalty, taxes, energyCost, energyComposition: comp, courtesyInvoiceExcluded,
-      localExtraCosts, matrizCost, matrizTaxCost, matrizCash, extraCosts, areaSharePct, areaParticipation,
+      localExtraCosts, matrizCost, matrizTaxCost, matrizCash, extraCosts, areaSharePct, areaParticipation, areaParticipationCalc,
       preAreaNet, operationNet, acNet, dcNet, unknownNet,
       ubyNet, p3SocietyProfit, p3AcEquity: model === "hybrid" ? acNet * num(cfg.p3AcEquityPct) / 100 : 0, p3DcEquity: model === "hybrid" ? dcNet * num(cfg.p3DcEquityPct) / 100 : 0,
       partnerShare, p3Gross: management + p3SocietyProfit, p3OperationalResult, ownResult,
