@@ -26,7 +26,7 @@
     return `
       <div class="hero"><div><p class="eyebrow">Gestão de obras · base oficial</p><h1>Obras</h1>
         <p class="lead">Da prospecção ao comissionamento: avanço, potência, pendências críticas, prazos de entrega e tarefas da equipe. Clique em uma obra para abrir o detalhe completo.</p></div>
-        <div class="callout"><strong>${fmt.int(s.criticalAlerts)} alerta(s) de prazo exigem ação</strong><small>${fmt.int(s.lateTasks)} tarefa(s) atrasada(s) e ${fmt.int(s.lateDeliveries)} entrega(s) vencida(s). Nova obra, fases e tarefas: <a href="#/obras-classico">Obras · cadastro e edição</a>.</small></div></div>
+        <div class="callout"><strong>${fmt.int(s.criticalAlerts)} alerta(s) de prazo exigem ação</strong><small>${fmt.int(s.lateTasks)} tarefa(s) atrasada(s) e ${fmt.int(s.lateDeliveries)} entrega(s) vencida(s). Para editar, abra a obra: tarefas, pendências e documentos gravam direto.</small></div></div>
       <section class="section"><div class="grid g5">
         ${kpi("Obras ativas", fmt.int(s.count), "no painel (arquivadas fora)", "", "lead")}
         ${kpi("Avanço médio", `${s.avgPct}%`, "tarefas OK + N/A")}
@@ -35,7 +35,18 @@
         ${kpi("Alertas de prazo", fmt.int(s.criticalAlerts), "atrasos, entregas vencidas, alta prioridade", "", s.criticalAlerts ? "bad" : "")}
       </div></section>
       <div class="toolbar"><div class="seg" id="obTabs">${TABS.map(([id, l]) => `<button data-tab="${id}" class="${tab === id ? "on" : ""}">${l}</button>`).join("")}</div>
-        <span class="spacer"></span><button class="btn" id="obRefresh" title="Reler obras e tarefas no Supabase">↻ Atualizar obras</button></div>`;
+        <span class="spacer"></span><button class="btn primary" id="obNew" type="button">＋ Nova obra</button><button class="btn" id="obRefresh" title="Reler obras e tarefas no Supabase">↻ Atualizar obras</button></div>
+      ${edit.newObra ? `<section class="section"><div class="section-head"><div><p class="kicker">Cadastro</p><h2>Nova obra</h2><p>Cria a obra com o checklist padrão de fases (documentação, concessionária, projeto, orçamentos, materiais, obras civil e elétrica, instalação e operação assistida). <span id="obEditStatus">${statusLine()}</span></p></div></div>
+        <form id="obNewForm" class="grid g4" style="gap:10px">
+          <label>Nome da obra<input class="search" name="nome" required></label>
+          <label>Cliente<input class="search" name="cliente"></label>
+          <label>Local (cidade - UF)<input class="search" name="local"></label>
+          <label>Etapa<select class="select" name="status">${opt(STAGES.map(v => [v, v]), "Prospecção / Estudo")}</select></label>
+          <label>Carregadores (quantidade)<input class="search" type="number" min="1" name="qtd" value="1"></label>
+          <label>Potência de cada (kW)<input class="search" type="number" min="1" name="kw" value="60"></label>
+          <label>Entrega prevista<input class="search" type="date" name="entrega"></label>
+          <div style="display:flex;align-items:end;gap:8px"><button class="btn primary" type="submit">Criar obra</button><button class="btn" type="button" id="obNewCancel">Cancelar</button></div>
+        </form></section>` : ""}`;
   }
 
   function portfolio() {
@@ -136,6 +147,38 @@
   const statusBadge = s => ({ done: "ok", na: "neutral", doing: "warn", pending: "bad" }[s] || "neutral");
   let obraCache = new Map();
 
+  // ---------- Edição na própria tela (grava na base real, relendo a obra antes) ----------
+  const TASK_STATUS = [["pending", "Pendente"], ["doing", "Em andamento"], ["done", "Concluído"], ["na", "Não se aplica"]];
+  const PEND_STATUS = ["Pendente", "Aguardando terceiro", "Em andamento", "Concluida"];
+  const edit = { busy: false, msg: "", err: "", openTask: "", showForm: false, newObra: false };
+  const uid = p => `${p}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const opt = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`).join("");
+  const statusLine = () => edit.busy ? '<span class="badge warn">gravando…</span>' : edit.err ? `<span class="badge bad">${esc(edit.err)}</span>` : edit.msg ? `<span class="badge ok">${esc(edit.msg)}</span>` : "";
+  async function save(target, id, tab, ops, note) {
+    if (edit.busy) return;
+    edit.busy = true; edit.err = ""; edit.msg = "";
+    const box = target.querySelector("#obEditStatus"); if (box) box.innerHTML = statusLine();
+    try {
+      const api = await UBY.obrasEdit();
+      await api.editObra(id, ops, note);
+      edit.msg = `Salvo na base às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+      snap = null; obraCache.delete(id);
+      await UBY.obras(true).catch(() => {});
+    } catch (err) { edit.err = err.message || String(err); }
+    edit.busy = false;
+    render(target, ["obra", id, tab]);
+  }
+  async function uploadDoc(target, id, nome, docId, file) {
+    edit.busy = true; edit.err = ""; const box = target.querySelector("#obEditStatus"); if (box) box.innerHTML = statusLine();
+    try {
+      await UBY.obrasEdit();
+      const w = document.getElementById("obrasEditFrame").contentWindow;
+      const up = await w.UBY_SUPABASE.uploadDocumentFile(id, nome, docId, file);
+      edit.busy = false;
+      return save(target, id, "documentos", [{ set: ["documents", { id: docId }], value: { status: "done", link: up.link, fileName: up.fileName, storagePath: up.storagePath } }], { type: "document", title: "Documento anexado", after: up.fileName });
+    } catch (err) { edit.busy = false; edit.err = err.message || String(err); render(target, ["obra", id, "documentos"]); }
+  }
+
   function obraView(target, id, tab) {
     if (!obraCache.has(id)) {
       obraCache.set(id, null);
@@ -151,6 +194,21 @@
     let body = "";
     if (tab === "geral") {
       body = `
+        <section class="section"><div class="section-head"><div><p class="kicker">Cadastro</p><h2>Dados da obra</h2><p>Nome, cliente, local, etapa, carregadores e entrega. A etapa e a potência atualizam o portfólio.</p></div>
+          <button class="btn" id="obToggleForm" type="button">${edit.showForm ? "Fechar" : "✎ Editar dados"}</button></div>
+          ${edit.showForm ? `<form id="obForm" class="grid g4" style="gap:10px">
+            <label>Nome da obra<input class="search" name="obraNome" value="${esc(o.nome)}" required></label>
+            <label>Cliente<input class="search" name="cliente" value="${esc(o.cliente)}"></label>
+            <label>Local<input class="search" name="local" value="${esc(o.local)}"></label>
+            <label>Etapa<select class="select" name="statusExec">${opt(STAGES.map(v => [v, v]), o.status)}</select></label>
+            <label>Carregadores (quantidade)<input class="search" type="number" min="1" name="qtdCarregadores" value="${o.qtd || 1}"></label>
+            <label>Potência de cada (kW)<input class="search" type="number" min="1" name="potenciaCarregador" value="${o.kw || 60}"></label>
+            <label>Entrega prevista<input class="search" type="date" name="entrega" value="${esc(o.entrega || "")}"></label>
+            <label>Planilha da obra (link)<input class="search" name="obraSheetUrl" value="${esc(o.sheetUrl || "")}"></label>
+            <div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="submit">Salvar dados</button>
+              <span class="spacer"></span><button class="btn" type="button" id="obArchive" style="color:var(--uby-red)">Arquivar obra</button></div>
+          </form>` : `<div class="grid g4">${mini("Cliente", esc(o.cliente || "—"))}${mini("Local", esc(o.local || "—"))}${mini("Carregadores", `${o.qtd} × ${o.kw} kW`)}${mini("Entrega", o.entrega ? fmt.date(o.entrega + "T12:00:00") : "—")}</div>`}
+        </section>
         <div class="grid g6" style="margin-bottom:18px">
           ${kpi("Avanço", `${s.pct}%`, `${s.done} OK · ${s.na} N/A de ${s.total} tarefas`, "", "lead big")}
           ${kpi("Em andamento", fmt.int(s.doing), `${fmt.int(s.pending)} pendente(s)`, "", s.doing ? "warn" : "")}
@@ -176,21 +234,41 @@
     } else if (tab === "fases") {
       body = o.phases.map(ph => `
         <section class="section"><div class="section-head"><div><p class="kicker">${esc(ph.owner)}</p><h2>${esc(ph.name)}${ph.critical ? ' <span class="badge warn">fase crítica</span>' : ""}</h2></div><div class="meta"><strong>${ph.stats.pct}%</strong> · ${ph.stats.done} OK · ${ph.stats.na} N/A · ${ph.stats.doing} em andamento · ${ph.stats.pending} pendente(s)</div></div>
-          <div class="table-wrap"><table><thead><tr><th>Tarefa</th><th>Situação</th><th>Protocolo</th><th>Pedido</th><th>Previsão</th><th>Observação</th></tr></thead>
-            <tbody>${ph.tasks.map(t => `<tr class="${t.status === "done" || t.status === "na" ? "muted" : ""}"><td style="white-space:normal"><strong>${esc(t.title)}</strong></td><td><span class="badge ${statusBadge(t.status)}">${esc(t.statusLabel)}</span></td>
-              <td>${esc(t.protocol || "—")}</td><td>${t.requestDate ? fmt.date(t.requestDate + "T12:00:00") : "—"}</td><td>${t.forecastDate ? fmt.date(t.forecastDate + "T12:00:00") : "—"}</td><td style="white-space:normal;min-width:180px"><small style="color:var(--uby-muted)">${esc(t.note)}</small></td></tr>`).join("")}</tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Tarefa</th><th>Situação</th><th>Protocolo</th><th>Pedido</th><th>Previsão</th><th>Observação</th><th></th></tr></thead>
+            <tbody>${ph.tasks.map(t => `<tr class="${t.status === "done" || t.status === "na" ? "muted" : ""}"><td style="white-space:normal"><strong>${esc(t.title)}</strong></td>
+              <td><select class="select" data-status-task="${esc(t.id)}" data-phase="${esc(ph.name)}" data-before="${esc(t.statusLabel)}" data-title="${esc(t.title)}" aria-label="Situação de ${esc(t.title)}">${opt(TASK_STATUS, t.status)}</select></td>
+              <td>${esc(t.protocol || "—")}</td><td>${t.requestDate ? fmt.date(t.requestDate + "T12:00:00") : "—"}</td><td>${t.forecastDate ? fmt.date(t.forecastDate + "T12:00:00") : "—"}</td><td style="white-space:normal;min-width:180px"><small style="color:var(--uby-muted)">${esc(t.note)}</small></td>
+              <td><button class="btn" type="button" data-open-task="${esc(t.id)}" title="Protocolo, datas e observação">✎</button></td></tr>
+              ${edit.openTask === t.id ? `<tr><td colspan="7"><form class="grid g4" data-task-form="${esc(t.id)}" data-phase="${esc(ph.name)}" style="gap:8px">
+                <label>Protocolo<input class="search" name="protocol" value="${esc(t.protocol)}"></label>
+                <label>Data do pedido<input class="search" type="date" name="requestDate" value="${esc(t.requestDate)}"></label>
+                <label>Previsão<input class="search" type="date" name="forecastDate" value="${esc(t.forecastDate)}"></label>
+                <label>Observação<input class="search" name="note" value="${esc(t.note)}"></label>
+                <div style="grid-column:1/-1;display:flex;gap:8px"><button class="btn primary" type="submit">Salvar tarefa</button><button class="btn" type="button" data-close-task>Cancelar</button></div></form></td></tr>` : ""}`).join("")}</tbody></table></div>
+          <form class="toolbar" data-add-task="${esc(ph.name)}" style="margin-top:8px"><input class="search" name="title" placeholder="Nova tarefa em ${esc(ph.name)}" style="flex:1"><button class="btn" type="submit">＋ Adicionar tarefa</button></form>
         </section>`).join("") || `<section class="section"><div class="note">Esta obra ainda não tem checklist de fases.</div></section>`;
     } else if (tab === "pendencias") {
       const open = o.pending.filter(i => i.status !== "Concluida"), done = o.pending.filter(i => i.status === "Concluida");
       const table = rows => `<div class="table-wrap"><table><thead><tr><th>Pendência</th><th>Responsável</th><th>Situação</th><th>Aguardando</th><th>Prazo</th></tr></thead><tbody>
         ${rows.map(i => `<tr><td style="white-space:normal"><strong>${esc(i.title)}</strong>${i.priority ? ` <span class="badge ${i.priority === "Alta" ? "bad" : "neutral"}">${esc(i.priority)}</span>` : ""}${i.note ? `<small>${esc(i.note)}</small>` : ""}</td><td>${esc(i.owner || "sem responsável")}</td>
-          <td>${esc(i.status)}${i.completedAt ? `<small>${fmt.date(i.completedAt)}</small>` : ""}</td><td>${esc(i.waitingOn || "—")}</td><td>${i.status === "Concluida" ? "—" : dayBadge(i.days)}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">Nada aqui.</td></tr>`}</tbody></table></div>`;
-      body = `<section class="section"><div class="section-head"><div><p class="kicker">Operação da obra</p><h2>Pendências abertas (${open.length})</h2></div></div>${table(open.sort((a, b) => (a.days ?? 99999) - (b.days ?? 99999)))}</section>
+          <td>${i.status === "Concluida" ? `${esc(i.status)}${i.completedAt ? `<small>${fmt.date(i.completedAt)}</small>` : ""}` : `<select class="select" data-pend="${esc(i.id)}" data-title="${esc(i.title)}">${opt(PEND_STATUS.map(v => [v, v === "Concluida" ? "Concluída ✓" : v]), i.status)}</select>`}</td><td>${esc(i.waitingOn || "—")}</td><td>${i.status === "Concluida" ? "—" : dayBadge(i.days)}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">Nada aqui.</td></tr>`}</tbody></table></div>`;
+      body = `<section class="section"><div class="section-head"><div><p class="kicker">Nova pendência</p><h2>Registrar pendência</h2></div></div>
+          <form id="obPendForm" class="grid g4" style="gap:8px">
+            <label style="grid-column:span 2">Pendência<input class="search" name="title" required></label>
+            <label>Responsável<input class="search" name="owner"></label>
+            <label>Prazo<input class="search" type="date" name="due"></label>
+            <label>Prioridade<select class="select" name="priority">${opt([["Alta", "Alta"], ["Media", "Média"], ["Baixa", "Baixa"]], "Media")}</select></label>
+            <label>Situação<select class="select" name="status">${opt(PEND_STATUS.slice(0, 3).map(v => [v, v]), "Pendente")}</select></label>
+            <label>Aguardando<input class="search" name="waitingOn" placeholder="ex.: Copel, cliente"></label>
+            <label>Observação<input class="search" name="note"></label>
+            <div style="grid-column:1/-1"><button class="btn primary" type="submit">＋ Registrar pendência</button></div></form></section>
+        <section class="section"><div class="section-head"><div><p class="kicker">Operação da obra</p><h2>Pendências abertas (${open.length})</h2></div></div>${table(open.sort((a, b) => (a.days ?? 99999) - (b.days ?? 99999)))}</section>
         <details class="section"><summary style="cursor:pointer;font-weight:850;color:var(--uby-forest)">Concluídas (${done.length})</summary><div style="margin-top:10px">${table(done)}</div></details>`;
     } else if (tab === "documentos") {
       body = `<section class="section"><div class="section-head"><div><p class="kicker">Arquivos da obra</p><h2>Documentos (${o.docsOk} de ${o.documents.length} recebidos)</h2></div></div>
         <div class="table-wrap"><table><thead><tr><th>Documento</th><th>Fase</th><th>Situação</th><th>Responsável</th><th>Validade / prazo</th><th>Link</th></tr></thead>
-          <tbody>${o.documents.map(d => `<tr><td><strong>${esc(d.name)}</strong>${d.fileName ? `<small>${esc(d.fileName)}</small>` : ""}</td><td>${esc(d.phase)}</td><td><span class="badge ${statusBadge(d.status)}">${esc(d.statusLabel)}</span></td><td>${esc(d.owner || "—")}</td>
+          <tbody>${o.documents.map(d => `<tr><td><strong>${esc(d.name)}</strong>${d.fileName ? `<small>${esc(d.fileName)}</small>` : ""}<label class="btn" style="margin-top:6px;display:inline-flex;cursor:pointer">📎 Anexar<input type="file" data-doc-file="${esc(d.id)}" hidden></label></td><td>${esc(d.phase)}</td>
+            <td><select class="select" data-doc-status="${esc(d.id)}" data-title="${esc(d.name)}">${opt(TASK_STATUS.map(([v, l]) => [v, v === "done" ? "Recebido" : l]), d.status)}</select></td><td>${esc(d.owner || "—")}</td>
             <td>${d.due ? fmt.date(d.due + "T12:00:00") : "—"}</td><td>${/^https?:\/\//.test(d.link) ? `<a href="${esc(d.link)}" target="_blank" rel="noopener">abrir ↗</a>` : esc(d.link || "—")}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">Nenhum documento cadastrado.</td></tr>`}</tbody></table></div></section>`;
     } else if (tab === "prospeccao") {
       const pr = o.prospecting;
@@ -207,11 +285,66 @@
     target.innerHTML = `
       <p style="margin:0 0 12px"><a href="#/obras" style="font-weight:800;font-size:12px">← Obras</a></p>
       <div class="hero"><div><p class="eyebrow">Obra · ${esc(o.stage)}</p><h1>${esc(o.nome)}</h1><p class="lead">${esc(o.cliente)} · ${esc(o.local)}</p></div>
-        <div class="callout"><strong>${esc(o.status)} · ${s.pct}% concluída</strong><small>Para marcar tarefas, anexar documentos ou registrar pendências: <a href="#" id="openLegacyObra">editar esta obra ✎</a> (grava na base real)${o.sheetUrl ? ` · <a href="${esc(o.sheetUrl)}" target="_blank" rel="noopener">planilha da obra ↗</a>` : ""}</small></div></div>
+        <div class="callout"><strong>${esc(o.status)} · ${s.pct}% concluída</strong><small>Edite aqui mesmo: dados, tarefas, pendências e documentos gravam direto na base. <span id="obEditStatus">${statusLine()}</span><br><a href="#" id="openLegacyObra">abrir a tela original</a>${o.sheetUrl ? ` · <a href="${esc(o.sheetUrl)}" target="_blank" rel="noopener">planilha da obra ↗</a>` : ""}</small></div></div>
       <div class="toolbar"><div class="seg" id="obraTabs">${OBRA_TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
       ${body}`;
     target.querySelectorAll("#obraTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/obra/${encodeURIComponent(id)}/${b.dataset.tab}`));
     target.querySelector("#openLegacyObra").onclick = e => { e.preventDefault(); UBY.openLegacy(detailSrc(id), `Obra · ${o.nome}`); };
+    bindEdit(target, id, tab, o);
+  }
+
+  function bindEdit(target, id, tab, o) {
+    const q = sel => target.querySelector(sel);
+    const qa = sel => [...target.querySelectorAll(sel)];
+    const tog = q("#obToggleForm"); if (tog) tog.onclick = () => { edit.showForm = !edit.showForm; render(target, ["obra", id, tab]); };
+    const form = q("#obForm");
+    if (form) form.onsubmit = e => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(form).entries());
+      const ops = ["obraNome", "cliente", "local", "statusExec", "entrega", "obraSheetUrl"].map(k => ({ set: ["project", k], value: String(f[k] || "").trim() }))
+        .concat([{ set: ["project", "qtdCarregadores"], value: parseInt(f.qtdCarregadores, 10) || 1 }, { set: ["project", "potenciaCarregador"], value: parseInt(f.potenciaCarregador, 10) || 60 }]);
+      edit.showForm = false;
+      save(target, id, tab, ops, { type: "project", title: "Dados da obra atualizados", after: `${f.statusExec} · ${f.qtdCarregadores} x ${f.potenciaCarregador} kW` });
+    };
+    const arch = q("#obArchive");
+    if (arch) arch.onclick = () => {
+      if (!confirm(`Arquivar a obra "${o.nome}"? Ela sai do painel (nada é apagado e pode ser reativada pela tela original).`)) return;
+      edit.showForm = false;
+      save(target, id, tab, [{ set: ["archived"], value: true }, { set: ["project", "statusExec"], value: "Arquivada" }], { type: "status", title: "Obra arquivada", after: "Arquivada" });
+    };
+    qa("[data-status-task]").forEach(sel => sel.onchange = () => save(target, id, tab,
+      [{ set: ["phases", { name: sel.dataset.phase }, "tasks", { id: sel.dataset.statusTask }, "status"], value: sel.value }],
+      { type: "status", title: sel.dataset.title, field: "status", before: sel.dataset.before, after: sel.selectedOptions[0].textContent }));
+    qa("[data-open-task]").forEach(b => b.onclick = () => { edit.openTask = edit.openTask === b.dataset.openTask ? "" : b.dataset.openTask; render(target, ["obra", id, tab]); });
+    qa("[data-close-task]").forEach(b => b.onclick = () => { edit.openTask = ""; render(target, ["obra", id, tab]); });
+    qa("[data-task-form]").forEach(fm => fm.onsubmit = e => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(fm).entries());
+      edit.openTask = "";
+      save(target, id, tab, [{ set: ["phases", { name: fm.dataset.phase }, "tasks", { id: fm.dataset.taskForm }], value: { protocol: f.protocol.trim(), requestDate: f.requestDate, forecastDate: f.forecastDate, note: f.note.trim() } }],
+        { type: f.protocol ? "protocol" : "update", title: "Tarefa atualizada", after: [f.protocol, f.note].filter(Boolean).join(" · ") });
+    });
+    qa("[data-add-task]").forEach(fm => fm.onsubmit = e => {
+      e.preventDefault();
+      const title = String(new FormData(fm).get("title") || "").trim();
+      if (!title) return;
+      save(target, id, tab, [{ push: ["phases", { name: fm.dataset.addTask }, "tasks"], value: { id: uid(fm.dataset.addTask), title, status: "pending", note: "", protocol: "", requestDate: "", forecastDate: "" } }],
+        { type: "update", title: `Tarefa criada em ${fm.dataset.addTask}`, after: title });
+    });
+    const pf = q("#obPendForm");
+    if (pf) pf.onsubmit = e => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(pf).entries());
+      if (!String(f.title || "").trim()) return;
+      save(target, id, tab, [{ push: ["operation", "pendingItems"], value: { id: uid("pend"), title: f.title.trim(), owner: f.owner.trim(), due: f.due, priority: f.priority, status: f.status, waitingOn: f.waitingOn.trim(), note: f.note.trim(), category: "Pendência operacional", createdAt: new Date().toISOString() } }],
+        { type: "update", title: "Pendência criada", after: f.title.trim() });
+    };
+    qa("[data-pend]").forEach(sel => sel.onchange = () => save(target, id, tab,
+      [{ set: ["operation", "pendingItems", { id: sel.dataset.pend }], value: sel.value === "Concluida" ? { status: "Concluida", completedAt: new Date().toISOString() } : { status: sel.value } }],
+      { type: "status", title: sel.dataset.title, after: sel.value }));
+    qa("[data-doc-status]").forEach(sel => sel.onchange = () => save(target, id, tab,
+      [{ set: ["documents", { id: sel.dataset.docStatus }], value: { status: sel.value } }], { type: "document", title: sel.dataset.title, after: sel.selectedOptions[0].textContent }));
+    qa("[data-doc-file]").forEach(inp => inp.onchange = () => { const file = inp.files[0]; if (file) uploadDoc(target, id, o.nome, inp.dataset.docFile, file); });
   }
 
   function render(target, params = []) {
@@ -228,6 +361,23 @@
     target.innerHTML = head(tab) + body;
     target.querySelectorAll("#obTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/${b.dataset.tab}`));
     target.querySelector("#obRefresh").onclick = () => { snap = null; obraCache = new Map(); UBY.obras(true); render(target, params); };
+    target.querySelector("#obNew").onclick = () => { edit.newObra = !edit.newObra; edit.err = ""; render(target, params); };
+    const cancelNew = target.querySelector("#obNewCancel"); if (cancelNew) cancelNew.onclick = () => { edit.newObra = false; render(target, params); };
+    const newForm = target.querySelector("#obNewForm");
+    if (newForm) newForm.onsubmit = async e => {
+      e.preventDefault();
+      if (edit.busy) return;
+      const f = Object.fromEntries(new FormData(newForm).entries());
+      edit.busy = true; edit.err = ""; target.querySelector("#obEditStatus").innerHTML = statusLine();
+      try {
+        const api = await UBY.obrasEdit();
+        const res = await api.createObra(f);
+        edit.busy = false; edit.newObra = false; edit.msg = "Obra criada ✓";
+        snap = null; obraCache = new Map();
+        await UBY.obras(true).catch(() => {});
+        UBY.go(`#/obras/obra/${encodeURIComponent(res.id)}`);
+      } catch (err) { edit.busy = false; edit.err = err.message || String(err); render(target, params); }
+    };
     target.querySelectorAll("[data-obra]").forEach(el => el.onclick = () => UBY.go(`#/obras/obra/${encodeURIComponent(el.dataset.obra)}`));
     target.querySelectorAll("[data-stage]").forEach(el => el.onclick = () => { ui.stage = ui.stage === el.dataset.stage ? "all" : el.dataset.stage; render(target, params); });
     const clear = target.querySelector("#clearStage"); if (clear) clear.onclick = e => { e.preventDefault(); ui.stage = "all"; render(target, params); };

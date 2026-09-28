@@ -95,6 +95,8 @@
       if (embedded && params.get("nova_params") === "1" && /^#\/parametros/.test(hash)) return PARAMS_SCOPE;
       const frameId = (window.frameElement && window.frameElement.id) || "";
       if (embedded && frameId === "classicFrame" && OBRAS_PAGES.test(location.pathname) && OBRAS_ROUTES.test(hash)) return OBRAS_SCOPE;
+      // Obras editadas na tela nova (#/obras): quadro de edição dedicado.
+      if (embedded && frameId === "obrasEditFrame" && /\/legado\/obra-ev\/motor-obras\.html$/.test(location.pathname) && params.get("nova_obras") === "1" && /^#\/obras(\/|$)/.test(hash)) return OBRAS_SCOPE;
       if (embedded && frameId === "clubFrame" && /\/legado\/obra-ev\/clube-gravacao\.html$/.test(location.pathname) && /^#\/clube(\/|$)/.test(hash)) return CLUB_SCOPE;
       return null;
     } catch (_) { return null; }

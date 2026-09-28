@@ -179,5 +179,108 @@
     }))));
   }
 
-  window.UBY_OBRAS_API = { ready, snapshot, obraDetail, allTasks };
+  // ---------------------------------------------------------------------
+  // Edição de obras na Nova (27/09/2026, usuário: "desses arrume o obras").
+  // Só grava no quadro de edição (#obrasEditFrame) — a ponte libera o escopo
+  // "obras" apenas ali. Cada gravação RELÊ a obra na nuvem e aplica só a
+  // alteração pedida (ops), para nunca sobrescrever o que outra pessoa gravou.
+  // ---------------------------------------------------------------------
+  const EDIT_CRITICAL = ["Concessionaria", "Orcamentos e contratacoes", "Materiais e equipamentos", "Obra eletrica"];
+  const clone = v => JSON.parse(JSON.stringify(v));
+  const matches = (item, sel) => item && typeof item === "object" && Object.entries(sel).every(([k, v]) => String(item[k]) === String(v));
+
+  // Caminho: ["phases", {name: "Concessionaria"}, "tasks", {id: "x"}, "status"].
+  function walk(root, path, create) {
+    let node = root;
+    for (let i = 0; i < path.length - 1; i += 1) {
+      const step = path[i], next = path[i + 1];
+      let child = typeof step === "object" ? (Array.isArray(node) ? node.find(it => matches(it, step)) : undefined) : node[step];
+      if (child === undefined || child === null) {
+        if (!create || typeof step === "object") throw new Error(`Item não encontrado na obra (${JSON.stringify(step)}). Recarregue e tente de novo.`);
+        child = typeof next === "object" || next === undefined ? [] : {};
+        node[step] = child;
+      }
+      node = child;
+    }
+    return { parent: node, key: path[path.length - 1] };
+  }
+  function applyOps(detail, ops) {
+    ops.forEach(op => {
+      if (op.set) {
+        const { parent, key } = walk(detail, op.set, true);
+        if (typeof key === "object") { const i = parent.findIndex(it => matches(it, key)); if (i < 0) throw new Error("Item não encontrado."); parent[i] = { ...parent[i], ...op.value }; }
+        else parent[key] = op.value;
+      } else if (op.push) {
+        const { parent } = walk(detail, [...op.push, { __lista: 1 }], true); // o seletor final só força criar uma lista
+        const list = parent;
+        if (!Array.isArray(list)) throw new Error("Lista inválida.");
+        list.push(op.value);
+      } else if (op.remove) {
+        const { parent, key } = walk(detail, op.remove, false);
+        const i = Array.isArray(parent) ? parent.findIndex(it => matches(it, key)) : -1;
+        if (i >= 0) parent.splice(i, 1);
+      }
+    });
+    return detail;
+  }
+  function cardOf(id, detail, row = {}) {
+    const p = detail.project || {};
+    const tasks = (detail.phases || []).flatMap(ph => (ph.tasks || []).map(t => ({ ...t, phase: ph.name })));
+    const done = tasks.filter(t => t.status === "done" || t.status === "na").length;
+    const qtd = parseInt(p.qtdCarregadores, 10) || 1, kw = parseInt(p.potenciaCarregador, 10) || 60;
+    return {
+      id: String(id), nome: p.obraNome || row.nome || String(id), cliente: p.cliente || row.cliente || "", local: p.local || row.local || "",
+      status: p.statusExec || row.status_exec || "Projeto",
+      pct: tasks.length ? Math.round(done / tasks.length * 100) : Number(row.progresso || 0),
+      kw: qtd * kw, carregadores: `${qtd} x ${kw} kW`,
+      crit: tasks.filter(t => EDIT_CRITICAL.includes(t.phase) && ["pending", "doing"].includes(t.status)).length
+    };
+  }
+  function requireWrite() {
+    if (window.UBY_WRITE_SCOPE !== "obras") throw new Error("Gravação de obras indisponível nesta tela. Nada foi gravado.");
+  }
+  async function readRow(id) {
+    const { data, error } = await window.UBY_SUPABASE.client().from("obras").select("id,nome,cliente,local,status_exec,progresso,potencia_kw,carregadores,criticas,raw_data").eq("id", String(id)).maybeSingle();
+    if (error) throw new Error(`Não consegui ler a obra na nuvem (${error.message}). Nada foi gravado.`);
+    return data;
+  }
+  function seedFor(row) {
+    const [q, k] = String(row.carregadores || "1 x 60").split("x").map(s => parseInt(s, 10));
+    return createDetailSeed({ nome: row.nome, cliente: row.cliente, local: row.local, status: row.status_exec || "Projeto" }, q || 1, k || Number(row.potencia_kw) || 60);
+  }
+  async function rawDetail(id) {
+    const row = await readRow(id);
+    if (!row) throw new Error("Obra não encontrada na nuvem.");
+    return clone(row.raw_data?.project ? row.raw_data : seedFor(row));
+  }
+  async function editObra(id, ops, note = {}) {
+    requireWrite();
+    const row = await readRow(id);
+    if (!row) throw new Error("Obra não encontrada na nuvem. Nada foi gravado.");
+    const detail = applyOps(clone(row.raw_data?.project ? row.raw_data : seedFor(row)), ops || []);
+    if (!detail.project || !Array.isArray(detail.phases)) throw new Error("Detalhe da obra incompleto. Nada foi gravado.");
+    const card = cardOf(id, detail, row);
+    await window.UBY_STORE.saveWork(card, detail);
+    try { window.UBY_ACTIVITY?.record({ workId: card.id, workName: card.nome, type: note.type || "project", title: note.title || "Obra atualizada na Nova Plataforma", detail: note.detail || "", field: note.field || "", before: note.before || "", after: note.after || "" }); } catch (_) {}
+    return clone({ card, detail });
+  }
+  function slug(text) {
+    return String(text || "obra").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "obra";
+  }
+  async function createObra(f) {
+    requireWrite();
+    if (!String(f.nome || "").trim()) throw new Error("Informe o nome da obra.");
+    const base = slug(f.nome);
+    let id = base;
+    for (let n = 2; await readRow(id); n += 1) id = `${base}-${n}`;
+    const qtd = parseInt(f.qtd, 10) || 1, pot = parseInt(f.kw, 10) || 60;
+    const detail = createDetailSeed({ nome: f.nome.trim(), cliente: (f.cliente || f.nome).trim(), local: (f.local || "").trim(), status: f.status || "Prospecção / Estudo" }, qtd, pot);
+    if (f.entrega) detail.project.entrega = f.entrega;
+    const card = cardOf(id, detail, {});
+    await window.UBY_STORE.saveWork(card, detail);
+    try { window.UBY_ACTIVITY?.record({ workId: id, workName: card.nome, type: "project", title: "Obra criada na Nova Plataforma", after: `${card.status} · ${card.carregadores}` }); } catch (_) {}
+    return clone({ id, card });
+  }
+
+  window.UBY_OBRAS_API = { ready, snapshot, obraDetail, allTasks, rawDetail, editObra, createObra, applyOps, cardOf };
 })();

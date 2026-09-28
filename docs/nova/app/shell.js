@@ -288,6 +288,43 @@
     return obrasPromise;
   }
 
+  // Quadro de edição de obras (gravação liberada só aqui e só na rota #/obras).
+  // Criado sob demanda na primeira gravação e removido ao sair de Obras.
+  let obrasEditPromise = null;
+  function obrasEdit() {
+    if (!/^#\/obras(\/|$)/.test(location.hash)) return Promise.reject(new Error("A edição de obras só funciona na tela Obras."));
+    if (obrasEditPromise) return obrasEditPromise;
+    obrasEditPromise = new Promise((resolve, reject) => {
+      const frame = document.createElement("iframe");
+      frame.id = "obrasEditFrame";
+      frame.title = "Gravação de obras";
+      frame.setAttribute("aria-hidden", "true");
+      frame.tabIndex = -1;
+      frame.style.cssText = "position:absolute;width:1px;height:1px;left:-9999px;top:0;border:0;visibility:hidden";
+      frame.src = LEGACY + "motor-obras.html?nova_obras=1&t=" + Date.now();
+      document.body.appendChild(frame);
+      const started = Date.now();
+      const timer = setInterval(async () => {
+        let w = null;
+        try { w = frame.contentWindow; } catch (_) {}
+        if (w && w.UBY_OBRAS_API?.editObra && w.UBY_SUPABASE?.client) {
+          clearInterval(timer);
+          try {
+            w.UBY_SUPABASE.client();
+            if (w.UBY_WRITE_SCOPE !== "obras") throw new Error("Gravação de obras não liberada neste quadro.");
+            await w.UBY_OBRAS_API.ready();
+            resolve(w.UBY_OBRAS_API);
+          } catch (err) { reject(err); }
+        } else if (Date.now() - started > 90000) { clearInterval(timer); reject(new Error("O quadro de gravação de obras não respondeu em 90 s.")); }
+      }, 250);
+    });
+    obrasEditPromise.catch(() => { obrasEditPromise = null; document.getElementById("obrasEditFrame")?.remove(); });
+    return obrasEditPromise;
+  }
+  window.addEventListener("hashchange", () => {
+    if (!/^#\/obras(\/|$)/.test(location.hash) && obrasEditPromise) { obrasEditPromise = null; document.getElementById("obrasEditFrame")?.remove(); }
+  });
+
   // Lê uma constante de dados (const NOME = [...] / {...}) direto do texto de uma
   // página original, sem abrir a página: instantâneo e sem tempo de espera.
   async function legacyConst(src, name) {
@@ -510,6 +547,6 @@
   const modelLabel = model => MODEL_LABELS[model] || "Ativo UBY";
   const isUbyModel = model => UBY_MODELS.includes(model || "uby");
 
-  window.UBY = { start, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel,
+  window.UBY = { start, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, obrasEdit, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel,
     register: (id, view) => { VIEWS[id] = view; }, go: hash => { location.hash = hash; }, ROUTES };
 })();
