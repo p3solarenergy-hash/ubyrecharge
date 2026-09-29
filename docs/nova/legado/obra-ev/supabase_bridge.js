@@ -829,6 +829,35 @@
     return { payload: next, updatedAt: data?.updated_at || next.updatedAt };
   }
 
+  // Extratos bancários e conferência (linha própria "bank-uby"; gravada só pela tela
+  // Parâmetros · Pagamentos, dentro do PARAMS_SCOPE). Mesmo padrão do Clube: relê antes de gravar.
+  const BANK_DOC_ID = "bank-uby";
+  async function loadBankData() {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    if (!(await currentUser())) throw new Error("Entre na plataforma para ler os extratos.");
+    const { data, error } = await sb.from("uby_financial_matrix").select("payload,updated_at").eq("id", BANK_DOC_ID).maybeSingle();
+    if (error) throw error;
+    return { payload: data?.payload && typeof data.payload === "object" ? data.payload : null, updatedAt: data?.updated_at || null };
+  }
+  async function saveBankData(mutate, summary = {}) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre na plataforma antes de salvar o extrato.");
+    const current = await loadBankData();
+    const base = JSON.parse(JSON.stringify(current.payload || {}));
+    const next = await mutate(base);
+    if (!next || typeof next !== "object" || !Array.isArray(next.transactions)) throw new Error("Alteração do extrato inválida. Nada foi gravado.");
+    next.updatedAt = new Date().toISOString();
+    const { data, error } = await sb.from("uby_financial_matrix")
+      .upsert({ id: BANK_DOC_ID, payload: next, updated_by: user.id, updated_at: next.updatedAt }, { onConflict: "id" })
+      .select("id,updated_at").single();
+    if (error) throw error;
+    await insertAuditLog(sb, user, { modulo: "financeiro", entidadeTipo: "uby_financial_matrix", entidadeId: BANK_DOC_ID, acao: summary.acao || "save_bank", resumo: summary });
+    return { payload: next, updatedAt: data?.updated_at || next.updatedAt };
+  }
+
   async function saveFinancialMatrix(matrizCosts = [], networkDistribution) {
     const sb = client();
     if (!sb) throw new Error("Supabase ainda nao configurado.");
@@ -1503,6 +1532,8 @@
     uploadDocumentFile,
     loadClubData,
     saveClubData,
+    loadBankData,
+    saveBankData,
     saveRechargeBase,
     saveRechargeMetadata,
     loadFinancialMatrix,

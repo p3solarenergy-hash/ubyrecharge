@@ -11,7 +11,7 @@
   "use strict";
   const { fmt, esc, kpi } = UBY;
   const SRC = "legado/obra-ev/recargas.html?nova_params=1";
-  const ui = { tab: "carregador", charger: "", month: "", edits: {}, rules: null, matrixMonth: "", editingCost: "", costForm: null, payMonth: new Date().toISOString().slice(0, 7), payForm: null, policyEdits: null, log: [] };
+  const ui = { tab: "pagamentos", charger: "", month: "", edits: {}, rules: null, matrixMonth: "", editingCost: "", costForm: null, payMonth: new Date().toISOString().slice(0, 7), payForm: null, policyEdits: null, log: [] };
   let frame = null, readyPromise = null, busy = false;
 
   // ---------- motor original oculto ----------
@@ -304,6 +304,154 @@
       </section>`;
   }
 
+  // ---------- pagamentos (central) + extrato bancário ----------
+  // Tudo que vence no mês numa lista só (matriz, programados, energia, repasses), com baixa na
+  // própria linha, e a conferência com o extrato do banco (app/bank.js; dados em "bank-uby").
+  const REC = {
+    "conferido": ["ok", "Conferido no extrato"], "pago-nao-marcado": ["warn", "No banco, não marcado"], "diferenca": ["bad", "Valor diferente no extrato"],
+    "sem-extrato": ["bad", "Pago, não achado no extrato"], "aberto": ["neutral", "Não achado no extrato"]
+  };
+  function bankState(data) {
+    const B = window.UBY_BANK;
+    const p = data.bank || { transactions: [], statements: [], links: {} };
+    const tx = p.transactions || [];
+    const from = (p.statements || []).map(s => s.from).filter(Boolean).sort()[0] || "";
+    const to = (p.statements || []).map(s => s.to).filter(Boolean).sort().at(-1) || "";
+    const bills = data.bills || [];
+    const rec = B && tx.length ? B.reconcile(tx, bills, p.links || {}) : { bills: [], outflows: [], unmatched: [] };
+    const byKey = new Map(rec.bills.map(b => [b.key, b]));
+    // Só vale "não achado" para contas cujo vencimento/pagamento cai dentro do período dos extratos.
+    const covered = b => from && to && (b.paidAt || b.due) >= from && (b.paidAt || b.due) <= to;
+    return { p, tx, from, to, rec, byKey, covered, bills };
+  }
+  function centralTab(w, data) {
+    const mk = ui.payMonth;
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const today = new Date().toISOString().slice(0, 10);
+    const bs = bankState(data);
+    const rows = bs.bills.filter(b => b.monthKey === mk).sort((a, b) => String(a.due).localeCompare(String(b.due)));
+    const tot = rows.reduce((a, r) => { a.total += r.amount; if (r.paid) a.paid += r.amount; else a.open += r.amount; if (r.status === "overdue") a.late += r.amount; return a; }, { total: 0, paid: 0, open: 0, late: 0 });
+    const recOf = b => { const r = bs.byKey.get(b.key); if (!r) return null; if (r.status === "aberto" || r.status === "sem-extrato") return bs.covered(b) ? r : null; return r; };
+    const nRec = rows.map(recOf).filter(Boolean);
+    const conf = nRec.filter(r => r.status === "conferido").length;
+    const kindLabel = b => b.kind === "energia" ? "Energia" : b.kind === "area" ? "Repasse à área" : b.source || "Custo";
+    const recCell = b => {
+      const r = recOf(b);
+      if (!bs.tx.length) return `<small style="color:var(--uby-muted)">sem extrato</small>`;
+      if (!r) return `<small style="color:var(--uby-muted)">fora do período do extrato</small>`;
+      const [cls, label] = REC[r.status];
+      const txt = r.tx.length ? `${r.tx.map(t => `${fmtDay(t.date)} · ${fmt.brl(t.value)}`).join(" + ")}${r.sharedWith.length ? ` (junto com ${r.sharedWith.length} outra(s) conta(s))` : ""}${r.diff ? ` · diferença ${fmt.brl(r.diff)}` : ""}` : "";
+      return `<span class="badge ${cls}">${label}</span>${txt ? `<small>${esc(txt)}</small>` : ""}${!b.paid && (r.status === "pago-nao-marcado" || r.status === "diferenca") ? `<button class="btn" data-c-paybank="${esc(b.key)}|${esc(r.bankDate)}|${r.sharedWith.length ? "" : r.paidTotal}" type="button" style="margin-top:4px" ${can}>Marcar pago em ${fmtDay(r.bankDate)}${b.kind === "area" && r.diff && !r.sharedWith.length ? ` com ${fmt.brl(r.paidTotal)} (diferença vai ao mês seguinte)` : ""}</button>` : ""}`;
+    };
+    const payPanel = b => {
+      const r = recOf(b);
+      const date = r?.bankDate || today;
+      const isArea = b.kind === "area";
+      const due = isArea ? Number(b.dueAmount ?? b.amount) : b.amount;
+      return `<tr><td colspan="7"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        ${field("Pago em", `<input class="select" type="date" data-c-date value="${esc(date)}" style="width:150px">`)}
+        ${isArea ? `${field(`Valor pago (devido ${fmt.brl(due)})`, `<input class="select" type="number" step="0.01" data-c-amount data-due="${esc(due.toFixed(2))}" value="${esc((r && !r.sharedWith.length && r.tx.length ? r.paidTotal : due).toFixed(2))}" style="width:150px">`)}
+          ${field("Se o valor pago for diferente do devido", `<select class="select" data-c-diff style="width:260px"><option value="next">Levar a diferença para o mês seguinte</option><option value="drop">Zerar a diferença</option></select>`)}` : `<small style="padding-bottom:8px">Valor: <strong>${fmt.brl(b.amount)}</strong>${b.kind === "energia" ? " · para mudar o valor, edite a fatura em Energia" : " · para mudar o valor, edite o custo em Outros custos"}</small>`}
+        <button class="btn primary" data-c-confirm="${esc(b.key)}" type="button" ${can}>Confirmar pagamento</button>
+        <button class="btn ghost" data-c-cancel type="button">Cancelar</button></div></td></tr>`;
+    };
+    // Saídas do extrato no mês (para conferir e vincular à mão o que não casou sozinho).
+    const outs = bs.rec.outflows.filter(t => t.date.slice(0, 7) === mk);
+    const billName = k => { const b = bs.bills.find(x => x.key === k); return b ? `${b.name}${b.station ? ` · ${b.station}` : ""}` : k; };
+    const linkOptions = t => {
+      const near = bs.bills.filter(b => Math.abs((new Date(`${b.due}T12:00:00`) - new Date(`${t.date}T12:00:00`)) / 86400000) <= 75)
+        .sort((a, b) => Math.abs(a.amount - t.value) - Math.abs(b.amount - t.value)).slice(0, 25);
+      return `<option value="">Vincular a uma conta…</option>${near.map(b => `<option value="${esc(b.key)}">${esc(fmtDay(b.due))} · ${esc(fmt.brl(b.amount))} · ${esc(b.name)}</option>`).join("")}<option value="__new">＋ Lançar como conta nova (já paga)</option><option value="__ignore">Não é conta (transferência, retirada…)</option>`;
+    };
+    // Painel "lançar como conta nova": pagamento avulso do mês, já pago na data do banco.
+    const targets = (() => { try { w.renderScheduledPayments(w.getGeneralUnitData()); return [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text })); } catch (_) { return []; } })();
+    const newPanel = t => {
+      const f = ui.bankNewForm || {};
+      return `<tr><td colspan="5"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        ${field("Carregador", `<select class="select" data-bn="target" style="width:260px"><option value="">Selecione</option>${targets.map(o => `<option value="${esc(o.value)}" ${f.target === o.value ? "selected" : ""}>${esc(o.text)}</option>`).join("")}</select>`)}
+        ${field("Conta", `<input class="select" data-bn="name" value="${esc(f.name ?? t.description)}" style="width:200px">`)}
+        ${field("Fornecedor", `<input class="select" data-bn="supplier" value="${esc(f.supplier ?? t.description)}" style="width:170px">`)}
+        ${field("Categoria", `<select class="select" data-bn="category">${["Internet / dados", "Energia", "Locação / aluguel", "Seguro", "Manutenção", "Licença / plataforma", "Outros custos"].map(c => `<option ${(f.category || "Internet / dados") === c ? "selected" : ""}>${c}</option>`).join("")}</select>`)}
+        <small style="padding-bottom:8px">${fmt.brl(t.value)} · pago em ${fmtDay(t.date)}</small>
+        <button class="btn primary" data-bank-new-save="${esc(t.id)}" type="button" ${can}>Lançar e vincular</button>
+        <button class="btn ghost" data-bank-new-cancel type="button">Cancelar</button></div>
+        <small class="source-line">Entra como pagamento avulso de ${esc(UBY.state.api?.monthName?.(t.date.slice(0, 7)) || t.date.slice(0, 7))} (calendário de caixa, já pago). Não muda o resultado: o custo do mês continua vindo das regras em Carregadores.</small></td></tr>`;
+    };
+    const infl = window.UBY_BANK ? window.UBY_BANK.inflows(bs.tx) : {};
+    const inflMonths = Object.keys(infl).sort().reverse();
+    const inflSrc = ["Spott", "Move", "Cartão (vendas)", "Rendimentos", "Outras entradas"].filter(s => inflMonths.some(m => infl[m][s]));
+    return `
+      <div class="toolbar"><label>Vencimentos de <input class="select" id="pmCentralMonth" type="month" value="${esc(mk)}"></label>
+        <span class="spacer"></span><small>Energia, repasses às áreas, custos da matriz e pagamentos programados · para cotistas, veja Cotas e fechamentos</small></div>
+      <div class="grid g5" style="margin-bottom:14px">${kpi("A pagar no mês", fmt.brl(tot.total), `${rows.length} conta(s)`, "", "lead")}${kpi("Em aberto", fmt.brl(tot.open))}${kpi("Vencido", fmt.brl(tot.late), "", "", tot.late ? "bad" : "")}${kpi("Pago", fmt.brl(tot.paid))}${kpi("Conferido no extrato", bs.tx.length ? `${conf} de ${nRec.length}` : "—", bs.tx.length ? `extratos de ${fmtDay(bs.from)} a ${fmtDay(bs.to)}` : "anexe o extrato abaixo")}</div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Contas do mês</p><h2>Pagamentos</h2><p>Marque como pago aqui mesmo. Quando houver extrato, a coluna Extrato mostra se o pagamento apareceu no banco, com a data e o valor.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Vencimento</th><th>Conta</th><th>De onde</th><th class="num">Valor</th><th>Situação</th><th>Extrato</th><th></th></tr></thead>
+          <tbody>${rows.map(b => `<tr><td><strong>${fmtDay(b.due)}</strong></td>
+            <td><strong>${esc(b.name)}</strong><small>${esc(kindLabel(b))}${b.supplier ? ` · ${esc(b.supplier)}` : ""}</small></td>
+            <td>${esc(b.station || "—")}${b.workName ? `<small>${esc(b.workName)}</small>` : ""}</td>
+            <td class="num"><strong>${fmt.brl(b.amount)}</strong>${b.kind === "area" && b.paidAmount !== null && b.paidAmount !== undefined && Math.abs(b.paidAmount - b.dueAmount) > 0.009 ? `<small>devido ${fmt.brl(b.dueAmount)}</small>` : ""}</td>
+            <td><span class="badge ${b.paid ? "ok" : b.status === "overdue" ? "bad" : "warn"}">${esc(b.statusLabel || (b.paid ? "Pago" : "A pagar"))}</span>${b.paidAt ? `<small>em ${fmtDay(b.paidAt)}</small>` : ""}</td>
+            <td style="white-space:normal;min-width:200px">${recCell(b)}</td>
+            <td style="white-space:nowrap">${b.paid ? `<button class="btn ghost" data-c-unpay="${esc(b.key)}" type="button" ${can}>Desfazer</button>` : `<button class="btn primary" data-c-pay="${esc(b.key)}" type="button" ${can}>Marcar pago</button>`}</td></tr>
+            ${ui.cPay === b.key && !b.paid ? payPanel(b) : ""}`).join("") || `<tr><td colspan="7" class="empty">Nenhuma conta vence neste mês.</td></tr>`}</tbody></table></div>
+      </section>
+      <section class="section"><div class="section-head"><div><p class="kicker">Conferência</p><h2>Extrato do banco</h2>
+          <p>Anexe o extrato (Excel, CSV ou OFX; o do PagSeguro em Excel funciona direto). Pode anexar períodos que se sobrepõem: lançamentos repetidos não duplicam. As saídas são casadas com as contas pelo valor e pela data; o que não casar sozinho você vincula abaixo.</p></div></div>
+        <label class="imp-field" style="display:block;border:1.5px dashed var(--uby-line, #c9d6cf);border-radius:10px;padding:10px 12px;margin-bottom:10px;cursor:pointer">
+          <span style="font-size:12px;font-weight:800">🏦 Anexar extrato</span><small style="display:block;color:var(--uby-muted)">.xlsx, .xls, .csv ou .ofx</small>
+          <input id="pmBankFile" type="file" accept=".xlsx,.xls,.csv,.ofx,.txt" style="margin-top:6px;width:100%" ${can}></label>
+        ${data.bankError ? `<div class="note" style="border-color:var(--uby-red)">Não consegui ler os extratos guardados: ${esc(data.bankError)}</div>` : ""}
+        ${(bs.p.statements || []).length ? `<div class="list" style="margin-bottom:12px">${bs.p.statements.slice().reverse().map(s => `<div class="list-row"><span><strong>${esc(s.fileName || "extrato")}</strong> · ${esc(s.bank || "")}${s.account ? ` · conta ${esc(s.account)}` : ""}<br><small>${fmtDay(s.from)} a ${fmtDay(s.to)} · ${fmt.int(s.count)} lançamento(s), ${fmt.int(s.added)} novo(s) · anexado ${esc(fmt.dt(s.importedAt))}</small></span></div>`).join("")}</div>` : ""}
+        ${bs.tx.length ? `
+          <h3 style="margin:14px 0 8px;font-size:13px">Saídas do banco em ${esc(UBY.state.api?.monthName?.(mk) || mk)} ${bs.rec.unmatched.length ? `<span class="badge warn">${fmt.int(bs.rec.unmatched.length)} sem conta no total</span>` : ""}</h3>
+          <div class="table-wrap"><table><thead><tr><th>Data</th><th>Descrição no extrato</th><th class="num">Valor</th><th>Conta</th><th></th></tr></thead><tbody>
+            ${outs.map(t => `<tr><td>${fmtDay(t.date)}</td><td>${esc(t.description)}<small>${esc(t.type || "")}</small></td><td class="num"><strong>${fmt.brl(t.value)}</strong></td>
+              <td style="white-space:normal">${t.bills.length ? `${t.bills.map(k => `<small>${esc(billName(k))}</small>`).join("")}<span class="badge ${t.how === "manual" ? "neutral" : t.how === "aproximado" ? "warn" : "ok"}">${t.how === "manual" ? "vinculado à mão" : t.how === "grupo" ? "casado (soma)" : t.how === "aproximado" ? "casado (valor próximo)" : "casado"}</span>` : t.ignored ? `<span class="badge neutral">não é conta</span>${t.note ? `<small>${esc(t.note)}</small>` : ""}` : `<select class="select" data-bank-link="${esc(t.id)}" style="max-width:360px" ${can}>${linkOptions(t)}</select>`}</td>
+              <td>${(bs.p.links || {})[t.id] ? `<button class="btn ghost" data-bank-unlink="${esc(t.id)}" type="button" ${can}>Desfazer</button>` : ""}</td></tr>
+              ${ui.bankNew === t.id && !t.bills.length ? newPanel(t) : ""}`).join("") || `<tr><td colspan="5" class="empty">Nenhuma saída no extrato neste mês.</td></tr>`}
+          </tbody></table></div>
+          <h3 style="margin:18px 0 8px;font-size:13px">Entradas por mês e origem</h3>
+          <div class="table-wrap"><table><thead><tr><th>Mês</th>${inflSrc.map(s => `<th class="num">${esc(s)}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>
+            ${inflMonths.map(m => `<tr><td><strong>${esc(UBY.state.api?.monthName?.(m) || m)}</strong></td>${inflSrc.map(s => `<td class="num">${infl[m][s] ? fmt.brl(infl[m][s]) : "—"}</td>`).join("")}<td class="num"><strong>${fmt.brl(Object.values(infl[m]).reduce((a, v) => a + v, 0))}</strong></td></tr>`).join("")}
+          </tbody></table></div>
+          <p class="source-line">Spott e Move repassam o faturamento das recargas; "Cartão (vendas)" são vendas no crédito que caem na conta. Os repasses chegam depois do mês das recargas, então comparar com o faturamento pede o mês seguinte.</p>` : ""}
+      </section>`;
+  }
+  // Baixa (ou reabertura) de uma conta, pelo tipo: custo da matriz, fatura de energia ou repasse à área.
+  async function setBillPaid(w, b, date, opts = {}) {
+    if (b.kind === "matriz") {
+      await resyncMatrix(w);
+      const list = w.loadMatrizCosts();
+      const item = list.find(i => i.id === b.costId);
+      if (!item) throw new Error("Custo não encontrado na matriz. Nada foi gravado.");
+      const now = new Date().toISOString();
+      item.paymentLedger = { ...(item.paymentLedger || {}), [b.monthKey]: date ? { status: "paid", paidAt: `${date}T12:00:00`, updatedAt: now } : { status: "pending", paidAt: "", updatedAt: now } };
+      item.updatedAt = now;
+      w.saveMatrizCosts(list);
+      return await awaitMatrixSave(w);
+    }
+    if (b.kind === "energia") {
+      const f = b.part === "copel" ? "paidAt" : "leasePaidAt";
+      let found = false;
+      await saveChargerField(w, b.workId, b.station, b.workName, "energyInvoices", cur => (cur || []).map(i => { if (i.id !== b.invoiceId) return i; found = true; return { ...i, [f]: date || "" }; }));
+      if (!found) throw new Error("Fatura não encontrada na nuvem.");
+      return "salvo";
+    }
+    if (b.kind === "area") {
+      const mk = b.competence;
+      await saveChargerField(w, b.workId, b.station, b.workName, "areaAccount", cur => {
+        const c = { ...(cur || {}) }, paid = { ...(c.paid || {}) }, paidInfo = { ...(c.paidInfo || {}) };
+        if (date) {
+          paid[mk] = date;
+          if (opts.amount !== undefined) { const due = Number(opts.due); const diff = Math.round((due - opts.amount) * 100) / 100; paidInfo[mk] = { amount: opts.amount, due, diff, diffMode: opts.diffMode === "drop" ? "drop" : "next" }; }
+        } else { delete paid[mk]; delete paidInfo[mk]; }
+        return { ...c, paid, paidInfo };
+      });
+      return "salvo";
+    }
+    throw new Error("Tipo de conta desconhecido.");
+  }
+
   // ---------- operação: quem entra na UBY, potência, horários e cortesia ----------
   const DAYS = [["1", "Seg"], ["2", "Ter"], ["3", "Qua"], ["4", "Qui"], ["5", "Sex"], ["6", "Sáb"], ["0", "Dom"]];
   function checkPending(w) {
@@ -559,7 +707,8 @@
     const key = w.normalizeStationForCompare(w.canonicalStationNameForWork(workId, station, workName));
     if (!key) throw new Error("Carregador sem identificação. Nada foi gravado.");
     fs.chargers = fs.chargers || {};
-    fs.chargers[key] = { ...(fs.chargers[key] || {}), [field]: value };
+    // value pode ser uma função (valor atual na nuvem → novo valor), para alterar só um item.
+    fs.chargers[key] = { ...(fs.chargers[key] || {}), [field]: typeof value === "function" ? value(JSON.parse(JSON.stringify(fs.chargers[key]?.[field] ?? null))) : value };
     await w.UBY_SUPABASE.saveRechargeMetadata(workId, { workId, workName, financialSettings: fs });
     // Mantém a cópia em memória da plataforma oculta igual à nuvem, para que um
     // "Salvar competência" depois não grave uma versão sem as faturas.
@@ -776,7 +925,17 @@
   }
 
   // ---------- render ----------
-  const TAB_IDS = ["carregador", "energia", "area", "operacao", "matriz", "pagamentos", "documentos", "cotas", "fechamentos"];
+  // 5 grupos (usuário: "muitas abas… tudo que for de energia em uma só, outros custos em outra");
+  // as subabas continuam com os ids antigos para os links diretos (#/parametros/<id>/…).
+  const GROUPS = [
+    ["Pagamentos e extrato", [["pagamentos", "Pagamentos e extrato"]]],
+    ["Energia", [["energia", "Faturas de energia"], ["area", "Repasse à área"]]],
+    ["Outros custos", [["matriz", "Custos da matriz"], ["programados", "Pagamentos programados"], ["documentos", "Documentos"]]],
+    ["Carregadores", [["carregador", "Por carregador"], ["operacao", "Operação e carregadores"]]],
+    ["Cotas e fechamentos", [["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]]]
+  ];
+  const TAB_IDS = GROUPS.flatMap(g => g[1].map(t => t[0]));
+  const groupOf = id => GROUPS.find(g => g[1].some(t => t[0] === id)) || GROUPS[0];
   async function render(target, params = []) {
     if (TAB_IDS.includes(params[0])) {
       ui.tab = params[0];
@@ -808,10 +967,15 @@
       }
     } else {
       data.months = (UBY.state.months && UBY.state.months.length ? UBY.state.months : (w.getMonths?.() || [])).slice();
-      if (ui.tab === "energia" || ui.tab === "area") {
+      if (ui.tab === "energia" || ui.tab === "area" || ui.tab === "pagamentos") {
         // Depois de gravar, o motor principal recarrega: espera ele voltar com o histórico completo.
         for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
         try { await Promise.race([UBY.state.api.loadFull(), new Promise(r => setTimeout(r, 15000))]); } catch (_) {}
+      }
+      if (ui.tab === "pagamentos") {
+        try { data.bills = UBY.state.api.allBills(); } catch (err) { data.bills = []; }
+        try { data.bank = (await w.UBY_SUPABASE.loadBankData()).payload || null; data.bankError = ""; }
+        catch (err) { data.bank = null; data.bankError = err.message; }
       }
       if (ui.tab === "documentos") {
         const mk = ui.docMonth || data.months.at(-1) || "";
@@ -829,8 +993,9 @@
       <div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
         <p class="lead">Modelo, splits, energia, capital, metas e regras de cada carregador por competência; custos centrais da matriz; calendário de pagamentos; rodadas e cotistas. As contas e a gravação são as mesmas da plataforma original.</p></div>
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
-      <div class="seg" id="pmTabs" style="margin-bottom:14px">${[["carregador", "Por carregador"], ["energia", "Faturas de energia"], ["area", "Repasse à área"], ["operacao", "Operação e carregadores"], ["matriz", "Custos da matriz"], ["pagamentos", "Pagamentos"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
-      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "area" ? areaTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : quotasTab(w)}
+      <div class="seg" id="pmTabs" style="margin-bottom:${groupOf(ui.tab)[1].length > 1 ? 8 : 14}px">${GROUPS.map(g => `<button type="button" data-v="${g[1][0][0]}" data-group="${esc(g[0])}" class="${groupOf(ui.tab) === g ? "on" : ""}">${esc(g[0])}</button>`).join("")}</div>
+      ${groupOf(ui.tab)[1].length > 1 ? `<div class="seg" id="pmSubTabs" style="margin-bottom:14px;font-size:12px">${groupOf(ui.tab)[1].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${esc(l)}</button>`).join("")}</div>` : ""}
+      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "area" ? areaTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
@@ -849,7 +1014,96 @@
   function bind(target, w, data) {
     const $ = s => target.querySelector(s);
     const dirty = () => Object.keys(ui.edits).length || ui.rules;
-    target.querySelectorAll("#pmTabs button").forEach(b => b.onclick = () => { ui.tab = b.dataset.v; draw(target, w); });
+    target.querySelectorAll("#pmTabs button").forEach(b => b.onclick = () => { const g = GROUPS.find(x => x[0] === b.dataset.group); ui.tab = g && g[1].some(t => t[0] === ui.lastSub?.[g[0]]) ? ui.lastSub[g[0]] : b.dataset.v; draw(target, w); });
+    target.querySelectorAll("#pmSubTabs button").forEach(b => b.onclick = () => { ui.tab = b.dataset.v; ui.lastSub = { ...(ui.lastSub || {}), [groupOf(ui.tab)[0]]: ui.tab }; draw(target, w); });
+    // --- pagamentos (central) + extrato ---
+    const cBill = key => (data.bills || []).find(b => b.key === key);
+    if ($("#pmCentralMonth")) $("#pmCentralMonth").onchange = e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { ui.payMonth = e.target.value; ui.cPay = ""; draw(target, w); } };
+    target.querySelectorAll("[data-c-pay]").forEach(b => b.onclick = () => { ui.cPay = ui.cPay === b.dataset.cPay ? "" : b.dataset.cPay; draw(target, w); });
+    target.querySelectorAll("[data-c-cancel]").forEach(b => b.onclick = () => { ui.cPay = ""; draw(target, w); });
+    target.querySelectorAll("[data-c-confirm]").forEach(btn => btn.onclick = () => {
+      const bill = cBill(btn.dataset.cConfirm); if (!bill) return;
+      const date = target.querySelector("[data-c-date]")?.value || new Date().toISOString().slice(0, 10);
+      const opts = {};
+      const amt = target.querySelector("[data-c-amount]");
+      if (amt) {
+        const v = Math.round(Number(String(amt.value).replace(",", ".")) * 100) / 100;
+        if (!Number.isFinite(v) || v < 0) { alert("Informe o valor pago."); return; }
+        opts.amount = v; opts.due = Number(amt.dataset.due); opts.diffMode = target.querySelector("[data-c-diff]")?.value;
+      }
+      ui.cPay = "";
+      run(target, w, `${bill.name} pago em ${fmtDay(date)}`, () => setBillPaid(w, bill, date, opts));
+    });
+    target.querySelectorAll("[data-c-paybank]").forEach(btn => btn.onclick = () => {
+      const [key, date, amount] = btn.dataset.cPaybank.split("|");
+      const bill = cBill(key); if (!bill) return;
+      const opts = bill.kind === "area" && amount !== "" ? { amount: Number(amount), due: Number(bill.dueAmount ?? bill.amount), diffMode: "next" } : {};
+      run(target, w, `${bill.name} pago em ${fmtDay(date)} (extrato)`, () => setBillPaid(w, bill, date, opts));
+    });
+    target.querySelectorAll("[data-c-unpay]").forEach(btn => btn.onclick = () => {
+      const bill = cBill(btn.dataset.cUnpay); if (!bill) return;
+      if (!confirm(`Desfazer o pagamento de "${bill.name}"?`)) return;
+      run(target, w, `${bill.name} reaberto`, () => setBillPaid(w, bill, ""));
+    });
+    if ($("#pmBankFile")) $("#pmBankFile").onchange = async e => {
+      const file = e.target.files?.[0]; if (!file) return;
+      const B = window.UBY_BANK;
+      let parsed;
+      try {
+        if (/\.(ofx|txt)$/i.test(file.name)) parsed = B.parseOFX(await file.text());
+        else {
+          // A biblioteca de planilhas é carregada sob demanda pela plataforma original.
+          let X = w.XLSX;
+          if (!X && typeof w.ensureSpreadsheetLibrary === "function") { try { X = await w.ensureSpreadsheetLibrary(); } catch (_) {} X = X || w.XLSX; }
+          if (!X) throw new Error("Não consegui carregar o leitor de planilhas (verifique a internet e tente de novo).");
+          // Os bytes precisam ser do mesmo "window" da biblioteca (senão ela lê o arquivo como texto).
+          const buf = await file.arrayBuffer();
+          const bytes = new w.Uint8Array(buf.byteLength);
+          bytes.set(new Uint8Array(buf));
+          const wb = X.read(bytes, { type: "array" });
+          const rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
+          parsed = B.parseRows(rows);
+        }
+      } catch (err) { log(`Extrato ${file.name}: ${err.message}`, "bad"); draw(target, w); return; }
+      let res = null;
+      run(target, w, `Extrato ${file.name}`, async () => {
+        await w.UBY_SUPABASE.saveBankData(p => { res = B.merge(p, parsed, file.name); return res.payload; }, { acao: "import_statement", arquivo: file.name, de: parsed.meta.from, ate: parsed.meta.to });
+        return `${res.total} lançamento(s) de ${fmtDay(parsed.meta.from)} a ${fmtDay(parsed.meta.to)}, ${res.added} novo(s)`;
+      });
+    };
+    const saveLinks = (label, mutate) => run(target, w, label, async () => { await w.UBY_SUPABASE.saveBankData(p => { const links = { ...(p.links || {}) }; mutate(links); return { statements: [], transactions: [], ...p, links }; }, { acao: "bank_link" }); return "salvo"; });
+    target.querySelectorAll("[data-bank-link]").forEach(sel => sel.onchange = () => {
+      const id = sel.dataset.bankLink, v = sel.value;
+      if (!v) return;
+      if (v === "__new") { ui.bankNew = id; ui.bankNewForm = {}; draw(target, w); return; }
+      if (v === "__ignore") { const note = prompt("Motivo (opcional): ex.: transferência entre contas, retirada de sócio", "") ; if (note === null) { sel.value = ""; return; } saveLinks("Saída marcada como não sendo conta", l => { l[id] = { ignore: true, note: note.trim() }; }); }
+      else saveLinks("Saída vinculada à conta", l => { l[id] = { bill: v }; });
+    });
+    target.querySelectorAll("[data-bn]").forEach(el => el.onchange = () => { ui.bankNewForm = { ...(ui.bankNewForm || {}), [el.dataset.bn]: el.value }; });
+    target.querySelectorAll("[data-bank-new-cancel]").forEach(b => b.onclick = () => { ui.bankNew = ""; ui.bankNewForm = null; draw(target, w); });
+    target.querySelectorAll("[data-bank-new-save]").forEach(btn => btn.onclick = () => {
+      const tx = (data.bank?.transactions || []).find(t => t.id === btn.dataset.bankNewSave); if (!tx) return;
+      const f = { category: "Internet / dados", name: tx.description, supplier: tx.description, ...(ui.bankNewForm || {}) };
+      target.querySelectorAll("[data-bn]").forEach(el => { f[el.dataset.bn] = el.value; });
+      const opt = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].find(o => o.value === f.target);
+      if (!opt || !String(f.name || "").trim()) { alert("Escolha o carregador e dê um nome à conta."); return; }
+      const mk = tx.date.slice(0, 7), value = Math.round(-tx.amount * 100) / 100;
+      ui.bankNew = ""; ui.bankNewForm = null;
+      run(target, w, `Conta "${f.name}" lançada e vinculada (${fmt.brl(value)})`, async () => {
+        await resyncMatrix(w);
+        const [workId] = String(opt.value).split("::");
+        const id = `p${Date.now().toString(36)}`;
+        const item = w.matrizNormalizeCost({ id, name: String(f.name).trim(), amount: value, scheduledPayment: true, costKind: "recurring", installments: 1, coverageMonths: 1,
+          category: f.category, supplier: String(f.supplier || "").trim(), startMonth: mk, endMonth: mk, dueDay: Number(tx.date.slice(8, 10)), allocation: "equal", enabled: true,
+          paymentLedger: { [mk]: { status: "paid", paidAt: `${tx.date}T12:00:00`, updatedAt: new Date().toISOString() } },
+          targets: [{ scope: opt.value, workId, station: opt.dataset.station || "", workName: opt.dataset.workName || "", startMonth: mk, share: 100 }] });
+        w.saveMatrizCosts([...w.loadMatrizCosts(), item]);
+        await awaitMatrixSave(w);
+        await w.UBY_SUPABASE.saveBankData(p => ({ statements: [], transactions: [], ...p, links: { ...(p.links || {}), [tx.id]: { bill: `${id}|${mk}` } } }), { acao: "bank_new_bill" });
+        return "salvo";
+      });
+    });
+    target.querySelectorAll("[data-bank-unlink]").forEach(b => b.onclick = () => saveLinks("Vínculo desfeito", l => { delete l[b.dataset.bankUnlink]; }));
     // --- repasse à área ---
     if ($("#pmArCharger")) $("#pmArCharger").onchange = e => { ui.arCharger = e.target.value; ui.arForm = null; draw(target, w); };
     target.querySelectorAll("[data-ar]").forEach(el => el.onchange = () => { ui.arForm[el.dataset.ar] = el.type === "checkbox" ? el.checked : el.dataset.ar === "dueDay" ? Number(el.value || 10) : el.value; draw(target, w); });
@@ -1173,5 +1427,5 @@
     });
   }
 
-  UBY.register("parametros", { render });
+  UBY.register("parametros", { render, _test: { centralTab, bankState } });
 })();

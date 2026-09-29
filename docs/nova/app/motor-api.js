@@ -742,7 +742,7 @@
         const target = scheduledPaymentTarget(item);
         const status = scheduledPaymentStatus(item, mk);
         const amount = item.scheduledPayment ? Number(item.amount || 0) : matrizCashAmount(item, mk);
-        return { id: item.id, name: item.name, category: item.category, supplier: item.supplier || "", source: item.scheduledPayment ? "Pagamento programado" : "Custo da matriz",
+        return { id: item.id, kind: "matriz", costId: item.id, name: item.name, category: item.category, supplier: item.supplier || "", source: item.scheduledPayment ? "Pagamento programado" : "Custo da matriz",
           station: target.station || "Carregador não identificado", workName: target.workName || (target.targetCount > 1 ? `rateado para ${target.targetCount} carregadores` : ""),
           due: iso(scheduledPaymentDueDate(item, mk)), dueDay: item.dueDay, amount, status: status.key, statusLabel: status.label,
           paidAt: item.paymentLedger?.[mk]?.paidAt || "" };
@@ -1949,7 +1949,8 @@
     FV2.rows.filter(r => r.included && fv2AreaConfig(r)).forEach(row => {
       const acc = areaAccountRow(row);
       acc.months.filter(m => String(m.due).slice(0, 7) === mk && m.total > 0).forEach(m => {
-        out.push({ id: `area-${row.workId}-${m.key}`, name: `Repasse à área · ${acc.config.payee} · ${m.label}`, category: "Repasse à área", supplier: acc.config.payee,
+        out.push({ id: `area-${row.workId}-${m.key}`, kind: "area", workId: row.workId, competence: m.key, dueAmount: m.dueAmount, paidAmount: m.paidAmount,
+          name: `Repasse à área · ${acc.config.payee} · ${m.label}`, category: "Repasse à área", supplier: acc.config.payee,
           station: acc.station, workName: row.workName, due: m.due, dueDay: acc.config.dueDay, amount: m.total,
           status: m.paidAt ? "paid" : m.status === "vencido" ? "overdue" : "pending", statusLabel: m.paidAt ? "Pago" : m.status === "vencido" ? "Vencido" : "A pagar",
           paidAt: m.paidAt, source: `Repasse à área (${m.reimbursement ? "energia + " : ""}${fmtPctPlain(m.areaPct)} do faturamento)` });
@@ -1969,10 +1970,11 @@
         const key = `${row.workId}|${inv.id}`;
         if (seen.has(key)) return; seen.add(key);
         const lease = n0(inv.leaseAmount) > 0 ? Math.round(n0(inv.leaseAmount) * 100) / 100 : Math.round(n0(inv.leaseKWh) * n0(inv.leaseRate) * 100) / 100;
-        [["Copel", n0(inv.copelAmount), inv.dueDate, inv.paidAt], ["Arrendamento de energia", lease, inv.leaseDueDate || inv.dueDate, inv.leasePaidAt || inv.paidAt]].forEach(([name, amount, due, paidAt]) => {
+        [["Copel", n0(inv.copelAmount), inv.dueDate, inv.paidAt], ["Arrendamento de energia", lease, inv.leaseDueDate || inv.dueDate, inv.leasePaidAt !== undefined ? inv.leasePaidAt : inv.paidAt]].forEach(([name, amount, due, paidAt]) => {
           if (!(amount > 0) || !due || String(due).slice(0, 7) !== mk) return;
           const overdue = !paidAt && new Date(`${due}T23:59:59`) < new Date();
-          out.push({ id: `energia-${inv.id}-${name}`, name: `${name} · fatura ${inv.ref || inv.start}`, category: "Energia", supplier: name === "Copel" ? "Copel" : "Arrendamento",
+          out.push({ id: `energia-${inv.id}-${name}`, kind: "energia", workId: row.workId, invoiceId: inv.id, part: name === "Copel" ? "copel" : "lease",
+            name: `${name} · fatura ${inv.ref || inv.start}`, category: "Energia", supplier: name === "Copel" ? "Copel" : "Arrendamento",
             station: row.stationName || row.station, workName: row.workName, due, dueDay: Number(String(due).slice(8, 10)), amount,
             status: paidAt ? "paid" : overdue ? "overdue" : "pending", statusLabel: paidAt ? "Pago" : overdue ? "Vencido" : "A pagar", paidAt: paidAt || "", source: "Fatura de energia" });
         });
@@ -2086,7 +2088,9 @@
   // Contas pagas (controle): tudo o que foi marcado como pago — custos da matriz e pagamentos
   // programados, faturas de energia (Copel e arrendamento), repasses às áreas e distribuição aos
   // cotistas — com data, valor e origem. Percorre as competências com operação até o mês seguinte.
-  function paidBills() {
+  // Todas as contas (pagas e em aberto) de todas as competências até o mês seguinte, com chave
+  // estável `${id}|${mês do vencimento}` — base da lista de pagas e da conferência com o extrato.
+  function allBills() {
     fv2Ensure();
     const cur = monthKey(new Date());
     const months = [...new Set([...(FV2.months || []), cur, nextMonth(cur)])].filter(isPlausibleMonthKey).sort();
@@ -2096,14 +2100,17 @@
       let list = [];
       try { list = payments(mk).list; } catch (_) { return; }
       list.forEach(p => {
-        if (p.status !== "paid") return;
         const key = `${p.id}|${mk}`;
-        if (seen.has(key)) return;
+        if (seen.has(key) || !(Number(p.amount) > 0)) return;
         seen.add(key);
-        out.push({ id: key, paidAt: String(p.paidAt || "").slice(0, 10), due: String(p.due || "").slice(0, 10), name: p.name, category: p.category || "", supplier: p.supplier || "",
-          source: p.source || "", station: p.station || "", workName: p.workName || "", amount: Number(p.amount) || 0, monthKey: mk });
+        out.push({ ...p, key, id: key, billId: p.id, paid: p.status === "paid", paidAt: String(p.paidAt || "").slice(0, 10), due: String(p.due || "").slice(0, 10),
+          category: p.category || "", supplier: p.supplier || "", source: p.source || "", station: p.station || "", workName: p.workName || "", amount: Number(p.amount) || 0, monthKey: mk });
       });
     });
+    return out;
+  }
+  function paidBills() {
+    const out = allBills().filter(b => b.paid);
     let inv = null;
     try { inv = investorDistribution(); } catch (_) {}
     (inv?.months || []).filter(m => m.paidAt).forEach(m => {
@@ -2114,7 +2121,7 @@
     return { list: out, total: out.reduce((s, p) => s + p.amount, 0) };
   }
 
-  window.UBY_MOTOR_API = { alerts, paidBills, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
+  window.UBY_MOTOR_API = { alerts, paidBills, allBills, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,

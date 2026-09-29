@@ -12,7 +12,7 @@
   ];
   const LEVEL = { critico: ["bad", "Urgente"], atencao: ["warn", "Atenção"], info: ["neutral", "Informativo"] };
   const when = d => d < 0 ? `venceu há ${Math.abs(d)} dia${Math.abs(d) > 1 ? "s" : ""}` : d === 0 ? "vence hoje" : d === 1 ? "vence amanhã" : `em ${d} dias`;
-  const payLink = b => /energia/i.test(b.category) ? "#/parametros/energia" : /área/i.test(b.category) ? "#/parametros/area" : "#/parametros/pagamentos";
+  const payLink = () => "#/parametros/pagamentos";
   const fmtDay = s => { const [y, m, d] = String(s).split("-"); return `${d}/${m}/${y}`; };
 
   // Contas pagas: lista geral para controle (data, conta, origem, valor), filtrável por mês do pagamento e tipo.
@@ -74,7 +74,7 @@
               <td><a class="btn" href="${payLink(b)}">Marcar pago →</a></td></tr>`).join("")}
           </tbody></table></div>`).join("")
         : `<div class="note" style="margin-top:12px">Nenhuma conta ${ui.bucket ? "neste prazo" : "em aberto"}.</div>`}
-        <p class="source-line">Para marcar como paga: Parâmetros e custos → Pagamentos (faturas de energia e repasses têm abas próprias). Contas de até 3 meses atrás não pagas continuam aparecendo como vencidas.</p>
+        <p class="source-line">Para marcar como paga: Parâmetros e custos → Pagamentos e extrato (todas as contas numa lista só, com a conferência do extrato do banco). Contas de até 3 meses atrás não pagas continuam aparecendo como vencidas.</p>
       </section>
 
       ${paidSection()}
