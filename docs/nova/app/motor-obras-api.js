@@ -113,7 +113,10 @@
         waiting: pend.filter(i => i.status === "Aguardando terceiro") },
       prospects: (prospects || []).map(p => ({ id: p.id, ponto: p.ponto, cidade: p.cidade, uf: p.uf, tipo: p.tipo, contato: p.contato || "", prioridade: p.prioridade || "",
         status: p.status || "", etapa: p.etapa || "", acao: p.acao || "", kw: p.kw || "", trafo: p.trafo || "", disjuntor: p.disjuntor || "" })),
-      cloud: (() => { const t = String(document.getElementById("cloudStatus")?.textContent || ""); return { text: t, ok: /^Sincronizado com a nuvem/i.test(t) }; })(),
+      // "Sincronizado" só vale se a lista de obras veio mesmo da nuvem (UBY_WORKS_CLOUD, gravado por loadWorks).
+      cloud: (() => { const t = String(document.getElementById("cloudStatus")?.textContent || ""); const w = window.UBY_WORKS_CLOUD;
+        if (w && w.ok === false) return { text: `leitura das obras falhou: ${w.error}`, ok: false };
+        return { text: t, ok: /^Sincronizado com a nuvem/i.test(t) && (!w || w.ok === true), count: w && w.count }; })(),
       macro, messages, activity, loadedAt: new Date().toISOString()
     }));
   }

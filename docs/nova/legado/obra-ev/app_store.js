@@ -24,8 +24,20 @@
     }
   }
 
+  // A cópia no navegador é só um apoio: se não couber (armazenamento cheio),
+  // nunca pode derrubar a leitura ou a gravação da nuvem.
   function writeLocal(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (err) {
+      console.warn("Copia local nao gravada (" + key + "):", err && err.message);
+      if (key === WORKS_KEY && Array.isArray(value)) {
+        // Tenta de novo sem o detalhe de cada obra (a parte pesada).
+        try { localStorage.setItem(key, JSON.stringify(value.map(({ detail, ...card }) => card))); return true; } catch (_) {}
+      }
+      return false;
+    }
   }
 
   function detailLink(id) {
@@ -227,7 +239,8 @@
   async function loadWorks(fallback) {
     try {
       const rows = await cloudSelect("obras");
-      if (!rows) return fallback;
+      if (!rows) { window.UBY_WORKS_CLOUD = { ok: false, error: "sessao nao conectada", at: Date.now() }; return fallback; }
+      window.UBY_WORKS_CLOUD = { ok: true, count: rows.length, at: Date.now() };
       const mapped = rows.map(rowToWork);
       const archivedIds = mapped.filter(item => item.archived).map(item => item.id);
     // A successful cloud response is authoritative. Browser-specific cache must
@@ -238,6 +251,8 @@
     return works;
     } catch (err) {
       console.warn("Falha ao ler obras no Supabase:", err.message);
+      // Registra a falha: a tela precisa avisar que a lista NÃO é a da nuvem.
+      window.UBY_WORKS_CLOUD = { ok: false, error: err.message || String(err), at: Date.now() };
       return fallback;
     }
   }
@@ -315,7 +330,8 @@
     if (String(window.__UBY_DETAIL_LOADING_ID__ || "") === normalizedId) {
       throw new Error("A obra ainda esta sendo carregada da nuvem. A gravacao provisoria foi bloqueada.");
     }
-    localStorage.setItem(`uby-obra-detalhe-${normalizedId}`, JSON.stringify(detail));
+    // Cópia local de apoio: armazenamento cheio não pode impedir a gravação na nuvem.
+    try { localStorage.setItem(`uby-obra-detalhe-${normalizedId}`, JSON.stringify(detail)); } catch (err) { console.warn("Copia local do detalhe nao gravada:", err && err.message); }
     return await saveWork(card, detail);
   }
 
