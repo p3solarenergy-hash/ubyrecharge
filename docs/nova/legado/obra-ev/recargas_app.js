@@ -763,7 +763,14 @@ function hydrateCharge(charge) {
   // baseado em data (o código já trata startDate/endDate nulos).
   if (startDate && !isPlausibleChargeDate(startDate)) startDate = null;
   if (endDate && !isPlausibleChargeDate(endDate)) endDate = null;
-  return { ...charge, startDate, endDate };
+  // Recargas do Shopping Aurora DC foram gravadas como "AURORA AC" pela regra
+  // antiga (qualquer "shopping aurora" virava AC). O nome original fica em
+  // rawStation (ou _sourceStation, nas sessões): quando ele é DC, a estação
+  // volta a ser a original.
+  let station = charge.station;
+  const raw = safeText(charge.rawStation || charge._sourceStation || '').trim();
+  if (raw && isUnifiedAuroraAcStation(station) && !isAuroraAcCandidateText(raw)) station = raw;
+  return { ...charge, station, startDate, endDate };
 }
 
 function chargeDateKey(charge) {
@@ -1305,6 +1312,9 @@ function canonicalStationNameForWork(workId, stationName, fallbackName = '') {
 
 function isAuroraAcCandidateText(value = '') {
   const text = normalizeStationForCompare(value);
+  // O Shopping Aurora também tem carregador DC (obra própria): nome com "DC"
+  // nunca é o Aurora AC, senão os dois viram um carregador só.
+  if (/(^|[^a-z0-9])dc([^a-z0-9]|$)/.test(text)) return false;
   return text.includes('aurora') && (text.includes('ac') || text.includes('shopping'));
 }
 
@@ -9394,6 +9404,8 @@ function isSinglePhysicalChargerStation(workId, stationName, workName = '') {
   return station.includes('robert koch') ||
     station.includes('rio beach') ||
     isUnifiedAuroraAcStation(station) ||
+    // Shopping Aurora DC: 5 × 30 kW no mesmo ponto — um carregador só para a operação.
+    station.includes('shopping aurora dc') ||
     context.includes('central jk') ||
     context.includes('posto central jk');
 }
