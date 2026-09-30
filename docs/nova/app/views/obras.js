@@ -324,7 +324,7 @@
       <p style="margin:0 0 12px"><a href="#/obras" style="font-weight:800;font-size:12px">← Obras</a></p>
       <div class="hero"><div><p class="eyebrow">Obra · ${esc(o.stage)}</p><h1>${esc(o.nome)}</h1><p class="lead">${esc(o.cliente)} · ${esc(o.local)}</p></div>
         <div class="callout"><strong>${esc(o.status)} · ${s.pct}% concluída</strong><small>Edite aqui mesmo: dados, tarefas, pendências e documentos gravam direto na base. <span id="obEditStatus">${statusLine()}</span><br><a href="#" id="openLegacyObra">abrir a tela original</a>${o.sheetUrl ? ` · <a href="${esc(o.sheetUrl)}" target="_blank" rel="noopener">planilha da obra ↗</a>` : ""}</small></div></div>
-      ${hasGap ? `<div class="note" style="margin-bottom:12px"><strong>Estrutura padrão incompleta:</strong> faltam ${esc(gapText(gap))}. ${edit.busy ? "Completando…" : `<button class="btn primary" id="obComplete" type="button">Completar estrutura agora</button>`}</div>` : ""}
+      ${hasGap ? `<div class="note" style="margin-bottom:12px"><strong>Estrutura padrão incompleta:</strong> faltam ${esc(gapText(gap))}. ${edit.err ? `<span class="badge bad">${esc(edit.err)}</span> ` : ""}${edit.busy ? "Completando…" : `<button class="btn primary" id="obComplete" type="button">Completar estrutura agora</button>`}</div>` : ""}
       <div class="toolbar"><div class="seg" id="obraTabs">${OBRA_TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
       ${body}`;
     target.querySelectorAll("#obraTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/obra/${encodeURIComponent(id)}/${b.dataset.tab}`));

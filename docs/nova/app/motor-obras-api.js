@@ -291,13 +291,21 @@
   // Completa uma obra com a estrutura padrão, gravando só o que faltava (relê a obra na nuvem antes).
   async function completeObra(id) {
     requireWrite();
-    const row = await readRow(id);
-    if (!row) throw new Error("Obra não encontrada na nuvem. Nada foi gravado.");
-    const detail = clone(row.raw_data?.project ? row.raw_data : seedFor(row));
+    let row = await readRow(id);
+    if (!row) {
+      // Obra conhecida só localmente (ainda sem linha na nuvem): cria a partir do cartão.
+      const o = obras.find(x => String(x.id) === String(id));
+      if (!o) throw new Error("Obra não encontrada. Nada foi gravado.");
+      row = { nome: o.nome, cliente: o.cliente, local: o.local, status_exec: o.status, carregadores: o.carregadores, potencia_kw: o.kw, raw_data: o.detail || null };
+    }
+    const detail = clone(row.raw_data?.project ? row.raw_data : (detailOf({ id, detail: row.raw_data }) || seedFor(row)));
     const added = completeDetail(detail);
     if (!added.phases && !added.tasks && !added.docs && row.raw_data?.project) return { id, added, changed: false };
     const card = cardOf(id, detail, row);
-    await window.UBY_STORE.saveWork(card, detail);
+    const saved = await window.UBY_STORE.saveWork(card, detail);
+    if (!saved?.cloud) throw new Error("Não consegui gravar na nuvem (sessão expirada?). Entre de novo e tente outra vez.");
+    const check = await readRow(id);
+    if (!(check?.raw_data?.phases || []).length) throw new Error("A gravação não confirmou na nuvem. Tente de novo.");
     try { window.UBY_ACTIVITY?.record({ workId: card.id, workName: card.nome, type: "update", title: "Estrutura padrão completada na Nova Plataforma", after: `+${added.phases} fase(s), +${added.tasks} tarefa(s), +${added.docs} documento(s)` }); } catch (_) {}
     return { id, added, changed: true };
   }
