@@ -36,7 +36,7 @@
       </div></section>
       ${edit.busy || edit.err || edit.msg ? `<div class="note" style="margin-bottom:12px">${statusLine()}</div>` : ""}
       <div class="toolbar"><div class="seg" id="obTabs">${TABS.map(([id, l]) => `<button data-tab="${id}" class="${tab === id ? "on" : ""}">${l}</button>`).join("")}</div>
-        <span class="spacer"></span>${snap.works.some(w => w.structureGap) ? `<button class="btn" id="obCompleteAll" type="button" title="Acrescenta fases, tarefas e documentos padrão que faltam; não altera o que já existe">Completar estrutura de ${snap.works.filter(w => w.structureGap).length} obra(s)</button>` : ""}<button class="btn primary" id="obNew" type="button">＋ Nova obra</button><button class="btn" id="obRefresh" title="Reler obras e tarefas no Supabase">↻ Atualizar obras</button></div>
+        <span class="spacer"></span>${snap.works.some(w => w.structureGap && !edit.settled.has(String(w.id))) ? `<button class="btn" id="obCompleteAll" type="button" title="Acrescenta fases, tarefas e documentos padrão que faltam; não altera o que já existe">Completar estrutura de ${snap.works.filter(w => w.structureGap && !edit.settled.has(String(w.id))).length} obra(s)</button>` : ""}<button class="btn primary" id="obNew" type="button">＋ Nova obra</button><button class="btn" id="obRefresh" title="Reler obras e tarefas no Supabase">↻ Atualizar obras</button></div>
       ${edit.newObra ? `<section class="section"><div class="section-head"><div><p class="kicker">Cadastro</p><h2>Nova obra</h2><p>Cria a obra com o checklist padrão de fases (documentação, concessionária, projeto, orçamentos, materiais, obras civil e elétrica, instalação e operação assistida). <span id="obEditStatus">${statusLine()}</span></p></div></div>
         <form id="obNewForm" class="grid g4" style="gap:10px">
           <label>Nome da obra<input class="search" name="nome" required></label>
@@ -151,7 +151,7 @@
   // ---------- Edição na própria tela (grava na base real, relendo a obra antes) ----------
   const TASK_STATUS = [["pending", "Pendente"], ["doing", "Em andamento"], ["done", "Concluído"], ["na", "Não se aplica"]];
   const PEND_STATUS = ["Pendente", "Aguardando terceiro", "Em andamento", "Concluida"];
-  const edit = { busy: false, msg: "", err: "", openTask: "", showForm: false, newObra: false, autoTried: new Set() };
+  const edit = { busy: false, msg: "", err: "", openTask: "", showForm: false, newObra: false, autoTried: new Set(), settled: new Set() };
   const gapText = m => [m.phases && `${m.phases} fase(s)`, m.tasks && `${m.tasks} tarefa(s)`, m.docs && `${m.docs} documento(s)`].filter(Boolean).join(", ");
   // Completa a estrutura padrão (só acrescenta o que falta) — automático ao abrir a obra e em lote no portfólio.
   async function completeStructure(target, ids, tab, backTo) {
@@ -163,6 +163,7 @@
       edit.step = `Gravando a estrutura em ${ids.length} obra(s)…`; render(target, backTo);
       const res = await api.completeAll(ids);
       const bad = res.filter(r => r.error), done = res.filter(r => r.changed);
+      res.filter(r => !r.error && !r.changed).forEach(r => edit.settled.add(String(r.id))); // já completas na nuvem (a leitura dessa obra vem de outra fonte)
       edit.msg = done.length ? `Estrutura completada em ${done.length} obra(s)` : "Estrutura já estava completa";
       if (bad.length) edit.err = bad.map(b => `${b.id}: ${b.error}`).join(" · ");
       snap = null; ids.forEach(i => obraCache.delete(i));
@@ -210,7 +211,7 @@
     if (o.error || o.missing) { target.innerHTML = `<p><a href="#/obras">← Obras</a></p><div class="note">${o.error ? esc(o.error) : "Obra não encontrada entre as ativas."}</div>`; return; }
     document.getElementById("crumbTitle").textContent = o.nome;
     const gap = o.structureMissing || { phases: 0, tasks: 0, docs: 0 };
-    const hasGap = gap.phases + gap.tasks + gap.docs > 0;
+    const hasGap = gap.phases + gap.tasks + gap.docs > 0 && !edit.settled.has(String(id));
     if (hasGap && !edit.busy && !edit.autoTried.has(id)) { edit.autoTried.add(id); setTimeout(() => completeStructure(target, [id], tab, ["obra", id, tab]), 0); }
     const s = o.stats;
     const dd = o.entregaDias;
@@ -416,13 +417,13 @@
         : `<div class="loading"><div class="spinner"></div><h2>Lendo obras, tarefas e prospecção</h2><p>O painel de obras original está carregando a base oficial no Supabase.</p></div>`;
       return;
     }
-    const gapIds = snap.works.filter(w => w.structureGap).map(w => w.id);
+    const gapIds = snap.works.filter(w => w.structureGap && !edit.settled.has(String(w.id))).map(w => w.id);
     if (gapIds.length && !edit.busy && !edit.autoAll) { edit.autoAll = true; setTimeout(() => completeStructure(target, gapIds, tab, params), 0); } // padrão em TODAS as obras, uma vez por sessão
     const body = { portfolio, prazos, fases, prospeccao, atividade }[tab]();
     target.innerHTML = head(tab) + body;
     target.querySelectorAll("#obTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/${b.dataset.tab}`));
     target.querySelector("#obRefresh").onclick = () => { snap = null; obraCache = new Map(); UBY.obras(true); render(target, params); };
-    const cAll = target.querySelector("#obCompleteAll"); if (cAll) cAll.onclick = () => completeStructure(target, snap.works.filter(w => w.structureGap).map(w => w.id), tab, params);
+    const cAll = target.querySelector("#obCompleteAll"); if (cAll) cAll.onclick = () => completeStructure(target, snap.works.filter(w => w.structureGap && !edit.settled.has(String(w.id))).map(w => w.id), tab, params);
     target.querySelector("#obNew").onclick = () => { edit.newObra = !edit.newObra; edit.err = ""; render(target, params); };
     const cancelNew = target.querySelector("#obNewCancel"); if (cancelNew) cancelNew.onclick = () => { edit.newObra = false; render(target, params); };
     const newForm = target.querySelector("#obNewForm");
