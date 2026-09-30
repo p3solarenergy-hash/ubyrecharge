@@ -35,7 +35,7 @@
         ${kpi("Alertas de prazo", fmt.int(s.criticalAlerts), "atrasos, entregas vencidas, alta prioridade", "", s.criticalAlerts ? "bad" : "")}
       </div></section>
       <div class="toolbar"><div class="seg" id="obTabs">${TABS.map(([id, l]) => `<button data-tab="${id}" class="${tab === id ? "on" : ""}">${l}</button>`).join("")}</div>
-        <span class="spacer"></span><button class="btn primary" id="obNew" type="button">＋ Nova obra</button><button class="btn" id="obRefresh" title="Reler obras e tarefas no Supabase">↻ Atualizar obras</button></div>
+        <span class="spacer"></span>${snap.works.some(w => w.structureGap) ? `<button class="btn" id="obCompleteAll" type="button" title="Acrescenta fases, tarefas e documentos padrão que faltam; não altera o que já existe">Completar estrutura de ${snap.works.filter(w => w.structureGap).length} obra(s)</button>` : ""}<button class="btn primary" id="obNew" type="button">＋ Nova obra</button><button class="btn" id="obRefresh" title="Reler obras e tarefas no Supabase">↻ Atualizar obras</button></div>
       ${edit.newObra ? `<section class="section"><div class="section-head"><div><p class="kicker">Cadastro</p><h2>Nova obra</h2><p>Cria a obra com o checklist padrão de fases (documentação, concessionária, projeto, orçamentos, materiais, obras civil e elétrica, instalação e operação assistida). <span id="obEditStatus">${statusLine()}</span></p></div></div>
         <form id="obNewForm" class="grid g4" style="gap:10px">
           <label>Nome da obra<input class="search" name="nome" required></label>
@@ -150,7 +150,25 @@
   // ---------- Edição na própria tela (grava na base real, relendo a obra antes) ----------
   const TASK_STATUS = [["pending", "Pendente"], ["doing", "Em andamento"], ["done", "Concluído"], ["na", "Não se aplica"]];
   const PEND_STATUS = ["Pendente", "Aguardando terceiro", "Em andamento", "Concluida"];
-  const edit = { busy: false, msg: "", err: "", openTask: "", showForm: false, newObra: false };
+  const edit = { busy: false, msg: "", err: "", openTask: "", showForm: false, newObra: false, autoTried: new Set() };
+  const gapText = m => [m.phases && `${m.phases} fase(s)`, m.tasks && `${m.tasks} tarefa(s)`, m.docs && `${m.docs} documento(s)`].filter(Boolean).join(", ");
+  // Completa a estrutura padrão (só acrescenta o que falta) — automático ao abrir a obra e em lote no portfólio.
+  async function completeStructure(target, ids, tab, backTo) {
+    if (edit.busy) return;
+    edit.busy = true; edit.err = ""; edit.msg = "";
+    const box = target.querySelector("#obEditStatus"); if (box) box.innerHTML = statusLine();
+    try {
+      const api = await UBY.obrasEdit();
+      const res = await api.completeAll(ids);
+      const bad = res.filter(r => r.error), done = res.filter(r => r.changed);
+      edit.msg = done.length ? `Estrutura completada em ${done.length} obra(s)` : "Estrutura já estava completa";
+      if (bad.length) edit.err = bad.map(b => `${b.id}: ${b.error}`).join(" · ");
+      snap = null; ids.forEach(i => obraCache.delete(i));
+      await UBY.obras(true).catch(() => {});
+    } catch (err) { edit.err = err.message || String(err); }
+    edit.busy = false;
+    render(target, backTo);
+  }
   const uid = p => `${p}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   const opt = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`).join("");
   const statusLine = () => edit.busy ? '<span class="badge warn">gravando…</span>' : edit.err ? `<span class="badge bad">${esc(edit.err)}</span>` : edit.msg ? `<span class="badge ok">${esc(edit.msg)}</span>` : "";
@@ -189,6 +207,9 @@
     if (!o) { target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Abrindo a obra</h2></div>`; return; }
     if (o.error || o.missing) { target.innerHTML = `<p><a href="#/obras">← Obras</a></p><div class="note">${o.error ? esc(o.error) : "Obra não encontrada entre as ativas."}</div>`; return; }
     document.getElementById("crumbTitle").textContent = o.nome;
+    const gap = o.structureMissing || { phases: 0, tasks: 0, docs: 0 };
+    const hasGap = gap.phases + gap.tasks + gap.docs > 0;
+    if (hasGap && !edit.busy && !edit.autoTried.has(id)) { edit.autoTried.add(id); setTimeout(() => completeStructure(target, [id], tab, ["obra", id, tab]), 0); }
     const s = o.stats;
     const dd = o.entregaDias;
     let body = "";
@@ -272,11 +293,28 @@
             <td>${d.due ? fmt.date(d.due + "T12:00:00") : "—"}</td><td>${/^https?:\/\//.test(d.link) ? `<a href="${esc(d.link)}" target="_blank" rel="noopener">abrir ↗</a>` : esc(d.link || "—")}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">Nenhum documento cadastrado.</td></tr>`}</tbody></table></div></section>`;
     } else if (tab === "prospeccao") {
       const pr = o.prospecting;
-      body = `<div class="split"><section class="section"><div class="section-head"><div><p class="kicker">Comercial</p><h2>Prospecção</h2></div><div class="meta">${pr.contractClosed ? `<span class="badge ok">contrato fechado</span>${pr.contractClosedAt ? `<br>${fmt.date(pr.contractClosedAt)}` : ""}` : '<span class="badge neutral">contrato em aberto</span>'}</div></div>
-          <div class="grid g2">${mini("Etapa", esc(pr.stage || "—"))}${mini("Responsável", esc(pr.responsible || "—"))}${mini("Contato", esc(pr.contactName || "—"), esc([pr.contactRole, pr.phone, pr.email].filter(Boolean).join(" · ")))}${mini("Próxima ação", esc(pr.nextAction || "—"), pr.nextActionDate ? fmt.date(pr.nextActionDate + "T12:00:00") : "")}</div>
-          ${pr.notes ? `<div class="note" style="margin-top:10px;white-space:pre-wrap">${esc(pr.notes)}</div>` : ""}</section>
+      body = `<div class="split"><section class="section"><div class="section-head"><div><p class="kicker">Comercial</p><h2>Prospecção e contrato</h2></div><div class="meta">${pr.contractClosed ? `<span class="badge ok">contrato fechado</span>${pr.contractClosedAt ? `<br>${fmt.date(pr.contractClosedAt)}` : ""}` : '<span class="badge neutral">contrato em aberto</span>'}</div></div>
+          <form id="obProspForm" class="grid g2" style="gap:8px">
+            <label>Etapa<input class="search" name="stage" value="${esc(pr.stage)}"></label>
+            <label>Responsável<input class="search" name="responsible" value="${esc(pr.responsible)}"></label>
+            <label>Contato<input class="search" name="contactName" value="${esc(pr.contactName)}"></label>
+            <label>Cargo do contato<input class="search" name="contactRole" value="${esc(pr.contactRole)}"></label>
+            <label>Telefone<input class="search" name="phone" value="${esc(pr.phone)}"></label>
+            <label>E-mail<input class="search" name="email" value="${esc(pr.email)}"></label>
+            <label>Próxima ação<input class="search" name="nextAction" value="${esc(pr.nextAction)}"></label>
+            <label>Data da próxima ação<input class="search" type="date" name="nextActionDate" value="${esc(pr.nextActionDate)}"></label>
+            <label style="grid-column:1/-1">Observações<textarea class="search" name="notes" rows="4">${esc(pr.notes)}</textarea></label>
+            <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="contractClosed" ${pr.contractClosed ? "checked" : ""}> Contrato fechado</label>
+            <div><button class="btn primary" type="submit">Salvar prospecção</button></div>
+          </form></section>
         <section class="section"><div class="section-head"><div><p class="kicker">Protocolos</p><h2>Protocolos e prazos (${pr.protocols.length})</h2></div><div class="meta">${pr.documents} documento(s) comerciais</div></div>
-          <div class="table-wrap"><table><thead><tr><th>Protocolo</th><th>Número</th><th>Situação</th><th>Prazo</th></tr></thead><tbody>${pr.protocols.map(p => `<tr><td>${esc(p.name || "—")}<small>${esc(p.reference)}</small></td><td>${esc(p.number || "—")}</td><td>${esc(p.status || "—")}</td><td>${p.deadline ? fmt.date(p.deadline + "T12:00:00") : "—"}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">Nenhum protocolo.</td></tr>`}</tbody></table></div></section></div>`;
+          <div class="table-wrap"><table><thead><tr><th>Protocolo</th><th>Número</th><th>Situação</th><th>Prazo</th></tr></thead><tbody>${pr.protocols.map(p => `<tr><td>${esc(p.name || "—")}<small>${esc(p.reference)}</small></td><td>${esc(p.number || "—")}</td><td>${esc(p.status || "—")}</td><td>${p.deadline ? fmt.date(p.deadline + "T12:00:00") : "—"}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">Nenhum protocolo.</td></tr>`}</tbody></table></div>
+          <form id="obProtoForm" class="grid g2" style="gap:8px;margin-top:10px">
+            <label>Protocolo<input class="search" name="name" placeholder="ex.: Aumento de carga Copel" required></label>
+            <label>Número<input class="search" name="number"></label>
+            <label>Situação<input class="search" name="status" value="Aberto"></label>
+            <label>Prazo<input class="search" type="date" name="deadline"></label>
+            <div style="grid-column:1/-1"><button class="btn" type="submit">＋ Adicionar protocolo</button></div></form></section></div>`;
     } else {
       const item = a => `<div class="list-row" style="display:block"><small style="color:var(--uby-muted)">${fmt.dt(a.at)} · ${esc(a.user)}</small><strong style="display:block;color:var(--uby-ink)">${esc(a.title || "")}</strong><span style="white-space:normal">${esc(a.text || a.detail || "")}${a.after ? ` → ${esc(a.after)}` : ""}</span></div>`;
       body = `<div class="grid g2" style="gap:18px"><section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Equipe</p><h2>Mensagens da obra</h2></div></div><div class="list" style="max-height:600px;overflow:auto">${o.messages.map(item).join("") || `<div class="note">Nenhuma mensagem nesta obra.</div>`}</div></section>
@@ -286,9 +324,11 @@
       <p style="margin:0 0 12px"><a href="#/obras" style="font-weight:800;font-size:12px">← Obras</a></p>
       <div class="hero"><div><p class="eyebrow">Obra · ${esc(o.stage)}</p><h1>${esc(o.nome)}</h1><p class="lead">${esc(o.cliente)} · ${esc(o.local)}</p></div>
         <div class="callout"><strong>${esc(o.status)} · ${s.pct}% concluída</strong><small>Edite aqui mesmo: dados, tarefas, pendências e documentos gravam direto na base. <span id="obEditStatus">${statusLine()}</span><br><a href="#" id="openLegacyObra">abrir a tela original</a>${o.sheetUrl ? ` · <a href="${esc(o.sheetUrl)}" target="_blank" rel="noopener">planilha da obra ↗</a>` : ""}</small></div></div>
+      ${hasGap ? `<div class="note" style="margin-bottom:12px"><strong>Estrutura padrão incompleta:</strong> faltam ${esc(gapText(gap))}. ${edit.busy ? "Completando…" : `<button class="btn primary" id="obComplete" type="button">Completar estrutura agora</button>`}</div>` : ""}
       <div class="toolbar"><div class="seg" id="obraTabs">${OBRA_TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
       ${body}`;
     target.querySelectorAll("#obraTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/obra/${encodeURIComponent(id)}/${b.dataset.tab}`));
+    const cbtn = target.querySelector("#obComplete"); if (cbtn) cbtn.onclick = () => completeStructure(target, [id], tab, ["obra", id, tab]);
     target.querySelector("#openLegacyObra").onclick = e => { e.preventDefault(); UBY.openLegacy(detailSrc(id), `Obra · ${o.nome}`); };
     bindEdit(target, id, tab, o);
   }
@@ -331,6 +371,23 @@
       save(target, id, tab, [{ push: ["phases", { name: fm.dataset.addTask }, "tasks"], value: { id: uid(fm.dataset.addTask), title, status: "pending", note: "", protocol: "", requestDate: "", forecastDate: "" } }],
         { type: "update", title: `Tarefa criada em ${fm.dataset.addTask}`, after: title });
     });
+    const prf = q("#obProspForm");
+    if (prf) prf.onsubmit = e => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(prf).entries());
+      const closed = prf.querySelector("[name=contractClosed]").checked;
+      const value = { stage: f.stage.trim(), responsible: f.responsible.trim(), contactName: f.contactName.trim(), contactRole: f.contactRole.trim(), phone: f.phone.trim(), email: f.email.trim(), nextAction: f.nextAction.trim(), nextActionDate: f.nextActionDate, notes: f.notes.trim() };
+      const ops = Object.entries(value).map(([k, v]) => ({ set: ["prospecting", k], value: v }))
+        .concat([{ set: ["prospecting", "contract", "closed"], value: closed }, { set: ["prospecting", "contract", "closedAt"], value: closed ? (o.prospecting.contractClosedAt || new Date().toISOString()) : "" }]);
+      save(target, id, tab, ops, { type: "update", title: "Prospecção atualizada", after: `${value.stage}${closed ? " · contrato fechado" : ""}` });
+    };
+    const ptf = q("#obProtoForm");
+    if (ptf) ptf.onsubmit = e => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(ptf).entries());
+      save(target, id, tab, [{ push: ["prospecting", "protocols"], value: { reference: uid("prot"), name: f.name.trim(), number: f.number.trim(), status: f.status.trim(), deadline: f.deadline } }],
+        { type: "protocol", title: "Protocolo criado", after: f.name.trim() });
+    };
     const pf = q("#obPendForm");
     if (pf) pf.onsubmit = e => {
       e.preventDefault();
@@ -361,6 +418,7 @@
     target.innerHTML = head(tab) + body;
     target.querySelectorAll("#obTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/${b.dataset.tab}`));
     target.querySelector("#obRefresh").onclick = () => { snap = null; obraCache = new Map(); UBY.obras(true); render(target, params); };
+    const cAll = target.querySelector("#obCompleteAll"); if (cAll) cAll.onclick = () => completeStructure(target, snap.works.filter(w => w.structureGap).map(w => w.id), tab, params);
     target.querySelector("#obNew").onclick = () => { edit.newObra = !edit.newObra; edit.err = ""; render(target, params); };
     const cancelNew = target.querySelector("#obNewCancel"); if (cancelNew) cancelNew.onclick = () => { edit.newObra = false; render(target, params); };
     const newForm = target.querySelector("#obNewForm");

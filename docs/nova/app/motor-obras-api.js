@@ -42,7 +42,7 @@
         id: o.id, nome: o.nome, cliente: o.cliente, local: o.local, status: o.status, stage: stageLabel(o.status || ""), kind: o.kind,
         pct: Number(o.pct || 0), kw: Number(o.kw || 0), carregadores: o.carregadores || "", crit: Number(o.crit || 0), flags: o.flags || [],
         entrega: p.entrega || "", entregaDias: p.entrega ? taskDaysUntil(p.entrega) : null, currentPhase: current ? current.name : (phases.length ? "Concluída" : ""),
-        phases, hasDetail: !!detail, pending: (detail?.operation?.pendingItems || []).filter(i => i.status !== "Concluida").length,
+        phases, hasDetail: !!detail, structureGap: (() => { const m = missingOf(detail || {}); return m.phases + m.tasks + m.docs; })(), pending: (detail?.operation?.pendingItems || []).filter(i => i.status !== "Concluida").length,
         mapLocation: p.mapLocation || o.mapLocation || null
       };
     });
@@ -158,7 +158,7 @@
       sheetUrl: p.obraSheetUrl || obra.obraSheetUrl || "", mapLocation: p.mapLocation || obra.mapLocation || null, archived: !!(detail.archived || obra.archived),
       stats: taskStats(allTasks.map(t => ({ status: t.status }))), hasDetail: !!detail.project, worstPhase: worst ? { name: worst.name, pct: worst.stats.pct } : null,
       phases, critical: crit.map(t => ({ phase: t.phase, title: t.title, status: t.statusLabel, protocol: t.protocol, forecastDate: t.forecastDate, requestDate: t.requestDate })),
-      documents: docs, docsOk: docs.filter(d => d.status === "done" || d.status === "na").length,
+      structureMissing: missingOf(detail), documents: docs, docsOk: docs.filter(d => d.status === "done" || d.status === "na").length,
       pending, pendingOpen: pending.filter(i => i.status !== "Concluida").length,
       analysis: p.analysis ? { title: p.analysis.title || "", url: p.analysis.url || "", peak: p.analysis.peak || "", consumption: p.analysis.consumption || "",
         ev: p.analysis.ev || "", status: p.analysis.status || "", utility: p.analysis.utility || "", action: p.analysis.action || "" } : null,
@@ -253,6 +253,60 @@
     if (!row) throw new Error("Obra não encontrada na nuvem.");
     return clone(row.raw_data?.project ? row.raw_data : seedFor(row));
   }
+  // Estrutura padrão de toda obra (mesma do original): 10 fases com checklist + 7 documentos + prospecção.
+  const DOC_DEFAULTS = [
+    { id: "doc-contrato", name: "Contrato ou proposta aprovada", phase: "Documentacao", owner: "Cliente / UBY" },
+    { id: "doc-art", name: "ART / TRT", phase: "Projeto", owner: "Responsavel tecnico" },
+    { id: "doc-projeto", name: "Projeto eletrico executivo", phase: "Projeto", owner: "Engenharia" },
+    { id: "doc-concessionaria", name: "Protocolo / aprovacao concessionaria", phase: "Concessionaria", owner: "UBY" },
+    { id: "doc-orcamentos", name: "Orcamentos aprovados", phase: "Orcamentos", owner: "Compras" },
+    { id: "doc-fotos", name: "Fotos antes, durante e entrega", phase: "Obra", owner: "Equipe de campo" },
+    { id: "doc-comissionamento", name: "Teste e termo de entrega", phase: "Comissionamento", owner: "Tecnico UBY" }
+  ].map(d => ({ ...d, status: "pending", due: "", link: "" }));
+  const PROSPECT_DEFAULTS = { stage: "Triagem inicial", responsible: "", contactName: "", contactRole: "", phone: "", email: "", nextAction: "", nextActionDate: "", notes: "", protocols: [], documents: [] };
+  const standardSeed = () => createDetailSeed({ nome: "", cliente: "", local: "", status: "Projeto" }, 1, 60);
+
+  // Só ACRESCENTA o que falta (fases, tarefas por título, documentos por id, campos de prospecção); nunca altera nem apaga o que já existe.
+  function completeDetail(detail) {
+    const seed = standardSeed(), added = { phases: 0, tasks: 0, docs: 0 };
+    detail.phases = Array.isArray(detail.phases) ? detail.phases : [];
+    seed.phases.forEach(sp => {
+      let ph = detail.phases.find(p => p.name === sp.name);
+      if (!ph) { ph = { name: sp.name, owner: sp.owner, tasks: [] }; detail.phases.push(ph); added.phases += 1; }
+      ph.tasks = Array.isArray(ph.tasks) ? ph.tasks : [];
+      sp.tasks.forEach(st => { if (!ph.tasks.some(t => t.title === st.title)) { ph.tasks.push(clone(st)); added.tasks += 1; } });
+    });
+    detail.documents = Array.isArray(detail.documents) ? detail.documents : [];
+    DOC_DEFAULTS.forEach(d => { if (!detail.documents.some(x => x.id === d.id)) { detail.documents.push(clone(d)); added.docs += 1; } });
+    detail.prospecting = { ...clone(PROSPECT_DEFAULTS), ...(detail.prospecting || {}) };
+    detail.prospecting.protocols = detail.prospecting.protocols || [];
+    detail.prospecting.documents = detail.prospecting.documents || [];
+    detail.operation = detail.operation || {};
+    detail.operation.pendingItems = detail.operation.pendingItems || [];
+    return added;
+  }
+  function missingOf(detail) {
+    return completeDetail(clone(detail || {}));
+  }
+  // Completa uma obra com a estrutura padrão, gravando só o que faltava (relê a obra na nuvem antes).
+  async function completeObra(id) {
+    requireWrite();
+    const row = await readRow(id);
+    if (!row) throw new Error("Obra não encontrada na nuvem. Nada foi gravado.");
+    const detail = clone(row.raw_data?.project ? row.raw_data : seedFor(row));
+    const added = completeDetail(detail);
+    if (!added.phases && !added.tasks && !added.docs && row.raw_data?.project) return { id, added, changed: false };
+    const card = cardOf(id, detail, row);
+    await window.UBY_STORE.saveWork(card, detail);
+    try { window.UBY_ACTIVITY?.record({ workId: card.id, workName: card.nome, type: "update", title: "Estrutura padrão completada na Nova Plataforma", after: `+${added.phases} fase(s), +${added.tasks} tarefa(s), +${added.docs} documento(s)` }); } catch (_) {}
+    return { id, added, changed: true };
+  }
+  async function completeAll(ids) {
+    const out = [];
+    for (const id of ids) { try { out.push(await completeObra(id)); } catch (err) { out.push({ id, error: err.message }); } }
+    return out;
+  }
+
   async function editObra(id, ops, note = {}) {
     requireWrite();
     const row = await readRow(id);
@@ -282,5 +336,6 @@
     return clone({ id, card });
   }
 
-  window.UBY_OBRAS_API = { ready, snapshot, obraDetail, allTasks, rawDetail, editObra, createObra, applyOps, cardOf };
+  const missingByWork = () => obras.map(o => ({ id: o.id, nome: o.nome, missing: missingOf(detailOf(o) || {}) }));
+  window.UBY_OBRAS_API = { ready, snapshot, obraDetail, allTasks, rawDetail, editObra, createObra, applyOps, cardOf, completeObra, completeAll, missingOf, missingByWork, completeDetail };
 })();
