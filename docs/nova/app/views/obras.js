@@ -34,6 +34,7 @@
         ${kpi("Potência da carteira", `${fmt.int(s.kw)} kW`, "soma dos carregadores")}
         ${kpi("Alertas de prazo", fmt.int(s.criticalAlerts), "atrasos, entregas vencidas, alta prioridade", "", s.criticalAlerts ? "bad" : "")}
       </div></section>
+      ${edit.busy || edit.err || edit.msg ? `<div class="note" style="margin-bottom:12px">${statusLine()}</div>` : ""}
       <div class="toolbar"><div class="seg" id="obTabs">${TABS.map(([id, l]) => `<button data-tab="${id}" class="${tab === id ? "on" : ""}">${l}</button>`).join("")}</div>
         <span class="spacer"></span>${snap.works.some(w => w.structureGap) ? `<button class="btn" id="obCompleteAll" type="button" title="Acrescenta fases, tarefas e documentos padrão que faltam; não altera o que já existe">Completar estrutura de ${snap.works.filter(w => w.structureGap).length} obra(s)</button>` : ""}<button class="btn primary" id="obNew" type="button">＋ Nova obra</button><button class="btn" id="obRefresh" title="Reler obras e tarefas no Supabase">↻ Atualizar obras</button></div>
       ${edit.newObra ? `<section class="section"><div class="section-head"><div><p class="kicker">Cadastro</p><h2>Nova obra</h2><p>Cria a obra com o checklist padrão de fases (documentação, concessionária, projeto, orçamentos, materiais, obras civil e elétrica, instalação e operação assistida). <span id="obEditStatus">${statusLine()}</span></p></div></div>
@@ -155,10 +156,11 @@
   // Completa a estrutura padrão (só acrescenta o que falta) — automático ao abrir a obra e em lote no portfólio.
   async function completeStructure(target, ids, tab, backTo) {
     if (edit.busy) return;
-    edit.busy = true; edit.err = ""; edit.msg = "";
-    const box = target.querySelector("#obEditStatus"); if (box) box.innerHTML = statusLine();
+    edit.busy = true; edit.err = ""; edit.msg = ""; edit.step = "Abrindo o quadro de gravação (pode levar até 1 minuto)…";
+    render(target, backTo);
     try {
       const api = await UBY.obrasEdit();
+      edit.step = `Gravando a estrutura em ${ids.length} obra(s)…`; render(target, backTo);
       const res = await api.completeAll(ids);
       const bad = res.filter(r => r.error), done = res.filter(r => r.changed);
       edit.msg = done.length ? `Estrutura completada em ${done.length} obra(s)` : "Estrutura já estava completa";
@@ -166,12 +168,12 @@
       snap = null; ids.forEach(i => obraCache.delete(i));
       await UBY.obras(true).catch(() => {});
     } catch (err) { edit.err = err.message || String(err); }
-    edit.busy = false;
+    edit.busy = false; edit.step = "";
     render(target, backTo);
   }
   const uid = p => `${p}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   const opt = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`).join("");
-  const statusLine = () => edit.busy ? '<span class="badge warn">gravando…</span>' : edit.err ? `<span class="badge bad">${esc(edit.err)}</span>` : edit.msg ? `<span class="badge ok">${esc(edit.msg)}</span>` : "";
+  const statusLine = () => edit.busy ? `<span class="badge warn">${esc(edit.step || "gravando…")}</span>` : edit.err ? `<span class="badge bad">${esc(edit.err)}</span>` : edit.msg ? `<span class="badge ok">${esc(edit.msg)}</span>` : "";
   async function save(target, id, tab, ops, note) {
     if (edit.busy) return;
     edit.busy = true; edit.err = ""; edit.msg = "";
@@ -324,7 +326,7 @@
       <p style="margin:0 0 12px"><a href="#/obras" style="font-weight:800;font-size:12px">← Obras</a></p>
       <div class="hero"><div><p class="eyebrow">Obra · ${esc(o.stage)}</p><h1>${esc(o.nome)}</h1><p class="lead">${esc(o.cliente)} · ${esc(o.local)}</p></div>
         <div class="callout"><strong>${esc(o.status)} · ${s.pct}% concluída</strong><small>Edite aqui mesmo: dados, tarefas, pendências e documentos gravam direto na base. <span id="obEditStatus">${statusLine()}</span><br><a href="#" id="openLegacyObra">abrir a tela original</a>${o.sheetUrl ? ` · <a href="${esc(o.sheetUrl)}" target="_blank" rel="noopener">planilha da obra ↗</a>` : ""}</small></div></div>
-      ${hasGap ? `<div class="note" style="margin-bottom:12px"><strong>Estrutura padrão incompleta:</strong> faltam ${esc(gapText(gap))}. ${edit.err ? `<span class="badge bad">${esc(edit.err)}</span> ` : ""}${edit.busy ? "Completando…" : `<button class="btn primary" id="obComplete" type="button">Completar estrutura agora</button>`}</div>` : ""}
+      ${hasGap ? `<div class="note" style="margin-bottom:12px"><strong>Estrutura padrão incompleta:</strong> faltam ${esc(gapText(gap))}. ${edit.err ? `<span class="badge bad">${esc(edit.err)}</span> ` : ""}${edit.busy ? statusLine() : `<button class="btn primary" id="obComplete" type="button">Completar estrutura agora</button>`}</div>` : ""}
       <div class="toolbar"><div class="seg" id="obraTabs">${OBRA_TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
       ${body}`;
     target.querySelectorAll("#obraTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/obra/${encodeURIComponent(id)}/${b.dataset.tab}`));
