@@ -113,6 +113,7 @@
         waiting: pend.filter(i => i.status === "Aguardando terceiro") },
       prospects: (prospects || []).map(p => ({ id: p.id, ponto: p.ponto, cidade: p.cidade, uf: p.uf, tipo: p.tipo, contato: p.contato || "", prioridade: p.prioridade || "",
         status: p.status || "", etapa: p.etapa || "", acao: p.acao || "", kw: p.kw || "", trafo: p.trafo || "", disjuntor: p.disjuntor || "" })),
+      cloud: (() => { const t = String(document.getElementById("cloudStatus")?.textContent || ""); return { text: t, ok: /^Sincronizado com a nuvem/i.test(t) }; })(),
       macro, messages, activity, loadedAt: new Date().toISOString()
     }));
   }
@@ -291,14 +292,9 @@
   // Completa uma obra com a estrutura padrão, gravando só o que faltava (relê a obra na nuvem antes).
   async function completeObra(id) {
     requireWrite();
-    let row = await readRow(id);
-    if (!row) {
-      // Obra conhecida só localmente (ainda sem linha na nuvem): cria a partir do cartão.
-      const o = obras.find(x => String(x.id) === String(id));
-      if (!o) throw new Error("Obra não encontrada. Nada foi gravado.");
-      row = { nome: o.nome, cliente: o.cliente, local: o.local, status_exec: o.status, carregadores: o.carregadores, potencia_kw: o.kw, raw_data: o.detail || null };
-    }
-    const detail = clone(row.raw_data?.project ? row.raw_data : (detailOf({ id, detail: row.raw_data }) || seedFor(row)));
+    const row = await readRow(id);
+    if (!row) throw new Error("Obra não encontrada na nuvem. Nada foi gravado."); // nunca cria/sobrescreve a partir de cópia local
+    const detail = clone(row.raw_data?.project ? row.raw_data : seedFor(row));
     const added = completeDetail(detail);
     if (!added.phases && !added.tasks && !added.docs && row.raw_data?.project) return { id, added, changed: false };
     const card = cardOf(id, detail, row);

@@ -34,6 +34,7 @@
         ${kpi("Potência da carteira", `${fmt.int(s.kw)} kW`, "soma dos carregadores")}
         ${kpi("Alertas de prazo", fmt.int(s.criticalAlerts), "atrasos, entregas vencidas, alta prioridade", "", s.criticalAlerts ? "bad" : "")}
       </div></section>
+      ${snap.cloud && !snap.cloud.ok ? `<div class="note" style="margin-bottom:12px;border-color:var(--uby-red)"><strong>A lista de obras NÃO veio da nuvem</strong> (${esc(snap.cloud.text || "sem resposta")}). O que aparece pode estar incompleto e nada será gravado automaticamente. Saia e entre de novo na plataforma e clique em ↻ Atualizar obras.</div>` : ""}
       ${edit.busy || edit.err || edit.msg ? `<div class="note" style="margin-bottom:12px">${statusLine()}</div>` : ""}
       <div class="toolbar"><div class="seg" id="obTabs">${TABS.map(([id, l]) => `<button data-tab="${id}" class="${tab === id ? "on" : ""}">${l}</button>`).join("")}</div>
         <span class="spacer"></span>${snap.works.some(w => w.structureGap && !edit.settled.has(String(w.id))) ? `<button class="btn" id="obCompleteAll" type="button" title="Acrescenta fases, tarefas e documentos padrão que faltam; não altera o que já existe">Completar estrutura de ${snap.works.filter(w => w.structureGap && !edit.settled.has(String(w.id))).length} obra(s)</button>` : ""}<button class="btn primary" id="obNew" type="button">＋ Nova obra</button><button class="btn" id="obRefresh" title="Reler obras e tarefas no Supabase">↻ Atualizar obras</button></div>
@@ -146,7 +147,7 @@
   const OBRA_TABS = [["geral", "Visão geral"], ["fases", "Fases e tarefas"], ["pendencias", "Pendências"], ["documentos", "Documentos"], ["prospeccao", "Prospecção e contrato"], ["historico", "Histórico e mensagens"]];
   const PUB = "https://p3solarenergy-hash.github.io/ubyrecharge/obra-ev/";
   const statusBadge = s => ({ done: "ok", na: "neutral", doing: "warn", pending: "bad" }[s] || "neutral");
-  let obraCache = new Map();
+  let obraCache = new Map(), obraCloudFlag = false;
 
   // ---------- Edição na própria tela (grava na base real, relendo a obra antes) ----------
   const TASK_STATUS = [["pending", "Pendente"], ["doing", "Em andamento"], ["done", "Concluído"], ["na", "Não se aplica"]];
@@ -203,16 +204,17 @@
   function obraView(target, id, tab) {
     if (!obraCache.has(id)) {
       obraCache.set(id, null);
-      UBY.obras().then(r => { obraCache.set(id, r.api.obraDetail(id) || { missing: true }); }).catch(err => obraCache.set(id, { error: err.message }))
+      UBY.obras().then(r => { obraCloudFlag = !!r.data.cloud?.ok; obraCache.set(id, r.api.obraDetail(id) || { missing: true }); }).catch(err => obraCache.set(id, { error: err.message }))
         .finally(() => { if (decodeURIComponent(location.hash).startsWith(`#/obras/obra/${id}`)) render(target, ["obra", id, tab]); });
     }
     const o = obraCache.get(id);
     if (!o) { target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Abrindo a obra</h2></div>`; return; }
     if (o.error || o.missing) { target.innerHTML = `<p><a href="#/obras">← Obras</a></p><div class="note">${o.error ? esc(o.error) : "Obra não encontrada entre as ativas."}</div>`; return; }
     document.getElementById("crumbTitle").textContent = o.nome;
+    const obraCloudOk = !!(snap?.cloud?.ok || obraCloudFlag);
     const gap = o.structureMissing || { phases: 0, tasks: 0, docs: 0 };
     const hasGap = gap.phases + gap.tasks + gap.docs > 0 && !edit.settled.has(String(id));
-    if (hasGap && !edit.busy && !edit.autoTried.has(id)) { edit.autoTried.add(id); setTimeout(() => completeStructure(target, [id], tab, ["obra", id, tab]), 0); }
+    if (hasGap && obraCloudOk && !edit.busy && !edit.autoTried.has(id)) { edit.autoTried.add(id); setTimeout(() => completeStructure(target, [id], tab, ["obra", id, tab]), 0); }
     const s = o.stats;
     const dd = o.entregaDias;
     let body = "";
@@ -417,7 +419,7 @@
         : `<div class="loading"><div class="spinner"></div><h2>Lendo obras, tarefas e prospecção</h2><p>O painel de obras original está carregando a base oficial no Supabase.</p></div>`;
       return;
     }
-    const gapIds = snap.works.filter(w => w.structureGap && !edit.settled.has(String(w.id))).map(w => w.id);
+    const gapIds = snap.cloud?.ok ? snap.works.filter(w => w.structureGap && !edit.settled.has(String(w.id))).map(w => w.id) : [];
     if (gapIds.length && !edit.busy && !edit.autoAll) { edit.autoAll = true; setTimeout(() => completeStructure(target, gapIds, tab, params), 0); } // padrão em TODAS as obras, uma vez por sessão
     const body = { portfolio, prazos, fases, prospeccao, atividade }[tab]();
     target.innerHTML = head(tab) + body;
