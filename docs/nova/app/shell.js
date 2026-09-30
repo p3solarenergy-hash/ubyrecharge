@@ -22,6 +22,7 @@
     { label: "REDE DE RECARGAS", items: [
       { id: "comando", icon: "▦", label: "Comando da rede", type: "view", period: true },
       { id: "unidades", icon: "▤", label: "Unidades e carregadores", type: "view", period: true },
+      { id: "aurora", icon: "◫", label: "Shopping Aurora · AC e DC", type: "view", period: true },
       { id: "uso", icon: "◔", label: "Análise de uso", type: "view", period: true },
       { id: "clientes", icon: "◎", label: "Clientes", type: "view", period: true },
       { id: "clube", icon: "✦", label: "Clube UBY", type: "view" },

@@ -243,7 +243,37 @@
       <div class="sign"><div>Responsável · UBY Recharge</div><div>${esc(a.config.payee)}</div></div>${foot()}`;
   }
 
+  // ---------------------------------------------------------------- Shopping Aurora (AC + DC no mesmo ponto)
+  // Página de resumo lado a lado; o individual de cada lado vem de pageCarregador.
+  function pageAurora(parts, mk) {
+    const cols = parts.map(p => ({ label: p.label, s: UBY.data("stationFinance", p.workId, p.station, mk) })).map(c => ({ ...c, f: c.s && c.s.finance }));
+    const sum = k => cols.reduce((t, c) => t + n(c.f && c.f[k]), 0);
+    const line = (label, get, fmtFn = fmt.brl) => `<tr><td>${label}</td>${cols.map(c => `<td class="n">${c.f ? fmtFn(get(c.f)) : "—"}</td>`).join("")}<td class="n"><b>${fmtFn(cols.reduce((t, c) => t + (c.f ? n(get(c.f)) : 0), 0))}</b></td></tr>`;
+    return `${header("Shopping Aurora · AC e DC", `Dois carregadores na mesma localização · competência ${esc(monthName(mk))}`, "pendente")}
+      <div class="kpis">
+        ${kpi("Faturamento", fmt.brl(sum("totalRevenue") || sum("revenue")), "AC + DC")}
+        ${kpi("Energia entregue", fmt.kwh0(sum("energy")), "AC + DC")}
+        ${kpi("Custos totais", fmt.brl(sum("totalOperatingCost")))}
+        ${kpi("Resultado do ponto", signed(sum("operationNet")), "", true)}
+      </div>
+      <h2>Comparativo AC × DC</h2>
+      <table><thead><tr><th></th>${cols.map(c => `<th class="n">${esc(c.label)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
+        ${line("Faturamento", f => f.totalRevenue || f.revenue)}
+        ${line("Energia entregue", f => f.energy, fmt.kwh0)}
+        ${line("Custo de energia", f => f.energyCost)}
+        ${line("Custos totais", f => f.totalOperatingCost)}
+        ${line("Resultado operacional", f => f.operationNet)}
+      </tbody></table>
+      ${cols.some(c => !c.f) ? `<div class="note">Sem competência com operação para: ${cols.filter(c => !c.f).map(c => esc(c.label)).join(", ")}.</div>` : ""}
+      <div class="note">As páginas seguintes trazem o relatório individual de cada carregador.</div>${foot()}`;
+  }
+
   function build(kind, o = {}) {
+    if (kind === "aurora") {
+      const parts = o.parts || [];
+      if (!parts.length) throw new Error("Nenhum carregador do Shopping Aurora encontrado.");
+      return doc(`Shopping Aurora AC e DC ${monthName(o.month)}`, [pageAurora(parts, o.month), ...parts.map(p => pageCarregador(p.workId, p.station, o.month))]);
+    }
     if (kind === "area") return doc(`Prestação de contas ${o.station} ${monthName(o.month)}`, [pageArea(o.workId, o.station, o.month)]);
     if (kind === "unificado") return doc(`Relatório unificado ${monthName(o.month)}`, [pageUnificado(o.month)]);
     if (kind === "carregador") return doc(`Relatório ${o.station} ${monthName(o.month)}`, [pageCarregador(o.workId, o.station, o.month)]);
