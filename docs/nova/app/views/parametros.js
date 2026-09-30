@@ -496,6 +496,7 @@
         </div>
         <p style="margin:10px 0 4px;font-size:11px;font-weight:800">Dias de funcionamento</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">${DAYS.map(([v, l]) => `<label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" data-of-day="${v}" ${(f.openDays || []).includes(v) ? "checked" : ""}>${l}</label>`).join("")}</div>
+        ${(() => { const closed = DAYS.filter(([v]) => !(f.openDays || []).includes(v)).map(([, l]) => l); return closed.length ? `<div class="note" id="pmOpClosedDays" style="margin-top:8px;border-color:var(--uby-red)"><strong>Fechado em: ${esc(closed.join(", "))}.</strong> Nesses dias o carregador conta como fechado: 0 hora disponível e ocupação zerada, mesmo que tenha recarga. Para um dia com horário diferente (ex.: domingo), deixe o dia marcado e use "Horário próprio" abaixo.</div>` : ""; })()}
         <p style="margin:12px 0 4px;font-size:11px;font-weight:800">Horário por dia da semana</p>
         <p class="source-line" style="margin:0 0 6px">Marque "Horário próprio" no dia que funciona diferente do horário geral (ex.: domingo das 10:00 às 18:00). Os demais dias seguem o horário geral acima.</p>
         <div class="table-wrap"><table><thead><tr><th>Dia</th><th>Horário próprio</th><th>Funcionamento</th><th>Abre</th><th>Fecha</th></tr></thead><tbody>
@@ -1298,6 +1299,8 @@
       const [workId, station] = ui.opCharger.split("|");
       const f = ui.opForm;
       if (!(f.openDays || []).length) { log("Horários: selecione ao menos um dia de funcionamento.", "bad"); draw(target, w); return; }
+      const closedDays = DAYS.filter(([v]) => !(f.openDays || []).includes(v)).map(([, l]) => l);
+      if (closedDays.length && !confirm(`${station} vai ficar FECHADO em: ${closedDays.join(", ")}.\n\nNesses dias a ocupação fica zerada, mesmo com recarga. Confirma?`)) return;
       run(target, w, `Horários e cortesia · ${station}`, async () => {
         try { w.openStationLayoutConfiguration(workId, station); } catch (_) { /* o modal pode não abrir na moldura invisível; os campos são preenchidos abaixo */ }
         const d = w.document;
