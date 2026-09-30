@@ -266,7 +266,7 @@
   // ---------- motor de obras (carregado sob demanda) ----------
   let obrasPromise = null;
   function obras(force = false) {
-    if (force) obrasPromise = null;
+    if (force) { obrasPromise = null; document.getElementById("obrasFrame")?.remove(); } // quadro novo: senão lê a página antiga ainda carregada
     if (obrasPromise) return obrasPromise;
     obrasPromise = new Promise((resolve, reject) => {
       let frame = document.getElementById("obrasFrame");

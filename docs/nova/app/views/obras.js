@@ -414,6 +414,8 @@
         : `<div class="loading"><div class="spinner"></div><h2>Lendo obras, tarefas e prospecção</h2><p>O painel de obras original está carregando a base oficial no Supabase.</p></div>`;
       return;
     }
+    const gapIds = snap.works.filter(w => w.structureGap).map(w => w.id);
+    if (gapIds.length && !edit.busy && !edit.autoAll) { edit.autoAll = true; setTimeout(() => completeStructure(target, gapIds, tab, params), 0); } // padrão em TODAS as obras, uma vez por sessão
     const body = { portfolio, prazos, fases, prospeccao, atividade }[tab]();
     target.innerHTML = head(tab) + body;
     target.querySelectorAll("#obTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/${b.dataset.tab}`));
