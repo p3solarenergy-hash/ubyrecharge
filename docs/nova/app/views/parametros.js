@@ -164,6 +164,9 @@
     return field(c.label || row.name, input);
   }
 
+  // Retenção S.A. e % de cotas não são mais por carregador: a reserva legal, o fundo de expansão e a
+  // parte dos cotistas valem sobre o resultado consolidado (Cotas, impostos e rodadas).
+  const CENTRAL_KEYS = ["saRetentionPct", "investorQuotaPct"];
   function chargerTab(w, data) {
     const list = data.chargers;
     const groups = [["Operação UBY", c => c.included && ["uby", "hybrid"].includes(c.model)], ["Parceiros · royalty UBY", c => c.included && c.model === "third_party_management"],
@@ -217,11 +220,12 @@
            <div class="note" style="margin-bottom:12px">Simulação das alterações ainda não salvas (conta da tela original${hasInv ? ", sem as faturas de energia por leitura" : ""}). Depois de salvar, os cartões voltam a mostrar o resultado oficial.</div>`
         : `<div class="grid g5" style="margin-bottom:14px">${officialCards}${kpi("Base desta competência", esc(f.versionSource || "—"), esc(f.versionHelp || ""))}</div>
            ${off && !off.operating ? `<div class="note" style="margin-bottom:12px">Este carregador ainda não operava em ${esc(mName(ui.month))}${firstOp ? ` (primeira competência com recarga: ${esc(mName(firstOp))})` : ""}. Os parâmetros abaixo ficam guardados, mas esta competência não entra no resultado oficial, nos relatórios nem na distribuição.</div>` : ""}`}
-      <div class="grid g2" style="gap:14px">${f.rows.filter(r => modelVisible(r, model, transfer) && r.controls.length).map(r => `
+      <div class="grid g2" style="gap:14px">${f.rows.filter(r => modelVisible(r, model, transfer) && r.controls.length && !CENTRAL_KEYS.includes(r.key)).map(r => `
         <section class="section" style="margin:0" data-focus="${esc(r.key)}"><div class="section-head" style="margin-bottom:8px"><div><p class="kicker">${esc(r.group)}</p><h2 style="font-size:14px">${esc(r.name)}</h2><p>${esc(r.key === "energyCostPerKWh" && hasInv ? "Custo de energia pelas faturas da Copel e do arrendamento, dividido pelo mês de consumo." : r.rule)}</p></div>
           ${r.key === "energyCostPerKWh" && hasInv ? "" : `<div class="meta">anterior<br><strong>${esc(r.previous || "—")}</strong></div>`}</div>
           ${r.key === "energyCostPerKWh" && hasInv ? energyInvoiceBox() : `<div class="grid ${r.controls.length > 2 ? "g3" : "g2"}" style="gap:8px">${r.controls.filter(c => !c.leaseOnly || energyMode === "copel_lease").map(c => control(c, r)).join("")}</div>
           ${r.key === "energyCostPerKWh" ? `<p class="source-line">${esc(f.energySummary)}</p>` : ""}`}</section>`).join("")}</div>
+      ${["uby", "hybrid"].includes(model) ? `<div class="note" style="margin-top:14px">Reserva legal S.A., fundo de expansão e cotistas não são configurados por carregador: valem uma vez só sobre o resultado consolidado da rede, em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a>.</div>` : ""}
       <section class="section" style="margin-top:14px"><div class="section-head"><div><p class="kicker">Regras do carregador</p><h2>Custos e receitas adicionais</h2><p>Valem nesta competência. "Avulso no mês" não é reaproveitado nos meses seguintes pelo motor novo.</p></div>
           <div><button class="btn" data-rule-add="cost" type="button">＋ Custo</button> <button class="btn" data-rule-add="revenue" type="button">＋ Receita</button></div></div>
         <h3 style="margin:4px 0 6px">Custos</h3>

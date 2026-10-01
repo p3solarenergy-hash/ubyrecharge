@@ -22,7 +22,7 @@
         <td class="num">${fmt.pct1(r.areaPct)}<small>${r.areaMode === "net" ? "do lucro" : "do faturamento"}</small></td>
         <td class="num">${r.ubyRoyaltyPct ? fmt.pct1(r.ubyRoyaltyPct) : "—"}</td><td class="num">${fmt.pct1(r.taxRatePct)}</td>
         <td class="num">${r.energyCostPerKWh ? `${fmt.brl(r.energyCostPerKWh)}/kWh` : "—"}<small>${esc(r.energyBillingMode)}</small></td>
-        <td class="num">${r.investmentValue ? fmt.brl(r.investmentValue) : "—"}${r.investmentValue ? `<small>cotas ${fmt.pct1(r.investorQuotaPct)} · retenção ${fmt.pct1(r.saRetentionPct)}</small>` : ""}</td>
+        <td class="num">${r.investmentValue ? fmt.brl(r.investmentValue) : "—"}</td>
         <td style="white-space:normal;min-width:200px"><small style="color:var(--uby-muted)">${esc(rulesText(r.costRules) || "sem custos fixos")}${r.revenueRules.some(x => x.value) ? `<br>Receitas: ${esc(rulesText(r.revenueRules))}` : ""}</small></td>
         <td style="white-space:nowrap"><a class="btn link-btn" href="#/parametros/carregador/${encodeURIComponent(`${r.workId}|${r.station}`)}">Editar valores</a> <a class="btn ghost link-btn" href="#/parametros/operacao/${encodeURIComponent(`${r.workId}|${r.station}`)}">Horários</a></td>
       </tr>`).join("")}</tbody></table></div>`;
@@ -52,7 +52,7 @@
       ${outside.length ? `<details class="section"><summary style="cursor:pointer;font-weight:850;color:var(--uby-forest)">Fora da UBY: ${outside.length} carregador(es) (${esc(outside.map(r => r.station).join(", "))})</summary>
         <p style="margin:10px 0">Carregadores só com gestão P3, sociedades P3 ou sem base de recargas. Ficam aqui para conferência dos parâmetros.</p>${table(outside)}</details>` : ""}
 
-      <p class="source-line">Fonte: configurações financeiras salvas por carregador (obra_recargas_base) e horários de disponibilidade, lidas pelo motor original. Gestão P3, plataforma e área em % do faturamento total; plataforma só sobre recargas e ociosidade.</p>`;
+      <p class="source-line">Fonte: configurações financeiras salvas por carregador (obra_recargas_base) e horários de disponibilidade, lidas pelo motor original. Gestão P3, plataforma e área em % do faturamento total; plataforma só sobre recargas e ociosidade. Reserva legal S.A., fundo de expansão e cotistas não são por carregador: ficam centralizados em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a> e valem sobre o resultado consolidado.</p>`;
   }
 
   UBY.register("configuracao", { render });

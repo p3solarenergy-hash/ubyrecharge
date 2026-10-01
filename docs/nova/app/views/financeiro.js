@@ -60,7 +60,7 @@
           ${kpi(partner ? "Resultado do parceiro" : "Resultado operacional", signed(f.operationNet), `margem ${fmt.pct(f.operationMargin)}`, "", f.operationNet >= 0 ? "" : "bad")}
           ${kpi("Custo por kWh", perKwh(f.totalCostPerKWh), `venda ${perKwh(perSold(f.totalRevenue))}/kWh`)}
           ${kpi("Payback", paybackShort(f.paybackMonths), `${f.paybackMonths ? `${Math.round(f.paybackMonths)} meses · ` : ""}retorno ${fmt.pct(f.roiMonthly)} ao mês`)}
-          ${kpi(partner ? "Royalty UBY" : "Resultado UBY", fmt.brl(partner ? f.ubyRoyalty : f.ubyNet), partner ? "única receita da UBY neste ativo" : `investidores ${fmt.brl(f.investorDistribution)}`)}
+          ${kpi(partner ? "Royalty UBY" : "Resultado UBY", fmt.brl(partner ? f.ubyRoyalty : f.ubyNet), partner ? "única receita da UBY neste ativo" : "vai para o resultado consolidado")}
         </div>
       </section>
 
@@ -95,11 +95,9 @@
           </tbody><tfoot><tr><td>${partner ? "Resultado do parceiro" : "Margem"} <small>${fmt.pct1(f.totalRevenue ? f.operationNet / f.totalRevenue * 100 : 0)} do faturamento</small></td><td class="num">${signed(f.operationNet)}</td><td class="num">${perKwh(perSold(f.operationNet))}</td></tr></tfoot></table></div>
           ${ec.estimatedCost ? `<p class="source-line">Energia inclui ${fmt.brl(ec.estimatedCost)} de estimativa (${fmt.date(ec.estimatedFrom + "T12:00:00")} a ${fmt.date(ec.estimatedTo + "T12:00:00")}): dias ainda sem fatura lançada. Acerta quando a próxima fatura entrar.</p>` : ""}
           ${f.courtesyCharges ? `<div class="note" style="margin-top:10px">Cortesia: ${fmt.kwh(f.courtesyEnergy)} em ${f.courtesyCharges} sessão(ões); ${fmt.brl(f.courtesyCostExcluded)} fora do resultado UBY.</div>` : ""}
-          ${!partner ? `<h3 style="margin:14px 0 8px">Destino do resultado</h3><div class="list">
-            <div class="list-row"><span>Retenção S.A.</span><strong>${fmt.brl(f.saRetention)}</strong></div>
-            <div class="list-row"><span>Investidores (cotas)</span><strong>${fmt.brl(f.investorDistribution)}</strong></div>
-            <div class="list-row"><span>UBY retido</span><strong>${fmt.brl(f.ubyRetained)}</strong></div>
-            ${f.p3SocietyProfit ? `<div class="list-row"><span>Sociedade P3</span><strong>${fmt.brl(f.p3SocietyProfit)}</strong></div>` : ""}</div>` : ""}
+          ${!partner && UBY.isUbyModel(f.model) ? (() => { const p = (UBY.data("finance", mk) || {}).dre?.policy || {}; return `<h3 style="margin:14px 0 8px">Destino do resultado</h3>
+            <div class="note">O resultado deste carregador (${signed(f.operationNet)}) entra no resultado consolidado da UBY. A reserva legal S.A. (${fmt.pct1(p.legalReservePct || 0)}), o fundo de expansão (${fmt.pct1(p.expansionReservePct || 0)}) e a parte dos cotistas são aplicados uma vez só, no total da rede: veja <a href="#/financeiro/dre">DRE e fechamento</a>. Os percentuais ficam em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a>.</div>`; })() : ""}
+          ${f.p3SocietyProfit ? `<div class="list" style="margin-top:10px"><div class="list-row"><span>Sociedade P3</span><strong>${fmt.brl(f.p3SocietyProfit)}</strong></div></div>` : ""}
         </section>
       </div>
 
@@ -128,20 +126,25 @@
       <td class="num">${paybackLabel(x.paybackMonths)}</td><td class="num">${x.roiMonthly ? fmt.pct(x.roiMonthly) : "—"}</td></tr>`).join("");
     const unitHead = `<thead><tr><th>Unidade</th><th>Modelo</th><th class="num">Faturamento</th><th class="num">Custo total</th><th>Resultado</th><th class="num">Margem</th><th class="num">Investimento</th><th class="num">Payback</th><th class="num">Retorno/mês</th></tr></thead>`;
     const p3Uby = onlyUby(d.groups.p3);
+    // Reservas e cotistas são centralizados (Investidores): somam as competências apuradas.
+    const invMonths = (UBY.data("investorDistribution").months || []);
+    const cent = invMonths.reduce((a, m) => ({ ...a, pool: a.pool + (m.investorPool || 0), legal: a.legal + (m.legalReserve || 0), expansion: a.expansion + (m.expansionReserve || 0) }), { pool: 0, legal: 0, expansion: 0, months: invMonths });
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Ativos da UBY · acumulado</p><h2>Para onde vai o resultado da UBY</h2><p>Ativos próprios distribuem por cotas; parceiros com a marca geram royalty. A P3 aparece como prestadora de serviço (gestão), depois da UBY.</p></div>
           <div class="meta">${u.units} ativo(s) UBY · investimento ${fmt.brl(u.investmentValue)}</div></div>
         <div class="grid g5">
           ${kpi("Resultado UBY e royalties", signed(u.ubyNet), `royalties ${fmt.brl(u.ubyRoyalty)}`, "", "lead big")}
-          ${kpi("Investidores UBY", fmt.brl(u.investorDistribution), "repasse por cotas")}
-          ${kpi("Retenção S.A.", fmt.brl(u.saRetention), `UBY retido ${fmt.brl(u.ubyRetained)}`)}
+          ${kpi("Cotistas UBY", fmt.brl(cent.pool), "pool por cotas, após as reservas")}
+          ${kpi("Reservas centralizadas", fmt.brl(cent.legal + cent.expansion), `reserva legal ${fmt.brl(cent.legal)} · expansão ${fmt.brl(cent.expansion)}`)}
           ${kpi("Payback dos ativos UBY", paybackShort(u.paybackMonths), `${u.paybackMonths ? `${Math.round(u.paybackMonths)} meses · ` : ""}retorno ${fmt.pct(u.roiMonthly)} ao mês`)}
           ${kpi("Faturamento dos ativos UBY", fmt.brl(u.revenue), `custo total ${fmt.brl(u.totalOperatingCost)}`)}
         </div>
       </section>
       <div class="grid g3" style="gap:14px;margin-bottom:18px">
         ${group("UBY", "dc", d.groups.uby, "Resultado dos ativos UBY e royalties de marca, antes da distribuição.", "Nenhuma unidade.")}
-        ${group("Investidores UBY", "ac", d.groups.investors, "Distribuição por cotas dos ativos UBY, após a retenção.", "Nenhuma distribuição.")}
+        <article class="panel ac"><div class="panel-head"><div><h2>Cotistas UBY</h2><p>Pool de cada competência, calculado sobre o resultado consolidado depois da reserva legal e do fundo de expansão.</p></div></div>
+          <p style="margin:0 0 8px;font-size:22px;font-weight:850;color:var(--uby-forest)">${fmt.brl(cent.pool)}</p>
+          <div class="list">${cent.months.slice().reverse().map(m => `<div class="list-row"><span>${esc(m.label)}<small style="display:block;color:var(--uby-muted)">reservas ${fmt.brl(m.legalReserve + m.expansionReserve)} · ${fmt.brl(m.perQuota)}/cota</small></span><strong>${fmt.brl(m.investorPool)}</strong></div>`).join("") || `<div class="note">Nenhuma distribuição.</div>`}</div></article>
         ${group("P3 · gestão dos ativos UBY", "consolidated", p3Uby, "Prestação de serviço: gestão cobrada dos ativos UBY e de parceiros com a marca.", "Nenhuma gestão.")}
       </div>
       <div class="split" style="margin-bottom:18px">
@@ -244,14 +247,14 @@
         </section>
       </div>
 
-      <section class="section"><div class="section-head"><div><p class="kicker">Distribuição UBY</p><h2>Como o resultado UBY se divide</h2><p>${d.hasProfit ? "Retenção estatutária e repasse aos investidores por cotas, já com a matriz descontada." : "Sem destinação enquanto o resultado consolidado for prejuízo."}</p></div></div>
+      ${(() => { const r = f.dre, p = r.policy; return `<section class="section"><div class="section-head"><div><p class="kicker">Distribuição UBY · centralizada</p><h2>Como o resultado UBY se divide</h2><p>${r.networkResult > 0 ? "Reservas aplicadas uma vez só, sobre o resultado consolidado da rede (royalties, matriz e impostos já considerados). Os percentuais ficam em Cotas, impostos e rodadas." : "Sem destinação enquanto o resultado consolidado for prejuízo."}</p></div></div>
         <div class="grid g4">
-          ${kpi("Resultado UBY", signed(d.ubyNet), "após custos e matriz", "", "lead")}
-          ${kpi("Retenção S.A.", fmt.brl(d.saRetention), d.hasProfit ? "retenção estatutária" : "R$ 0,00 com prejuízo")}
-          ${kpi(`Investidores (${fmt.pct1(d.quotaPct)})`, fmt.brl(d.investors), d.hasProfit ? "repasse por cotas" : "sem distribuição com prejuízo")}
-          ${kpi("UBY retido", fmt.brl(d.retained), "fica na UBY")}
+          ${kpi("Resultado consolidado", signed(r.networkResult), r.lossCarried ? `prejuízo anterior compensado ${fmt.brl(r.lossCarried)}` : "antes da distribuição", "", "lead")}
+          ${kpi(`Reserva legal S.A. (${fmt.pct1(p.legalReservePct)})`, fmt.brl(r.legalReserve), "fica na S.A.")}
+          ${kpi(`Fundo de expansão (${fmt.pct1(p.expansionReservePct)})`, fmt.brl(r.expansionReserve), "fica na UBY")}
+          ${kpi(`Cotistas (${fmt.pct1(p.investorPct)} após reservas)`, fmt.brl(r.investorPool), `${fmt.brl(r.perQuota)} por cota`)}
         </div>
-      </section>
+      </section>`; })()}
 
       <section class="section"><div class="section-head"><div><p class="kicker">Por carregador</p><h2>Resultado por ativo</h2><p>Parceiros aparecem com o royalty UBY como única receita da marca.</p></div></div>
         <div class="table-wrap"><table>
