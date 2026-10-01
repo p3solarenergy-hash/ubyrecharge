@@ -26,7 +26,7 @@
     const otherCosts = c => c.fin.localExtraCosts + c.fin.taxes + c.fin.ubyRoyalty;
 
     target.innerHTML = `
-      <div class="hero"><div><p class="eyebrow">Rede de recargas · ${esc(v.label)}</p><h1>Locais AC + DC</h1>
+      <div class="hero"><div><p class="eyebrow">Rede de recargas · ${esc(v.label)}</p><h1>${esc(v.place.label)} · AC + DC</h1>
         <p class="lead">Carregadores no mesmo local, que se complementam: cada um individualmente e os dois juntos, com as mesmas contas das outras telas.</p></div>
         <div class="callout"><strong>Só leitura</strong><small>Os números de cada carregador continuam iguais em todas as outras telas. Para editar custos, clique no carregador (↗) e use o centro de custos dele.</small></div></div>
       ${v.places.length > 1 ? `<div class="toolbar"><div class="seg" id="placeTabs">${v.places.map(p => `<button data-place="${esc(p.key)}" class="${p.key === v.place.key ? "on" : ""}">${esc(p.label)} (${p.members.map(m => esc(m.kind)).join(" + ")})</button>`).join("")}</div></div>` : ""}

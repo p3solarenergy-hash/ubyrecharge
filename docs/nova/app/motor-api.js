@@ -2110,6 +2110,7 @@
   // conjunta, só leitura. Soma as mesmas contas oficiais de cada estação
   // (stationFinance e métricas de recarga); nenhuma outra visão muda.
   // ---------------------------------------------------------------------
+  const PLACES_JOINED = ["shopping aurora"];
   const placeKey = name => normalizeStationForCompare(String(name || "").replace(/^\s*uby\s+recharge\s*-?\s*/i, ""))
     .split(/\s+/).filter(t => t && t !== "ac" && t !== "dc").join(" ");
   function places() {
@@ -2120,7 +2121,8 @@
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(r);
     });
-    return [...groups.entries()].filter(([, list]) => list.length > 1).map(([key, list]) => ({
+    // Só os locais pedidos para a visão conjunta (por enquanto, o Shopping Aurora).
+    return [...groups.entries()].filter(([key, list]) => list.length > 1 && PLACES_JOINED.includes(key)).map(([key, list]) => ({
       key,
       label: String(list[0].station || "").replace(/^\s*UBY\s+RECHARGE\s*-?\s*/i, "").replace(/\s+(AC|DC)\s*$/i, "").trim(),
       members: list.map(r => ({ workId: String(r.workId), station: r.station, workName: r.workName || "", kind: String(r.kind || "").toUpperCase() }))
