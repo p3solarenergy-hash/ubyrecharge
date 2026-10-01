@@ -1806,6 +1806,16 @@
       engine: "v2", workId: row.workId, workName: row.workName, station: row.station, kind: row.kind, included: row.included, monthKey: mk, label: mk ? monthLabel(mk) : "—",
       months: rowMonths.map(m => ({ key: m, label: monthLabel(m) })), modelLabel: v ? operationModelLabel(v.operationModel) : "",
       flags: v ? v.flags || [] : [], finance,
+      // Retorno explicado: o mês sozinho e o acumulado desde o início da operação até esta competência.
+      returns: v ? (() => {
+        const upTo = rowMonths.filter(m => m <= mk);
+        const t = CORE().aggregate(upTo.map(m => fv2Month(row, m, fixes)), fixes, { months: upTo.length || 1 });
+        const inv = n0(v.paybackInvestmentValue);
+        return { investment: inv,
+          month: { key: mk, label: monthLabel(mk), result: n0(v.paybackBase), roi: n0(v.roiMonthly), payback: n0(v.paybackMonths) },
+          toDate: { months: upTo.length, from: upTo[0] || "", fromLabel: upTo[0] ? monthLabel(upTo[0]) : "", to: mk, result: n0(t.paybackBase), average: upTo.length ? n0(t.paybackBase) / upTo.length : 0,
+            roi: n0(t.roiMonthly), payback: n0(t.paybackMonths), recoveredPct: inv > 0 ? n0(t.paybackBase) / inv * 100 : 0, remaining: Math.max(inv - n0(t.paybackBase), 0) } };
+      })() : null,
       settings: v ? { managementPct: n0(cfg.managementPct), platformPct: n0(cfg.platformPct), taxRatePct: n0(cfg.taxRatePct), ubyRoyaltyPct: n0(cfg.ubyRoyaltyPct),
         energyCostPerKWh: n0(cfg.energyCostPerKWh), investmentValue: n0(cfg.investmentValue), saRetentionPct: n0(cfg.saRetentionPct), investorQuotaPct: n0(cfg.investorQuotaPct),
         p3SocietyPct: n0(cfg.p3SocietyPct), energyBillingMode: cfg.energyBillingMode || "" } : null,

@@ -16,7 +16,7 @@
     const all = UBY.data("financeStations");
     const list = [...all.filter(s => UBY.isUbyModel(s.model)), ...all.filter(s => !UBY.isUbyModel(s.model))];
     // Vindo de um link (#/financeiro/estacao/<obra|estação>): acha a estação pela obra, mesmo com o nome da obra.
-    if (ui.stationWant) {
+    if (ui.stationWant && list.length) { // só consome o link depois que a lista de estações carregou
       const [wid, st] = ui.stationWant.split("|");
       const norm = v => String(v || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/^uby recharge\s*-\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
       const same = list.filter(s => String(s.workId) === String(wid));
@@ -69,7 +69,8 @@
           ${kpi("Custo total", fmt.brl(f.totalOperatingCost), `${perKwh(f.totalCostPerKWh)} efetivo`)}
           ${kpi(partner ? "Resultado do parceiro" : "Resultado operacional", signed(f.operationNet), `margem ${fmt.pct(f.operationMargin)}`, "", f.operationNet >= 0 ? "" : "bad")}
           ${kpi("Custo por kWh", perKwh(f.totalCostPerKWh), `venda ${perKwh(perSold(f.totalRevenue))}/kWh`)}
-          ${kpi("Payback", paybackShort(f.paybackMonths), `${f.paybackMonths ? `${Math.round(f.paybackMonths)} meses · ` : ""}retorno ${fmt.pct(f.roiMonthly)} ao mês`)}
+          ${s.returns ? kpi("Retorno no mês", fmt.pct(s.returns.month.roi), `média desde ${esc(s.returns.toDate.fromLabel)}: ${fmt.pct(s.returns.toDate.roi)} ao mês · payback ${paybackShort(s.returns.toDate.payback)} · recuperado ${fmt.pct1(s.returns.toDate.recoveredPct)}`)
+            : kpi("Payback", paybackShort(f.paybackMonths), `${f.paybackMonths ? `${Math.round(f.paybackMonths)} meses · ` : ""}retorno ${fmt.pct(f.roiMonthly)} ao mês`)}
           ${kpi(partner ? "Royalty UBY" : "Resultado UBY", fmt.brl(partner ? f.ubyRoyalty : f.ubyNet), partner ? "única receita da UBY neste ativo" : "vai para o resultado consolidado")}
         </div>
       </section>

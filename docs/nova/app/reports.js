@@ -170,8 +170,28 @@
         <tr class="g"><td colspan="2">Destinação</td></tr>
         ${(dest[model] || dest.uby)()}
       </tbody></table>
-      ${f.investmentValue ? `<h2>Investimento</h2><table><tbody><tr><td>Investimento no ponto</td><td class="n">${fmt.brl(f.investmentValue)}</td></tr>
-        <tr><td>Payback pelo resultado médio mensal</td><td class="n">${f.paybackMonths ? `${fmt.n1(f.paybackMonths)} meses` : "—"}</td></tr><tr><td>Retorno mensal médio</td><td class="n">${fmt.pct(f.roiMonthly)}</td></tr></tbody></table>` : ""}
+      ${f.investmentValue ? (() => {
+        // Retorno do mês e acumulado, cada um com a conta escrita (o "médio" sozinho confundia com o do mês).
+        const r = s.returns;
+        if (!r) return `<h2>Investimento</h2><table><tbody><tr><td>Investimento no ponto</td><td class="n">${fmt.brl(f.investmentValue)}</td></tr></tbody></table>`;
+        const mo = r.month, td = r.toDate, inv = r.investment || f.investmentValue;
+        const pb = m => m > 0 ? `${fmt.n1(m)} meses${m >= 12 ? ` (${fmt.n1(m / 12)} anos)` : ""}` : "—";
+        const nm = k => `${k} ${k === 1 ? "mês" : "meses"}`;
+        const line = (label, value, note = "") => `<tr><td>${label}${note ? `<div class="sub">${note}</div>` : ""}</td><td class="n">${value}</td></tr>`;
+        return `<h2>Investimento e retorno</h2><table><tbody>
+          ${line("Investimento no ponto", fmt.brl(inv))}
+          <tr class="g"><td colspan="2">Só o mês de ${esc(mo.label)}</td></tr>
+          ${line("Resultado do mês", signed(mo.result))}
+          ${line("Retorno no mês", fmt.pct(mo.roi), `${fmt.brl(mo.result)} ÷ ${fmt.brl(inv)}`)}
+          ${line("Payback se todo mês fosse igual a este", pb(mo.payback), `${fmt.brl(inv)} ÷ ${fmt.brl(mo.result)}`)}
+          <tr class="g"><td colspan="2">Acumulado desde o início da operação (${esc(td.fromLabel)} a ${esc(mo.label)}, ${nm(td.months)})</td></tr>
+          ${line("Resultado acumulado", signed(td.result))}
+          ${line("Resultado médio por mês", fmt.brl(td.average), `${fmt.brl(td.result)} ÷ ${nm(td.months)} — inclui os primeiros meses, com menos recargas`)}
+          ${line("Retorno médio ao mês", fmt.pct(td.roi), `${fmt.brl(td.average)} ÷ ${fmt.brl(inv)}`)}
+          ${line("Payback pela média", pb(td.payback), `${fmt.brl(inv)} ÷ ${fmt.brl(td.average)}`)}
+          ${line("Já recuperado do investimento", `${fmt.pct1(td.recoveredPct)}`, `${fmt.brl(td.result)} de ${fmt.brl(inv)} · falta ${fmt.brl(td.remaining)}`)}
+        </tbody></table>`;
+      })() : ""}
       <h2>Evolução mensal do ponto</h2>
       <table><thead><tr><th>Competência</th><th class="n">Energia</th><th class="n">Faturamento</th><th class="n">Custos</th><th class="n">Resultado</th></tr></thead><tbody>
         ${s.monthly.map(x => `<tr class="${x.key === s.monthKey ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.kwh0(x.energy)}</td><td class="n">${fmt.brl(x.totalRevenue || x.revenue)}</td><td class="n">${fmt.brl(x.totalOperatingCost)}</td><td class="n">${signed(x.operationNet)}</td></tr>`).join("")}
