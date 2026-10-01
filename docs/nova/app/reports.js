@@ -39,6 +39,9 @@
     .actions{max-width:900px;margin:18px auto 0;display:flex;gap:8px;justify-content:flex-end}.actions button{border:0;border-radius:8px;padding:9px 14px;font-weight:800;cursor:pointer;background:#0a1628;color:#fff}
     @media print{body{background:#fff}.page{box-shadow:none;margin:0;max-width:none;border-radius:0;padding:12mm;break-after:page}.page:last-child{break-after:auto}.actions{display:none}}`;
 
+  // O título vira o nome do arquivo ao salvar em PDF: "Relatório - CENTRAL JK - Set-2026".
+  // Sem "UBY RECHARGE - " repetido e sem "/" (o navegador cortava o nome na barra do mês).
+  const fileTitle = (...parts) => parts.filter(Boolean).map(p => String(p).replace(/^\s*UBY RECHARGE\s*-\s*/i, "").replace(/[\\/:*?"<>|]+/g, "-").trim()).join(" - ");
   function doc(title, pages) {
     return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${CSS}</style></head><body>
       <div class="actions"><button onclick="window.print()">Imprimir / salvar PDF</button></div>${pages.map(p => `<div class="page">${p}</div>`).join("")}</body></html>`;
@@ -124,11 +127,6 @@
     let u = null;
     try { u = UBY.data("usage", { kind: "station", workId, station, monthKey: s.monthKey }).kpis; } catch (_) {}
     const model = f.model;
-    const ec = s.energyComposition || {};
-    const energyNote = ec.mode === "invoice"
-      ? [...(ec.parts || []).map(p => `fatura ${p.ref ? monthName(p.ref) : p.start} (consumo de ${fmt.date(p.from + "T12:00:00")} a ${fmt.date(p.to + "T12:00:00")}): Copel ${fmt.brl(p.copel)}${p.lease ? ` + arrendamento ${fmt.brl(p.lease)}` : ""}`),
-         ec.estimatedCost ? `ESTIMATIVA ${fmt.brl(ec.estimatedCost)} (${fmt.date(ec.estimatedFrom + "T12:00:00")} a ${fmt.date(ec.estimatedTo + "T12:00:00")}, ${fmt.kwh0(ec.estimatedDeliveredKWh)} entregues, tarifa da fatura ${ec.estimatedRef ? monthName(ec.estimatedRef) : "anterior"}) — acerta quando a próxima fatura for lançada` : ""].filter(Boolean).join(" · ") || "sem consumo no período"
-      : ec.totalCost > 0 ? `fatura ${ec.mode === "copel_lease" ? "Copel + arrendamento" : "Copel"}: ${fmt.brl(ec.copelCost)}${ec.leaseCost ? ` + ${fmt.brl(ec.leaseCost)}` : ""}` : `${fmt.kwh0(f.commercialEnergy || f.energy)} × ${fmt.brl(st.energyCostPerKWh || 0)}/kWh`;
     const opRevenue = s.revenueLines.filter(l => l.scope !== "non_operational"), mkt = s.revenueLines.filter(l => l.scope === "non_operational");
     const localCosts = s.costLines.filter(l => !l.matrix), matrix = s.costLines.filter(l => l.matrix);
     const dest = {
@@ -140,15 +138,14 @@
     };
     return `${header(`Relatório do carregador · ${s.station}`, `${esc(s.workName)} · ${esc(s.modelLabel)} · competência ${esc(monthName(s.monthKey))}`, "pendente")}
       <div class="kpis">
-        ${kpi("Faturamento", fmt.brl(f.totalRevenue || f.revenue), `${fmt.int(u?.sessions ?? 0)} recargas · ${fmt.int(u?.clients ?? 0)} clientes`)}
+        ${kpi("Faturamento", fmt.brl(f.totalRevenue || f.revenue), `${fmt.int(u?.validSessions ?? u?.sessions ?? 0)} recargas · ${fmt.int(u?.clients ?? 0)} clientes`)}
         ${kpi("Energia entregue", fmt.kwh0(f.energy), u ? `ocupação ${fmt.pct1(u.occupancy)}` : "")}
         ${kpi("Custos totais", fmt.brl(f.totalOperatingCost), f.totalCostPerKWh ? `${fmt.brl(f.totalCostPerKWh)}/kWh` : "")}
         ${kpi(model === "third_party_management" ? "Repasse ao parceiro" : "Resultado do ponto", signed(model === "third_party_management" || model === "management_only" ? f.partnerShare : f.operationNet), f.operationMargin ? `margem ${fmt.pct1(f.operationMargin)}` : "", true)}
       </div>
       ${u ? `<h2>Operação</h2><div class="two"><table><tbody>
-          <tr><td>Recargas (tentativas)</td><td class="n">${fmt.int(u.sessions)}</td></tr><tr><td>Recargas válidas</td><td class="n">${fmt.int(u.validSessions)}</td></tr>
-          <tr><td>Falhas</td><td class="n">${fmt.int(u.failed)}</td></tr><tr><td>Clientes</td><td class="n">${fmt.int(u.clients)}</td></tr>
-          <tr><td>Energia por recarga válida</td><td class="n">${fmt.n1(u.avgKwh)} kWh</td></tr></tbody></table>
+          <tr><td>Recargas</td><td class="n">${fmt.int(u.validSessions)}</td></tr><tr><td>Clientes</td><td class="n">${fmt.int(u.clients)}</td></tr>
+          <tr><td>Energia por recarga</td><td class="n">${fmt.n1(u.avgKwh)} kWh</td></tr></tbody></table>
         <table><tbody>
           <tr><td>Ocupação real</td><td class="n">${fmt.pct1(u.occupancy)}</td></tr><tr><td>Ticket médio</td><td class="n">${fmt.brl(u.avgTicket)}</td></tr>
           <tr><td>Preço médio</td><td class="n">${fmt.brl(u.revPerKwh)}/kWh</td></tr><tr><td>Tempo médio</td><td class="n">${fmt.hours(u.avgDuration)}</td></tr>
@@ -159,7 +156,7 @@
         ${row("Recargas", f.revenue)}${opRevenue.map(l => row(esc(l.label), l.actual)).join("")}${mkt.map(l => row(`${esc(l.label)} (marketing)`, l.actual)).join("")}
         ${row("Faturamento total", f.totalRevenue || f.revenue, "t")}
         <tr class="g"><td colspan="2">Custos</td></tr>
-        ${row("Energia", -f.energyCost, "", energyNote)}
+        ${row("Energia", -f.energyCost)}
         ${localCosts.map(l => row(esc(l.label), -l.actual)).join("")}
         ${matrix.map(l => row(`${esc(l.label)} (matriz)`, -l.actual, "", l.rule)).join("")}
         ${f.taxes ? row(`Tributos (${fmt.pct1(st.taxRatePct)})`, -f.taxes) : ""}
@@ -251,15 +248,19 @@
   }
 
   function build(kind, o = {}) {
-    if (kind === "area") return doc(`Prestação de contas ${o.station} ${monthName(o.month)}`, [pageArea(o.workId, o.station, o.month)]);
-    if (kind === "unificado") return doc(`Relatório unificado ${monthName(o.month)}`, [pageUnificado(o.month)]);
-    if (kind === "carregador") return doc(`Relatório ${o.station} ${monthName(o.month)}`, [pageCarregador(o.workId, o.station, o.month)]);
+    const latest = UBY.state.months.at(-1) || "";
+    if (kind === "area") return doc(fileTitle("Prestação de contas", o.station, monthName(o.month || latest)), [pageArea(o.workId, o.station, o.month)]);
+    if (kind === "unificado") return doc(fileTitle("Relatório unificado", monthName(o.month)), [pageUnificado(o.month)]);
+    if (kind === "carregador") {
+      const s = UBY.data("stationFinance", o.workId, o.station, o.month);
+      return doc(fileTitle("Relatório", s?.station || o.station, monthName(s?.monthKey || o.month || latest)), [pageCarregador(o.workId, o.station, o.month)]);
+    }
     if (kind === "todos") {
       const list = UBY.data("financeStations").filter(s => o.includeOutside || UBY.isUbyModel(s.model));
-      return doc(`Relatórios dos carregadores ${monthName(o.month)}`, list.map(s => pageCarregador(s.workId, s.station, o.month)));
+      return doc(fileTitle("Relatórios dos carregadores", monthName(o.month || latest)), list.map(s => pageCarregador(s.workId, s.station, o.month)));
     }
-    if (kind === "cotista") return doc(`Extrato ${o.name}`, [pageCotista(o.name)]);
-    if (kind === "cotistas") return doc("Extratos dos cotistas", UBY.data("investorDistribution").investors.map(i => pageCotista(i.name)));
+    if (kind === "cotista") return doc(fileTitle("Extrato", o.name, monthName(latest)), [pageCotista(o.name)]);
+    if (kind === "cotistas") return doc(fileTitle("Extratos dos cotistas", monthName(latest)), UBY.data("investorDistribution").investors.map(i => pageCotista(i.name)));
     throw new Error(`Tipo de relatório desconhecido: ${kind}`);
   }
 
