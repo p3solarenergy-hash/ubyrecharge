@@ -69,7 +69,7 @@
           ${kpi("Custo total", fmt.brl(f.totalOperatingCost), `${perKwh(f.totalCostPerKWh)} efetivo`)}
           ${kpi(partner ? "Resultado do parceiro" : "Resultado operacional", signed(f.operationNet), `margem ${fmt.pct(f.operationMargin)}`, "", f.operationNet >= 0 ? "" : "bad")}
           ${kpi("Custo por kWh", perKwh(f.totalCostPerKWh), `venda ${perKwh(perSold(f.totalRevenue))}/kWh`)}
-          ${s.returns ? kpi("Retorno no mês", fmt.pct(s.returns.month.roi), `média desde ${esc(s.returns.toDate.fromLabel)}: ${fmt.pct(s.returns.toDate.roi)} ao mês · payback ${paybackShort(s.returns.toDate.payback)} · recuperado ${fmt.pct1(s.returns.toDate.recoveredPct)}`)
+          ${s.returns ? kpi("Retorno no mês", fmt.pct(s.returns.month.roi), `acumulado ${fmt.pct(s.returns.toDate.recoveredPct)} do investido`)
             : kpi("Payback", paybackShort(f.paybackMonths), `${f.paybackMonths ? `${Math.round(f.paybackMonths)} meses · ` : ""}retorno ${fmt.pct(f.roiMonthly)} ao mês`)}
           ${kpi(partner ? "Royalty UBY" : "Resultado UBY", fmt.brl(partner ? f.ubyRoyalty : f.ubyNet), partner ? "única receita da UBY neste ativo" : "vai para o resultado consolidado")}
         </div>

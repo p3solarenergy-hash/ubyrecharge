@@ -132,8 +132,7 @@
     const opRevenue = s.revenueLines.filter(l => l.scope !== "non_operational"), mkt = s.revenueLines.filter(l => l.scope === "non_operational");
     const localCosts = s.costLines.filter(l => !l.matrix), matrix = s.costLines.filter(l => l.matrix);
     const dest = {
-      uby: () => `${row("Resultado do ponto para a UBY", f.ubyNet, "t")}
-        <tr class="s"><td colspan="2">Entra no resultado da rede UBY; a distribuição aos cotistas é feita no relatório unificado, depois dos custos centrais, impostos e reservas.</td></tr>`,
+      uby: () => row("Resultado do ponto para a UBY", f.ubyNet, "t"),
       hybrid: () => dest.uby() + (f.p3SocietyProfit ? row("Participação P3 (sociedade AC/DC)", f.p3SocietyProfit) : ""),
       third_party_management: () => `${row("Royalty de marca UBY", f.ubyRoyalty)}${row("Gestão P3", f.management)}${row("Resultado do parceiro (repasse)", f.partnerShare, "t")}`,
       management_only: () => `${row("Gestão P3", f.management)}${row("Resultado do parceiro (repasse)", f.partnerShare, "t")}`,
@@ -170,32 +169,20 @@
         <tr class="g"><td colspan="2">Destinação</td></tr>
         ${(dest[model] || dest.uby)()}
       </tbody></table>
-      ${f.investmentValue ? (() => {
-        // Retorno do mês e acumulado, cada um com a conta escrita (o "médio" sozinho confundia com o do mês).
-        const r = s.returns;
-        if (!r) return `<h2>Investimento</h2><table><tbody><tr><td>Investimento no ponto</td><td class="n">${fmt.brl(f.investmentValue)}</td></tr></tbody></table>`;
-        const mo = r.month, td = r.toDate, inv = r.investment || f.investmentValue;
-        const pb = m => m > 0 ? `${fmt.n1(m)} meses${m >= 12 ? ` (${fmt.n1(m / 12)} anos)` : ""}` : "—";
-        const nm = k => `${k} ${k === 1 ? "mês" : "meses"}`;
-        const line = (label, value, note = "") => `<tr><td>${label}${note ? `<div class="sub">${note}</div>` : ""}</td><td class="n">${value}</td></tr>`;
-        return `<h2>Investimento e retorno</h2><table><tbody>
-          ${line("Investimento no ponto", fmt.brl(inv))}
-          <tr class="g"><td colspan="2">Só o mês de ${esc(mo.label)}</td></tr>
-          ${line("Resultado do mês", signed(mo.result))}
-          ${line("Retorno no mês", fmt.pct(mo.roi), `${fmt.brl(mo.result)} ÷ ${fmt.brl(inv)}`)}
-          ${line("Payback se todo mês fosse igual a este", pb(mo.payback), `${fmt.brl(inv)} ÷ ${fmt.brl(mo.result)}`)}
-          <tr class="g"><td colspan="2">Acumulado desde o início da operação (${esc(td.fromLabel)} a ${esc(mo.label)}, ${nm(td.months)})</td></tr>
-          ${line("Resultado acumulado", signed(td.result))}
-          ${line("Resultado médio por mês", fmt.brl(td.average), `${fmt.brl(td.result)} ÷ ${nm(td.months)} — inclui os primeiros meses, com menos recargas`)}
-          ${line("Retorno médio ao mês", fmt.pct(td.roi), `${fmt.brl(td.average)} ÷ ${fmt.brl(inv)}`)}
-          ${line("Payback pela média", pb(td.payback), `${fmt.brl(inv)} ÷ ${fmt.brl(td.average)}`)}
-          ${line("Já recuperado do investimento", `${fmt.pct1(td.recoveredPct)}`, `${fmt.brl(td.result)} de ${fmt.brl(inv)} · falta ${fmt.brl(td.remaining)}`)}
-        </tbody></table>`;
-      })() : ""}
+      ${(() => {
+        // Evolução até a competência do relatório; % = resultado ÷ valor investido (no mês e no acumulado).
+        const inv = n(s.returns?.investment || f.investmentValue);
+        const list = s.monthly.filter(x => x.key <= s.monthKey);
+        const sum = k => list.reduce((a, x) => a + n(x[k]), 0);
+        const pct = v => inv > 0 ? fmt.pct(v / inv * 100) : "—";
+        const accResult = sum("paybackBase");
+        return `${inv ? `<h2>Valor investido</h2><table><tbody><tr><td>Investimento no ponto</td><td class="n">${fmt.brl(inv)}</td></tr></tbody></table>` : ""}
       <h2>Evolução mensal do ponto</h2>
-      <table><thead><tr><th>Competência</th><th class="n">Energia</th><th class="n">Faturamento</th><th class="n">Custos</th><th class="n">Resultado</th></tr></thead><tbody>
-        ${s.monthly.map(x => `<tr class="${x.key === s.monthKey ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.kwh0(x.energy)}</td><td class="n">${fmt.brl(x.totalRevenue || x.revenue)}</td><td class="n">${fmt.brl(x.totalOperatingCost)}</td><td class="n">${signed(x.operationNet)}</td></tr>`).join("")}
-      </tbody></table>
+      <table><thead><tr><th>Competência</th><th class="n">Energia</th><th class="n">Faturamento</th><th class="n">Custos</th><th class="n">Resultado</th>${inv ? `<th class="n">% do investido</th>` : ""}</tr></thead><tbody>
+        ${list.map(x => `<tr class="${x.key === s.monthKey ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.kwh0(x.energy)}</td><td class="n">${fmt.brl(x.totalRevenue || x.revenue)}</td><td class="n">${fmt.brl(x.totalOperatingCost)}</td><td class="n">${signed(x.operationNet)}</td>${inv ? `<td class="n">${pct(n(x.paybackBase))}</td>` : ""}</tr>`).join("")}
+        <tr class="t"><td>Acumulado</td><td class="n">${fmt.kwh0(sum("energy"))}</td><td class="n">${fmt.brl(list.reduce((a, x) => a + n(x.totalRevenue || x.revenue), 0))}</td><td class="n">${fmt.brl(sum("totalOperatingCost"))}</td><td class="n">${signed(sum("operationNet"))}</td>${inv ? `<td class="n">${pct(accResult)}</td>` : ""}</tr>
+      </tbody></table>`;
+      })()}
       ${(s.flags || []).includes("fatura-copiada") ? `<div class="note">A fatura de energia desta competência era cópia do mês anterior; o custo foi calculado por kWh × tarifa até a fatura real ser lançada.</div>` : ""}
       <div class="sign"><div>Responsável · UBY Recharge</div><div>${model === "third_party_management" || model === "management_only" || model === "p3_society" ? "Parceiro" : "Aprovação"}</div></div>${foot()}`;
   }
