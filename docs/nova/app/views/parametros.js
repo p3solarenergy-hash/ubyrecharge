@@ -78,6 +78,16 @@
     });
   }
 
+  function resolveKey(list, key) {
+    if (!key || list.some(c => c.key === key)) return key;
+    const [wid, st] = String(key).split("|");
+    const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/^uby recharge\s*-\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
+    const same = list.filter(c => c.workId === String(wid));
+    const hit = same.find(c => norm(c.station) === norm(st)) || (same.length === 1 ? same[0] : null)
+      || same.find(c => norm(c.station).includes(norm(st)) || norm(st).includes(norm(c.station)));
+    return hit ? hit.key : key;
+  }
+
   async function openCharger(w, key, month) {
     const [workId, station] = key.split("|");
     const wantStation = w.shouldOpenFullRechargeWork?.(workId, station) ? "" : station;
@@ -185,7 +195,7 @@
           <br><strong>Energia do mês: ${fmt.brl(invMonth.cost)}</strong>` : `<br>Nenhum consumo deste carregador cai nesta competência.`}
         <br><small>Os campos de energia por competência deixam de ser usados para este carregador.</small>
         <br><a class="btn" href="#/parametros/energia/${encodeURIComponent(ui.charger)}" style="margin-top:8px;display:inline-flex">Abrir Faturas de energia →</a></div>`;
-    const ruleRows = (kind, arr) => arr.map((r, i) => `<tr>
+    const ruleRows = (kind, arr) => arr.map((r, i) => `<tr data-focus="rule:${esc(r.id || r.label)}" data-focus-alt="rule:${esc(r.label)}">
         <td><input type="checkbox" data-rule="${kind}|${i}|enabled" ${r.enabled ? "checked" : ""}></td>
         <td><input class="select" data-rule="${kind}|${i}|label" value="${esc(r.label)}" style="width:100%"></td>
         <td><select class="select" data-rule="${kind}|${i}|basis">${[["fixed", "Fixo mensal"], ["per_kwh", "Por kWh"], ["revenue_pct", "% do faturamento"], ["per_charge", "Por recarga"], ["one_off", "Avulso no mês"]].map(([v, l]) => `<option value="${v}" ${r.basis === v ? "selected" : ""}>${l}</option>`).join("")}</select></td>
@@ -208,7 +218,7 @@
         : `<div class="grid g5" style="margin-bottom:14px">${officialCards}${kpi("Base desta competência", esc(f.versionSource || "—"), esc(f.versionHelp || ""))}</div>
            ${off && !off.operating ? `<div class="note" style="margin-bottom:12px">Este carregador ainda não operava em ${esc(mName(ui.month))}${firstOp ? ` (primeira competência com recarga: ${esc(mName(firstOp))})` : ""}. Os parâmetros abaixo ficam guardados, mas esta competência não entra no resultado oficial, nos relatórios nem na distribuição.</div>` : ""}`}
       <div class="grid g2" style="gap:14px">${f.rows.filter(r => modelVisible(r, model, transfer) && r.controls.length).map(r => `
-        <section class="section" style="margin:0"><div class="section-head" style="margin-bottom:8px"><div><p class="kicker">${esc(r.group)}</p><h2 style="font-size:14px">${esc(r.name)}</h2><p>${esc(r.key === "energyCostPerKWh" && hasInv ? "Custo de energia pelas faturas da Copel e do arrendamento, dividido pelo mês de consumo." : r.rule)}</p></div>
+        <section class="section" style="margin:0" data-focus="${esc(r.key)}"><div class="section-head" style="margin-bottom:8px"><div><p class="kicker">${esc(r.group)}</p><h2 style="font-size:14px">${esc(r.name)}</h2><p>${esc(r.key === "energyCostPerKWh" && hasInv ? "Custo de energia pelas faturas da Copel e do arrendamento, dividido pelo mês de consumo." : r.rule)}</p></div>
           ${r.key === "energyCostPerKWh" && hasInv ? "" : `<div class="meta">anterior<br><strong>${esc(r.previous || "—")}</strong></div>`}</div>
           ${r.key === "energyCostPerKWh" && hasInv ? energyInvoiceBox() : `<div class="grid ${r.controls.length > 2 ? "g3" : "g2"}" style="gap:8px">${r.controls.filter(c => !c.leaseOnly || energyMode === "copel_lease").map(c => control(c, r)).join("")}</div>
           ${r.key === "energyCostPerKWh" ? `<p class="source-line">${esc(f.energySummary)}</p>` : ""}`}</section>`).join("")}</div>
@@ -944,6 +954,14 @@
       if (ref && ui.tab === "carregador" && ref !== ui.charger) { ui.charger = ref; ui.edits = {}; ui.rules = null; }
       if (ref && ui.tab === "operacao") { ui.opCharger = ref; ui.opForm = null; }
       if (ref && ui.tab === "energia" && ref !== ui.enCharger) { ui.enCharger = ref; ui.enDraft = null; ui.enForm = null; }
+      if (ref && ui.tab === "area" && ref !== ui.arCharger) { ui.arCharger = ref; ui.arForm = null; }
+      // Links dos custos (#/parametros/<aba>/<carregador>/<campo>/<competência>): abre no mês e destaca o campo.
+      const month = /^\d{4}-\d{2}$/.test(params[3] || "") ? params[3] : "";
+      if (month && ui.tab === "carregador" && month !== ui.month) { ui.month = month; ui.edits = {}; ui.rules = null; }
+      if (month && ui.tab === "matriz") ui.matrixMonth = month;
+      ui.focus = params[2] || "";
+      const costId = ui.tab === "matriz" && ui.focus.startsWith("cost:") ? ui.focus.slice(5) : "";
+      if (costId) { ui.editingCost = costId; ui.costForm = null; }
     }
     target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Abrindo parâmetros e custos</h2><p>Carregando a plataforma original com a base completa. Na primeira vez leva alguns segundos.</p></div>`;
     let w;
@@ -954,6 +972,9 @@
 
   async function draw(target, w) {
     const data = { chargers: chargers(w), months: [], form: null };
+    // Links de outras telas usam o nome da estação das recargas (ex.: "UBY RECHARGE - CENTRAL JK");
+    // aqui o carregador tem o nome da obra ("POSTO CENTRAL JK"). Acha o mesmo carregador pela obra.
+    ["charger", "enCharger", "arCharger", "opCharger"].forEach(k => { ui[k] = resolveKey(data.chargers, ui[k]); });
     const writable = canWrite(w);
     if (ui.tab === "carregador") {
       // Resultado oficial por competência precisa do histórico completo no motor principal.
@@ -1000,6 +1021,24 @@
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
+    applyFocus(target);
+  }
+
+  // Leva até o campo pedido pelo link do custo (uma vez só) e destaca por alguns segundos.
+  function applyFocus(target) {
+    const want = String(ui.focus || "").split(",").filter(Boolean);
+    ui.focus = "";
+    if (!want.length) return;
+    const all = [...target.querySelectorAll("[data-focus]")];
+    const el = want.map(k => all.find(x => x.dataset.focus === k) || all.find(x => x.dataset.focusAlt === k)).find(Boolean)
+      || (want[0].startsWith("cost:") ? target.querySelector("#pmCostSave")?.closest("section") : null);
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.classList.add("focus-flash");
+    const input = el.querySelector("input:not([type=checkbox]), select");
+    if (input) input.focus({ preventScroll: true });
+    setTimeout(() => el.classList.add("fade"), 2500);
+    setTimeout(() => el.classList.remove("focus-flash", "fade"), 4000);
   }
 
   async function run(target, w, label, fn) {

@@ -27,13 +27,20 @@
     const kwhSold = f.commercialEnergy || f.energy || 0;
     const perSold = v => kwhSold > 0 ? Number(v || 0) / kwhSold : null;
     const ec = s.energyComposition || {};
+    // Cada custo leva direto para onde ele é editado (aba, carregador, competência e o campo em destaque).
+    const month = mk || UBY.state.months.at(-1) || "";
+    const edit = (tab, focus = "", ref = `${workId}|${station}`) => `#/parametros/${tab}/${encodeURIComponent(ref)}/${encodeURIComponent(focus)}/${month}`;
+    const go = (label, href) => href ? `<a class="edit-link" href="${href}" title="Abrir onde este valor é editado">${label}<span aria-hidden="true"> ✎</span></a>` : label;
+    const energyHref = ec.mode === "invoice" ? edit("energia") : edit("carregador", "energyCostPerKWh");
+    const costHref = c => c.matrix ? edit("matriz", `cost:${c.id || c.label}`, "-") : edit("carregador", `rule:${c.id || c.label}`);
     const energyParts = (ec.mode === "invoice"
       ? [["Copel", ec.copelCost], ["Arrendamento", ec.leaseCost], ["Estimativa (dias sem fatura lançada)", ec.estimatedCost]]
       : ec.totalCost > 0 ? [["Copel", ec.copelCost], ["Arrendamento", ec.leaseCost]]
       : [[`Energia pela tarifa cadastrada (${fmt.brl(st.energyCostPerKWh || 0)}/kWh)`, f.energyCost]]).filter(([, v]) => Number(v) > 0);
-    const otherCosts = [...s.costLines.map(c => [c.matrix ? `Matriz · ${c.label}` : c.label, c.actual]),
-      ["Gestão P3", f.management], ["App / plataforma", f.platform], ["Royalty UBY", f.ubyRoyalty],
-      [`Repasse da área${f.areaSharePct ? ` (${fmt.pct1(f.areaSharePct)})` : ""}`, f.areaParticipation], ["Impostos", f.taxes]].filter(([, v]) => Number(v) > 0);
+    const AREA = "ownerRevenueSharePct,ownerNetProfitSharePct";
+    const otherCosts = [...s.costLines.map(c => [c.matrix ? `Matriz · ${c.label}` : c.label, c.actual, costHref(c)]),
+      ["Gestão P3", f.management, edit("carregador", "managementPct")], ["App / plataforma", f.platform, edit("carregador", "platformPct")], ["Royalty UBY", f.ubyRoyalty, edit("carregador", "ubyRoyaltyPct")],
+      [`Repasse da área${f.areaSharePct ? ` (${fmt.pct1(f.areaSharePct)})` : ""}`, f.areaParticipation, edit("carregador", AREA)], ["Impostos", f.taxes, edit("carregador", "taxRatePct")]].filter(([, v]) => Number(v) > 0);
     const otherTotal = otherCosts.reduce((a, [, v]) => a + Number(v || 0), 0);
     const uRow = (label, v, cls = "") => `<tr class="${cls}"><td>${label}</td><td class="num">${fmt.brl(v)}</td><td class="num">${perKwh(perSold(v))}</td></tr>`;
     return `
@@ -63,25 +70,26 @@
           ${line("Recargas (plataforma)", fmt.brl(f.revenue))}
           ${f.extraRevenue ? line("Receitas operacionais complementares", fmt.brl(f.extraRevenue)) : ""}
           ${f.marketingRevenue ? line("Marketing e contratos (só no fechamento)", fmt.brl(f.marketingRevenue)) : ""}
-          ${s.revenueLines.map(r => line(`· ${esc(r.label)}`, fmt.brl(r.actual), r.rule)).join("")}
+          ${s.revenueLines.map(r => line(go(`· ${esc(r.label)}`, edit("carregador", `rule:${r.id || r.label}`)), fmt.brl(r.actual), r.rule)).join("")}
           </tbody><tfoot><tr><td>Faturamento total</td><td class="num">${fmt.brl(f.totalRevenue)}</td></tr></tfoot><tbody>
           <tr><th colspan="2" style="position:static">Custos</th></tr>
-          ${line("Energia", `${fmt.brl(f.energyCost)}${pct(f.energyCost)}`, [energyParts.map(([l, v]) => `${l} ${fmt.brl(v)}`).join(" + "), `${perKwh(perSold(f.energyCost))} sobre ${fmt.kwh(kwhSold)} vendidos`].filter(Boolean).join(" · "))}
-          ${s.costLines.map(c => line(c.matrix ? `Matriz · ${esc(c.label)}` : esc(c.label), `${fmt.brl(c.actual)}${pct(c.actual)}`, [c.rule, c.perKWh != null ? `${perKwh(c.perKWh)}` : ""].filter(Boolean).join(" · "))).join("")}
-          ${line("Gestão P3", `${fmt.brl(f.management)}${pct(f.management)}`, "sobre o faturamento total")}
-          ${line("App / plataforma", `${fmt.brl(f.platform)}${pct(f.platform)}`, "só sobre recargas e ociosidade")}
-          ${f.ubyRoyalty ? line("Royalty UBY", `${fmt.brl(f.ubyRoyalty)}${pct(f.ubyRoyalty)}`, "uso da marca") : ""}
-          ${line("Repasse da área", `${fmt.brl(f.areaParticipation)}${pct(f.areaParticipation)}`, f.areaSharePct ? `${fmt.pct1(f.areaSharePct)} do faturamento total` : "")}
+          ${line(go("Energia", energyHref), `${fmt.brl(f.energyCost)}${pct(f.energyCost)}`, [energyParts.map(([l, v]) => `${l} ${fmt.brl(v)}`).join(" + "), `${perKwh(perSold(f.energyCost))} sobre ${fmt.kwh(kwhSold)} vendidos`].filter(Boolean).join(" · "))}
+          ${s.costLines.map(c => line(go(c.matrix ? `Matriz · ${esc(c.label)}` : esc(c.label), costHref(c)), `${fmt.brl(c.actual)}${pct(c.actual)}`, [c.rule, c.perKWh != null ? `${perKwh(c.perKWh)}` : ""].filter(Boolean).join(" · "))).join("")}
+          ${line(go("Gestão P3", edit("carregador", "managementPct")), `${fmt.brl(f.management)}${pct(f.management)}`, "sobre o faturamento total")}
+          ${line(go("App / plataforma", edit("carregador", "platformPct")), `${fmt.brl(f.platform)}${pct(f.platform)}`, "só sobre recargas e ociosidade")}
+          ${f.ubyRoyalty ? line(go("Royalty UBY", edit("carregador", "ubyRoyaltyPct")), `${fmt.brl(f.ubyRoyalty)}${pct(f.ubyRoyalty)}`, "uso da marca") : ""}
+          ${line(go("Repasse da área", edit("carregador", AREA)), `${fmt.brl(f.areaParticipation)}${pct(f.areaParticipation)}`, f.areaSharePct ? `${fmt.pct1(f.areaSharePct)} do faturamento total` : "")}
+          ${f.taxes ? line(go("Impostos", edit("carregador", "taxRatePct")), `${fmt.brl(f.taxes)}${pct(f.taxes)}`, st.taxRatePct ? `${fmt.pct1(st.taxRatePct)} do faturamento` : "") : ""}
           </tbody><tfoot><tr><td>Custo total</td><td class="num">${fmt.brl(f.totalOperatingCost)}</td></tr><tr><td>= ${partner ? "Resultado do parceiro" : "Resultado operacional"}</td><td class="num">${signed(f.operationNet)}</td></tr></tfoot>
         </table></div></section>
         <section class="section"><div class="section-head"><div><p class="kicker">Economia da unidade</p><h2>Preço, custos e margem</h2><p>Valores oficiais da competência. "Por kWh" = valor ÷ ${fmt.kwh(kwhSold)} vendidos.</p></div></div>
           <div class="table-wrap"><table><thead><tr><th></th><th class="num">Total</th><th class="num">Por kWh</th></tr></thead><tbody>
             ${uRow("<strong>Preço de venda</strong>", f.totalRevenue, "lead")}
             <tr><th colspan="3" style="position:static">Energia</th></tr>
-            ${energyParts.map(([l, v]) => uRow(`<span style="padding-left:12px">${esc(l)}</span>`, v)).join("")}
+            ${energyParts.map(([l, v]) => uRow(`<span style="padding-left:12px">${go(esc(l), energyHref)}</span>`, v)).join("")}
             ${uRow("<strong>Total de energia</strong>", f.energyCost, "t")}
             <tr><th colspan="3" style="position:static">Demais custos</th></tr>
-            ${otherCosts.map(([l, v]) => uRow(`<span style="padding-left:12px">${esc(l)}</span>`, v)).join("") || `<tr><td colspan="3"><small>Nenhum.</small></td></tr>`}
+            ${otherCosts.map(([l, v, href]) => uRow(`<span style="padding-left:12px">${go(esc(l), href)}</span>`, v)).join("") || `<tr><td colspan="3"><small>Nenhum.</small></td></tr>`}
             ${uRow("<strong>Total dos demais custos</strong>", otherTotal, "t")}
             ${uRow("<strong>Custo total</strong>", f.totalOperatingCost, "t")}
           </tbody><tfoot><tr><td>${partner ? "Resultado do parceiro" : "Margem"} <small>${fmt.pct1(f.totalRevenue ? f.operationNet / f.totalRevenue * 100 : 0)} do faturamento</small></td><td class="num">${signed(f.operationNet)}</td><td class="num">${perKwh(perSold(f.operationNet))}</td></tr></tfoot></table></div>
@@ -264,7 +272,9 @@
     const d = f.dre, p = d.policy;
     const share = v => d.networkRevenue > 0 ? `<small>${fmt.pct1(v / d.networkRevenue * 100)} do faturamento</small>` : "";
     const line = (label, value, detail = "", cls = "") => `<tr class="${cls}"><td>${label}${detail ? `<small>${esc(detail)}</small>` : ""}</td><td class="num">${fmt.brl(value)}</td></tr>`;
-    const cost = (label, value, detail) => `<tr><td>${label}<small>${esc(detail)}</small></td><td class="num">${fmt.brl(value)}${share(value)}</td></tr>`;
+    const cost = (label, value, detail, href = "") => `<tr><td>${href ? `<a class="edit-link" href="${href}" title="Abrir onde este valor é editado">${label}<span aria-hidden="true"> ✎</span></a>` : label}<small>${esc(detail)}</small></td><td class="num">${fmt.brl(value)}${share(value)}</td></tr>`;
+    const mkArg = (f.period && f.period.monthKey) || UBY.state.months.at(-1) || "";
+    const matrizHref = `#/parametros/matriz/-//${mkArg}`;
     const group = label => `<tr><th colspan="2" style="position:static">${label}</th></tr>`;
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Fechamento por competência</p><h2>DRE consolidada da rede UBY</h2><p>${esc(f.period.label)}. Só ativos UBY; royalties entram como receita da marca e marketing só no fechamento, sem alterar as métricas de recarga.</p></div>
@@ -290,14 +300,14 @@
           ${line("Marketing e contratos reconhecidos no fechamento", d.marketing)}
           </tbody><tfoot><tr><td>Faturamento total (base gestão P3 e área)</td><td class="num">${fmt.brl(d.networkRevenue)}</td></tr></tfoot><tbody>
           ${group("Custos reconhecidos na rede")}
-          ${cost("Energia", d.energyCost, "Fatura de energia vinculada às recargas dos ativos UBY.")}
-          ${cost("Operação direta por ativo", d.directOperation, "Despesas próprias dos carregadores, sem tributos e sem rateio da matriz.")}
-          ${cost("Tributos atribuíveis aos carregadores", d.taxes, "Impostos cadastrados na unidade.")}
-          ${cost("Tributos corporativos centralizados", d.matrizTaxCost, "Impostos da matriz, distribuídos entre os destinos do rateio.")}
-          ${cost("Demais custos centralizados da matriz", d.otherMatriz, "Seguro, aluguel, sistemas e outros custos compartilhados.")}
-          ${cost("Gestão P3", d.management, "Percentual sobre o faturamento total conforme contrato.")}
-          ${cost("App / plataforma", d.platform, "Somente sobre recargas e ociosidade; não incide sobre marketing ou royalties.")}
-          ${cost("Participação de área", d.areaParticipation, "Repasse ao parceiro da área sobre o faturamento total.")}
+          ${cost("Energia", d.energyCost, "Fatura de energia vinculada às recargas dos ativos UBY.", "#/parametros/energia")}
+          ${cost("Operação direta por ativo", d.directOperation, "Despesas próprias dos carregadores, sem tributos e sem rateio da matriz.", "#/parametros/carregador")}
+          ${cost("Tributos atribuíveis aos carregadores", d.taxes, "Impostos cadastrados na unidade.", "#/parametros/carregador")}
+          ${cost("Tributos corporativos centralizados", d.matrizTaxCost, "Impostos da matriz, distribuídos entre os destinos do rateio.", matrizHref)}
+          ${cost("Demais custos centralizados da matriz", d.otherMatriz, "Seguro, aluguel, sistemas e outros custos compartilhados.", matrizHref)}
+          ${cost("Gestão P3", d.management, "Percentual sobre o faturamento total conforme contrato.", "#/parametros/carregador")}
+          ${cost("App / plataforma", d.platform, "Somente sobre recargas e ociosidade; não incide sobre marketing ou royalties.", "#/parametros/carregador")}
+          ${cost("Participação de área", d.areaParticipation, "Repasse ao parceiro da área sobre o faturamento total.", "#/parametros/area")}
           </tbody><tfoot><tr><td>Resultado operacional dos ativos UBY</td><td class="num">${fmt.brl(d.operationalResult)}</td></tr></tfoot><tbody>
           ${group("Resultado final da rede")}
           ${line("Resultado operacional UBY", d.operationalResult)}
@@ -339,7 +349,7 @@
       </section>
       <section class="section"><div class="section-head"><div><p class="kicker">Cadastro</p><h2>Custos compartilhados</h2></div></div>
         <div class="table-wrap"><table><thead><tr><th>Custo</th><th>Período</th><th>Rateio</th><th class="num">Competência</th><th class="num">Caixa</th><th class="num">Rateado</th></tr></thead>
-          <tbody>${m.costs.map(c => `<tr class="${c.applies ? "" : "muted"}"><td><strong>${esc(c.name)}</strong><small>${esc([c.category, c.supplier, c.documentRef].filter(Boolean).join(" · "))}${c.enabled ? "" : " · desativado"}</small></td>
+          <tbody>${m.costs.map(c => `<tr class="${c.applies ? "" : "muted"}"><td><strong><a class="edit-link" href="#/parametros/matriz/-/${encodeURIComponent(`cost:${c.id}`)}/${esc(m.monthKey || "")}" title="Editar este custo">${esc(c.name)}<span aria-hidden="true"> ✎</span></a></strong><small>${esc([c.category, c.supplier, c.documentRef].filter(Boolean).join(" · "))}${c.enabled ? "" : " · desativado"}</small></td>
             <td>${esc(c.kindLabel)}<small>início ${esc(c.startMonth)} · venc. dia ${esc(c.dueDay)}</small></td>
             <td>${esc(c.method)}<small>${c.byUnit.length ? c.byUnit.map(u => `${esc(u.name)}: ${fmt.brl(u.amount)}`).join(" · ") : esc(c.targets.join(" · ") || "sem destino ativo")}</small></td>
             <td class="num">${c.applies ? fmt.brl(c.competency) : "fora da competência"}</td><td class="num">${c.applies ? fmt.brl(c.cash) : ""}</td><td class="num">${c.applies ? fmt.brl(c.allocated) : ""}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">Nenhum custo compartilhado cadastrado.</td></tr>`}</tbody>

@@ -1811,10 +1811,10 @@
         p3SocietyPct: n0(cfg.p3SocietyPct), energyBillingMode: cfg.energyBillingMode || "" } : null,
       energyComposition: v?.energyComposition ? JSON.parse(JSON.stringify(v.energyComposition)) : null,
       costLines: v ? [
-        ...v.costRuleDetails.filter(d => d.enabled !== false && (n0(d.actual) || n0(d.planned))).map(d => ({ label: d.label, rule: d.displayRule || "", actual: n0(d.actual), planned: n0(d.planned), perKWh: v.energy > 0 ? n0(d.actual) / v.energy : null, matrix: false })),
-        ...v.matrixItems.map(i => ({ label: /tribut|impost|taxa/i.test(`${i.category || ""} ${i.label || ""}`) ? `Tributo centralizado — ${i.label}` : i.label, rule: i.rule || "Rateio da matriz", actual: n0(i.amount), planned: n0(i.amount), perKWh: v.energy > 0 ? n0(i.amount) / v.energy : null, matrix: true }))
+        ...v.costRuleDetails.filter(d => d.enabled !== false && (n0(d.actual) || n0(d.planned))).map(d => ({ id: d.id || "", label: d.label, rule: d.displayRule || "", actual: n0(d.actual), planned: n0(d.planned), perKWh: v.energy > 0 ? n0(d.actual) / v.energy : null, matrix: false })),
+        ...v.matrixItems.map(i => ({ id: i.id || "", label: /tribut|impost|taxa/i.test(`${i.category || ""} ${i.label || ""}`) ? `Tributo centralizado — ${i.label}` : i.label, rule: i.rule || "Rateio da matriz", actual: n0(i.amount), planned: n0(i.amount), perKWh: v.energy > 0 ? n0(i.amount) / v.energy : null, matrix: true }))
       ] : [],
-      revenueLines: v ? v.revenueRuleDetails.filter(d => d.enabled !== false && (n0(d.actual) || n0(d.planned))).map(d => ({ label: d.label, rule: d.displayRule || "", actual: n0(d.actual), planned: n0(d.planned), scope: d.scope || "" })) : [],
+      revenueLines: v ? v.revenueRuleDetails.filter(d => d.enabled !== false && (n0(d.actual) || n0(d.planned))).map(d => ({ id: d.id || "", label: d.label, rule: d.displayRule || "", actual: n0(d.actual), planned: n0(d.planned), scope: d.scope || "" })) : [],
       planning: legacy?.planning ? { planningKWh: legacy.planning.planningKWh, planningRevenue: legacy.planning.planningRevenue, salePricePerKWh: legacy.planning.salePricePerKWh,
         targetOccPct: legacy.planning.targetOccPct, realOccPct: legacy.planning.realOccPct } : null,
       monthly

@@ -28,6 +28,14 @@
 html{color-scheme:light}
 body{margin:0;color:var(--uby-ink);background:var(--uby-canvas);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;font-size:13px;line-height:1.45}
 a{color:var(--uby-green)}
+/* Custo clicável: leva para onde o valor é editado. */
+a.edit-link{color:inherit;text-decoration:none;border-bottom:1px dashed currentColor;cursor:pointer}
+a.edit-link span{opacity:.45;font-size:.9em}
+a.edit-link:hover{color:var(--uby-green)}
+a.edit-link:hover span{opacity:1}
+/* Campo aberto por um link de custo: destaque por alguns segundos. */
+.focus-flash{outline:3px solid var(--uby-green);outline-offset:3px;border-radius:10px;transition:outline-color 1.2s}
+.focus-flash.fade{outline-color:transparent}
 button,select,input{font:inherit}
 h1,h2,h3{margin:0;color:var(--uby-ink)}
 h1{font-size:clamp(26px,3vw,38px);letter-spacing:-.045em;line-height:1.08}
