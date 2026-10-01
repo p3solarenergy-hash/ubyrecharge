@@ -231,6 +231,18 @@
       </section>`;
   }
 
+  // Parcelado: o caixa paga as parcelas; o resultado reparte o total pelos meses que o custo cobre.
+  function installmentCalc(f) {
+    const amount = Number(f.amount) || 0, n = Math.max(1, Math.round(Number(f.installments) || 1)), cov = Math.max(1, Math.round(Number(f.coverage) || n));
+    const total = amount * n;
+    const addM = (m, k) => { if (!/^\d{4}-\d{2}$/.test(m || "")) return ""; const [y, mo] = m.split("-").map(Number); const d = new Date(y, mo - 1 + k, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+    const name = m => UBY.state.api?.monthName?.(m) || m;
+    const s = f.startMonth;
+    return `<strong>Total ${fmt.brl(total)}</strong> (${n} × ${fmt.brl(amount)})<br>
+      Caixa: ${n} boleto(s) de ${fmt.brl(amount)}${s ? `, de ${esc(name(s))} a ${esc(name(addM(s, n - 1)))}` : ""}<br>
+      Resultado: <strong>${fmt.brl(total / cov)} por mês</strong> durante ${cov} mês(es)${s ? `, de ${esc(name(s))} a ${esc(name(addM(s, cov - 1)))}` : ""}, rateado entre os destinos`;
+  }
+
   function matrixTab(w, data) {
     const mk = ui.matrixMonth || data.months.at(-1) || "";
     const costs = w.loadMatrizCosts().filter(i => !i.scheduledPayment);
@@ -240,10 +252,10 @@
     if (!ui.costForm) {
       ui.costForm = editing ? {
         name: editing.name, amount: editing.amount, category: editing.category, supplier: editing.supplier, kind: editing.costKind, installments: editing.installments,
-        startMonth: editing.startMonth, endMonth: editing.endMonth, dueDay: editing.dueDay, method: editing.allocation, shares: (editing.targets || []).map(t => t.share || 0).join(", "),
+        coverage: w.matrizCoverageMonths(editing), startMonth: editing.startMonth, endMonth: editing.endMonth, dueDay: editing.dueDay, method: editing.allocation, shares: (editing.targets || []).map(t => t.share || 0).join(", "),
         documentRef: editing.documentRef, notes: editing.notes,
         targets: eligible.filter(e => (editing.targets || []).some(t => { try { return w.matrizRowsMatch(w.matrizResolveTargetRow(t, eligibleRows), e.row); } catch (_) { return false; } })).map(e => e.scope)
-      } : { name: "", amount: "", category: "Outros custos", supplier: "", kind: "recurring", installments: 1, startMonth: new Date().toISOString().slice(0, 7), endMonth: "", dueDay: 1, method: "equal", shares: "", documentRef: "", notes: "", targets: [] };
+      } : { name: "", amount: "", category: "Outros custos", supplier: "", kind: "recurring", installments: 1, coverage: 12, startMonth: new Date().toISOString().slice(0, 7), endMonth: "", dueDay: 1, method: "equal", shares: "", documentRef: "", notes: "", targets: [] };
     }
     const form = ui.costForm;
     const cats = ["Seguro", "Locacao / aluguel", "Internet / dados", "Manutencao preventiva", "Manutencao corretiva", "Licenca / plataforma", "Tributos corporativos / centralizados", "Marketing", "Administrativo", "Outros custos"];
@@ -256,7 +268,7 @@
         <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Matriz UBY</p><h2>Custos centrais</h2></div></div>
           <div class="table-wrap" style="max-height:520px"><table><thead><tr><th>Custo</th><th>Tipo</th><th class="num">Valor</th><th class="num">Nesta competência</th><th>Rateio</th><th></th></tr></thead>
             <tbody>${costs.map(c => { const on = w.matrizApplies(c, mk); return `<tr class="${c.enabled ? "" : "muted"}"><td><strong>${esc(c.name)}</strong><small>${esc(c.category)}${c.supplier ? ` · ${esc(c.supplier)}` : ""}${c.enabled ? "" : " · desativado"}</small></td>
-              <td>${esc(w.matrizKindLabel(c.costKind))}${c.costKind === "installment" ? `<small>${c.installments} parcela(s)</small>` : ""}<small>${esc(c.startMonth || "")}${c.endMonth ? ` até ${esc(c.endMonth)}` : ""} · dia ${c.dueDay}</small></td>
+              <td>${esc(w.matrizKindLabel(c.costKind))}${c.costKind === "installment" ? `<small>${c.installments} parcela(s) · resultado em ${w.matrizCoverageMonths(c)} mês(es)</small>` : ""}<small>${esc(c.startMonth || "")}${c.endMonth ? ` até ${esc(c.endMonth)}` : ""} · dia ${c.dueDay}</small></td>
               <td class="num">${fmt.brl(c.amount)}</td><td class="num">${on ? fmt.brl(w.matrizCompetencyAmount(c)) : "—"}</td><td>${esc(w.matrizMethodLabel(c.allocation))}<small>${(c.targets || []).length} destino(s)</small></td>
               <td style="white-space:nowrap"><button class="btn ghost" data-cost-edit="${esc(c.id)}" type="button">Editar</button>${c.enabled ? `<button class="btn ghost" data-cost-off="${esc(c.id)}" type="button" ${canWrite(w) && !busy ? "" : "disabled"}>Desativar</button>` : ""}<button class="btn ghost" data-cost-del="${esc(c.id)}" type="button" style="color:var(--uby-red)" ${canWrite(w) && !busy ? "" : "disabled"}>Excluir</button></td></tr>`; }).join("") || `<tr><td colspan="6" class="empty">Nenhum custo cadastrado.</td></tr>`}</tbody></table></div>
         </section>
@@ -264,7 +276,8 @@
           <div class="grid g2" style="gap:8px">
             ${inp("name", "Nome do custo")}${inp("amount", "Valor por parcela ou competência (R$)", "number", 'step="0.01" min="0"')}
             ${sel("category", "Categoria", cats.map(c => [c, c]))}${inp("supplier", "Fornecedor")}
-            ${sel("kind", "Tipo", [["recurring", "Recorrente mensal"], ["installment", "Parcelado"], ["one_off", "Pontual"]])}${inp("installments", "Parcelas", "number", 'min="1" step="1"')}
+            ${sel("kind", "Tipo", [["recurring", "Recorrente mensal"], ["installment", "Parcelado"], ["one_off", "Pontual"]])}${form.kind === "installment" ? inp("installments", "Parcelas (boletos)", "number", 'min="1" step="1"') : "<span></span>"}
+            ${form.kind === "installment" ? `${inp("coverage", "Meses que o custo cobre (resultado)", "number", 'min="1" step="1"')}<div class="note" id="pmCostCalc" style="margin:0">${installmentCalc(form)}</div>` : ""}
             ${inp("startMonth", "Início (primeira competência)", "month")}${inp("endMonth", "Fim (opcional)", "month")}
             ${form.startMonth && form.startMonth < new Date().toISOString().slice(0, 7) ? `<div class="note" style="grid-column:1/-1;border-color:var(--uby-amber)">Início em ${esc(UBY.state.api?.monthName?.(form.startMonth) || form.startMonth)}: este custo também entra nas competências passadas a partir desse mês e muda o resultado já apurado. Se ele só começou agora, use o mês atual.</div>` : ""}
             ${inp("dueDay", "Dia do vencimento", "number", 'min="1" max="31"')}${sel("method", "Rateio", [["equal", "Rateio igual"], ["power", "Por potência instalada"], ["energy", "Por kWh vendido"], ["revenue", "Por faturamento"], ["custom", "Participação definida"]])}
@@ -1255,7 +1268,11 @@
     });
     // --- matriz ---
     if ($("#pmMatrixMonth")) $("#pmMatrixMonth").onchange = e => { ui.matrixMonth = e.target.value; ui.costForm = null; draw(target, w); };
-    target.querySelectorAll("[data-cf]").forEach(el => el.onchange = () => { ui.costForm[el.dataset.cf] = el.value; if (["method", "startMonth"].includes(el.dataset.cf)) draw(target, w); });
+    target.querySelectorAll("[data-cf]").forEach(el => {
+      el.onchange = () => { ui.costForm[el.dataset.cf] = el.value; if (["method", "startMonth", "kind"].includes(el.dataset.cf)) draw(target, w); };
+      // Conta do parcelado atualiza enquanto digita, sem redesenhar a tela.
+      el.oninput = () => { ui.costForm[el.dataset.cf] = el.value; const calc = $("#pmCostCalc"); if (calc) calc.innerHTML = installmentCalc(ui.costForm); };
+    });
     target.querySelectorAll("[data-cf-target]").forEach(el => el.onchange = () => { const s = el.dataset.cfTarget; ui.costForm.targets = el.checked ? [...new Set([...ui.costForm.targets, s])] : ui.costForm.targets.filter(x => x !== s); });
     target.querySelectorAll("[data-cost-edit]").forEach(b => b.onclick = () => { ui.editingCost = b.dataset.costEdit; ui.costForm = null; draw(target, w); });
     if ($("#pmCostCancel")) $("#pmCostCancel").onclick = () => { ui.editingCost = ""; ui.costForm = null; draw(target, w); };
@@ -1271,7 +1288,15 @@
         if (ui.editingCost) w.editMatrizCost(ui.editingCost); else w.resetMatrizCostForm();
         const set = (id, v) => { const el = w.document.getElementById(id); if (el) el.value = v ?? ""; };
         set("matrizNewName", f.name); set("matrizNewValue", f.amount); set("matrizCostCategory", f.category); set("matrizCostSupplier", f.supplier);
-        set("matrizCostKind", f.kind); set("matrizCostInstallments", f.installments || 1); set("matrizCostStartMonth", f.startMonth || new Date().toISOString().slice(0, 7)); set("matrizCostEndMonth", f.endMonth);
+        set("matrizCostKind", f.kind); set("matrizCostInstallments", f.kind === "installment" ? f.installments || 1 : 1);
+        // Sem isto o parcelado ficava com cobertura 1: todas as parcelas caíam no resultado do primeiro mês.
+        // A tela original desta página não tem o campo; o motor lê pelo id, então ele é criado oculto.
+        if (!w.document.getElementById("matrizCostCoverageMonths")) {
+          const hidden = w.document.createElement("input");
+          hidden.type = "hidden"; hidden.id = "matrizCostCoverageMonths";
+          w.document.body.appendChild(hidden);
+        }
+        set("matrizCostCoverageMonths", f.kind === "installment" ? Math.max(1, Math.round(Number(f.coverage) || Number(f.installments) || 1)) : 1); set("matrizCostStartMonth", f.startMonth || new Date().toISOString().slice(0, 7)); set("matrizCostEndMonth", f.endMonth);
         set("matrizCostDueDay", f.dueDay || 1); set("matrizCostMethod", f.method); set("matrizCostCustomShares", f.shares); set("matrizCostDocument", f.documentRef); set("matrizCostNotes", f.notes);
         const tsel = w.document.getElementById("matrizCostTargets");
         if (tsel) [...tsel.options].forEach(o => { o.selected = f.targets.includes(o.value); });
