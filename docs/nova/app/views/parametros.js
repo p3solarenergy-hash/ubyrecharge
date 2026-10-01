@@ -301,11 +301,18 @@
     const rows = items.map(i => {
       const st = w.scheduledPaymentStatus(i, mk), tg = w.scheduledPaymentTarget(i);
       const amount = i.scheduledPayment ? Number(i.amount || 0) : w.matrizCashAmount(i, mk);
-      return { id: i.id, name: i.name, category: i.category, supplier: i.supplier, source: i.scheduledPayment ? "" : "Custo da matriz", target: tg, due: w.scheduledPaymentDueDate(i, mk), dueDay: i.dueDay, amount, st };
+      return { id: i.id, sched: !!i.scheduledPayment, name: i.name, category: i.category, supplier: i.supplier, source: i.scheduledPayment ? "" : "Custo da matriz", target: tg, due: w.scheduledPaymentDueDate(i, mk), dueDay: i.dueDay, amount, st };
     });
     const tot = rows.reduce((a, r) => { a.total += r.amount; if (r.st.key === "paid") a.paid += r.amount; else a.open += r.amount; if (r.st.key === "overdue") a.late += r.amount; return a; }, { total: 0, paid: 0, open: 0, late: 0 });
     w.renderScheduledPayments(w.getGeneralUnitData());
     const targets = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text }));
+    const editing = ui.payEditing ? w.loadMatrizCosts().find(c => c.id === ui.payEditing && c.scheduledPayment) || null : null;
+    if (ui.payEditing && !editing) ui.payEditing = "";
+    if (editing && !ui.payForm) {
+      const t0 = (editing.targets || [])[0] || {};
+      const scope = targets.some(t => t.value === t0.scope) ? t0.scope : (targets.find(t => t.value.split("::")[0] === String(t0.workId || "")) || {}).value || "";
+      ui.payForm = { target: scope, name: editing.name, supplier: editing.supplier || "", category: editing.category || "Outros custos", amount: editing.amount, dueDay: editing.dueDay, startMonth: editing.startMonth || "", endMonth: editing.endMonth || "" };
+    }
     const pf = ui.payForm || (ui.payForm = { target: "", name: "", supplier: "", category: "Internet / dados", amount: "", dueDay: 11, startMonth: mk, endMonth: "" });
     const inp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-pf="${k}" type="${type}" value="${esc(pf[k] ?? "")}" ${extra} style="width:100%">`);
     const can = canWrite(w) && !busy ? "" : "disabled";
@@ -318,16 +325,18 @@
             <td>${esc(r.target.station || "Carregador não identificado")}<small>${esc(r.target.workName || (r.target.targetCount > 1 ? `rateado para ${r.target.targetCount} carregadores` : ""))}</small></td>
             <td>${r.due.toLocaleDateString("pt-BR")}<small>todo dia ${r.dueDay}</small></td><td class="num">${fmt.brl(r.amount)}</td>
             <td><span class="badge ${r.st.key === "paid" ? "ok" : r.st.key === "overdue" ? "bad" : r.st.key === "pending" ? "neutral" : "warn"}">${esc(r.st.label)}</span></td>
-            <td>${r.st.key === "paid" ? `<button class="btn ghost" data-pay="${esc(r.id)}|pending" type="button" ${can}>Reabrir</button>` : `<button class="btn" data-pay="${esc(r.id)}|paid" type="button" ${can}>Marcar pago</button>`}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">Nenhum pagamento programado nesta competência.</td></tr>`}</tbody></table></div>
+            <td style="white-space:nowrap">${r.st.key === "paid" ? `<button class="btn ghost" data-pay="${esc(r.id)}|pending" type="button" ${can}>Reabrir</button>` : `<button class="btn" data-pay="${esc(r.id)}|paid" type="button" ${can}>Marcar pago</button>`}
+              ${r.sched ? `<button class="btn ghost" data-pay-edit="${esc(r.id)}" type="button">Editar</button>` : `<a class="btn ghost link-btn" href="#/parametros/matriz/-/${encodeURIComponent(`cost:${r.id}`)}/${esc(mk)}">Editar</a>`}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">Nenhum pagamento programado nesta competência.</td></tr>`}</tbody></table></div>
       </section>
-      <section class="section"><div class="section-head"><div><p class="kicker">Novo compromisso</p><h2>Adicionar pagamento recorrente de um carregador</h2><p>Entra no calendário de caixa; não altera o DRE sem lançamento financeiro.</p></div></div>
+      <section class="section" data-focus="${editing ? `pay:${esc(editing.id)}` : "pay:new"}"><div class="section-head"><div><p class="kicker">${editing ? "Editando" : "Novo compromisso"}</p><h2>${editing ? esc(editing.name) : "Adicionar pagamento recorrente de um carregador"}</h2><p>${editing ? "A alteração vale para todos os meses deste pagamento, inclusive os já lançados. Para parar de cobrar, use \"Remover daqui em diante\": os meses anteriores e o que já foi pago continuam no histórico." : "Entra no calendário de caixa; não altera o DRE sem lançamento financeiro."}</p></div></div>
         <div class="grid g4" style="gap:8px">
           ${field("Carregador", `<select class="select" data-pf="target"><option value="">Selecione</option>${targets.map(t => `<option value="${esc(t.value)}" ${pf.target === t.value ? "selected" : ""}>${esc(t.text)}</option>`).join("")}</select>`)}
           ${inp("name", "Pagamento")}${inp("supplier", "Fornecedor")}
           ${field("Categoria", `<select class="select" data-pf="category">${["Internet / dados", "Energia", "Locação / aluguel", "Seguro", "Manutenção", "Licença / plataforma", "Outros custos"].map(c => `<option ${pf.category === c ? "selected" : ""}>${c}</option>`).join("")}</select>`)}
           ${inp("amount", "Valor mensal (R$)", "number", 'min="0" step="0.01"')}${inp("dueDay", "Dia do vencimento", "number", 'min="1" max="31"')}${inp("startMonth", "Inicia em", "month")}${inp("endMonth", "Termina em (opcional)", "month")}
         </div>
-        <button class="btn primary" id="pmPayAdd" type="button" style="margin-top:12px" ${can}>Adicionar pagamento programado</button>
+        ${editing ? `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn primary" id="pmPayEditSave" type="button" ${can}>Salvar alteração</button><button class="btn" id="pmPayEditCancel" type="button">Cancelar</button><button class="btn ghost" data-pay-end="${esc(editing.id)}" type="button" style="color:var(--uby-red)" ${can}>Remover daqui em diante (a partir de ${esc(UBY.state.api?.monthName?.(mk) || mk)})</button></div>`
+          : `<button class="btn primary" id="pmPayAdd" type="button" style="margin-top:12px" ${can}>Adicionar pagamento programado</button>`}
       </section>`;
   }
 
@@ -362,6 +371,19 @@
     const nRec = rows.map(recOf).filter(Boolean);
     const conf = nRec.filter(r => r.status === "conferido").length;
     const kindLabel = b => b.kind === "energia" ? "Energia" : b.kind === "area" ? "Repasse à área" : b.source || "Custo";
+    // Cada conta leva para onde ela é editada.
+    const sched = b => b.kind === "matriz" && b.source === "Pagamento programado";
+    const billHref = b => {
+      const key = encodeURIComponent(`${b.workId || ""}|${b.station || ""}`);
+      if (b.kind === "energia") return `#/parametros/energia/${key}/${encodeURIComponent(`inv:${b.invoiceId}`)}`;
+      if (b.kind === "area") return `#/parametros/area/${key}`;
+      if (sched(b)) return `#/parametros/programados/-/${encodeURIComponent(`pay:${b.billId}`)}/${b.monthKey}`;
+      return `#/parametros/matriz/-/${encodeURIComponent(`cost:${b.billId}`)}/${b.monthKey}`;
+    };
+    // Possível duplicidade: mesmo carregador e mesmo valor no mês (ex.: pagamento programado da Copel
+    // e a fatura da Copel lançada em Energia). Só o programado pode ser removido daqui.
+    const normSt = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/^uby recharge\s*-\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
+    const dupsOf = b => rows.filter(o => o.key !== b.key && Math.abs(o.amount - b.amount) < 0.01 && normSt(o.station) === normSt(b.station));
     const recCell = b => {
       const r = recOf(b);
       if (!bs.tx.length) return `<small style="color:var(--uby-muted)">sem extrato</small>`;
@@ -414,7 +436,9 @@
       <section class="section"><div class="section-head"><div><p class="kicker">Contas do mês</p><h2>Pagamentos</h2><p>Marque como pago aqui mesmo. Quando houver extrato, a coluna Extrato mostra se o pagamento apareceu no banco, com a data e o valor.</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Vencimento</th><th>Conta</th><th>De onde</th><th class="num">Valor</th><th>Situação</th><th>Extrato</th><th></th></tr></thead>
           <tbody>${rows.map(b => `<tr><td><strong>${fmtDay(b.due)}</strong></td>
-            <td><strong>${esc(b.name)}</strong><small>${esc(kindLabel(b))}${b.supplier ? ` · ${esc(b.supplier)}` : ""}</small></td>
+            <td style="white-space:normal"><strong><a class="edit-link" href="${billHref(b)}" title="Abrir onde esta conta é editada">${esc(b.name)}<span aria-hidden="true"> ✎</span></a></strong><small>${esc(kindLabel(b))}${b.supplier ? ` · ${esc(b.supplier)}` : ""}</small>
+              ${(() => { const d = dupsOf(b); if (!d.length) return ""; return `<div style="margin-top:4px"><span class="badge warn">possível duplicidade</span><small>mesmo carregador e mesmo valor que: ${d.map(o => `"${esc(o.name)}"`).join(", ")}${!sched(b) && d.some(sched) ? " · remova o pagamento programado e mantenha este" : ""}</small>
+                ${sched(b) ? `<button class="btn ghost" data-pay-end="${esc(b.billId)}" data-month="${esc(mk)}" type="button" style="color:var(--uby-red);margin-top:4px" ${can}>Remover este (daqui em diante)</button>` : ""}</div>`; })()}</td>
             <td>${esc(b.station || "—")}${b.workName ? `<small>${esc(b.workName)}</small>` : ""}</td>
             <td class="num"><strong>${fmt.brl(b.amount)}</strong>${b.kind === "area" && b.paidAmount !== null && b.paidAmount !== undefined && Math.abs(b.paidAmount - b.dueAmount) > 0.009 ? `<small>devido ${fmt.brl(b.dueAmount)}</small>` : ""}</td>
             <td><span class="badge ${b.paid ? "ok" : b.status === "overdue" ? "bad" : "warn"}">${esc(b.statusLabel || (b.paid ? "Pago" : "A pagar"))}</span>${b.paidAt ? `<small>em ${fmtDay(b.paidAt)}</small>` : ""}</td>
@@ -657,6 +681,8 @@
     if (!info) return `<div class="note">Carregador não encontrado no motor.</div>`;
     const draft = ui.enDraft || info.stored;
     const dirty = !!ui.enDraft;
+    // Link de Pagamentos (#/parametros/energia/<carregador>/inv:<id>): abre a fatura já em edição.
+    if (ui.enEditId) { const it = draft.find(i => i.id === ui.enEditId); if (it) ui.enForm = { ...it }; ui.enEditId = ""; }
     const f = ui.enForm || (ui.enForm = blankInvoice(draft.slice().sort((a, b) => String(a.end).localeCompare(String(b.end))).pop()));
     const preview = cleanInvoice(f);
     const can = canWrite(w) && !busy ? "" : "disabled";
@@ -694,7 +720,7 @@
               <td class="num">${fmt.int(m.kwh + m.estimatedKWh)}</td><td class="num">${fmt.brl(m.copel)}</td><td class="num">${fmt.brl(m.lease)}</td><td class="num">${m.estimatedCost ? fmt.brl(m.estimatedCost) : "—"}</td>
               <td class="num"><strong>${fmt.brl(m.cost)}</strong></td></tr>`; }).join("") || `<tr><td colspan="7" class="empty">Sem faturas lançadas.</td></tr>`}</tbody></table></div>
         </section>
-        <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">${f.id ? "Editando" : "Nova fatura"}</p><h2>${f.id ? `Fatura ${esc(f.ref || f.start)}` : "Lançar fatura de energia"}</h2><p>Lance o que veio na fatura: kWh consumido, valor da Copel, valor do arrendamento e as datas das leituras (a anterior já vem da última fatura). Médias por kWh e a divisão entre os meses são calculadas pela plataforma.</p></div></div>
+        <section class="section" style="margin:0" data-focus="${f.id ? `inv:${esc(f.id)}` : "inv:new"}"><div class="section-head"><div><p class="kicker">${f.id ? "Editando" : "Nova fatura"}</p><h2>${f.id ? `Fatura ${esc(f.ref || f.start)}` : "Lançar fatura de energia"}</h2><p>Lance o que veio na fatura: kWh consumido, valor da Copel, valor do arrendamento e as datas das leituras (a anterior já vem da última fatura). Médias por kWh e a divisão entre os meses são calculadas pela plataforma.</p></div></div>
           <label class="imp-field" style="display:block;border:1.5px dashed var(--uby-line, #c9d6cf);border-radius:10px;padding:10px 12px;margin-bottom:10px;cursor:pointer">
             <span style="font-size:12px;font-weight:800">📄 Ler fatura da Copel (PDF)</span>
             <small style="display:block;color:var(--uby-muted)">Escolha o PDF baixado do site/app da Copel: datas das leituras, kWh, valor, vencimento e leituras do medidor são preenchidos sozinhos. O PDF fica guardado junto da fatura ao salvar.</small>
@@ -979,6 +1005,11 @@
       ui.focus = params[2] || "";
       const costId = ui.tab === "matriz" && ui.focus.startsWith("cost:") ? ui.focus.slice(5) : "";
       if (costId) { ui.editingCost = costId; ui.costForm = null; }
+      if (ui.tab === "energia" && ui.focus.startsWith("inv:")) { ui.enEditId = ui.focus.slice(4); ui.enDraft = null; }
+      if (ui.tab === "programados") {
+        if (month) ui.payMonth = month;
+        if (ui.focus.startsWith("pay:")) { ui.payEditing = ui.focus.slice(4); ui.payForm = null; }
+      }
     }
     target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Abrindo parâmetros e custos</h2><p>Carregando a plataforma original com a base completa. Na primeira vez leva alguns segundos.</p></div>`;
     let w;
@@ -1346,6 +1377,47 @@
         return fb || "pagamento programado salvo";
       });
     };
+    target.querySelectorAll("[data-pay-edit]").forEach(b => b.onclick = () => { ui.payEditing = b.dataset.payEdit; ui.payForm = null; ui.focus = `pay:${b.dataset.payEdit}`; draw(target, w); });
+    if ($("#pmPayEditCancel")) $("#pmPayEditCancel").onclick = () => { ui.payEditing = ""; ui.payForm = null; draw(target, w); };
+    if ($("#pmPayEditSave")) $("#pmPayEditSave").onclick = () => {
+      const p = ui.payForm, id = ui.payEditing;
+      if (!p.target || !String(p.name || "").trim() || !(Number(p.amount) > 0) || !/^\d{4}-\d{2}$/.test(p.startMonth || "") || (p.endMonth && !/^\d{4}-\d{2}$/.test(p.endMonth))) { log("Pagamento: informe carregador, nome, valor e mês de início.", "bad"); draw(target, w); return; }
+      run(target, w, `Pagamento ${p.name}`, async () => {
+        await resyncMatrix(w);
+        w.renderScheduledPayments(w.getGeneralUnitData());
+        const opt = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].find(o => o.value === p.target);
+        const list = w.loadMatrizCosts();
+        const idx = list.findIndex(c => c.id === id && c.scheduledPayment);
+        if (idx < 0) throw new Error("Este pagamento não existe mais na nuvem (pode ter sido removido em outra aba). Nada foi gravado.");
+        const it = list[idx], t0 = (it.targets || [])[0] || {};
+        list[idx] = w.matrizNormalizeCost({ ...it, name: String(p.name).trim(), supplier: p.supplier || "", category: p.category || "Outros custos", amount: Number(p.amount), dueDay: Number(p.dueDay) || 1,
+          startMonth: p.startMonth, endMonth: p.endMonth || "", updatedAt: new Date().toISOString(),
+          targets: [{ ...t0, scope: p.target, workId: String(p.target).split("::")[0], station: opt?.dataset.station || t0.station || "", workName: opt?.dataset.workName || t0.workName || "", startMonth: t0.startMonth || p.startMonth, share: 100 }] });
+        w.saveMatrizCosts(list);
+        const fb = await awaitMatrixSave(w);
+        ui.payEditing = ""; ui.payForm = null;
+        return fb || "pagamento atualizado";
+      });
+    };
+    // "Remover daqui em diante": encerra no mês anterior (o histórico e o que foi pago ficam); se nunca valeu antes, apaga.
+    target.querySelectorAll("[data-pay-end]").forEach(b => b.onclick = () => {
+      const id = b.dataset.payEnd, mk = b.dataset.month || ui.payMonth;
+      const it = w.loadMatrizCosts().find(c => c.id === id);
+      if (!it || !confirm(`Remover "${it.name}" de ${UBY.state.api?.monthName?.(mk) || mk} em diante?\nOs meses anteriores e os pagamentos já marcados continuam no histórico.`)) return;
+      run(target, w, `Remover ${it.name}`, async () => {
+        await resyncMatrix(w);
+        const list = w.loadMatrizCosts();
+        const cur = list.find(c => c.id === id && c.scheduledPayment);
+        if (!cur) throw new Error("Este pagamento não existe mais na nuvem. Nada foi gravado.");
+        const [y, m] = mk.split("-").map(Number);
+        const prev = `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}`;
+        const keep = !cur.startMonth || cur.startMonth < mk;
+        w.saveMatrizCosts(keep ? list.map(c => c.id === id ? { ...c, endMonth: c.endMonth && c.endMonth < prev ? c.endMonth : prev, updatedAt: new Date().toISOString() } : c) : list.filter(c => c.id !== id));
+        const fb = await awaitMatrixSave(w);
+        if (ui.payEditing === id) { ui.payEditing = ""; ui.payForm = null; }
+        return keep ? `encerrado em ${UBY.state.api?.monthName?.(prev) || prev}` : (fb || "removido");
+      });
+    });
     // --- operação ---
     target.querySelectorAll("[data-op-cfg]").forEach(b => b.onclick = () => { ui.opCharger = ui.opCharger === b.dataset.opCfg ? "" : b.dataset.opCfg; ui.opForm = null; draw(target, w); });
     if ($("#pmOpCancel")) $("#pmOpCancel").onclick = () => { ui.opCharger = ""; ui.opForm = null; draw(target, w); };

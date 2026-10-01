@@ -6087,6 +6087,11 @@ async function syncEnergyPaymentsFromFinanceSnapshot(snapshot = {}) {
   const workId = String(snapshot.workId || '');
   const settings = snapshot.settings || {};
   if (!/^\d{4}-\d{2}$/.test(competenceMonth) || !workId || !stationKey) return;
+  // Carregador com Faturas de energia lançadas: os vencimentos da Copel e do arrendamento já vêm das
+  // faturas em Pagamentos. Gerar o programado aqui duplicava a conta (mesmo valor, mesmo mês).
+  const invoiceRoot = allRechargeRecords?.[workId]?.financialSettings || allRechargeRecords?.[workId]?.summary?.financialSettings || {};
+  const storedInvoices = invoiceRoot?.chargers?.[stationKey]?.energyInvoices;
+  if (Array.isArray(storedInvoices) && storedInvoices.length) return;
   const paymentMonth = matrizAddMonths(competenceMonth, 1);
   const target = {
     scope: `${workId}::${stationKey}`,
