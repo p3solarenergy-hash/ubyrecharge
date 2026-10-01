@@ -198,9 +198,18 @@
           <br><strong>Energia do mês: ${fmt.brl(invMonth.cost)}</strong>` : `<br>Nenhum consumo deste carregador cai nesta competência.`}
         <br><small>Os campos de energia por competência deixam de ser usados para este carregador.</small>
         <br><a class="btn" href="#/parametros/energia/${encodeURIComponent(ui.charger)}" style="margin-top:8px;display:inline-flex">Abrir Faturas de energia →</a></div>`;
+    // Custo fixo do carregador x conta em Pagamentos: mostra a ligação (ou a falta dela) para não lançar em dois lugares sem saber.
+    let schedHere = [];
+    try { schedHere = w.loadMatrizCosts().filter(c => c.scheduledPayment && c.enabled && (c.targets || []).some(t => String(t.workId || String(t.scope || "").split("::")[0]) === String(wid)) && (!c.endMonth || c.endMonth >= ui.month)); } catch (_) {}
+    const cashHint = r => {
+      if (r.basis !== "fixed" || !(Number(r.value) > 0)) return "";
+      const hit = schedHere.find(c => Math.abs(Number(c.amount) - Number(r.value)) < 0.01);
+      return hit ? `<small>no caixa: <a class="edit-link" href="#/parametros/programados/-/${encodeURIComponent(`pay:${hit.id}`)}/${ui.month}">${esc(hit.name)} · dia ${esc(hit.dueDay)}<span aria-hidden="true"> ✎</span></a></small>`
+        : `<small style="color:var(--uby-amber)">não está em Pagamentos (só entra no resultado) · <a href="#/parametros/pagamentos">lançar a conta</a></small>`;
+    };
     const ruleRows = (kind, arr) => arr.map((r, i) => `<tr data-focus="rule:${esc(r.id || r.label)}" data-focus-alt="rule:${esc(r.label)}">
         <td><input type="checkbox" data-rule="${kind}|${i}|enabled" ${r.enabled ? "checked" : ""}></td>
-        <td><input class="select" data-rule="${kind}|${i}|label" value="${esc(r.label)}" style="width:100%"></td>
+        <td><input class="select" data-rule="${kind}|${i}|label" value="${esc(r.label)}" style="width:100%">${kind === "cost" ? cashHint(r) : ""}</td>
         <td><select class="select" data-rule="${kind}|${i}|basis">${[["fixed", "Fixo mensal"], ["per_kwh", "Por kWh"], ["revenue_pct", "% do faturamento"], ["per_charge", "Por recarga"], ["one_off", "Avulso no mês"]].map(([v, l]) => `<option value="${v}" ${r.basis === v ? "selected" : ""}>${l}</option>`).join("")}</select></td>
         <td><input class="select" type="number" step="0.01" min="0" data-rule="${kind}|${i}|value" value="${esc(r.value)}" style="width:110px"></td>
         ${kind === "revenue" ? `<td><select class="select" data-rule="${kind}|${i}|scope"><option value="operational" ${r.scope !== "non_operational" ? "selected" : ""}>Operacional</option><option value="non_operational" ${r.scope === "non_operational" ? "selected" : ""}>Não operacional (marketing)</option></select></td>` : ""}
@@ -232,6 +241,96 @@
         <div class="table-wrap"><table><thead><tr><th>Usar</th><th>Item</th><th>Base</th><th>Valor</th><th>Anterior</th><th></th></tr></thead><tbody>${ruleRows("cost", rules.cost)}</tbody></table></div>
         <h3 style="margin:12px 0 6px">Receitas</h3>
         <div class="table-wrap"><table><thead><tr><th>Usar</th><th>Item</th><th>Base</th><th>Valor</th><th>Classificação</th><th>Anterior</th><th></th></tr></thead><tbody>${ruleRows("revenue", rules.revenue)}</tbody></table></div>
+      </section>`;
+  }
+
+  // ---------- checklist do fechamento ----------
+  // Uma tela só com o que falta no mês; cada item leva direto para onde se resolve.
+  function checklistTab() {
+    const api = UBY.state.api;
+    const months = (UBY.state.months || []).slice();
+    const mk = months.includes(ui.ckMonth) ? ui.ckMonth : months.at(-1) || "";
+    ui.ckMonth = mk;
+    if (!mk || !api) return `<div class="note">Sem competências carregadas ainda. Abra esta aba de novo em alguns segundos.</div>`;
+    const mName = m => api.monthName?.(m) || m;
+    const enc = encodeURIComponent;
+    const [yy, mm] = mk.split("-").map(Number);
+    const nextMk = `${mm === 12 ? yy + 1 : yy}-${String(mm === 12 ? 1 : mm + 1).padStart(2, "0")}`;
+    const items = [];
+    const add = (cat, status, title, detail, href, action) => items.push({ cat, status, title, detail, href, action });
+    const safe = fn => { try { fn(); } catch (err) { add("Erro", "bad", "Não consegui conferir uma parte", err.message, "", ""); } };
+
+    // 1. Recargas importadas até o fim do mês
+    safe(() => {
+      const endDay = new Date(yy, mm, 0);
+      UBY.data("networkConfig").filter(r => UBY.isUbyModel(r.model) && r.included).forEach(r => {
+        const last = r.lastDate ? new Date(r.lastDate) : null;
+        if (last && last >= endDay) return;
+        add("Recargas", "warn", `${r.station}: recargas importadas só até ${last ? fmt.date(last) : "—"}`, `Para fechar ${mName(mk)}, a planilha precisa ir até ${fmt.date(endDay)} (se o ponto não teve recarga nos últimos dias, pode ignorar).`,
+          `#/importar/${enc(r.workId)}/${mk}`, "Importar planilha");
+      });
+    });
+    // 2. Energia e custos por carregador
+    safe(() => {
+      UBY.data("financeStations").filter(s => UBY.isUbyModel(s.model) && s.model !== "third_party_management").forEach(s => {
+        const sf = UBY.data("stationFinance", s.workId, s.station, mk);
+        if (!sf || sf.monthKey !== mk || !sf.finance || !(sf.finance.energy > 0)) return;
+        const f = sf.finance, ec = sf.energyComposition || {}, key = enc(`${s.workId}|${s.station}`);
+        if (ec.estimatedCost > 0) add("Energia", "warn", `${s.station}: energia com estimativa de ${fmt.brl(ec.estimatedCost)}`, `Consumo de ${fmtDay(ec.estimatedFrom)} a ${fmtDay(ec.estimatedTo)} ainda sem fatura lançada. Acerta quando a fatura entrar.`,
+          `#/parametros/energia/${key}/${enc("inv:new")}`, "Lançar fatura");
+        else if (!(f.energyCost > 0)) add("Energia", "bad", `${s.station}: energia sem custo`, `${fmt.kwh(f.energy)} vendidos e custo de energia R$ 0,00 — a margem fica inflada.`,
+          `#/parametros/carregador/${key}/energyCostPerKWh/${mk}`, "Cadastrar energia");
+        if (!(f.platform > 0)) add("Custos do carregador", "warn", `${s.station}: App / plataforma zerado`, "Nenhum percentual de plataforma nesta competência. Se o ponto paga app, cadastre.",
+          `#/parametros/carregador/${key}/platformPct/${mk}`, "Conferir");
+        if (!(f.management > 0)) add("Custos do carregador", "warn", `${s.station}: gestão P3 zerada`, "Nenhum percentual de gestão nesta competência.",
+          `#/parametros/carregador/${key}/managementPct/${mk}`, "Conferir");
+      });
+    });
+    // 3. Impostos
+    safe(() => {
+      const d = UBY.data("finance", mk).dre;
+      if (!(d.networkTaxes > 0)) add("Impostos", "bad", "Impostos do mês não lançados", `Faturamento de ${fmt.brl(d.networkRevenue)} e imposto R$ 0,00: o pool dos cotistas sai maior do que deveria.`, "#/parametros/cotas", "Lançar impostos");
+    });
+    // 4. Custos da matriz sem destino
+    safe(() => {
+      const s = UBY.data("matrix", mk).summary;
+      if (s.pending > 0.009) add("Custos da matriz", "warn", `${fmt.brl(s.pending)} de custos da matriz sem destino`, "Esse valor não está rateado para nenhum carregador.", `#/parametros/matriz/-//${mk}`, "Ajustar rateio");
+    });
+    // 5. Pagamentos: vencidos sem baixa e possíveis duplicidades (mês do fechamento e o seguinte)
+    safe(() => {
+      const bills = api.allBills();
+      const overdue = bills.filter(b => !b.paid && b.status === "overdue").sort((a, b) => String(a.due).localeCompare(String(b.due)));
+      if (overdue.length) add("Pagamentos", "bad", `${overdue.length} conta(s) vencida(s) sem baixa`, overdue.slice(0, 4).map(b => `${fmtDay(b.due)} · ${b.name} · ${fmt.brl(b.amount)}`).join(" · ") + (overdue.length > 4 ? " …" : ""),
+        `#/parametros/pagamentos/-//${overdue[0].monthKey}`, "Dar baixa");
+      const norm = v => String(v || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/^uby recharge\s*-\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
+      [mk, nextMk].forEach(m => {
+        const rows = bills.filter(b => b.monthKey === m);
+        const pairs = rows.filter((b, i) => rows.some((o, j) => j > i && Math.abs(o.amount - b.amount) < 0.01 && norm(o.station) === norm(b.station)));
+        if (pairs.length) add("Pagamentos", "warn", `${pairs.length} possível(is) conta(s) em duplicidade em ${mName(m)}`, pairs.map(b => `${b.name} · ${fmt.brl(b.amount)}`).join(" · "), `#/parametros/pagamentos/-//${m}`, "Revisar");
+      });
+    });
+    // 6. Fechamento dos cotistas
+    safe(() => {
+      const m = (UBY.data("investorDistribution").months || []).find(x => x.key === mk);
+      if (m && !/aprovado|pago|paid/i.test(m.status || "")) add("Fechamento", "warn", `Fechamento de ${mName(mk)} ainda não aprovado`, `Pool dos cotistas ${fmt.brl(m.investorPool)} (${fmt.brl(m.perQuota)} por cota, ${m.eligibleQuotas} cotas). Aprove depois de resolver o resto da lista.`, "#/parametros/fechamentos", "Aprovar");
+    });
+
+    const cats = ["Recargas", "Energia", "Custos do carregador", "Impostos", "Custos da matriz", "Pagamentos", "Fechamento"];
+    cats.filter(c => !items.some(i => i.cat === c)).forEach(c => add(c, "ok", `${c}: tudo certo`, "", "", ""));
+    const order = { bad: 0, warn: 1, ok: 2 };
+    items.sort((a, b) => order[a.status] - order[b.status] || cats.indexOf(a.cat) - cats.indexOf(b.cat));
+    const open = items.filter(i => i.status !== "ok");
+    const badge = { bad: ["bad", "resolver"], warn: ["warn", "conferir"], ok: ["ok", "ok"] };
+    return `
+      <div class="toolbar"><label>Competência <select class="select" id="pmCkMonth">${months.slice().reverse().map(m => `<option value="${m}" ${m === mk ? "selected" : ""}>${esc(mName(m))}</option>`).join("")}</select></label>
+        <span class="spacer"></span><small>Recarregue a lista depois de resolver cada item</small></div>
+      <div class="grid g3" style="margin-bottom:14px">${kpi("Pendências", fmt.int(open.length), open.length ? "clique em cada uma para resolver" : "pronto para aprovar", "", open.length ? "lead" : "lead")}${kpi("Para resolver", fmt.int(items.filter(i => i.status === "bad").length), "afetam o resultado ou o caixa", "", items.some(i => i.status === "bad") ? "bad" : "")}${kpi("Para conferir", fmt.int(items.filter(i => i.status === "warn").length), "podem estar certos, mas vale olhar")}</div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Fechamento de ${esc(mName(mk))}</p><h2>O que falta no mês</h2><p>Recargas, energia, custos, impostos, pagamentos e aprovação, numa lista só.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Situação</th><th>Item</th><th></th></tr></thead><tbody>
+          ${items.map(i => `<tr><td><span class="badge ${badge[i.status][0]}">${badge[i.status][1]}</span><small>${esc(i.cat)}</small></td>
+            <td style="white-space:normal"><strong>${esc(i.title)}</strong>${i.detail ? `<small>${esc(i.detail)}</small>` : ""}</td>
+            <td style="white-space:nowrap">${i.href ? `<a class="btn ${i.status === "bad" ? "primary" : ""} link-btn" href="${i.href}">${esc(i.action)} →</a>` : ""}</td></tr>`).join("")}
+        </tbody></table></div>
       </section>`;
   }
 
@@ -322,7 +421,7 @@
       <section class="section"><div class="section-head"><div><p class="kicker">Calendário de caixa</p><h2>Pagamentos da competência</h2></div></div>
         <div class="table-wrap"><table><thead><tr><th>Pagamento</th><th>Carregador / obra</th><th>Vencimento</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead>
           <tbody>${rows.map(r => `<tr><td><strong>${esc(r.name)}</strong><small>${r.source ? `${esc(r.source)} · ` : ""}${esc(r.category)}${r.supplier ? ` · ${esc(r.supplier)}` : ""}</small></td>
-            <td>${esc(r.target.station || "Carregador não identificado")}<small>${esc(r.target.workName || (r.target.targetCount > 1 ? `rateado para ${r.target.targetCount} carregadores` : ""))}</small></td>
+            <td>${r.target.workId && r.target.targetCount <= 1 ? UBY.stationLink(r.target.workId, r.target.station || r.target.workName || "Carregador") : esc(r.target.station || "Carregador não identificado")}<small>${esc(r.target.workName || (r.target.targetCount > 1 ? `rateado para ${r.target.targetCount} carregadores` : ""))}</small></td>
             <td>${r.due.toLocaleDateString("pt-BR")}<small>todo dia ${r.dueDay}</small></td><td class="num">${fmt.brl(r.amount)}</td>
             <td><span class="badge ${r.st.key === "paid" ? "ok" : r.st.key === "overdue" ? "bad" : r.st.key === "pending" ? "neutral" : "warn"}">${esc(r.st.label)}</span></td>
             <td style="white-space:nowrap">${r.st.key === "paid" ? `<button class="btn ghost" data-pay="${esc(r.id)}|pending" type="button" ${can}>Reabrir</button>` : `<button class="btn" data-pay="${esc(r.id)}|paid" type="button" ${can}>Marcar pago</button>`}
@@ -439,13 +538,28 @@
             <td style="white-space:normal"><strong><a class="edit-link" href="${billHref(b)}" title="Abrir onde esta conta é editada">${esc(b.name)}<span aria-hidden="true"> ✎</span></a></strong><small>${esc(kindLabel(b))}${b.supplier ? ` · ${esc(b.supplier)}` : ""}</small>
               ${(() => { const d = dupsOf(b); if (!d.length) return ""; return `<div style="margin-top:4px"><span class="badge warn">possível duplicidade</span><small>mesmo carregador e mesmo valor que: ${d.map(o => `"${esc(o.name)}"`).join(", ")}${!sched(b) && d.some(sched) ? " · remova o pagamento programado e mantenha este" : ""}</small>
                 ${sched(b) ? `<button class="btn ghost" data-pay-end="${esc(b.billId)}" data-month="${esc(mk)}" type="button" style="color:var(--uby-red);margin-top:4px" ${can}>Remover este (daqui em diante)</button>` : ""}</div>`; })()}</td>
-            <td>${esc(b.station || "—")}${b.workName ? `<small>${esc(b.workName)}</small>` : ""}</td>
+            <td>${b.workId ? UBY.stationLink(b.workId, b.station || b.workName) : esc(b.station || "—")}${b.workName ? `<small>${esc(b.workName)}</small>` : ""}</td>
             <td class="num"><strong>${fmt.brl(b.amount)}</strong>${b.kind === "area" && b.paidAmount !== null && b.paidAmount !== undefined && Math.abs(b.paidAmount - b.dueAmount) > 0.009 ? `<small>devido ${fmt.brl(b.dueAmount)}</small>` : ""}</td>
             <td><span class="badge ${b.paid ? "ok" : b.status === "overdue" ? "bad" : "warn"}">${esc(b.statusLabel || (b.paid ? "Pago" : "A pagar"))}</span>${b.paidAt ? `<small>em ${fmtDay(b.paidAt)}</small>` : ""}</td>
             <td style="white-space:normal;min-width:200px">${recCell(b)}</td>
             <td style="white-space:nowrap">${b.paid ? `<button class="btn ghost" data-c-unpay="${esc(b.key)}" type="button" ${can}>Desfazer</button>` : `<button class="btn primary" data-c-pay="${esc(b.key)}" type="button" ${can}>Marcar pago</button>`}</td></tr>
             ${ui.cPay === b.key && !b.paid ? payPanel(b) : ""}`).join("") || `<tr><td colspan="7" class="empty">Nenhuma conta vence neste mês.</td></tr>`}</tbody></table></div>
       </section>
+      ${(() => {
+        // Lançar conta aqui mesmo (pagamento recorrente de um carregador), sem trocar de aba.
+        if (ui.payEditing) { ui.payEditing = ""; ui.payForm = null; }
+        const pf = ui.payForm || (ui.payForm = { target: "", name: "", supplier: "", category: "Internet / dados", amount: "", dueDay: 11, startMonth: mk, endMonth: "" });
+        const pinp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-pf="${k}" type="${type}" value="${esc(pf[k] ?? "")}" ${extra} style="width:100%">`);
+        return `<details class="section" ${ui.payAddOpen ? "open" : ""} id="pmPayAddBox"><summary style="cursor:pointer;font-weight:850;color:var(--uby-forest)">＋ Lançar conta nova de um carregador (internet, aluguel, manutenção…)</summary>
+          <p style="margin:10px 0">Pagamento recorrente: entra aqui em Pagamentos todo mês, no dia do vencimento. Para custo dividido entre carregadores, parcelado ou seguro, use <a href="#/parametros/matriz">Custos da matriz</a>; para energia, <a href="#/parametros/energia">Faturas de energia</a>.</p>
+          <div class="grid g4" style="gap:8px">
+            ${field("Carregador", `<select class="select" data-pf="target"><option value="">Selecione</option>${targets.map(t => `<option value="${esc(t.value)}" ${pf.target === t.value ? "selected" : ""}>${esc(t.text)}</option>`).join("")}</select>`)}
+            ${pinp("name", "Conta")}${pinp("supplier", "Fornecedor")}
+            ${field("Categoria", `<select class="select" data-pf="category">${["Internet / dados", "Energia", "Locação / aluguel", "Seguro", "Manutenção", "Licença / plataforma", "Outros custos"].map(c => `<option ${pf.category === c ? "selected" : ""}>${c}</option>`).join("")}</select>`)}
+            ${pinp("amount", "Valor mensal (R$)", "number", 'min="0" step="0.01"')}${pinp("dueDay", "Dia do vencimento", "number", 'min="1" max="31"')}${pinp("startMonth", "Inicia em", "month")}${pinp("endMonth", "Termina em (opcional)", "month")}
+          </div>
+          <button class="btn primary" id="pmPayAdd" type="button" style="margin-top:12px" ${can}>Lançar conta</button></details>`;
+      })()}
       <section class="section"><div class="section-head"><div><p class="kicker">Conferência</p><h2>Extrato do banco</h2>
           <p>Anexe o extrato (Excel, CSV ou OFX; o do PagSeguro em Excel funciona direto). Pode anexar períodos que se sobrepõem: lançamentos repetidos não duplicam. As saídas são casadas com as contas pelo valor e pela data; o que não casar sozinho você vincula abaixo.</p></div></div>
         <label class="imp-field" style="display:block;border:1.5px dashed var(--uby-line, #c9d6cf);border-radius:10px;padding:10px 12px;margin-bottom:10px;cursor:pointer">
@@ -682,7 +796,7 @@
     const draft = ui.enDraft || info.stored;
     const dirty = !!ui.enDraft;
     // Link de Pagamentos (#/parametros/energia/<carregador>/inv:<id>): abre a fatura já em edição.
-    if (ui.enEditId) { const it = draft.find(i => i.id === ui.enEditId); if (it) ui.enForm = { ...it }; ui.enEditId = ""; }
+    if (ui.enEditId) { const it = draft.find(i => i.id === ui.enEditId); if (it) ui.enForm = { ...it }; else if (ui.enEditId === "new") ui.enForm = null; ui.enEditId = ""; }
     const f = ui.enForm || (ui.enForm = blankInvoice(draft.slice().sort((a, b) => String(a.end).localeCompare(String(b.end))).pop()));
     const preview = cleanInvoice(f);
     const can = canWrite(w) && !busy ? "" : "disabled";
@@ -982,6 +1096,7 @@
   // 5 grupos (usuário: "muitas abas… tudo que for de energia em uma só, outros custos em outra");
   // as subabas continuam com os ids antigos para os links diretos (#/parametros/<id>/…).
   const GROUPS = [
+    ["Fechamento do mês", [["checklist", "O que falta no mês"]]],
     ["Pagamentos e extrato", [["pagamentos", "Pagamentos e extrato"]]],
     ["Energia", [["energia", "Faturas de energia"], ["area", "Repasse à área"]]],
     ["Outros custos", [["matriz", "Custos da matriz"], ["programados", "Pagamentos programados"], ["documentos", "Documentos"]]],
@@ -1006,6 +1121,7 @@
       const costId = ui.tab === "matriz" && ui.focus.startsWith("cost:") ? ui.focus.slice(5) : "";
       if (costId) { ui.editingCost = costId; ui.costForm = null; }
       if (ui.tab === "energia" && ui.focus.startsWith("inv:")) { ui.enEditId = ui.focus.slice(4); ui.enDraft = null; }
+      if (month && (ui.tab === "pagamentos" || ui.tab === "checklist")) { if (ui.tab === "pagamentos") ui.payMonth = month; else ui.ckMonth = month; }
       if (ui.tab === "programados") {
         if (month) ui.payMonth = month;
         if (ui.focus.startsWith("pay:")) { ui.payEditing = ui.focus.slice(4); ui.payForm = null; }
@@ -1047,7 +1163,7 @@
       }
     } else {
       data.months = (UBY.state.months && UBY.state.months.length ? UBY.state.months : (w.getMonths?.() || [])).slice();
-      if (ui.tab === "energia" || ui.tab === "area" || ui.tab === "pagamentos") {
+      if (ui.tab === "energia" || ui.tab === "area" || ui.tab === "pagamentos" || ui.tab === "checklist") {
         // Depois de gravar, o motor principal recarrega: espera ele voltar com o histórico completo.
         for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
         try { await Promise.race([UBY.state.api.loadFull(), new Promise(r => setTimeout(r, 15000))]); } catch (_) {}
@@ -1076,7 +1192,7 @@
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
       <div class="seg" id="pmTabs" style="margin-bottom:${groupOf(ui.tab)[1].length > 1 ? 8 : 14}px">${GROUPS.map(g => `<button type="button" data-v="${g[1][0][0]}" data-group="${esc(g[0])}" class="${groupOf(ui.tab) === g ? "on" : ""}">${esc(g[0])}</button>`).join("")}</div>
       ${groupOf(ui.tab)[1].length > 1 ? `<div class="seg" id="pmSubTabs" style="margin-bottom:14px;font-size:12px">${groupOf(ui.tab)[1].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${esc(l)}</button>`).join("")}</div>` : ""}
-      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "area" ? areaTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : quotasTab(w)}
+      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "area" ? areaTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : ui.tab === "checklist" ? checklistTab() : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
@@ -1377,6 +1493,8 @@
         return fb || "pagamento programado salvo";
       });
     };
+    if ($("#pmCkMonth")) $("#pmCkMonth").onchange = e => { ui.ckMonth = e.target.value; draw(target, w); };
+    if ($("#pmPayAddBox")) $("#pmPayAddBox").addEventListener("toggle", e => { ui.payAddOpen = e.target.open; });
     target.querySelectorAll("[data-pay-edit]").forEach(b => b.onclick = () => { ui.payEditing = b.dataset.payEdit; ui.payForm = null; ui.focus = `pay:${b.dataset.payEdit}`; draw(target, w); });
     if ($("#pmPayEditCancel")) $("#pmPayEditCancel").onclick = () => { ui.payEditing = ""; ui.payForm = null; draw(target, w); };
     if ($("#pmPayEditSave")) $("#pmPayEditSave").onclick = () => {

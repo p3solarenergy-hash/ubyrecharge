@@ -552,7 +552,14 @@
   };
   const modelLabel = model => MODEL_LABELS[model] || "Ativo UBY";
   const isUbyModel = model => UBY_MODELS.includes(model || "uby");
+  // Centro de custos de um carregador (Financeiro › Por estação). O nome da estação pode vir da obra
+  // ("POSTO CENTRAL JK") ou das recargas ("UBY RECHARGE - CENTRAL JK"): a tela acha pelo workId.
+  const stationHref = (workId, station) => workId || station ? `#/financeiro/estacao/${encodeURIComponent(`${workId || ""}|${station || ""}`)}` : "";
+  const stationLink = (workId, station, label = station) => {
+    const href = stationHref(workId, station);
+    return href ? `<a class="edit-link" href="${href}" title="Abrir o centro de custos deste carregador">${esc(label)}<span aria-hidden="true"> ↗</span></a>` : esc(label);
+  };
 
-  window.UBY = { start, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, obrasEdit, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel,
+  window.UBY = { start, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, obrasEdit, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel, stationHref, stationLink,
     register: (id, view) => { VIEWS[id] = view; }, go: hash => { location.hash = hash; }, ROUTES };
 })();

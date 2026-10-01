@@ -747,7 +747,7 @@
         const target = scheduledPaymentTarget(item);
         const status = scheduledPaymentStatus(item, mk);
         const amount = item.scheduledPayment ? Number(item.amount || 0) : matrizCashAmount(item, mk);
-        return { id: item.id, kind: "matriz", costId: item.id, name: item.name, category: item.category, supplier: item.supplier || "", source: item.scheduledPayment ? "Pagamento programado" : "Custo da matriz",
+        return { id: item.id, kind: "matriz", costId: item.id, workId: target.targetCount === 1 ? target.workId : "", targetCount: target.targetCount, name: item.name, category: item.category, supplier: item.supplier || "", source: item.scheduledPayment ? "Pagamento programado" : "Custo da matriz",
           station: target.station || "Carregador não identificado", workName: target.workName || (target.targetCount > 1 ? `rateado para ${target.targetCount} carregadores` : ""),
           due: iso(scheduledPaymentDueDate(item, mk)), dueDay: item.dueDay, amount, status: status.key, statusLabel: status.label,
           paidAt: item.paymentLedger?.[mk]?.paidAt || "" };

@@ -15,6 +15,16 @@
   function estacao(mk) {
     const all = UBY.data("financeStations");
     const list = [...all.filter(s => UBY.isUbyModel(s.model)), ...all.filter(s => !UBY.isUbyModel(s.model))];
+    // Vindo de um link (#/financeiro/estacao/<obra|estação>): acha a estação pela obra, mesmo com o nome da obra.
+    if (ui.stationWant) {
+      const [wid, st] = ui.stationWant.split("|");
+      const norm = v => String(v || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/^uby recharge\s*-\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
+      const same = list.filter(s => String(s.workId) === String(wid));
+      const hit = same.find(s => norm(s.station) === norm(st)) || (same.length === 1 ? same[0] : null)
+        || same.find(s => norm(s.station).includes(norm(st)) || norm(st).includes(norm(s.station))) || (st ? list.find(s => norm(s.station) === norm(st)) : null);
+      if (hit) ui.station = `${hit.workId}|${hit.station}`;
+      ui.stationWant = "";
+    }
     if (!list.some(s => `${s.workId}|${s.station}` === ui.station)) ui.station = list[0] ? `${list[0].workId}|${list[0].station}` : "";
     const [workId, station] = ui.station.split("|");
     const s = UBY.data("stationFinance", workId, station, mk || UBY.state.months.at(-1));
@@ -101,6 +111,23 @@
         </section>
       </div>
 
+      ${(() => {
+        // Centro de custos: as contas a pagar deste carregador (competência e mês seguinte), cada uma clicável.
+        let bills = [];
+        try { bills = UBY.state.api.allBills(); } catch (_) { return ""; }
+        const cur = mk || UBY.state.months.at(-1) || "";
+        const [y, m] = cur.split("-").map(Number);
+        const nxt = cur ? `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}` : "";
+        const mine = bills.filter(b => [cur, nxt].includes(b.monthKey) && String(b.workId || "") === String(workId)).sort((a, b) => String(a.due).localeCompare(String(b.due)));
+        const statusCls = b => b.paid ? "ok" : b.status === "overdue" ? "bad" : "warn";
+        return `<section class="section"><div class="section-head"><div><p class="kicker">Centro de custos · contas a pagar</p><h2>Contas deste carregador</h2><p>Vencimentos de ${esc(UBY.state.api.monthName(cur))} e ${esc(UBY.state.api.monthName(nxt))}. Clique na conta para editar; para dar baixa, use Pagamentos.</p></div>
+            <div><a class="btn link-btn" href="#/parametros/pagamentos/-//${nxt}">Pagamentos de ${esc(UBY.state.api.monthName(nxt))} →</a></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Vencimento</th><th>Conta</th><th class="num">Valor</th><th>Situação</th></tr></thead><tbody>
+            ${mine.map(b => `<tr><td><strong>${fmt.date(b.due + "T12:00:00")}</strong></td><td><a class="edit-link" href="${billEditHref(b, b.monthKey)}">${esc(b.name)}<span aria-hidden="true"> ✎</span></a><small>${esc([b.source, b.supplier].filter(Boolean).join(" · "))}</small></td>
+              <td class="num">${fmt.brl(b.amount)}</td><td><span class="badge ${statusCls(b)}">${esc(b.statusLabel || (b.paid ? "Pago" : "A pagar"))}</span>${b.paidAt ? `<small>em ${fmt.date(b.paidAt + "T12:00:00")}</small>` : ""}</td></tr>`).join("")
+              || `<tr><td colspan="4" class="empty">Nenhuma conta deste carregador nesses meses. Custos rateados da matriz aparecem em Pagamentos.</td></tr>`}
+          </tbody></table></div></section>`;
+      })()}
       <section class="section"><div class="section-head"><div><p class="kicker">Histórico</p><h2>Mês a mês</h2><p>Cada competência com as configurações e custos vigentes naquele mês.</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Faturamento</th><th class="num">Energia (custo)</th><th class="num">Matriz</th><th class="num">Gestão</th><th class="num">Plataforma</th><th class="num">Área</th><th class="num">Custo total</th><th class="num">Custo/kWh</th><th class="num">Resultado</th><th class="num">Margem</th><th class="num">Payback</th></tr></thead>
           <tbody>${s.monthly.slice().reverse().map(m => `<tr${m.key === s.monthKey ? ' style="background:var(--uby-green-soft)"' : ""}><td><strong>${esc(m.label)}</strong></td><td class="num">${fmt.brl(m.revenue)}</td><td class="num">${fmt.brl(m.energyCost)}</td><td class="num">${fmt.brl(m.matrizCost)}</td>
@@ -366,6 +393,15 @@
   }
 
   // ---------- Caixa ----------
+  // Onde cada conta do calendário é editada (mesmos destinos da tela de Pagamentos).
+  function billEditHref(b, mk) {
+    const key = encodeURIComponent(`${b.workId || ""}|${b.station || ""}`);
+    if (b.kind === "energia") return `#/parametros/energia/${key}/${encodeURIComponent(`inv:${b.invoiceId}`)}`;
+    if (b.kind === "area") return `#/parametros/area/${key}`;
+    const id = b.billId || b.id;
+    if (b.source === "Pagamento programado") return `#/parametros/programados/-/${encodeURIComponent(`pay:${id}`)}/${mk}`;
+    return `#/parametros/matriz/-/${encodeURIComponent(`cost:${id}`)}/${mk}`;
+  }
   function caixa(p, docs) {
     const t = p.totals;
     const badge = { paid: "ok", overdue: "bad", today: "warn", soon: "warn", pending: "neutral" };
@@ -378,7 +414,7 @@
           ${kpi("Pago", fmt.brl(t.paid))}
         </div>
         <div class="table-wrap"><table><thead><tr><th>Pagamento</th><th>Carregador / obra</th><th>Vencimento</th><th class="num">Valor</th><th>Situação</th></tr></thead>
-          <tbody>${p.list.map(x => `<tr><td><strong>${esc(x.name)}</strong><small>${esc([x.source, x.category, x.supplier].filter(Boolean).join(" · "))}</small></td><td>${esc(x.station)}<small>${esc(x.workName)}</small></td>
+          <tbody>${p.list.map(x => `<tr><td><strong><a class="edit-link" href="${billEditHref(x, p.monthKey)}" title="Abrir onde esta conta é editada">${esc(x.name)}<span aria-hidden="true"> ✎</span></a></strong><small>${esc([x.source, x.category, x.supplier].filter(Boolean).join(" · "))}</small></td><td>${x.workId ? UBY.stationLink(x.workId, x.station) : esc(x.station)}<small>${esc(x.workName)}</small></td>
             <td>${fmt.date(x.due)}<small>todo dia ${esc(x.dueDay)}</small></td><td class="num">${fmt.brl(x.amount)}</td><td><span class="badge ${badge[x.status] || "neutral"}">${esc(x.statusLabel)}</span>${x.paidAt ? `<small>em ${fmt.date(x.paidAt)}</small>` : ""}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">Nenhum pagamento programado nesta competência.</td></tr>`}</tbody></table></div>
       </section>
       <section class="section"><div class="section-head"><div><p class="kicker">Documentos</p><h2>Boletos e documentos da competência</h2><p>Metadados em uby_finance_documents; o arquivo privado só é baixado quando você pede.</p></div></div>
@@ -412,6 +448,7 @@
 
   function render(target, params) {
     const tab = TABS.some(([id]) => id === params[0]) ? params[0] : "resultado";
+    if (tab === "estacao" && params[1] && params[1] !== ui.stationLink) { ui.stationWant = params[1]; ui.stationLink = params[1]; }
     const mk = monthArg();
     const f = UBY.data("finance", mk);
     let body = "";
