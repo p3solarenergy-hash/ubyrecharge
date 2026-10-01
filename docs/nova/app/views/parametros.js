@@ -987,7 +987,17 @@
     await draw(target, w);
   }
 
+  let drawSeq = 0;
   async function draw(target, w) {
+    // Enquanto o motor recarrega, a tela antiga não pode ficar à mostra com outro carregador já
+    // escolhido no seletor (parecia que o Robert Koch mostrava a regra do Central JK). Se demorar,
+    // mostra "carregando"; e um desenho atrasado nunca cobre o mais novo.
+    const seq = ++drawSeq;
+    const slow = setTimeout(() => { if (seq === drawSeq) target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Atualizando</h2><p>Esperando o motor terminar de recalcular…</p></div>`; }, 400);
+    try { await drawNow(target, w, seq); } finally { clearTimeout(slow); }
+  }
+
+  async function drawNow(target, w, seq) {
     const data = { chargers: chargers(w), months: [], form: null };
     // Links de outras telas usam o nome da estação das recargas (ex.: "UBY RECHARGE - CENTRAL JK");
     // aqui o carregador tem o nome da obra ("POSTO CENTRAL JK"). Acha o mesmo carregador pela obra.
@@ -1027,6 +1037,7 @@
         catch (err) { data.docs = []; data.docsError = err.message; }
       }
     }
+    if (seq !== drawSeq) return;
     const c = data.chargers.find(x => x.key === ui.charger);
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
