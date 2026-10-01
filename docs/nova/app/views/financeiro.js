@@ -23,6 +23,19 @@
     const partner = f.model === "third_party_management";
     const line = (label, value, note = "", cls = "") => `<tr class="${cls}"><td>${label}${note ? `<small>${esc(note)}</small>` : ""}</td><td class="num">${value}</td></tr>`;
     const pct = v => f.totalRevenue > 0 ? `<small>${fmt.pct1(v / f.totalRevenue * 100)} do faturamento</small>` : "";
+    // Economia da unidade só com o motor oficial: energia (Copel + arrendamento quando houver), demais custos e margem.
+    const kwhSold = f.commercialEnergy || f.energy || 0;
+    const perSold = v => kwhSold > 0 ? Number(v || 0) / kwhSold : null;
+    const ec = s.energyComposition || {};
+    const energyParts = (ec.mode === "invoice"
+      ? [["Copel", ec.copelCost], ["Arrendamento", ec.leaseCost], ["Estimativa (dias sem fatura lançada)", ec.estimatedCost]]
+      : ec.totalCost > 0 ? [["Copel", ec.copelCost], ["Arrendamento", ec.leaseCost]]
+      : [[`Energia pela tarifa cadastrada (${fmt.brl(st.energyCostPerKWh || 0)}/kWh)`, f.energyCost]]).filter(([, v]) => Number(v) > 0);
+    const otherCosts = [...s.costLines.map(c => [c.matrix ? `Matriz · ${c.label}` : c.label, c.actual]),
+      ["Gestão P3", f.management], ["App / plataforma", f.platform], ["Royalty UBY", f.ubyRoyalty],
+      [`Repasse da área${f.areaSharePct ? ` (${fmt.pct1(f.areaSharePct)})` : ""}`, f.areaParticipation], ["Impostos", f.taxes]].filter(([, v]) => Number(v) > 0);
+    const otherTotal = otherCosts.reduce((a, [, v]) => a + Number(v || 0), 0);
+    const uRow = (label, v, cls = "") => `<tr class="${cls}"><td>${label}</td><td class="num">${fmt.brl(v)}</td><td class="num">${perKwh(perSold(v))}</td></tr>`;
     return `
       <div class="toolbar"><label>Estação <select class="select" id="finStation">
           <optgroup label="Ativos UBY">${list.filter(x => UBY.isUbyModel(x.model)).map(x => `<option value="${esc(`${x.workId}|${x.station}`)}" ${`${x.workId}|${x.station}` === ui.station ? "selected" : ""}>${esc(x.station)}${x.model === "third_party_management" ? " (parceiro)" : ""}</option>`).join("")}</optgroup>
@@ -33,12 +46,12 @@
         <a class="btn link-btn" href="#/parametros/carregador/${encodeURIComponent(`${workId}|${station}`)}">Editar valores</a></div>
 
       <section class="section"><div class="section-head"><div><p class="kicker">${esc(s.label)} · ${esc(s.workName)}</p><h2>${esc(s.station)}</h2><p>Cálculo financeiro do carregador na competência. Custos da matriz entram já rateados.</p></div>
-          <div class="meta">Gestão ${fmt.pct1(st.managementPct)} · plataforma ${fmt.pct1(st.platformPct)} · tributos ${fmt.pct1(st.taxRatePct)}${st.ubyRoyaltyPct ? ` · royalty ${fmt.pct1(st.ubyRoyaltyPct)}` : ""}<br>energia ${fmt.brl(f.energyRate)}/kWh · investimento ${fmt.brl(st.investmentValue)}</div></div>
+          <div class="meta">Gestão ${fmt.pct1(st.managementPct)} · plataforma ${fmt.pct1(st.platformPct)} · tributos ${fmt.pct1(st.taxRatePct)}${st.ubyRoyaltyPct ? ` · royalty ${fmt.pct1(st.ubyRoyaltyPct)}` : ""}<br>energia ${perKwh(perSold(f.energyCost))} · investimento ${fmt.brl(st.investmentValue)}</div></div>
         <div class="grid g6">
           ${kpi("Faturamento", fmt.brl(f.revenue), `total ${fmt.brl(f.totalRevenue)} · ${fmt.kwh0(f.energy)}`, "", "lead big")}
           ${kpi("Custo total", fmt.brl(f.totalOperatingCost), `${perKwh(f.totalCostPerKWh)} efetivo`)}
           ${kpi(partner ? "Resultado do parceiro" : "Resultado operacional", signed(f.operationNet), `margem ${fmt.pct(f.operationMargin)}`, "", f.operationNet >= 0 ? "" : "bad")}
-          ${kpi("Ponto de equilíbrio", f.breakEvenKWh ? fmt.kwh(f.breakEvenKWh) : "—", `contribuição ${perKwh(f.contributionPerKWh)}`)}
+          ${kpi("Custo por kWh", perKwh(f.totalCostPerKWh), `venda ${perKwh(perSold(f.totalRevenue))}/kWh`)}
           ${kpi("Payback", paybackShort(f.paybackMonths), `${f.paybackMonths ? `${Math.round(f.paybackMonths)} meses · ` : ""}retorno ${fmt.pct(f.roiMonthly)} ao mês`)}
           ${kpi(partner ? "Royalty UBY" : "Resultado UBY", fmt.brl(partner ? f.ubyRoyalty : f.ubyNet), partner ? "única receita da UBY neste ativo" : `investidores ${fmt.brl(f.investorDistribution)}`)}
         </div>
@@ -53,7 +66,7 @@
           ${s.revenueLines.map(r => line(`· ${esc(r.label)}`, fmt.brl(r.actual), r.rule)).join("")}
           </tbody><tfoot><tr><td>Faturamento total</td><td class="num">${fmt.brl(f.totalRevenue)}</td></tr></tfoot><tbody>
           <tr><th colspan="2" style="position:static">Custos</th></tr>
-          ${line("Energia elétrica comercial", `${fmt.brl(f.energyCost)}${pct(f.energyCost)}`, `${fmt.brl(f.energyRate)}/kWh sobre ${fmt.kwh(f.commercialEnergy)} comercialmente elegíveis`)}
+          ${line("Energia", `${fmt.brl(f.energyCost)}${pct(f.energyCost)}`, [energyParts.map(([l, v]) => `${l} ${fmt.brl(v)}`).join(" + "), `${perKwh(perSold(f.energyCost))} sobre ${fmt.kwh(kwhSold)} vendidos`].filter(Boolean).join(" · "))}
           ${s.costLines.map(c => line(c.matrix ? `Matriz · ${esc(c.label)}` : esc(c.label), `${fmt.brl(c.actual)}${pct(c.actual)}`, [c.rule, c.perKWh != null ? `${perKwh(c.perKWh)}` : ""].filter(Boolean).join(" · "))).join("")}
           ${line("Gestão P3", `${fmt.brl(f.management)}${pct(f.management)}`, "sobre o faturamento total")}
           ${line("App / plataforma", `${fmt.brl(f.platform)}${pct(f.platform)}`, "só sobre recargas e ociosidade")}
@@ -61,15 +74,18 @@
           ${line("Repasse da área", `${fmt.brl(f.areaParticipation)}${pct(f.areaParticipation)}`, f.areaSharePct ? `${fmt.pct1(f.areaSharePct)} do faturamento total` : "")}
           </tbody><tfoot><tr><td>Custo total</td><td class="num">${fmt.brl(f.totalOperatingCost)}</td></tr><tr><td>= ${partner ? "Resultado do parceiro" : "Resultado operacional"}</td><td class="num">${signed(f.operationNet)}</td></tr></tfoot>
         </table></div></section>
-        <section class="section"><div class="section-head"><div><p class="kicker">Economia da unidade</p><h2>Por kWh</h2></div></div>
-          <div class="grid g2">
-            ${mini("Preço médio vendido", perKwh(f.energy ? f.revenue / f.energy : null), "referência de venda")}
-            ${mini("Custo efetivo real", perKwh(f.totalCostPerKWh), "custo total ÷ energia comercial")}
-            ${mini("Custo direto", perKwh(f.directCostPerKWh), "energia, unidade, matriz, tributos, área")}
-            ${mini("Custo total projetado", perKwh(f.plannedTotalCostPerKWh), s.planning ? `sobre ${fmt.kwh0(s.planning.planningKWh)} planejados` : "")}
-            ${mini("Resultado por kWh", perKwh(f.resultPerKWh), "resultado ÷ energia vendida")}
-            ${mini("Custo variável", perKwh(f.variableCostPerKWh), "por kWh adicional")}
-          </div>
+        <section class="section"><div class="section-head"><div><p class="kicker">Economia da unidade</p><h2>Preço, custos e margem</h2><p>Valores oficiais da competência. "Por kWh" = valor ÷ ${fmt.kwh(kwhSold)} vendidos.</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th></th><th class="num">Total</th><th class="num">Por kWh</th></tr></thead><tbody>
+            ${uRow("<strong>Preço de venda</strong>", f.totalRevenue, "lead")}
+            <tr><th colspan="3" style="position:static">Energia</th></tr>
+            ${energyParts.map(([l, v]) => uRow(`<span style="padding-left:12px">${esc(l)}</span>`, v)).join("")}
+            ${uRow("<strong>Total de energia</strong>", f.energyCost, "t")}
+            <tr><th colspan="3" style="position:static">Demais custos</th></tr>
+            ${otherCosts.map(([l, v]) => uRow(`<span style="padding-left:12px">${esc(l)}</span>`, v)).join("") || `<tr><td colspan="3"><small>Nenhum.</small></td></tr>`}
+            ${uRow("<strong>Total dos demais custos</strong>", otherTotal, "t")}
+            ${uRow("<strong>Custo total</strong>", f.totalOperatingCost, "t")}
+          </tbody><tfoot><tr><td>${partner ? "Resultado do parceiro" : "Margem"} <small>${fmt.pct1(f.totalRevenue ? f.operationNet / f.totalRevenue * 100 : 0)} do faturamento</small></td><td class="num">${signed(f.operationNet)}</td><td class="num">${perKwh(perSold(f.operationNet))}</td></tr></tfoot></table></div>
+          ${ec.estimatedCost ? `<p class="source-line">Energia inclui ${fmt.brl(ec.estimatedCost)} de estimativa (${fmt.date(ec.estimatedFrom + "T12:00:00")} a ${fmt.date(ec.estimatedTo + "T12:00:00")}): dias ainda sem fatura lançada. Acerta quando a próxima fatura entrar.</p>` : ""}
           ${f.courtesyCharges ? `<div class="note" style="margin-top:10px">Cortesia: ${fmt.kwh(f.courtesyEnergy)} em ${f.courtesyCharges} sessão(ões); ${fmt.brl(f.courtesyCostExcluded)} fora do resultado UBY.</div>` : ""}
           ${!partner ? `<h3 style="margin:14px 0 8px">Destino do resultado</h3><div class="list">
             <div class="list-row"><span>Retenção S.A.</span><strong>${fmt.brl(f.saRetention)}</strong></div>
