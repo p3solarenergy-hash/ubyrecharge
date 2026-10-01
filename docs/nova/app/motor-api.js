@@ -2105,6 +2105,92 @@
   // cotistas — com data, valor e origem. Percorre as competências com operação até o mês seguinte.
   // Todas as contas (pagas e em aberto) de todas as competências até o mês seguinte, com chave
   // estável `${id}|${mês do vencimento}` — base da lista de pagas e da conferência com o extrato.
+  // ---------------------------------------------------------------------
+  // Locais com mais de um carregador (ex.: Shopping Aurora AC + DC): visão
+  // conjunta, só leitura. Soma as mesmas contas oficiais de cada estação
+  // (stationFinance e métricas de recarga); nenhuma outra visão muda.
+  // ---------------------------------------------------------------------
+  const placeKey = name => normalizeStationForCompare(String(name || "").replace(/^\s*uby\s+recharge\s*-?\s*/i, ""))
+    .split(/\s+/).filter(t => t && t !== "ac" && t !== "dc").join(" ");
+  function places() {
+    const groups = new Map();
+    getUbyChargerRows(getGeneralUnitData()).filter(r => r.included).forEach(r => {
+      const k = placeKey(r.station);
+      if (!k) return;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    });
+    return [...groups.entries()].filter(([, list]) => list.length > 1).map(([key, list]) => ({
+      key,
+      label: String(list[0].station || "").replace(/^\s*UBY\s+RECHARGE\s*-?\s*/i, "").replace(/\s+(AC|DC)\s*$/i, "").trim(),
+      members: list.map(r => ({ workId: String(r.workId), station: r.station, workName: r.workName || "", kind: String(r.kind || "").toUpperCase() }))
+        .sort((a, b) => a.kind.localeCompare(b.kind))
+    }));
+  }
+  function placeView(key, monthKey) {
+    const all = places();
+    const place = all.find(p => p.key === key) || all[0];
+    if (!place) return { places: all, place: null };
+    const stationRows = getGeneralStationRows(getGeneralUnitData());
+    const members = place.members.map(m => {
+      const row = stationRows.find(r => String(r.workId) === m.workId && normalizeStationForCompare(r.stationName) === normalizeStationForCompare(m.station));
+      return { ...m, row, charges: row?.charges || [] };
+    });
+    const months = [...new Set(members.flatMap(m => m.charges.map(chargeMonthKey)).filter(k => k !== "unknown"))].filter(isPlausibleMonthKey).sort();
+    const mk = monthKey === "" ? "" : (months.includes(monthKey) ? monthKey : months.at(-1) || "");
+    const periodMonths = mk ? [mk] : months;
+    const inPeriod = c => periodMonths.includes(chargeMonthKey(c));
+
+    const ops = (charges, rows) => {
+      const m = summaryMetrics(charges);
+      let occEnergy = 0, maxKWh = 0, power = 0;
+      rows.filter(Boolean).forEach(r => {
+        const withCharges = periodMonths.filter(k => (r.charges || []).some(c => chargeMonthKey(c) === k));
+        const o = stationOccupancyForMonths(r, withCharges, "mtd");
+        occEnergy += n0(o.energy); maxKWh += n0(o.maxKWh); power += n0(o.power);
+      });
+      return { revenue: m.revenue, energy: m.energy, sessions: m.clean.executed.length, clients: m.clients, avgTicket: m.avgTicket, revenuePerKwh: m.revenuePerKwh,
+        avgKwh: m.avgKwh, avgDuration: formatRechargeDuration(m.avgDuration), idleValue: n0(m.idleValue), power, occupancy: maxKWh > 0 ? occEnergy / maxKWh * 100 : 0 };
+    };
+    const FIN = ["totalRevenue", "energyCost", "management", "platform", "areaParticipation", "matrizCost", "localExtraCosts", "taxes", "ubyRoyalty", "totalOperatingCost", "operationNet", "energy"];
+    const finOf = m => {
+      const s = stationFinance(m.workId, m.station, mk || months.at(-1) || "");
+      const list = (s?.monthly || []).filter(x => periodMonths.includes(x.key));
+      const out = Object.fromEntries(FIN.map(k => [k, list.reduce((a, x) => a + n0(x[k]), 0)]));
+      out.investment = n0(s?.settings?.investmentValue || s?.finance?.investmentValue);
+      out.monthly = (s?.monthly || []).map(x => ({ key: x.key, revenue: n0(x.totalRevenue), result: n0(x.operationNet), cost: n0(x.totalOperatingCost), energy: n0(x.energy) }));
+      return out;
+    };
+    const per = members.map(m => {
+      const ch = m.charges.filter(inPeriod);
+      return { workId: m.workId, station: m.station, workName: m.workName, kind: m.kind, ops: ops(ch, [m.row]), fin: finOf(m),
+        keys: new Set(ch.map(clientKeyFromCharge).filter(Boolean)), charges: m.charges };
+    });
+    const combinedCharges = members.flatMap(m => m.charges.filter(inPeriod));
+    const fin = Object.fromEntries(FIN.map(k => [k, per.reduce((a, p) => a + n0(p.fin[k]), 0)]));
+    fin.investment = per.reduce((a, p) => a + p.fin.investment, 0);
+    const seen = new Map();
+    per.forEach(p => p.keys.forEach(k => seen.set(k, (seen.get(k) || 0) + 1)));
+    const shared = [...seen.values()].filter(v => v > 1).length;
+    const monthly = months.map(k => {
+      const byMember = per.map(p => {
+        const x = p.fin.monthly.find(y => y.key === k) || { revenue: 0, result: 0, cost: 0, energy: 0 };
+        return { kind: p.kind, revenue: x.revenue, result: x.result, cost: x.cost, energy: x.energy, sessions: cleanOperationStats(p.charges.filter(c => chargeMonthKey(c) === k)).executed.length };
+      });
+      const sm = summaryMetrics(members.flatMap(m => m.charges.filter(c => chargeMonthKey(c) === k)));
+      const sum = f => byMember.reduce((a, x) => a + x[f], 0);
+      return { key: k, label: monthLabel(k), members: byMember, revenue: sum("revenue"), result: sum("result"), cost: sum("cost"), energy: sum("energy"),
+        sessions: sm.clean.executed.length, clients: sm.clients };
+    });
+    return {
+      places: all.map(p => ({ key: p.key, label: p.label, members: p.members })),
+      place: { key: place.key, label: place.label }, monthKey: mk, label: mk ? monthLabel(mk) : "Acumulado", months: months.map(k => ({ key: k, label: monthLabel(k) })),
+      members: per.map(p => ({ workId: p.workId, station: p.station, workName: p.workName, kind: p.kind, ops: p.ops, fin: p.fin, clients: p.keys.size })),
+      total: { ops: ops(combinedCharges, members.map(m => m.row)), fin, sharedClients: shared },
+      monthly
+    };
+  }
+
   function allBills() {
     fv2Ensure();
     const cur = monthKey(new Date());
@@ -2136,7 +2222,7 @@
     return { list: out, total: out.reduce((s, p) => s + p.amount, 0) };
   }
 
-  window.UBY_MOTOR_API = { alerts, paidBills, allBills, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
+  window.UBY_MOTOR_API = { alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,
