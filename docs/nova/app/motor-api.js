@@ -390,7 +390,8 @@
     const monthKey = key.slice(0, 7);
     const inDay = (c, a, b) => valid(c.startDate) && c.startDate >= a && c.startDate < b;
 
-    const spread = (charges, power) => {
+    // points = quantos carros o ponto atende ao mesmo tempo (maior entre carregadores e conectores cadastrados).
+    const spread = (charges, power, points = 1) => {
       const hours = Array.from({ length: 24 }, () => ({ revenue: 0, energy: 0, busyMin: 0 }));
       charges.filter(isExecutedCharge).forEach(c => {
         const start = c.startDate;
@@ -407,9 +408,12 @@
           hours[h].busyMin += ov / 60000;
         }
       });
-      // use = % da hora com carro conectado (tempo); occupancy = kWh da hora ÷ potência (regra de energia).
-      return hours.map(x => ({ revenue: x.revenue, energy: x.energy, busyMin: Math.min(x.busyMin, 60),
-        use: Math.min(x.busyMin, 60) / 60 * 100, occupancy: power > 0 ? Math.min(x.energy / power * 100, 100) : 0 }));
+      // use = % da capacidade do ponto com carro conectado: minutos conectados ÷ (60 × pontos de recarga).
+      // Antes dividia só por 60: um carro a hora inteira já dava 100% num ponto com 5 carregadores.
+      // occupancy = kWh da hora ÷ potência (regra de energia).
+      const cap = 60 * Math.max(1, Number(points) || 1);
+      return hours.map(x => ({ revenue: x.revenue, energy: x.energy, busyMin: Math.min(x.busyMin, cap), points: Math.max(1, Number(points) || 1),
+        use: Math.min(x.busyMin, cap) / cap * 100, occupancy: power > 0 ? Math.min(x.energy / power * 100, 100) : 0 }));
     };
 
     const GROUP = u => !u.included ? "outside" : u.model === "third_party_management" ? "partner"
@@ -435,7 +439,8 @@
         prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count, prevMaxKWh: power * prevHours,
         prevOccupancy: power * prevHours > 0 ? prev.energy / (power * prevHours) * 100 : 0,
         lastStart: iso(today.map(c => c.startDate).filter(valid).sort((a, b) => b - a)[0] || null),
-        hourly: spread(today, power) };
+        points: Math.max(1, Number(config.acChargers || 0) + Number(config.dcChargers || 0), Number(config.acPlugs || 0) + Number(config.dcPlugs || 0)),
+        hourly: spread(today, power, Math.max(1, Number(config.acChargers || 0) + Number(config.dcChargers || 0), Number(config.acPlugs || 0) + Number(config.dcPlugs || 0))) };
       u.group = GROUP(u);
       return u;
     }).filter(Boolean).sort((a, b) => b.revenue - a.revenue);

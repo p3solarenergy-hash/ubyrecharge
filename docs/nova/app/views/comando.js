@@ -199,9 +199,10 @@
     const net = res.network[dt.scope === "geral" ? "geral" : "uby"];
     const nd = net.day, np = net.previous || {};
     const sumH = (i, k) => list.reduce((s, u) => s + u.hourly[i][k], 0);
-    // Rede: % dos carregadores em uso naquela hora (minutos ocupados ÷ carregadores × 60).
+    // Rede: % dos pontos de recarga em uso naquela hora (minutos ocupados ÷ (pontos de todos os carregadores × 60)).
+    const totalPoints = list.reduce((s, u) => s + Math.max(1, Number(u.points) || 1), 0);
     const totalHourly = Array.from({ length: 24 }, (_, i) => ({ revenue: sumH(i, "revenue"), energy: sumH(i, "energy"),
-      use: list.length ? sumH(i, "busyMin") / (list.length * 60) * 100 : 0 }));
+      use: totalPoints ? sumH(i, "busyMin") / (totalPoints * 60) * 100 : 0 }));
     const tot = k => list.reduce((s, u) => s + Number(u[k] || 0), 0);
     const totOcc = tot("maxKWh") > 0 ? tot("energy") / tot("maxKWh") * 100 : 0;
     const totPrevOcc = tot("prevMaxKWh") > 0 ? tot("prevEnergy") / tot("prevMaxKWh") * 100 : 0;
@@ -248,7 +249,7 @@
         </div>
         <h3 class="dt-sub">Por carregador <small>mesma escala em todos os cartões · clique no nome para abrir o carregador</small></h3>
         <div class="dt-grid ${dtCols(list.length) > 3 ? "dt-many" : ""}" style="--dt-cols:${dtCols(list.length)}">${list.map(card).join("")}</div>` : `<div class="note">Nenhum carregador ${dt.scope === "uby" ? "da rede UBY " : ""}com recarga neste dia ou no anterior.</div>`}
-      <p class="source-line">Ocupação do dia = energia ÷ (potência × horas disponíveis da estação no dia${day.isToday ? ", até agora" : ""}), mesma regra do motor. Por hora: valor de cada recarga válida distribuído entre início e fim; linha = parte da hora com carro conectado (na rede, média dos carregadores). Passe o mouse no gráfico para ver cada hora. ${dt.scope === "uby" ? "“Geral” inclui também só gestão P3 e carregadores fora da UBY." : ""}</p>`;
+      <p class="source-line">Ocupação do dia = energia ÷ (potência × horas disponíveis da estação no dia${day.isToday ? ", até agora" : ""}), mesma regra do motor. Por hora: valor de cada recarga válida distribuído entre início e fim; linha = parte da capacidade do ponto com carro conectado (minutos conectados ÷ 60 × pontos de recarga; 100% = todos os pontos ocupados a hora inteira; na rede, somando os pontos de todos os carregadores). Passe o mouse no gráfico para ver cada hora. ${dt.scope === "uby" ? "“Geral” inclui também só gestão P3 e carregadores fora da UBY." : ""}</p>`;
 
     const redraw = () => drawDayTrack(box, defaultDay);
     box.querySelectorAll("#dtScope button").forEach(b => b.onclick = () => { dt.scope = b.dataset.v; redraw(); });
