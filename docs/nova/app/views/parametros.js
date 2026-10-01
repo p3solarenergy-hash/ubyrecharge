@@ -887,6 +887,37 @@
   // ---------- repasse à área (dono do local) ----------
   // Participação da área sobre o faturamento e, quando o ponto ainda usa a energia
   // do local, o reembolso dos kWh vendidos × tarifa do mês (Por carregador · energia).
+  // Ponto sem padrão próprio (reembolso ao dono do local): a fatura é a do posto inteiro. Dela sai só a
+  // tarifa — preço unitário com tributos das linhas de energia consumida — e essa tarifa vale para o mês
+  // fechado escolhido: reembolso = kWh que o carregador vendeu no mês × tarifa. As datas de leitura da
+  // Copel não importam aqui (diferente de Faturas de energia, que é para ponto com padrão próprio).
+  function postoInvoiceBox(a, workId, station, can) {
+    const today = new Date();
+    const closed = `${today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear()}-${String(today.getMonth() === 0 ? 12 : today.getMonth()).padStart(2, "0")}`;
+    const keys = a.months.map(m => m.key);
+    if (!keys.includes(ui.piMonth)) ui.piMonth = keys.includes(closed) ? closed : keys.at(-1) || "";
+    const m = a.months.find(x => x.key === ui.piMonth);
+    const r = ui.piRead, f = r?.ok ? r.fields : null;
+    const rate = f?.energyRate || 0;
+    const newReimb = m ? Math.round(m.energy * rate * 100) / 100 : 0;
+    return `<section class="section"><div class="section-head"><div><p class="kicker">Reembolso de energia</p><h2>Tarifa pela fatura do posto</h2>
+        <p>Anexe a fatura da Copel do posto. A plataforma soma o preço do kWh com tributos só das linhas de energia consumida (consumo, uso do sistema e bandeira) — sem energia injetada e sem iluminação pública — e aplica ao kWh que o carregador vendeu no mês fechado que você escolher.</p></div></div>
+      <div class="grid g2" style="gap:10px;align-items:end">
+        <label class="imp-field" style="display:block;border:1.5px dashed var(--uby-line, #c9d6cf);border-radius:10px;padding:10px 12px;cursor:pointer">
+          <span style="font-size:12px;font-weight:800">📄 Fatura da Copel do posto (PDF)</span><small style="display:block;color:var(--uby-muted)">${r?.file ? esc(r.file) : "baixe a 2ª via no site/app da Copel"}</small>
+          <input id="pmPiPdf" type="file" accept="application/pdf" style="margin-top:6px;width:100%"></label>
+        ${field("Aplicar no mês fechado", `<select class="select" id="pmPiMonth">${a.months.slice().reverse().map(x => `<option value="${esc(x.key)}" ${x.key === ui.piMonth ? "selected" : ""}>${esc(x.label)} · ${fmt.kwh(x.energy)} vendidos · tarifa atual R$ ${Number(x.rate || 0).toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 6 })}/kWh</option>`).join("")}</select>`)}
+      </div>
+      ${r && !r.ok ? `<div class="note" style="margin-top:10px;border-color:var(--uby-red)">Não consegui ler: ${esc(r.error || "")}</div>` : ""}
+      ${f ? `<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Item da fatura ${esc(f.ref ? (UBY.state.api?.monthName?.(f.ref) || f.ref) : "")}</th><th class="num">kWh</th><th class="num">Preço com tributos</th><th>Entra na tarifa</th></tr></thead><tbody>
+          ${(f.items || []).map(i => { const on = (f.energyRateItems || []).some(e => e.desc === i.desc); return `<tr${on ? "" : ' style="color:var(--uby-muted)"'}><td>${esc(i.desc)}</td><td class="num">${i.unit === "UN" ? "—" : fmt.int(i.qty)}</td><td class="num">${i.unit === "UN" ? fmt.brl(i.price) : `R$ ${i.price.toLocaleString("pt-BR", { minimumFractionDigits: 6, maximumFractionDigits: 6 })}`}</td><td>${on ? '<span class="badge ok">sim</span>' : "não"}</td></tr>`; }).join("")}
+          </tbody><tfoot><tr><td colspan="2">Tarifa de energia com tributos</td><td class="num">R$ ${rate.toLocaleString("pt-BR", { minimumFractionDigits: 6, maximumFractionDigits: 6 })}/kWh</td><td></td></tr></tfoot></table></div>
+        ${m && rate > 0 ? `<div class="note" style="margin-top:10px"><strong>${esc(m.label)}: ${fmt.kwh(m.energy)} vendidos × R$ ${rate.toLocaleString("pt-BR", { minimumFractionDigits: 6, maximumFractionDigits: 6 })} = ${fmt.brl(newReimb)} de reembolso de energia</strong><br>
+          Hoje está ${fmt.brl(m.reimbursement)} (tarifa ${fmt.brl(m.rate)}/kWh) · diferença ${fmt.brl(newReimb - m.reimbursement)}. A tarifa também passa a valer nos meses seguintes até a próxima fatura.${m.paidAt ? `<br><span class="badge warn">atenção</span> o repasse de ${esc(m.label)} já foi marcado como pago em ${fmt.date(m.paidAt + "T12:00:00")}.` : ""}</div>
+          <button class="btn primary" id="pmPiSave" type="button" style="margin-top:10px" ${can}>Gravar tarifa em ${esc(m.label)} e guardar a fatura</button>` : rate > 0 ? "" : `<div class="note" style="margin-top:10px">Não achei as linhas de energia nesta fatura. Lance a tarifa à mão em Por carregador.</div>`}` : ""}
+    </section>`;
+  }
+
   function areaTab(w, data) {
     const api = UBY.state.api;
     if (!api || typeof api.areaAccount !== "function") return `<div class="note">O motor está recarregando. Abra esta aba de novo em alguns segundos.</div>`;
@@ -920,6 +951,7 @@
             ${kpi("Energia reembolsada", fmt.brl(a.totals.reimbursement), a.config.reimburseEnergy ? "kWh vendidos × tarifa" : "não reembolsa")}${kpi("Participação da área", fmt.brl(a.totals.area), "sobre o faturamento bruto")}</div>
         </section>
       </div>
+      ${a.config.reimburseEnergy ? postoInvoiceBox(a, workId, station, can) : ""}
       <section class="section"><div class="section-head"><div><p class="kicker">Por competência</p><h2>Repasses ao local</h2><p>${a.config.configured ? `Vence no dia ${a.config.dueDay} do mês seguinte e aparece em Pagamentos.` : "Ative o repasse acima para ele aparecer em Pagamentos."}</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Faturamento</th><th class="num">kWh vendidos</th><th class="num">Tarifa</th><th class="num">Reembolso energia</th><th class="num">% área</th><th class="num">Participação</th><th class="num">Total ao local</th><th>Vencimento</th><th>Situação</th><th></th></tr></thead>
           <tbody>${a.months.slice().reverse().map(m => `<tr><td><strong>${esc(m.label)}</strong><small>${fmt.date(m.periodStart)} a ${fmt.date(m.periodEnd)}</small></td>
@@ -1325,6 +1357,39 @@
     const arCtx = () => { const c = data.chargers.find(x => x.key === ui.arCharger); const a = UBY.state.api.areaAccount(c.workId, c.station); return { c, a }; };
     const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, paid: { ...(a.config.paid || {}) }, paidInfo: { ...(a.config.paidInfo || {}) }, adjust: { ...(a.config.adjust || {}) } });
       run(target, w, `${label} · ${c.station}`, async () => { await saveChargerField(w, c.workId, c.station, c.workName, "areaAccount", next); ui.arForm = null; return "salvo"; }); };
+    // --- tarifa pela fatura do posto (reembolso) ---
+    if ($("#pmPiPdf")) $("#pmPiPdf").onchange = async e => {
+      const file = e.target.files?.[0]; if (!file) return;
+      ui.piRead = { ok: false, error: "lendo…", file: file.name }; draw(target, w);
+      const res = await window.UBY_COPEL.read(file);
+      ui.piRead = { ...res, file: file.name }; ui.piFile = res.ok ? file : null;
+      draw(target, w);
+    };
+    if ($("#pmPiMonth")) $("#pmPiMonth").onchange = e => { ui.piMonth = e.target.value; draw(target, w); };
+    if ($("#pmPiSave")) $("#pmPiSave").onclick = () => {
+      const { c } = arCtx();
+      const f = ui.piRead?.fields, rate = Number(f?.energyRate) || 0, mk = ui.piMonth;
+      if (!(rate > 0) || !/^\d{4}-\d{2}$/.test(mk || "")) return;
+      if ((Object.keys(ui.edits).length || ui.rules) && !confirm("Há alterações não salvas em Por carregador. Descartar e gravar a tarifa da fatura?")) return;
+      run(target, w, `Tarifa da fatura do posto · ${c.station} · ${mk}`, async () => {
+        await resyncMatrix(w);
+        await openCharger(w, c.key, mk);
+        ui.edits = { financeEnergyCost: String(rate) }; ui.rules = null;
+        applyToEngine(w);
+        w.scheduleFinancialSettingsSave();
+        await w.commitPendingFinancialSettingsSave();
+        ui.edits = {}; ui.charger = c.key; ui.month = mk;
+        let saved = "";
+        if (ui.piFile) {
+          const doc = await w.UBY_SUPABASE.createFinanceDocument({ scope: "charger", workId: c.workId, competenceKey: mk, supplier: "Copel", category: "Energia",
+            documentNumber: f.nfNumber || "", documentType: "fatura", amount: Number(f.copelAmount) || 0, dueDate: f.dueDate || null, status: "pending",
+            notes: `Fatura do posto ${f.ref || ""}${f.uc ? ` · UC ${f.uc}` : ""} · tarifa de energia com tributos R$ ${rate}/kWh aplicada em ${mk} (reembolso ao local)` }, ui.piFile);
+          if (doc?.id) saved = " · fatura guardada em Documentos";
+        }
+        ui.piRead = null; ui.piFile = null;
+        return `tarifa R$ ${rate.toLocaleString("pt-BR", { maximumFractionDigits: 6 })}/kWh gravada em ${mk}${saved}`;
+      });
+    };
     if ($("#pmArSave")) $("#pmArSave").onclick = () => arSave("Regra do repasse à área", cfg => ({ ...cfg, reimburseEnergy: !!ui.arForm.reimburseEnergy, payee: String(ui.arForm.payee || "").trim() || cfg.payee, payeeEmail: String(ui.arForm.payeeEmail || "").trim().toLowerCase(), dueDay: Math.min(Math.max(Number(ui.arForm.dueDay) || 10, 1), 28) }));
     target.querySelectorAll("[data-ar-pay-open]").forEach(b => b.onclick = () => { ui.arPay = ui.arPay === b.dataset.arPayOpen ? "" : b.dataset.arPayOpen; ui.arAdjust = ""; draw(target, w); });
     target.querySelectorAll("[data-ar-pay-cancel]").forEach(b => b.onclick = () => { ui.arPay = ""; draw(target, w); });

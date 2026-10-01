@@ -38,6 +38,26 @@
   const isoDate = d => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d || ""); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; };
   const brNum = s => Number(String(s || "").replace(/\./g, "").replace(",", ".")) || 0;
 
+  // "Itens de fatura": o PDF traz as colunas em blocos — N descrições, N unidades, N quantidades,
+  // N preços unitários com tributos, N valores. O bloco de unidades (kWh/UN) diz quantos itens são.
+  function parseItems(t) {
+    const L = String(t || "").split("\n").map(s => s.trim());
+    const isUnit = s => /^(kWh|kW|UN|kVArh|kVAr)$/i.test(s || "");
+    const u0 = L.findIndex((s, i) => isUnit(s) && i > 0 && /[A-Za-z]{3}/.test(L[i - 1]) && !isUnit(L[i - 1]));
+    if (u0 < 0) return [];
+    let n = 0;
+    while (isUnit(L[u0 + n])) n++;
+    const num = s => /^-?[\d.]+(,\d+)?$/.test(s || "");
+    const units = L.slice(u0, u0 + n), desc = L.slice(u0 - n, u0);
+    // A coluna de quantidade não traz linha para itens em "UN" (ex.: iluminação pública): só para os demais.
+    const nq = units.filter(u => !/^UN$/i.test(u)).length;
+    let p = u0 + n;
+    const qty = L.slice(p, p += nq), price = L.slice(p, p += n), value = L.slice(p, p += n);
+    if (desc.length !== n || ![...qty, ...price, ...value].every(num)) return [];
+    let qi = 0;
+    return desc.map((d, i) => ({ desc: d, unit: units[i], qty: /^UN$/i.test(units[i]) ? 1 : brNum(qty[qi++]), price: brNum(price[i]), value: brNum(value[i]) }));
+  }
+
   function parse(text) {
     const t = String(text || "");
     const warnings = [];
@@ -69,6 +89,14 @@
     const bal = /Todos os Per[ií]odos\s+(\d+);/.exec(t); if (bal) f.creditBalance = Number(bal[1]);
     const total = /\bTOTAL\s+([\d.]+,\d{2})/.exec(t);
     if (total && Math.abs(brNum(total[1]) - f.copelAmount) > 0.01) warnings.push(`Total do rodapé (R$ ${total[1]}) difere do cabeçalho.`);
+    // Itens da fatura e tarifa de energia com tributos (para reembolso de ponto sem padrão próprio):
+    // soma dos preços unitários com tributos das linhas de energia consumida (TE, TUSD/uso do sistema,
+    // bandeira). Fica de fora: energia injetada (créditos do gerador do local) e iluminação pública.
+    f.items = parseItems(t);
+    const energyItems = f.items.filter(i => /^kWh$/i.test(i.unit) && i.qty > 0 && /ENERGIA/i.test(i.desc) && !/INJ/i.test(i.desc));
+    f.energyRateItems = energyItems;
+    f.energyRate = Math.round(energyItems.reduce((s, i) => s + i.price, 0) * 1e6) / 1e6;
+    if (!energyItems.length) warnings.push("Não li os itens da fatura (preço do kWh com tributos).");
     if (!f.kwh) warnings.push("Não encontrei o kWh consumido: preencha à mão.");
     if (f.end <= f.start) warnings.push("Datas de leitura fora de ordem.");
     return { ok: true, fields: f, warnings };
