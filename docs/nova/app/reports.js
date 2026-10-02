@@ -41,7 +41,11 @@
 
   // O título vira o nome do arquivo ao salvar em PDF: "Relatório - CENTRAL JK - Set-2026".
   // Sem "UBY RECHARGE - " repetido e sem "/" (o navegador cortava o nome na barra do mês).
-  const fileTitle = (...parts) => parts.filter(Boolean).map(p => String(p).replace(/^\s*UBY RECHARGE\s*-\s*/i, "").replace(/[\\/:*?"<>|]+/g, "-").trim()).join(" - ");
+  // Padrão: "UBY Recharge — Prestação de contas - Central JK - 09-26" (tipo, local, mês-ano).
+  const placeName = s => String(s || "").replace(/^\s*UBY RECHARGE\s*-\s*/i, "").trim().toLowerCase()
+    .replace(/(^|\s)(\S+)/g, (m, sp, w) => sp + (w.replace(/\./g, "").length <= 2 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)));
+  const mmYY = mk => /^\d{4}-\d{2}$/.test(mk || "") ? `${mk.slice(5, 7)}-${mk.slice(2, 4)}` : "Acumulado";
+  const fileTitle = (type, place, mk) => [`UBY Recharge — ${type}`, place ? placeName(place) : "", mmYY(mk)].filter(Boolean).map(p => p.replace(/[\\/:*?"<>|]+/g, "-")).join(" - ");
   function doc(title, pages) {
     return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${CSS}</style></head><body>
       <div class="actions"><button onclick="window.print()">Imprimir / salvar PDF</button></div>${pages.map(p => `<div class="page">${p}</div>`).join("")}</body></html>`;
@@ -249,18 +253,18 @@
 
   function build(kind, o = {}) {
     const latest = UBY.state.months.at(-1) || "";
-    if (kind === "area") return doc(fileTitle("Prestação de contas", o.station, monthName(o.month || latest)), [pageArea(o.workId, o.station, o.month)]);
-    if (kind === "unificado") return doc(fileTitle("Relatório unificado", monthName(o.month)), [pageUnificado(o.month)]);
+    if (kind === "area") return doc(fileTitle("Prestação de contas", o.station, o.month || latest), [pageArea(o.workId, o.station, o.month)]);
+    if (kind === "unificado") return doc(fileTitle("Relatório unificado", "", o.month), [pageUnificado(o.month)]);
     if (kind === "carregador") {
       const s = UBY.data("stationFinance", o.workId, o.station, o.month);
-      return doc(fileTitle("Relatório", s?.station || o.station, monthName(s?.monthKey || o.month || latest)), [pageCarregador(o.workId, o.station, o.month)]);
+      return doc(fileTitle("Relatório", s?.station || o.station, s?.monthKey || o.month || latest), [pageCarregador(o.workId, o.station, o.month)]);
     }
     if (kind === "todos") {
       const list = UBY.data("financeStations").filter(s => o.includeOutside || UBY.isUbyModel(s.model));
-      return doc(fileTitle("Relatórios dos carregadores", monthName(o.month || latest)), list.map(s => pageCarregador(s.workId, s.station, o.month)));
+      return doc(fileTitle("Relatórios dos carregadores", "", o.month || latest), list.map(s => pageCarregador(s.workId, s.station, o.month)));
     }
-    if (kind === "cotista") return doc(fileTitle("Extrato", o.name, monthName(latest)), [pageCotista(o.name)]);
-    if (kind === "cotistas") return doc(fileTitle("Extratos dos cotistas", monthName(latest)), UBY.data("investorDistribution").investors.map(i => pageCotista(i.name)));
+    if (kind === "cotista") return doc(fileTitle("Extrato", o.name, latest), [pageCotista(o.name)]);
+    if (kind === "cotistas") return doc(fileTitle("Extratos dos cotistas", "", latest), UBY.data("investorDistribution").investors.map(i => pageCotista(i.name)));
     throw new Error(`Tipo de relatório desconhecido: ${kind}`);
   }
 
