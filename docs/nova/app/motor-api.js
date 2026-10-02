@@ -423,7 +423,8 @@
       const all = (row.charges || []).map(hydrateCharge);
       const today = all.filter(c => inDay(c, dayStart, dayEnd));
       const before = all.filter(c => inDay(c, prevStart, dayStart));
-      if (!today.length && !before.length) return null;
+      // Entra todo carregador que operou no mês (parado hoje também conta na capacidade da rede).
+      if (!today.length && !before.length && !all.some(c => valid(c.startDate) && c.startDate >= new Date(y, m - 1, 1) && c.startDate < dayEnd)) return null;
       const station = row.stationName || row.station;
       const cur = summarizeUbyChargerRow(row, today), prev = summarizeUbyChargerRow(row, before);
       const clean = cleanOperationStats(today);
@@ -864,6 +865,55 @@
     };
   }
 
+  // Ranking de clientes por período (mês, acumulado ou datas de/até) e por estação.
+  // Mesma base do ranking da Inteligência (operação UBY); conta tentativas e válidas.
+  function clientRanking(monthKey, from, to, stationRef) {
+    const unitData = getGeneralUnitData();
+    const rows = getUbyChargerRows(unitData).filter(row => row.included);
+    const refOf = row => `${row.workId}|${row.station}`;
+    const stations = rows.filter(row => (row.charges || []).length).map(row => ({ ref: refOf(row), label: abbreviatedStationLabel(row.station), workId: row.workId, station: row.station }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+    const picked = stationRef ? rows.filter(row => refOf(row) === stationRef) : rows;
+    const history = rows.flatMap(row => row.charges || []);
+    const monthKeys = [...new Set(history.map(chargeMonthKey).filter(k => k !== "unknown"))].filter(isPlausibleMonthKey).sort();
+    const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const okDate = d => d instanceof Date && !Number.isNaN(d.getTime());
+    const byDates = /^\d{4}-\d{2}-\d{2}$/.test(from || "") || /^\d{4}-\d{2}-\d{2}$/.test(to || "");
+    const mk = byDates || monthKey === "" ? "" : (monthKeys.includes(monthKey) ? monthKey : monthKeys.at(-1) || "");
+    const inPeriod = c => {
+      if (byDates) { if (!okDate(c.startDate)) return false; const k = ymd(c.startDate); return (!from || k >= from) && (!to || k <= to); }
+      return !mk || chargeMonthKey(c) === mk;
+    };
+    const period = picked.flatMap(row => (row.charges || []).filter(inPeriod));
+    const byUser = {};
+    period.forEach(c => {
+      const name = c.userName || c.userEmail || "Cliente sem nome";
+      const key = clientKeyFromCharge(c) || clientIdentityKey(name);
+      if (!byUser[key]) byUser[key] = { key, name, email: c.userEmail || "", phone: c.userPhone || "", sessions: 0, valid: 0, energy: 0, revenue: 0, first: null, last: null, stations: new Set() };
+      const u = byUser[key];
+      u.sessions += 1; if (isExecutedCharge(c)) u.valid += 1;
+      u.energy += Number(c.energyKWh || 0); u.revenue += Number(c.revenue || 0);
+      if (okDate(c.startDate) && (!u.last || c.startDate > u.last)) u.last = c.startDate;
+      if (okDate(c.startDate) && (!u.first || c.startDate < u.first)) u.first = c.startDate;
+      if (c.station) u.stations.add(abbreviatedStationLabel(canonicalStationNameForWork(c.workId, c.station, c.workName)));
+      if (!u.phone && c.userPhone) u.phone = c.userPhone;
+    });
+    const historyCount = {};
+    history.filter(isExecutedCharge).forEach(c => { const k = clientKeyFromCharge(c); if (k) historyCount[k] = (historyCount[k] || 0) + 1; });
+    const list = Object.values(byUser).filter(u => u.valid > 0 || u.revenue > 0);
+    const totalRevenue = list.reduce((s, u) => s + u.revenue, 0);
+    const ranking = list.sort((a, b) => b.revenue - a.revenue || b.valid - a.valid).map(u => ({
+      name: u.name, email: u.email, phone: u.phone, sessions: u.sessions, valid: u.valid, energy: u.energy, revenue: u.revenue,
+      share: totalRevenue ? u.revenue / totalRevenue * 100 : 0, perKwh: u.energy ? u.revenue / u.energy : 0, ticket: u.valid ? u.revenue / u.valid : 0,
+      first: iso(u.first), last: iso(u.last), stations: [...u.stations], historySessions: historyCount[u.key] || 0
+    }));
+    const br = k => k ? k.split("-").reverse().join("/") : "";
+    const label = byDates ? (from && to ? `${br(from)} a ${br(to)}` : from ? `desde ${br(from)}` : `até ${br(to)}`) : mk ? monthLabel(mk) : "Acumulado";
+    const st = stationRef ? stations.find(x => x.ref === stationRef) : null;
+    return { label, monthKey: mk, from: from || "", to: to || "", byDates, station: stationRef || "", stationLabel: st ? st.label : "Todas as estações", stations, ranking,
+      summary: { clients: ranking.length, valid: ranking.reduce((s, u) => s + u.valid, 0), revenue: totalRevenue, energy: ranking.reduce((s, u) => s + u.energy, 0) } };
+  }
+
   function club(monthKey) {
     try { ensureClubParticipantsAutoSync(); } catch (_) {}
     const unitData = getGeneralUnitData();
@@ -1038,6 +1088,19 @@
     const power = kind === "station" ? Number(workPowerById(scope.workId) || 0)
       : rows.filter(r => (r.charges || []).some(inMonth)).reduce((s, r) => s + Number(workPowerById(r.workId) || 0), 0);
 
+    // Capacidade do intervalo: soma, carregador a carregador, potência × horas disponíveis
+    // pelo horário de cada um (mesma regra do Resultado do dia). Antes usava a potência
+    // somada × o horário de um só carregador, e a ocupação do mesmo dia saía diferente.
+    const activeRows = rows.filter(r => (r.charges || []).some(inMonth)).map(r => ({
+      power: Number(workPowerById(r.workId) || 0), config: stationAvailabilityFor(r.workId, r.stationName || r.station, r.workName) }));
+    const capacity = (a, b) => b > a ? activeRows.reduce((s, r) => s + r.power * stationAvailableHours(r.config, new Date(a), new Date(b)), 0) : 0;
+    const dayCapacity = ref => {
+      if (!bounds) return 0;
+      const dayStart = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+      const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+      return capacity(Math.max(dayStart.getTime(), bounds.start.getTime()), Math.min(dayEnd.getTime(), bounds.end.getTime()));
+    };
+
     // Para uma estação, o painel mensal usa a estação "aberta" (currentWorkId...).
     const saved = { id: currentWorkId, name: currentWorkName, station: currentStationReportName };
     let weekday = [], kpis = null, days = [];
@@ -1045,20 +1108,23 @@
       if (kind === "station" && rows[0]) {
         currentWorkId = String(rows[0].workId); currentWorkName = rows[0].workName || ""; currentStationReportName = rows[0].stationName || "";
       }
-      weekday = weekdayOccupancyRows(charges, power, bounds).map(w => ({ label: w.label, days: w.days, count: w.count, valid: w.validCount, failed: w.failed,
-        revenue: w.revenue, energy: w.energy, clients: w.clientCount, occ: w.occ, avgRevenue: w.avgRevenue, avgKwh: w.avgKwh, avgTicket: w.avgTicket }));
+      const wdCap = {};
+      if (bounds) for (let c = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), bounds.start.getDate()), g = 0; c <= bounds.end && g < 400; c.setDate(c.getDate() + 1), g++)
+        wdCap[c.getDay()] = (wdCap[c.getDay()] || 0) + dayCapacity(c);
+      const WD = { Dom: 0, Seg: 1, Ter: 2, Qua: 3, Qui: 4, Sex: 5, Sab: 6, "Sáb": 6 };
+      weekday = weekdayOccupancyRows(charges, power, bounds).map(w => {
+        const cap = wdCap[w.idx ?? WD[w.label]] || 0;
+        return { label: w.label, days: w.days, count: w.count, valid: w.validCount, failed: w.failed,
+          revenue: w.revenue, energy: w.energy, clients: w.clientCount, occ: cap > 0 ? w.energy / cap * 100 : 0, avgRevenue: w.avgRevenue, avgKwh: w.avgKwh, avgTicket: w.avgTicket };
+      });
 
       // Ocupação de cada dia do calendário: mesma regra de weekdayOccupancyRows
       // (horas disponíveis do dia recortadas ao período; hoje só as horas já passadas).
-      const availability = availabilityForCurrentCharges(charges);
       days = dailySeries(charges, history).map(d => {
         const ref = new Date(d.date);
         if (!bounds || !(power > 0) || Number.isNaN(ref.getTime())) return { ...d, occ: null, occHours: 0 };
-        const dayStart = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
-        const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
-        const start = Math.max(dayStart.getTime(), bounds.start.getTime()), end = Math.min(dayEnd.getTime(), bounds.end.getTime());
-        const hours = end > start ? stationAvailableHours(availability, new Date(start), new Date(end)) : 0;
-        return { ...d, occ: hours > 0 ? d.energy / (power * hours) * 100 : null, occHours: hours };
+        const cap = dayCapacity(ref);
+        return { ...d, occ: cap > 0 ? d.energy / cap * 100 : null, occHours: power > 0 ? cap / power : 0 };
       });
 
       if (kind === "station" && mk && rows[0] && charges.length) {
@@ -2228,7 +2294,7 @@
   window.UBY_MOTOR_API = { alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
-    customerRegistry, clientIntelligence, club, financeV2, financeV2Parity, financeV2Impact,
+    customerRegistry, clientIntelligence, clientRanking, club, financeV2, financeV2Parity, financeV2Impact,
     financeLegacy, investorDistributionLegacy, stationFinanceLegacy, destinationsLegacy };
   document.dispatchEvent(new CustomEvent("uby:motor-api-ready"));
 })();

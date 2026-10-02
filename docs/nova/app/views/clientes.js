@@ -3,7 +3,7 @@
   "use strict";
   const { fmt, esc, kpi } = UBY;
   const TABS = [["visao", "Inteligência"], ["ranking", "Ranking do período"], ["ausentes", "Recuperação"], ["coortes", "Coortes"], ["cadastro", "Cadastro oficial"]];
-  const ui = { search: "", sort: "spent", mask: readMask() };
+  const ui = { search: "", sort: "spent", mask: readMask(), rk: { station: "", from: "", to: "" } };
   let registry = null, registryKey = "";
 
   function readMask() { try { return localStorage.getItem("uby-nova-mask") === "1"; } catch (_) { return false; } }
@@ -56,15 +56,22 @@
       </div>`;
   }
 
+  // Ranking por período (mês do seletor ou datas de/até) e por estação.
   function ranking(r) {
-    const max = r.ranking[0]?.revenue || 1;
+    const max = r.ranking[0]?.revenue || 1, sm = r.summary;
     return `
-      <section class="section"><div class="section-head"><div><p class="kicker">${esc(r.period.label)}</p><h2>Ranking de clientes (${r.ranking.length})</h2><p>Todas as tentativas do período; a coluna Válidas mostra quantas viraram recarga.</p></div></div>
-        <div class="table-wrap" style="max-height:640px"><table><thead><tr><th>#</th><th>Cliente</th><th>Estações</th><th class="num">Recargas</th><th class="num">Válidas</th><th class="num">Histórico</th><th class="num">Energia</th><th>Faturamento</th><th class="num">R$/kWh</th><th>Última</th></tr></thead>
+      <section class="section"><div class="section-head"><div><p class="kicker">${esc(r.label)} · ${esc(r.stationLabel)}</p><h2>Ranking de clientes (${r.ranking.length})</h2><p>Ordenado pelo faturamento. Recargas válidas; falhas ficam de fora.${r.byDates ? "" : " Sem datas, vale o mês do seletor no topo."}</p></div></div>
+        <div class="toolbar" style="box-shadow:none">
+          <select class="select" id="rkStation"><option value="">Todas as estações</option>${r.stations.map(x => `<option value="${esc(x.ref)}" ${x.ref === r.station ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select>
+          <label>De <input class="select" type="date" id="rkFrom" value="${esc(ui.rk.from)}"></label>
+          <label>Até <input class="select" type="date" id="rkTo" value="${esc(ui.rk.to)}"></label>
+          ${ui.rk.from || ui.rk.to ? `<button class="btn" type="button" id="rkClear">Limpar datas</button>` : ""}
+          <span class="spacer"></span><small>${fmt.int(sm.clients)} cliente(s) · ${fmt.int(sm.valid)} recargas · ${fmt.brl(sm.revenue)}</small></div>
+        <div class="table-wrap" style="max-height:640px"><table><thead><tr><th>#</th><th>Cliente</th><th>Estações</th><th class="num">Recargas</th><th class="num">Histórico</th><th class="num">Energia</th><th>Faturamento</th><th class="num">Ticket</th><th class="num">R$/kWh</th><th>Última</th></tr></thead>
           <tbody>${r.ranking.map((c, i) => `<tr><td>${i + 1}</td><td><strong>${who(c.name)}</strong><small>${contact(c.email || c.phone)}</small></td><td>${esc(c.stations.join(" · "))}</td>
-            <td class="num">${c.sessions}</td><td class="num">${c.valid}</td><td class="num">${c.historySessions}${c.historySessions > 1 ? ' <span class="badge ok">recorrente</span>' : ""}</td><td class="num">${fmt.kwh(c.energy)}</td>
+            <td class="num">${c.valid}</td><td class="num">${c.historySessions}${c.historySessions > 1 ? ' <span class="badge ok">recorrente</span>' : ""}</td><td class="num">${fmt.kwh(c.energy)}</td>
             <td style="min-width:170px"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${fmt.brl(c.revenue)}</strong><small>${fmt.pct1(c.share)}</small></div><div class="bar"><span style="width:${c.revenue / max * 100}%"></span></div></td>
-            <td class="num">${fmt.brl(c.perKwh)}</td><td>${fmt.dt(c.last)}</td></tr>`).join("") || `<tr><td colspan="10" class="empty">Sem clientes no período.</td></tr>`}</tbody></table></div>
+            <td class="num">${fmt.brl(c.ticket)}</td><td class="num">${fmt.brl(c.perKwh)}</td><td>${fmt.dt(c.last)}</td></tr>`).join("") || `<tr><td colspan="10" class="empty">Sem clientes no período.</td></tr>`}</tbody></table></div>
       </section>`;
   }
 
@@ -125,7 +132,7 @@
     const r = UBY.data("clientIntelligence", monthArg());
     let body = "";
     if (tab === "visao") body = visao(r);
-    else if (tab === "ranking") body = ranking(r);
+    else if (tab === "ranking") body = ranking(UBY.data("clientRanking", monthArg(), ui.rk.from, ui.rk.to, ui.rk.station));
     else if (tab === "ausentes") body = ausentes(r);
     else if (tab === "coortes") body = coortes(r);
     else if (tab === "cadastro") {
@@ -140,6 +147,11 @@
     target.innerHTML = head(r.period.label, tab) + body;
     target.querySelectorAll("#cliTabs button").forEach(b => b.onclick = () => UBY.go(`#/clientes/${b.dataset.tab}`));
     target.querySelector("#maskToggle").onchange = e => { ui.mask = e.target.checked; writeMask(ui.mask); render(target, [tab]); };
+    const rk = (k, v) => { ui.rk[k] = v; render(target, ["ranking"]); };
+    target.querySelector("#rkStation")?.addEventListener("change", e => rk("station", e.target.value));
+    target.querySelector("#rkFrom")?.addEventListener("change", e => rk("from", e.target.value));
+    target.querySelector("#rkTo")?.addEventListener("change", e => rk("to", e.target.value));
+    target.querySelector("#rkClear")?.addEventListener("click", () => { ui.rk.from = ui.rk.to = ""; render(target, ["ranking"]); });
     const search = target.querySelector("#regSearch");
     if (search) {
       search.oninput = () => { ui.search = search.value; clearTimeout(search._t); search._t = setTimeout(() => { render(target, ["cadastro"]); const el = target.querySelector("#regSearch"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
