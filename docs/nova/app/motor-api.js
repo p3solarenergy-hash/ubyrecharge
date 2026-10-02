@@ -1312,7 +1312,8 @@
     monthScope: "Fatura e avulsos só na própria competência (E6)",
     matrixCents: "Rateio da matriz fechando ao centavo",
     powerPerCharger: "Peso por potência dividido no local",
-    lossCarry: "Prejuízo compensado antes de distribuir"
+    lossCarry: "Prejuízo compensado antes de distribuir",
+    partnerNetBase: "Parceria: gestão e royalty sobre o líquido da plataforma"
   };
   const MONTH_SPECIFIC = ["energyCopelAmount", "energyCopelKWh", "energyLeaseCreditedKWh"];
 

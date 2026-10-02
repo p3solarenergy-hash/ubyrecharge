@@ -86,9 +86,9 @@
           <tr><th colspan="2" style="position:static">Custos</th></tr>
           ${line(go("Energia", energyHref), `${fmt.brl(f.energyCost)}${pct(f.energyCost)}`, [energyParts.map(([l, v]) => `${l} ${fmt.brl(v)}`).join(" + "), `${perKwh(perSold(f.energyCost))} sobre ${fmt.kwh(kwhSold)} vendidos`].filter(Boolean).join(" · "))}
           ${s.costLines.map(c => line(go(c.matrix ? `Matriz · ${esc(c.label)}` : esc(c.label), costHref(c)), `${fmt.brl(c.actual)}${pct(c.actual)}`, [c.rule, c.perKWh != null ? `${perKwh(c.perKWh)}` : ""].filter(Boolean).join(" · "))).join("")}
-          ${line(go("Gestão P3", edit("carregador", "managementPct")), `${fmt.brl(f.management)}${pct(f.management)}`, "sobre o faturamento total")}
+          ${line(go("Gestão P3", edit("carregador", "managementPct")), `${fmt.brl(f.management)}${pct(f.management)}`, partner || f.model === "management_only" ? "sobre o líquido (faturamento − plataforma)" : "sobre o faturamento total")}
           ${line(go("App / plataforma", edit("carregador", "platformPct")), `${fmt.brl(f.platform)}${pct(f.platform)}`, "só sobre recargas e ociosidade")}
-          ${f.ubyRoyalty ? line(go("Royalty UBY", edit("carregador", "ubyRoyaltyPct")), `${fmt.brl(f.ubyRoyalty)}${pct(f.ubyRoyalty)}`, "uso da marca") : ""}
+          ${f.ubyRoyalty ? line(go("Royalty UBY", edit("carregador", "ubyRoyaltyPct")), `${fmt.brl(f.ubyRoyalty)}${pct(f.ubyRoyalty)}`, "uso da marca · sobre o líquido (faturamento − plataforma)") : ""}
           ${line(go("Repasse da área", edit("carregador", AREA)), `${fmt.brl(f.areaParticipation)}${pct(f.areaParticipation)}`, f.areaSharePct ? `${fmt.pct1(f.areaSharePct)} do faturamento total` : "")}
           ${f.taxes ? line(go("Impostos", edit("carregador", "taxRatePct")), `${fmt.brl(f.taxes)}${pct(f.taxes)}`, st.taxRatePct ? `${fmt.pct1(st.taxRatePct)} do faturamento` : "") : ""}
           </tbody><tfoot><tr><td>Custo total</td><td class="num">${fmt.brl(f.totalOperatingCost)}</td></tr><tr><td>= ${partner ? "Resultado do parceiro" : "Resultado operacional"}</td><td class="num">${signed(f.operationNet)}</td></tr></tfoot>

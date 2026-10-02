@@ -164,8 +164,8 @@
         ${localCosts.map(l => row(esc(l.label), -l.actual)).join("")}
         ${matrix.map(l => row(`${esc(l.label)} (matriz)`, -l.actual, "", l.rule)).join("")}
         ${f.taxes ? row(`Tributos (${fmt.pct1(st.taxRatePct)})`, -f.taxes) : ""}
-        ${row(`Gestão P3 (${fmt.pct1(st.managementPct)})`, -f.management)}${f.platform ? row(`App / plataforma (${fmt.pct1(st.platformPct)})`, -f.platform) : ""}
-        ${f.areaParticipation ? row(`Participação da área (${fmt.pct1(f.areaSharePct)})`, -f.areaParticipation) : ""}${f.ubyRoyalty ? row(`Royalty de marca UBY (${fmt.pct1(st.ubyRoyaltyPct)})`, -f.ubyRoyalty) : ""}
+        ${row(`Gestão P3 (${fmt.pct1(st.managementPct)}${model === "third_party_management" || model === "management_only" ? " do líquido" : ""})`, -f.management)}${f.platform ? row(`App / plataforma (${fmt.pct1(st.platformPct)})`, -f.platform) : ""}
+        ${f.areaParticipation ? row(`Participação da área (${fmt.pct1(f.areaSharePct)})`, -f.areaParticipation) : ""}${f.ubyRoyalty ? row(`Royalty de marca UBY (${fmt.pct1(st.ubyRoyaltyPct)} do líquido)`, -f.ubyRoyalty) : ""}
         ${row("Resultado operacional do ponto", f.operationNet, "t")}
         <tr class="g"><td colspan="2">Destinação</td></tr>
         ${(dest[model] || dest.uby)()}

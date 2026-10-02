@@ -15,6 +15,9 @@
     matrixCents     rateio da matriz fecha ao centavo
     powerPerCharger peso "por potência" divide a potência do local
     lossCarry       prejuízo é compensado antes de distribuir
+    partnerNetBase  parceria (gestão de terceiro / só gestão): gestão P3 e
+                    royalty UBY sobre o repasse líquido (já sem a plataforma);
+                    nos carregadores UBY continuam sobre o bruto (02/10/2026)
 
   Com todas as chaves desligadas (FIXES_OFF) o resultado é idêntico ao da
   plataforma original — é o que a auditoria compara centavo a centavo.
@@ -22,7 +25,7 @@
 (function (global) {
   "use strict";
 
-  const FIXES = Object.freeze(["aggregation", "zeroSaleMonths", "hybridMarketing", "courtesyInvoice", "monthScope", "matrixCents", "powerPerCharger", "lossCarry"]);
+  const FIXES = Object.freeze(["aggregation", "zeroSaleMonths", "hybridMarketing", "courtesyInvoice", "monthScope", "matrixCents", "powerPerCharger", "lossCarry", "partnerNetBase"]);
   const FIXES_ON = Object.freeze(Object.fromEntries(FIXES.map(k => [k, true])));
   const FIXES_OFF = Object.freeze(Object.fromEntries(FIXES.map(k => [k, false])));
 
@@ -156,7 +159,9 @@
     const commercialEnergy = courtesy.treatment === "partner_absorbed" ? num(courtesy.commercialEnergy) : energy;
 
     const platform = revenue * num(cfg.platformPct) / 100;
-    const ubyRoyalty = model === "third_party_management" ? revenue * num(cfg.ubyRoyaltyPct) / 100 : 0;
+    // Parceria: a Spott retém a plataforma antes de repassar; gestão e royalty incidem sobre o líquido.
+    const feesOnNet = !!fixes.partnerNetBase && (model === "third_party_management" || model === "management_only");
+    const ubyRoyalty = model === "third_party_management" ? (feesOnNet ? revenue - platform : revenue) * num(cfg.ubyRoyaltyPct) / 100 : 0;
     const taxes = revenue * num(cfg.taxRatePct) / 100;
     // Com faturas por período de leitura, a energia da competência vem delas
     // (parte das faturas + estimativa dos dias ainda sem fatura).
@@ -187,7 +192,7 @@
     const extraCosts = localExtraCosts + matrizCost;
 
     const totalRevenue = revenue + extraRevenue + marketingRevenue;
-    const management = totalRevenue * num(cfg.managementPct) / 100;
+    const management = (feesOnNet ? totalRevenue - platform : totalRevenue) * num(cfg.managementPct) / 100;
     const costs = energyCost + extraCosts + taxes;
     const preAreaNet = totalRevenue - management - platform - ubyRoyalty - costs;
     const areaEligible = model === "uby" || model === "hybrid";
@@ -240,7 +245,7 @@
       monthKey: input.monthKey || "", operationModel: model,
       revenue, chargingRevenue: revenue, energy, commercialEnergy, acRevenue, dcRevenue,
       extraRevenue, marketingRevenue, totalRevenue,
-      management, platform, ubyRoyalty, taxes, energyCost, energyComposition: comp, courtesyInvoiceExcluded,
+      management, platform, ubyRoyalty, feesOnNet, taxes, energyCost, energyComposition: comp, courtesyInvoiceExcluded,
       localExtraCosts, matrizCost, matrizTaxCost, matrizCash, extraCosts, areaSharePct, areaParticipation, areaParticipationCalc,
       preAreaNet, operationNet, acNet, dcNet, unknownNet,
       ubyNet, p3SocietyProfit, p3AcEquity: model === "hybrid" ? acNet * num(cfg.p3AcEquityPct) / 100 : 0, p3DcEquity: model === "hybrid" ? dcNet * num(cfg.p3DcEquityPct) / 100 : 0,
