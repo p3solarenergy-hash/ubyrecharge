@@ -468,9 +468,18 @@
   }
 
   // Serie diaria com a mesma regra de dailyOperationalRows (falhas separadas).
+  // Faturamento e energia do dia = soma de todas as linhas das planilhas (inclusive a
+  // falha que cobrou algo), igual ao financeiro; recargas e clientes seguem só as válidas.
   function dailySeries(charges, history = charges) {
+    const sums = {};
+    charges.forEach(c => {
+      if (!(c.startDate instanceof Date) || Number.isNaN(c.startDate.getTime())) return;
+      const k = chargeDayKeyFromDate(c.startDate);
+      const x = sums[k] || (sums[k] = { revenue: 0, energy: 0 });
+      x.revenue += Number(c.revenue || 0); x.energy += Number(c.energyKWh || 0);
+    });
     return dailyOperationalRows(charges, history).map(row => ({
-      key: row.key, label: row.label, date: iso(row.date), revenue: row.revenue, energy: row.energy,
+      key: row.key, label: row.label, date: iso(row.date), revenue: sums[row.key]?.revenue || 0, energy: sums[row.key]?.energy || 0,
       sessions: row.count, clients: row.clientCount, newClients: row.newClientCount, failures: row.failed
     }));
   }
