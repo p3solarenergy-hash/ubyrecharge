@@ -2260,8 +2260,94 @@
       return { key: k, label: monthLabel(k), members: byMember, revenue: sum("revenue"), result: sum("result"), cost: sum("cost"), energy: sum("energy"),
         sessions: sm.clean.executed.length, clients: sm.clients };
     });
+    // ---- Detalhes do painel (02/10/2026): comparação, projeção, dia a dia, horários,
+    // dias da semana, clientes do local, falhas e destino do faturamento.
+    const okD = d => d instanceof Date && !Number.isNaN(d.getTime());
+    const ymdOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    // "Agora" = fim do último dia com recarga importada na rede (planilhas chegam com atraso);
+    // assim o dia ainda sem importação não aparece zerado nem derruba a projeção.
+    const clock = new Date();
+    const lastImported = getUbyChargerRows(getGeneralUnitData()).flatMap(r => r.charges || []).reduce((a, c) => okD(c.startDate) && (!a || c.startDate > a) ? c.startDate : a, null);
+    const now = lastImported ? new Date(Math.min(clock.getTime(), new Date(lastImported.getFullYear(), lastImported.getMonth(), lastImported.getDate() + 1).getTime())) : clock;
+    const live = !!mk && isCurrentMonthKey(mk);
+    const inMk = c => okD(c.startDate) && chargeMonthKey(c) === mk;
+    const memberInfo = members.map(m => ({ kind: m.kind, power: n0(workPowerById(m.workId)), config: stationAvailabilityFor(m.workId, m.station, m.workName),
+      first: m.charges.filter(c => okD(c.startDate)).reduce((a, c) => !a || c.startDate < a ? c.startDate : a, null) }));
+    const sumOps = list => { const v = list.filter(isExecutedCharge); return { revenue: sumBy(list, c => c.revenue), energy: sumBy(list, c => c.energyKWh), sessions: v.length,
+      clients: new Set(v.map(clientKeyFromCharge).filter(Boolean)).size }; };
+
+    // Mesmo período do mês anterior (até o mesmo dia/hora quando o mês está em andamento).
+    let compare = null;
+    if (mk) {
+      const [y, m] = mk.split("-").map(Number);
+      const lastDay = live ? new Date(now.getTime() - 1).getDate() : daysInMonth(y, m);
+      const pStart = new Date(y, m - 2, 1);
+      const pEnd = live ? new Date(y, m - 2, Math.min(now.getDate(), daysInMonth(pStart.getFullYear(), pStart.getMonth() + 1)), now.getHours(), now.getMinutes()) : new Date(y, m - 1, 1);
+      const prevList = members.flatMap(x => x.charges.filter(c => okD(c.startDate) && c.startDate >= pStart && c.startDate < pEnd));
+      if (prevList.length) compare = { label: live ? `1º a ${lastDay} de ${monthLabel(ymdOf(pStart).slice(0, 7))}` : monthLabel(ymdOf(pStart).slice(0, 7)), ...sumOps(prevList),
+        perMember: members.map(x => sumOps(x.charges.filter(c => okD(c.startDate) && c.startDate >= pStart && c.startDate < pEnd))) };
+    }
+    // Projeção do mês em andamento pelo ritmo dos dias já passados.
+    let projection = null;
+    if (live) {
+      const [y, m] = mk.split("-").map(Number);
+      const elapsed = (now - new Date(y, m - 1, 1)) / 86400000, dim = daysInMonth(y, m);
+      const cur = sumOps(combinedCharges);
+      if (elapsed > 0.5) projection = { revenue: cur.revenue / elapsed * dim, sessions: cur.sessions / elapsed * dim, energy: cur.energy / elapsed * dim, elapsedDays: elapsed, days: dim };
+    }
+    // Dia a dia do mês: faturamento de cada carregador e ocupação conjunta.
+    const daily = [];
+    if (mk) {
+      const [y, m] = mk.split("-").map(Number);
+      for (let d = 1; d <= daysInMonth(y, m); d++) {
+        const a = new Date(y, m - 1, d), b = new Date(y, m - 1, d + 1);
+        if (a >= now) break;
+        const end = b > now ? now : b;
+        const per = members.map((x, i) => {
+          const list = x.charges.filter(c => okD(c.startDate) && c.startDate >= a && c.startDate < b);
+          const info = memberInfo[i];
+          const cap = info.first && info.first < end ? info.power * stationAvailableHours(info.config, a < info.first ? new Date(info.first.getFullYear(), info.first.getMonth(), info.first.getDate()) : a, end) : 0;
+          return { ...sumOps(list), failures: list.filter(isFailedCharge).length, cap };
+        });
+        const energy = per.reduce((s, x) => s + x.energy, 0), cap = per.reduce((s, x) => s + x.cap, 0);
+        daily.push({ key: ymdOf(a), day: d, weekday: a.getDay(), members: per.map(x => ({ revenue: x.revenue, energy: x.energy, sessions: x.sessions, occ: x.cap > 0 ? x.energy / x.cap * 100 : 0 })),
+          revenue: per.reduce((s, x) => s + x.revenue, 0), energy, sessions: per.reduce((s, x) => s + x.sessions, 0), occ: cap > 0 ? energy / cap * 100 : 0 });
+      }
+    }
+    // Horário de início das recargas válidas e dias da semana (período escolhido).
+    const hourly = Array.from({ length: 24 }, (_, h) => ({ hour: h, members: members.map(() => ({ sessions: 0, revenue: 0 })) }));
+    const weekday = [1, 2, 3, 4, 5, 6, 0].map(w => ({ weekday: w, label: ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][w], days: new Set(), members: members.map(() => ({ sessions: 0, revenue: 0, energy: 0 })) }));
+    members.forEach((x, i) => x.charges.filter(c => inPeriod(c) && okD(c.startDate)).forEach(c => {
+      const wd = weekday.find(w => w.weekday === c.startDate.getDay());
+      wd.days.add(ymdOf(c.startDate));
+      wd.members[i].revenue += n0(c.revenue); wd.members[i].energy += n0(c.energyKWh);
+      if (!isExecutedCharge(c)) return;
+      hourly[c.startDate.getHours()].members[i].sessions += 1; hourly[c.startDate.getHours()].members[i].revenue += n0(c.revenue);
+      wd.members[i].sessions += 1;
+    }));
+    // Clientes do local no período: quem carregou, em qual carregador, e quem é novo no local.
+    const firstAtPlace = {};
+    members.flatMap(x => x.charges).filter(c => isExecutedCharge(c) && okD(c.startDate)).forEach(c => {
+      const k = clientKeyFromCharge(c); if (k && (!firstAtPlace[k] || c.startDate < firstAtPlace[k])) firstAtPlace[k] = c.startDate;
+    });
+    const periodStart = mk ? new Date(Number(mk.slice(0, 4)), Number(mk.slice(5, 7)) - 1, 1) : null;
+    const byClient = {};
+    members.forEach((x, i) => x.charges.filter(inPeriod).forEach(c => {
+      const k = clientKeyFromCharge(c); if (!k) return;
+      const u = byClient[k] || (byClient[k] = { name: c.userName || c.userEmail || "Cliente", email: c.userEmail || "", phone: c.userPhone || "", revenue: 0, energy: 0, sessions: 0, last: null, per: members.map(() => 0) });
+      u.revenue += n0(c.revenue); u.energy += n0(c.energyKWh);
+      if (isExecutedCharge(c)) { u.sessions += 1; u.per[i] += 1; }
+      if (okD(c.startDate) && (!u.last || c.startDate > u.last)) u.last = c.startDate;
+    }));
+    const clientList = Object.entries(byClient).filter(([, u]) => u.sessions > 0 || u.revenue > 0).map(([k, u]) => ({ ...u, last: iso(u.last), both: u.per.filter(n => n > 0).length > 1,
+      isNew: !!(periodStart && firstAtPlace[k] && firstAtPlace[k] >= periodStart), recurring: u.sessions > 1 })).sort((a, b) => b.revenue - a.revenue);
+    const health = members.map(x => { const list = x.charges.filter(inPeriod); const f = list.filter(isFailedCharge).length; return { kind: x.kind, attempts: list.length, failures: f, rate: list.length ? f / list.length * 100 : 0 }; });
+
     return {
       places: all.map(p => ({ key: p.key, label: p.label, members: p.members })),
+      live, compare, projection, daily, hourly, weekday: weekday.map(w => ({ ...w, days: w.days.size })), health,
+      clients: { list: clientList.slice(0, 20), total: clientList.length, newCount: clientList.filter(c => c.isNew).length, both: clientList.filter(c => c.both).length,
+        recurring: clientList.filter(c => c.recurring).length, top5Share: clientList.length ? clientList.slice(0, 5).reduce((s, c) => s + c.revenue, 0) / Math.max(clientList.reduce((s, c) => s + c.revenue, 0), 0.01) * 100 : 0 },
       place: { key: place.key, label: place.label }, monthKey: mk, label: mk ? monthLabel(mk) : "Acumulado", months: months.map(k => ({ key: k, label: monthLabel(k) })),
       members: per.map(p => ({ workId: p.workId, station: p.station, workName: p.workName, kind: p.kind, ops: p.ops, fin: p.fin, clients: p.keys.size })),
       total: { ops: ops(combinedCharges, members.map(m => m.row)), fin, sharedClients: shared },
