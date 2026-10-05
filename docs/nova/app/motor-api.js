@@ -2334,20 +2334,23 @@
     const byClient = {};
     members.forEach((x, i) => x.charges.filter(inPeriod).forEach(c => {
       const k = clientKeyFromCharge(c); if (!k) return;
-      const u = byClient[k] || (byClient[k] = { name: c.userName || c.userEmail || "Cliente", email: c.userEmail || "", phone: c.userPhone || "", revenue: 0, energy: 0, sessions: 0, last: null, per: members.map(() => 0) });
+      const u = byClient[k] || (byClient[k] = { name: c.userName || c.userEmail || "Cliente", email: c.userEmail || "", phone: c.userPhone || "", revenue: 0, energy: 0, sessions: 0, idle: 0, idleCount: 0, hours: 0, last: null, per: members.map(() => 0) });
       u.revenue += n0(c.revenue); u.energy += n0(c.energyKWh);
-      if (isExecutedCharge(c)) { u.sessions += 1; u.per[i] += 1; }
+      if (n0(c.idleValue) > 0) { u.idle += n0(c.idleValue); u.idleCount += 1; }
+      if (isExecutedCharge(c)) { u.sessions += 1; u.per[i] += 1; u.hours += durToHours(c.duration) || 0; }
       if (okD(c.startDate) && (!u.last || c.startDate > u.last)) u.last = c.startDate;
     }));
-    const clientList = Object.entries(byClient).filter(([, u]) => u.sessions > 0 || u.revenue > 0).map(([k, u]) => ({ ...u, last: iso(u.last), both: u.per.filter(n => n > 0).length > 1,
+    const clientList = Object.entries(byClient).filter(([, u]) => u.sessions > 0 || u.revenue > 0).map(([k, u]) => ({ ...u, last: iso(u.last),
+      perKwh: u.energy > 0 ? u.revenue / u.energy : 0, ticket: u.sessions ? u.revenue / u.sessions : 0, avgHours: u.sessions ? u.hours / u.sessions : 0, both: u.per.filter(n => n > 0).length > 1,
       isNew: !!(periodStart && firstAtPlace[k] && firstAtPlace[k] >= periodStart), recurring: u.sessions > 1 })).sort((a, b) => b.revenue - a.revenue);
     const health = members.map(x => { const list = x.charges.filter(inPeriod); const f = list.filter(isFailedCharge).length; return { kind: x.kind, attempts: list.length, failures: f, rate: list.length ? f / list.length * 100 : 0 }; });
 
     return {
       places: all.map(p => ({ key: p.key, label: p.label, members: p.members })),
       live, compare, projection, daily, hourly, weekday: weekday.map(w => ({ ...w, days: w.days.size })), health,
-      clients: { list: clientList.slice(0, 20), total: clientList.length, newCount: clientList.filter(c => c.isNew).length, both: clientList.filter(c => c.both).length,
-        recurring: clientList.filter(c => c.recurring).length, top5Share: clientList.length ? clientList.slice(0, 5).reduce((s, c) => s + c.revenue, 0) / Math.max(clientList.reduce((s, c) => s + c.revenue, 0), 0.01) * 100 : 0 },
+      clients: { list: clientList.slice(0, 60), total: clientList.length, newCount: clientList.filter(c => c.isNew).length, both: clientList.filter(c => c.both).length,
+        recurring: clientList.filter(c => c.recurring).length, idle: clientList.reduce((a, c2) => a + c2.idle, 0), idleClients: clientList.filter(c2 => c2.idle > 0).length,
+        perKwh: (() => { const e = clientList.reduce((a, c2) => a + c2.energy, 0); return e > 0 ? clientList.reduce((a, c2) => a + c2.revenue, 0) / e : 0; })(), top5Share: clientList.length ? clientList.slice(0, 5).reduce((s, c) => s + c.revenue, 0) / Math.max(clientList.reduce((s, c) => s + c.revenue, 0), 0.01) * 100 : 0 },
       place: { key: place.key, label: place.label }, monthKey: mk, label: mk ? monthLabel(mk) : "Acumulado", months: months.map(k => ({ key: k, label: monthLabel(k) })),
       members: per.map(p => ({ workId: p.workId, station: p.station, workName: p.workName, kind: p.kind, ops: p.ops, fin: p.fin, clients: p.keys.size })),
       total: { ops: ops(combinedCharges, members.map(m => m.row)), fin, sharedClients: shared },

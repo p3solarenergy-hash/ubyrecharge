@@ -18,6 +18,7 @@
   const masked = () => { try { return localStorage.getItem("uby-nova-mask") === "1"; } catch (_) { return false; } };
   const who = name => masked() ? String(name || "").split(/\s+/).map(p => p ? p[0] + "•••" : "").join(" ") : esc(name);
   const short = st => esc(String(st || "").replace(/^UBY RECHARGE\s*-\s*/i, ""));
+  const hm = h => !(h > 0) ? "—" : `${Math.floor(h)}h${String(Math.round((h % 1) * 60)).padStart(2, "0")}`;
   const hhmm = d => d ? new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
 
   // Curva suave hora a hora (mesmo desenho do Resultado do dia no Comando).
@@ -238,17 +239,23 @@
           <div class="chart-box"><canvas id="chPlace"></canvas></div></section>
       </div>
 
-      <section class="section"><div class="section-head"><div><p class="kicker">Clientes do local · ${esc(v.label)}</p><h2>Quem carrega no ${esc(v.place.label)}</h2><p>Recargas válidas em cada carregador. "Novo" = primeira recarga no local neste período.</p></div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Clientes do local · ${esc(v.label)}</p><h2>Quem carrega no ${esc(v.place.label)}</h2><p>Recargas válidas em cada carregador. R$/kWh acima da média do local fica destacado: costuma ser ociosidade (carro parado depois de carregar). "Novo" = primeira recarga no local neste período.</p></div>
           <div class="meta"><a href="#/clientes/ranking">Ranking completo →</a></div></div>
-        <div class="grid g4" style="margin-bottom:12px">
+        <div class="grid g6" style="margin-bottom:12px">
           ${kpi("Clientes no período", fmt.int(c.total), `${fmt.int(c.recurring)} voltaram mais de uma vez`, "", "lead")}
+          ${kpi("R$/kWh médio do local", perKwh(c.perKwh), "faturamento ÷ energia de todos os clientes")}
+          ${kpi("Ociosidade cobrada", fmt.brl(c.idle || 0), c.idleClients ? `${fmt.int(c.idleClients)} cliente(s) pagaram` : "ninguém pagou no período", "", c.idle > 0 ? "warn" : "")}
           ${kpi("Novos no local", fmt.int(c.newCount), "primeira recarga aqui")}
           ${kpi("Usaram AC e DC", fmt.int(c.both), "complementaridade")}
           ${kpi("Peso dos 5 maiores", fmt.pct1(c.top5Share), "do faturamento do local")}
         </div>
-        <div class="table-wrap" style="max-height:520px"><table><thead><tr><th>#</th><th>Cliente</th>${v.members.map((m, i) => `<th class="num"><span style="color:${colors[i]}">●</span> ${esc(m.kind)}</th>`).join("")}<th class="num">Energia</th><th class="num">Faturamento</th><th>Última</th></tr></thead>
+        <div class="table-wrap" style="max-height:520px"><table><thead><tr><th>#</th><th>Cliente</th>${v.members.map((m, i) => `<th class="num"><span style="color:${colors[i]}">●</span> ${esc(m.kind)}</th>`).join("")}<th class="num">Recargas</th><th class="num">Energia</th><th class="num">kWh/recarga</th><th class="num">Tempo médio</th><th class="num">R$/kWh</th><th class="num">Ociosidade</th><th class="num">Faturamento</th><th>Última</th></tr></thead>
           <tbody>${c.list.map((x, i) => `<tr><td>${i + 1}</td><td><strong>${who(x.name)}</strong> ${x.isNew ? '<span class="badge ok">novo</span>' : ""}${x.both ? ' <span class="badge neutral">AC + DC</span>' : ""}</td>
-            ${x.per.map(n => `<td class="num">${n || "—"}</td>`).join("")}<td class="num">${fmt.kwh(x.energy)}</td><td class="num"><strong>${fmt.brl(x.revenue)}</strong></td><td>${fmt.dt(x.last)}</td></tr>`).join("") || `<tr><td colspan="${v.members.length + 5}" class="empty">Sem clientes no período.</td></tr>`}</tbody></table></div>
+            ${x.per.map(n => `<td class="num">${n || "—"}</td>`).join("")}<td class="num"><strong>${fmt.int(x.sessions)}</strong></td><td class="num">${fmt.kwh(x.energy)}</td>
+            <td class="num">${x.sessions ? `${fmt.n1(x.energy / x.sessions)} kWh` : "—"}</td><td class="num">${hm(x.avgHours)}</td>
+            <td class="num"${x.perKwh > c.perKwh * 1.15 ? ' style="color:var(--uby-amber,#b98527);font-weight:800" title="Acima da média do local: pode ser ociosidade"' : ""}>${x.energy > 0 ? fmt.brl(x.perKwh) : "—"}</td>
+            <td class="num">${x.idle > 0 ? `<strong style="color:var(--uby-amber,#b98527)">${fmt.brl(x.idle)}</strong><small>${fmt.int(x.idleCount)}×</small>` : "—"}</td>
+            <td class="num"><strong>${fmt.brl(x.revenue)}</strong></td><td>${fmt.dt(x.last)}</td></tr>`).join("") || `<tr><td colspan="${v.members.length + 10}" class="empty">Sem clientes no período.</td></tr>`}</tbody></table></div>
         ${c.total > c.list.length ? `<p class="meta" style="margin-top:8px">Mostrando os ${c.list.length} maiores de ${c.total}.</p>` : ""}
       </section>
 
