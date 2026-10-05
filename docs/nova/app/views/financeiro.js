@@ -90,7 +90,7 @@
           ${line(go("App / plataforma", edit("carregador", "platformPct")), `${fmt.brl(f.platform)}${pct(f.platform)}`, "só sobre recargas e ociosidade")}
           ${f.ubyRoyalty ? line(go("Royalty UBY", edit("carregador", "ubyRoyaltyPct")), `${fmt.brl(f.ubyRoyalty)}${pct(f.ubyRoyalty)}`, "uso da marca · sobre o líquido (faturamento − plataforma)") : ""}
           ${line(go("Repasse da área", edit("carregador", AREA)), `${fmt.brl(f.areaParticipation)}${pct(f.areaParticipation)}`, f.areaSharePct ? `${fmt.pct1(f.areaSharePct)} do faturamento total` : "")}
-          ${f.taxes ? line(go("Impostos", edit("carregador", "taxRatePct")), `${fmt.brl(f.taxes)}${pct(f.taxes)}`, st.taxRatePct ? `${fmt.pct1(st.taxRatePct)} do faturamento` : "") : ""}
+          ${f.taxes ? line(go("Impostos", st.taxRatePct ? edit("carregador", "taxRatePct") : "#/parametros/cotas"), `${fmt.brl(f.taxes)}${pct(f.taxes)}`, `${(f.revenue ? f.taxes / f.revenue * 100 : st.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do faturamento${st.taxRatePct ? "" : " · alíquota central da UBY"}`) : ""}
           </tbody><tfoot><tr><td>Custo total</td><td class="num">${fmt.brl(f.totalOperatingCost)}</td></tr><tr><td>= ${partner ? "Resultado do parceiro" : "Resultado operacional"}</td><td class="num">${signed(f.operationNet)}</td></tr></tfoot>
         </table></div></section>
         <section class="section"><div class="section-head"><div><p class="kicker">Economia da unidade</p><h2>Preço, custos e margem</h2><p>Valores oficiais da competência. "Por kWh" = valor ÷ ${fmt.kwh(kwhSold)} vendidos.</p></div></div>
@@ -333,7 +333,7 @@
           ${group("Custos reconhecidos na rede")}
           ${cost("Energia", d.energyCost, "Fatura de energia vinculada às recargas dos ativos UBY.", "#/parametros/energia")}
           ${cost("Operação direta por ativo", d.directOperation, "Despesas próprias dos carregadores, sem tributos e sem rateio da matriz.", "#/parametros/carregador")}
-          ${cost("Tributos atribuíveis aos carregadores", d.taxes, "Impostos cadastrados na unidade.", "#/parametros/carregador")}
+          ${cost(`Impostos sobre o faturamento${d.taxRatePct ? ` (${Number(d.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%)` : ""}`, d.taxes, "Alíquota central da UBY (Parâmetros → Cotas, impostos e rodadas) sobre o faturamento de cada carregador próprio.", "#/parametros/cotas")}
           ${cost("Tributos corporativos centralizados", d.matrizTaxCost, "Impostos da matriz, distribuídos entre os destinos do rateio.", matrizHref)}
           ${cost("Demais custos centralizados da matriz", d.otherMatriz, "Seguro, aluguel, sistemas e outros custos compartilhados.", matrizHref)}
           ${cost("Gestão P3", d.management, "Percentual sobre o faturamento total conforme contrato.", "#/parametros/carregador")}
@@ -343,7 +343,7 @@
           ${group("Resultado final da rede")}
           ${line("Resultado operacional UBY", d.operationalResult)}
           ${line("+ Royalties UBY", d.royalties)}
-          ${line(`− Impostos sobre o faturamento${d.taxRatePct ? ` (${fmt.pct1(d.taxRatePct)} ou valor lançado)` : ""}`, d.networkTaxes || 0, d.networkTaxes ? `base: ${fmt.brl(d.networkTaxBase || 0)} faturados pela UBY no período` : "ainda não lançados — cadastre em Parâmetros e custos → Cotas, impostos e rodadas")}
+          ${line("− Impostos sobre royalties e ajuste da guia", d.networkTaxes || 0, d.taxesTotal ? `impostos do período: ${fmt.brl(d.taxesTotal)} sobre ${fmt.brl(d.networkTaxBase || 0)} faturados pela UBY (a maior parte já saiu de cada carregador)` : "ainda não lançados — cadastre em Parâmetros e custos → Cotas, impostos e rodadas")}
           </tbody><tfoot><tr><td>= Resultado consolidado antes da distribuição</td><td class="num">${signed(d.networkResult)}</td></tr></tfoot><tbody>
           ${group("Destinação do resultado")}
           ${d.lossCarried ? line("Prejuízo de meses anteriores compensado", d.lossCarried, "o lucro só é distribuído depois de cobrir prejuízos acumulados") : ""}
@@ -357,7 +357,7 @@
             ${mini("Cotas emitidas", fmt.int(p.totalQuotas))}${mini("Cotas vendidas", fmt.int(p.soldQuotas))}
             ${mini("% cotistas", fmt.pct1(p.investorPct))}${mini("% reserva legal S.A.", fmt.pct1(p.legalReservePct))}
             ${mini("% fundo expansão", fmt.pct1(p.expansionReservePct))}${mini("Valor por cota", fmt.brl(d.perQuota), "no período")}
-            ${mini("Impostos sobre faturamento", p.taxRatePct ? fmt.pct1(p.taxRatePct) : "—", p.taxRatePct ? "ou valor lançado no mês" : "não cadastrado")}${mini("Impostos no período", fmt.brl(d.networkTaxes || 0))}
+            ${mini("Impostos sobre faturamento", p.taxRatePct ? `${Number(p.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : "—", p.taxRatePct ? "ou valor lançado no mês" : "não cadastrado")}${mini("Impostos no período", fmt.brl(d.taxesTotal || 0))}
           </div>
           <div class="note" style="margin-top:12px">Prévia gerencial: confirme documentos, impostos e aprovação do fechamento antes de pagar ou contabilizar distribuição.</div>
         </section>

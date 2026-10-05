@@ -289,7 +289,7 @@
     // 3. Impostos
     safe(() => {
       const d = UBY.data("finance", mk).dre;
-      if (!(d.networkTaxes > 0)) add("Impostos", "bad", "Impostos do mês não lançados", `Faturamento de ${fmt.brl(d.networkRevenue)} e imposto R$ 0,00: o pool dos cotistas sai maior do que deveria.`, "#/parametros/cotas", "Lançar impostos");
+      if (!(d.taxesTotal > 0)) add("Impostos", "bad", "Impostos do mês não lançados", `Faturamento de ${fmt.brl(d.networkRevenue)} e imposto R$ 0,00: o pool dos cotistas sai maior do que deveria.`, "#/parametros/cotas", "Lançar impostos");
     });
     // 4. Custos da matriz sem destino
     safe(() => {
@@ -1083,7 +1083,7 @@
     const p = w.loadNetworkDistribution();
     const e = ui.policyEdits || (ui.policyEdits = JSON.parse(JSON.stringify({
       quotaValue: p.quotaValue || window.UBY_CONFIG.quotaValueDefault, distributionStartMonth: p.distributionStartMonth || window.UBY_CONFIG.distributionStartDefault, legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct,
-      investorPct: p.investorPct, totalQuotas: p.totalQuotas, soldQuotas: p.soldQuotas, roundLabel: p.roundLabel, taxRatePct: p.taxRatePct || 0, taxByMonth: { ...(p.taxByMonth || {}) },
+      investorPct: p.investorPct, totalQuotas: p.totalQuotas, soldQuotas: p.soldQuotas, roundLabel: p.roundLabel, taxRatePct: p.taxRatePct || 0, taxRateFrom: { ...(p.taxRateFrom || {}) }, taxByMonth: { ...(p.taxByMonth || {}) },
       investors: (p.investors || []).map(i => {
         const qv = Number(i.quotaValue) || Number(p.quotaValue) || window.UBY_CONFIG.quotaValueDefault;
         return { ...i, quotaValue: qv, investedAt: i.investedAt || (i.eligibleFrom ? `${i.eligibleFrom}-01` : ""), investment: Number(i.investment) || Math.round(Number(i.quotas || 0) * qv * 100) / 100 };
@@ -1104,6 +1104,11 @@
       </section>
       <section class="section"><div class="section-head"><div><p class="kicker">Impostos da UBY</p><h2>Impostos sobre o faturamento</h2><p>Incidem sobre tudo o que a UBY faturou no mês (recargas e receitas dos ativos próprios + royalties) e saem do resultado antes das reservas e dos cotistas. Use o percentual e, quando a guia sair, lance o valor exato do mês — ele substitui o percentual naquela competência.</p></div></div>
         <div class="grid g4" style="gap:8px">${inp("taxRatePct", "Alíquota sobre o faturamento (%)", "number", 'min="0" max="100" step="0.01"')}</div>
+        <p class="meta" style="margin:10px 0 6px">A alíquota sai do resultado de cada carregador próprio da UBY (e dos relatórios). Quando ela mudar, cadastre a nova "a partir de" um mês: os meses anteriores continuam com a antiga.</p>
+        <div class="table-wrap"><table><thead><tr><th>A partir de</th><th class="num">Nova alíquota (%)</th><th></th></tr></thead><tbody>
+          ${Object.keys(e.taxRateFrom || {}).sort().map(k => `<tr><td>${esc(UBY.state.api?.monthName?.(k) || k)}</td><td class="num"><input class="select" type="number" min="0" max="100" step="0.01" data-tax-from="${esc(k)}" value="${esc(e.taxRateFrom[k])}" style="width:120px"></td><td><button class="btn" type="button" data-tax-from-del="${esc(k)}">Remover</button></td></tr>`).join("")}
+          <tr><td><input class="select" type="month" id="pmTaxFromMonth"></td><td class="num"><input class="select" type="number" min="0" max="100" step="0.01" id="pmTaxFromPct" placeholder="%" style="width:120px"></td><td><button class="btn" type="button" id="pmTaxFromAdd">＋ Adicionar mudança</button></td></tr>
+        </tbody></table></div>
         <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Competência</th><th class="num">Valor exato do imposto (R$)</th><th>Uso</th></tr></thead>
           <tbody>${(UBY.state.months || []).slice().reverse().map(mk => { const v = e.taxByMonth[mk]; return `<tr><td>${esc(UBY.state.api?.monthName?.(mk) || mk)}</td><td class="num"><input class="select" type="number" min="0" step="0.01" data-tax-month="${esc(mk)}" value="${v === undefined ? "" : esc(v)}" placeholder="usar ${esc(e.taxRatePct || 0)}%" style="width:150px"></td><td><small>${v === undefined ? `alíquota de ${esc(e.taxRatePct || 0)}%` : "valor lançado"}</small></td></tr>`; }).join("")}</tbody></table></div>
       </section>
@@ -1746,6 +1751,9 @@
     });
     // --- cotas ---
     target.querySelectorAll("[data-pol]").forEach(el => el.onchange = () => { const k = el.dataset.pol; ui.policyEdits[k] = ["roundLabel", "distributionStartMonth"].includes(k) ? el.value : Number(el.value || 0); draw(target, w); });
+    target.querySelectorAll("[data-tax-from]").forEach(el => el.onchange = () => { ui.policyEdits.taxRateFrom[el.dataset.taxFrom] = Math.max(0, Number(el.value || 0)); draw(target, w); });
+    target.querySelectorAll("[data-tax-from-del]").forEach(b => b.onclick = () => { delete ui.policyEdits.taxRateFrom[b.dataset.taxFromDel]; draw(target, w); });
+    if ($("#pmTaxFromAdd")) $("#pmTaxFromAdd").onclick = () => { const m = $("#pmTaxFromMonth").value, v = $("#pmTaxFromPct").value; if (!/^\d{4}-\d{2}$/.test(m) || v === "") return alert("Informe o mês e a nova alíquota."); ui.policyEdits.taxRateFrom[m] = Math.max(0, Number(v)); draw(target, w); };
     target.querySelectorAll("[data-tax-month]").forEach(el => el.onchange = () => { const k = el.dataset.taxMonth; if (el.value === "") delete ui.policyEdits.taxByMonth[k]; else ui.policyEdits.taxByMonth[k] = Math.max(0, Number(el.value)); draw(target, w); });
     target.querySelectorAll("[data-inv]").forEach(el => el.onchange = () => { const [i, k] = el.dataset.inv.split("|"); ui.policyEdits.investors[Number(i)][k] = k === "investment" ? Number(el.value || 0) : el.value; draw(target, w); });
     if ($("#pmInvAdd")) $("#pmInvAdd").onclick = () => { const qv = Number(ui.policyEdits.quotaValue) || window.UBY_CONFIG.quotaValueDefault; ui.policyEdits.investors.push({ name: "Novo cotista", investedAt: new Date().toISOString().slice(0, 10), investment: qv, quotaValue: qv, status: "pendente" }); draw(target, w); };
@@ -1758,7 +1766,7 @@
       const next = { ...current, ...ui.policyEdits, investors };
       const saved = w.saveNetworkDistribution(next);
       const fb = await awaitMatrixSave(w);
-      if (Number(saved.quotaValue) !== Number(next.quotaValue) || Number(saved.taxRatePct || 0) !== Number(next.taxRatePct || 0)) throw new Error("A política não foi aceita pela plataforma original (valor da cota ou impostos).");
+      if (Number(saved.quotaValue) !== Number(next.quotaValue) || Number(saved.taxRatePct || 0) !== Number(next.taxRatePct || 0) || JSON.stringify(saved.taxRateFrom || {}) !== JSON.stringify(next.taxRateFrom || {})) throw new Error("A política não foi aceita pela plataforma original (valor da cota ou impostos).");
       ui.policyEdits = null;
       return fb || "política salva na nuvem";
     });

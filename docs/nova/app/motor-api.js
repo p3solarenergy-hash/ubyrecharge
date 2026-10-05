@@ -758,7 +758,7 @@
         const status = scheduledPaymentStatus(item, mk);
         const amount = item.scheduledPayment ? Number(item.amount || 0) : matrizCashAmount(item, mk);
         return { id: item.id, kind: "matriz", costId: item.id, workId: target.targetCount === 1 ? target.workId : "", targetCount: target.targetCount, name: item.name, category: item.category, supplier: item.supplier || "", source: item.scheduledPayment ? "Pagamento programado" : "Custo da matriz",
-          station: target.station || "Carregador não identificado", workName: target.workName || (target.targetCount > 1 ? `rateado para ${target.targetCount} carregadores` : ""),
+          station: target.station || (item.scheduledPayment && !target.targetCount ? "Rede UBY · central" : "Carregador não identificado"), workName: target.workName || (target.targetCount > 1 ? `rateado para ${target.targetCount} carregadores` : ""),
           due: iso(scheduledPaymentDueDate(item, mk)), dueDay: item.dueDay, amount, status: status.key, statusLabel: status.label,
           paidAt: item.paymentLedger?.[mk]?.paidAt || "" };
       }).concat(energyPayments(mk), areaPayments(mk)).sort((a, b) => String(a.due).localeCompare(String(b.due)));
@@ -1388,7 +1388,8 @@
     matrixCents: "Rateio da matriz fechando ao centavo",
     powerPerCharger: "Peso por potência dividido no local",
     lossCarry: "Prejuízo compensado antes de distribuir",
-    partnerNetBase: "Parceria: gestão e royalty sobre o líquido da plataforma"
+    partnerNetBase: "Parceria: gestão e royalty sobre o líquido da plataforma",
+    centralTax: "Imposto central no resultado de cada carregador próprio"
   };
   const MONTH_SPECIFIC = ["energyCopelAmount", "energyCopelKWh", "energyLeaseCreditedKWh"];
 
@@ -1401,7 +1402,9 @@
     });
     let matrix = 0;
     try { matrix = (loadMatrizCosts() || []).length; } catch (_) {}
-    return `${Object.keys(allRechargeRecords || {}).length}|${charges}|${updated}|${matrix}`;
+    let tax = "";
+    try { const p = loadNetworkDistribution(); tax = JSON.stringify([p.taxRatePct, p.taxRateFrom, p.taxByMonth]); } catch (_) {}
+    return `${Object.keys(allRechargeRecords || {}).length}|${charges}|${updated}|${matrix}|${tax}`;
   }
   function fv2Ensure() {
     const stamp = fv2Stamp();
@@ -1582,6 +1585,8 @@
       }
     }
     const cfg = fv2Cfg(settings);
+    // Imposto central da UBY (11,33% até dez/2026 etc.) em cada carregador próprio, salvo alíquota própria.
+    if (fixes.centralTax && ["uby", "hybrid"].includes(cfg.operationModel) && !(n0(cfg.taxRatePct) > 0)) cfg.taxRatePct = taxRateFor(mk);
     const stationName = row.stationName || row.station;
     const courtesy = courtesyFinanceBreakdown(charges, stationAvailabilityFor(row.workId, stationName, row.workName), cfg.energyCostPerKWh);
     const planning = financePlanningContext(charges, mk, cfg, row.charges || [], workPowerById(row.workId));
@@ -1614,28 +1619,35 @@
     if (monthKey) return fixes.zeroSaleMonths ? (own[0] && monthKey >= own[0] ? [monthKey] : []) : [monthKey];
     return fixes.zeroSaleMonths ? FV2.months.filter(m => own[0] && m >= own[0]) : own;
   }
+  // Alíquota de impostos da UBY na competência: a última "a partir de" até o mês; senão a alíquota geral.
+  function taxRateFor(mk) {
+    const p = loadNetworkDistribution();
+    const from = p.taxRateFrom || {};
+    const key = Object.keys(from).filter(k => k <= mk).sort().pop();
+    return key ? n0(from[key]) : n0(p.taxRatePct);
+  }
   function fv2Policy() {
     const p = loadNetworkDistribution();
     return { legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct, investorPct: p.investorPct,
       quotaValue: p.quotaValue, distributionStartMonth: p.distributionStartMonth, investors: normalizeNetworkInvestors(p.investors),
-      taxRatePct: p.taxRatePct || 0, taxByMonth: p.taxByMonth || {}, paymentLedger: p.paymentLedger || {} };
+      taxRatePct: p.taxRatePct || 0, taxRateFrom: p.taxRateFrom || {}, taxByMonth: p.taxByMonth || {}, paymentLedger: p.paymentLedger || {} };
   }
   function fv2NetworkMonthly(fixes) {
     const included = FV2.rows.filter(r => r.included);
     return FV2.months.map(mk => {
-      let ownedNet = 0, royalties = 0, taxBase = 0;
+      let ownedNet = 0, royalties = 0, taxBase = 0, taxesApplied = 0;
       const rows = [];
       included.forEach(row => {
         const active = !!(rowFirstMonth(row) && mk >= rowFirstMonth(row));
         if (fixes.zeroSaleMonths && !active) return;
         const r = fv2Month(row, mk, fixes);
         const owned = r.operationModel === "uby" || r.operationModel === "hybrid";
-        if (owned) { ownedNet += r.operationNet; taxBase += r.totalRevenue; }
+        if (owned) { ownedNet += r.operationNet; taxBase += r.totalRevenue; if (fixes.centralTax) taxesApplied += n0(r.taxes); }
         else if (r.operationModel === "third_party_management") { royalties += r.ubyRoyalty; taxBase += r.ubyRoyalty; }
         if (owned || r.operationModel === "third_party_management") rows.push({ station: row.stationName, active, model: r.operationModel, revenue: r.revenue, energyCost: r.energyCost,
           localExtraCosts: r.localExtraCosts, matrizCost: r.matrizCost, taxes: r.taxes, operationNet: r.operationNet, royalty: r.ubyRoyalty, flags: r.flags });
       });
-      return { monthKey: mk, ownedNet, royalties, taxBase, rows };
+      return { monthKey: mk, ownedNet, royalties, taxBase, taxesApplied, taxPct: fixes.centralTax ? taxRateFor(mk) : undefined, rows };
     });
   }
 
@@ -1795,7 +1807,7 @@
       networkRevenue, energyCost: n0(owned.energyCost), directOperation: Math.max(0, n0(owned.extraCosts) - n0(owned.matrizCost)),
       taxes: n0(owned.taxes), matrizTaxCost: n0(owned.matrizTaxCost), otherMatriz: Math.max(0, n0(owned.matrizCost) - n0(owned.matrizTaxCost)), matrizCost: n0(owned.matrizCost),
       management: n0(owned.management), platform: n0(owned.platform), areaParticipation: n0(owned.areaParticipation),
-      networkTaxes, networkTaxBase: pick("taxBase"), taxRatePct: n0(policy.taxRatePct),
+      networkTaxes, networkTaxBase: pick("taxBase"), taxRatePct: isMonthView ? taxRateFor(mk) : n0(policy.taxRatePct), taxesTotal: n0(owned.taxes) + networkTaxes,
       operationalResult, networkResult, margin: networkRevenue ? networkResult / networkRevenue * 100 : 0,
       distributable: pick("distributable"), lossCarried: isMonthView ? n0(nm.carryIn) : n0(net.totals.carryOut),
       legalReserve, expansionReserve, reserve: legalReserve + expansionReserve, investorPool, soldQuotas, perQuota: soldQuotas > 0 ? investorPool / soldQuotas : 0,
@@ -1840,7 +1852,8 @@
     const months = idx.map(i => {
       const m = net.months[i];
       const eligibleQuotas = policy.investors.filter(inv => inv.eligibleFrom <= m.monthKey).reduce((s, inv) => s + n0(inv.quotas), 0);
-      return { key: m.monthKey, label: monthLabel(m.monthKey), taxBase: m.taxBase, taxes: m.taxes, taxSource: m.taxSource, preTax: m.preTax, result: m.result,
+      // preTax e taxes mostram o imposto inteiro do mês (o que saiu dos carregadores + o restante da rede).
+      return { key: m.monthKey, label: monthLabel(m.monthKey), taxBase: m.taxBase, taxes: n0(m.taxes) + n0(m.taxesApplied), taxSource: m.taxSource, preTax: m.preTax + n0(m.taxesApplied), result: m.result,
         carryIn: m.carryIn, carryOut: m.carryOut, distributable: m.distributable, legalReserve: m.legalReserve, expansionReserve: m.expansionReserve,
         investorPool: m.investorPool, eligibleQuotas, perQuota: eligibleQuotas && m.investorPool > 0 ? m.investorPool / eligibleQuotas : 0,
         status: policy.paymentLedger?.[m.monthKey]?.status || "pendente",

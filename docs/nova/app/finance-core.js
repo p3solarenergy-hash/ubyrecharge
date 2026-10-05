@@ -18,6 +18,8 @@
     partnerNetBase  parceria (gestão de terceiro / só gestão): gestão P3 e
                     royalty UBY sobre o repasse líquido (já sem a plataforma);
                     nos carregadores UBY continuam sobre o bruto (02/10/2026)
+    centralTax      imposto central (Parâmetros · Cotas, impostos) sai do resultado
+                    de cada carregador próprio; a rede tributa só o restante (05/10/2026)
 
   Com todas as chaves desligadas (FIXES_OFF) o resultado é idêntico ao da
   plataforma original — é o que a auditoria compara centavo a centavo.
@@ -25,7 +27,7 @@
 (function (global) {
   "use strict";
 
-  const FIXES = Object.freeze(["aggregation", "zeroSaleMonths", "hybridMarketing", "courtesyInvoice", "monthScope", "matrixCents", "powerPerCharger", "lossCarry", "partnerNetBase"]);
+  const FIXES = Object.freeze(["aggregation", "zeroSaleMonths", "hybridMarketing", "courtesyInvoice", "monthScope", "matrixCents", "powerPerCharger", "lossCarry", "partnerNetBase", "centralTax"]);
   const FIXES_ON = Object.freeze(Object.fromEntries(FIXES.map(k => [k, true])));
   const FIXES_OFF = Object.freeze(Object.fromEntries(FIXES.map(k => [k, false])));
 
@@ -314,7 +316,12 @@
     const months = (monthly || []).map(m => {
       const taxBase = num(m.taxBase);
       const manual = taxByMonth[m.monthKey] !== undefined && taxByMonth[m.monthKey] !== null && taxByMonth[m.monthKey] !== "";
-      const taxes = manual ? num(taxByMonth[m.monthKey]) : taxBase * taxPct / 100;
+      const pct = m.taxPct !== undefined ? num(m.taxPct) : taxPct;
+      // taxesApplied: impostos que já saíram do resultado de cada carregador próprio; aqui fica só o restante
+      // (royalties, receitas extras ou diferença para a guia lançada), sem cobrar duas vezes.
+      const taxesTotal = manual ? num(taxByMonth[m.monthKey]) : taxBase * pct / 100;
+      const taxesApplied = num(m.taxesApplied);
+      const taxes = taxesTotal - taxesApplied;
       const preTax = num(m.ownedNet) + num(m.royalties);
       const result = preTax - taxes;
       const carryIn = carry;
@@ -328,7 +335,7 @@
       }
       const legalReserve = distributable * legalPct / 100, expansionReserve = distributable * expPct / 100;
       const investorPool = (distributable - legalReserve - expansionReserve) * invPct / 100;
-      return { monthKey: m.monthKey, ownedNet: num(m.ownedNet), royalties: num(m.royalties), rows: m.rows || [], taxBase, taxes, taxSource: manual ? "valor lançado" : (taxPct ? `${taxPct}% do faturamento` : "sem imposto lançado"), preTax, result, carryIn, carryOut: carry, distributable, legalReserve, expansionReserve, investorPool, inDistribution: m.monthKey >= start };
+      return { monthKey: m.monthKey, ownedNet: num(m.ownedNet), royalties: num(m.royalties), rows: m.rows || [], taxBase, taxes, taxesTotal, taxesApplied, taxSource: manual ? "valor lançado" : (pct ? `${pct}% do faturamento` : "sem imposto lançado"), preTax, result, carryIn, carryOut: carry, distributable, legalReserve, expansionReserve, investorPool, inDistribution: m.monthKey >= start };
     });
     const all = policy.investors || [];
     const investors = all.map(inv => {
@@ -346,7 +353,7 @@
     });
     const sum = k => months.reduce((s, m) => s + num(m[k]), 0);
     return { months, investors, quotaValue, distributionStartMonth: start,
-      totals: { preTax: sum("preTax"), taxes: sum("taxes"), taxBase: sum("taxBase"), result: sum("result"), distributable: sum("distributable"), investorPool: sum("investorPool"), legalReserve: sum("legalReserve"), expansionReserve: sum("expansionReserve"), carryOut: carry } };
+      totals: { preTax: sum("preTax"), taxes: sum("taxes"), taxesTotal: sum("taxesTotal"), taxesApplied: sum("taxesApplied"), taxBase: sum("taxBase"), result: sum("result"), distributable: sum("distributable"), investorPool: sum("investorPool"), legalReserve: sum("legalReserve"), expansionReserve: sum("expansionReserve"), carryOut: carry } };
   }
 
   global.UBY_FINANCE_CORE = Object.freeze({ FIXES, FIXES_ON, FIXES_OFF, computeMonth, aggregate, network, allocate, evaluateRules, energyComposition, energyInvoiceMonths, ADDITIVE });

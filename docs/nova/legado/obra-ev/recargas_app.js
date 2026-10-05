@@ -5869,6 +5869,8 @@ function normalizeNetworkDistribution(raw = {}) {
     distributionStartMonth: /^\d{4}-\d{2}$/.test(String(raw.distributionStartMonth || '')) ? String(raw.distributionStartMonth) : base.distributionStartMonth,
     // Impostos da UBY sobre o faturamento: percentual e valores exatos por competência.
     taxRatePct: Math.min(100, Math.max(0, Number(raw.taxRatePct || 0))),
+    // NOVA PLATAFORMA (05/10/2026): alíquota que passa a valer a partir de uma competência ({ 'AAAA-MM': % }).
+    taxRateFrom: raw.taxRateFrom && typeof raw.taxRateFrom === 'object' && !Array.isArray(raw.taxRateFrom) ? Object.fromEntries(Object.entries(raw.taxRateFrom).filter(([k, v]) => /^\d{4}-\d{2}$/.test(k) && v !== '' && v !== null && Number.isFinite(Number(v))).map(([k, v]) => [k, Math.min(100, Math.max(0, Number(v)))])) : {},
     taxByMonth: raw.taxByMonth && typeof raw.taxByMonth === 'object' && !Array.isArray(raw.taxByMonth) ? Object.fromEntries(Object.entries(raw.taxByMonth).filter(([k, v]) => /^\d{4}-\d{2}$/.test(k) && v !== '' && v !== null && Number.isFinite(Number(v))).map(([k, v]) => [k, Math.max(0, Number(v))])) : {},
     legalReservePurpose: base.legalReservePurpose,
     expansionReservePurpose: base.expansionReservePurpose,
