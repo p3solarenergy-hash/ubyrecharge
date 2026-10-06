@@ -90,7 +90,7 @@
     const [workId, station] = ui.station.split("|");
     const u = UBY.data("usage", { kind: ui.kind, workId, station, monthKey: month });
     const t = u.totals;
-    const scopeLabel = ui.kind === "uby" ? "Operação UBY" : ui.kind === "all" ? "Rede toda (inclui fora da operação UBY)" : station;
+    const scopeLabel = ui.kind === "uby" ? "Operação UBY (sem parceiros)" : ui.kind === "partner" ? "Parceiros" : ui.kind === "all" ? "Rede toda (inclui fora da operação UBY)" : station;
     const maxHour = Math.max(...u.hours.values, 1);
     const payTotal = u.payments.reduce((s, p) => s + p.count, 0) || 1;
     const couponTotal = u.coupons.reduce((s, c) => s + c.count, 0) || 1;
@@ -101,7 +101,7 @@
         <div class="callout"><strong>${esc(scopeLabel)}</strong><small>${fmt.int(u.scope.stations)} estação(ões) · potência considerada ${fmt.int(u.scope.power)} kW${u.scope.bounds ? ` · ${fmt.dt(u.scope.bounds.start)} a ${fmt.dt(u.scope.bounds.end)}` : ""}</small></div></div>
 
       <div class="toolbar">
-        <div class="seg" id="usoKind">${[["uby", "Operação UBY"], ["all", "Rede toda"], ["station", "Uma estação"]].map(([v, l]) => `<button data-v="${v}" class="${ui.kind === v ? "on" : ""}">${l}</button>`).join("")}</div>
+        <div class="seg" id="usoKind">${[["uby", "Operação UBY"], ["partner", "Parceiros"], ["all", "Rede toda"], ["station", "Uma estação"]].map(([v, l]) => `<button data-v="${v}" class="${ui.kind === v ? "on" : ""}">${l}</button>`).join("")}</div>
         ${ui.kind === "station" ? `<select class="select" id="usoStation">${stationList.map(s => `<option value="${esc(`${s.workId}|${s.station}`)}" ${`${s.workId}|${s.station}` === ui.station ? "selected" : ""}>${esc(s.station)}</option>`).join("")}</select>` : ""}
         <span class="spacer"></span>
         ${ui.kind === "station" ? `<a class="btn" href="#/unidades/${encodeURIComponent(workId)}/${encodeURIComponent(station)}" style="display:inline-flex;align-items:center;text-decoration:none">Sessões da estação →</a>` : ""}

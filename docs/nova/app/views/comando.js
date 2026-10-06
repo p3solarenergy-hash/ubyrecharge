@@ -191,12 +191,12 @@
     const res = UBY.data("dayTracking", dt.day || defaultDay || "");
     if (!res.day) { box.innerHTML = `<div class="note">Nenhuma recarga registrada para acompanhar por dia.</div>`; return; }
     const day = res.day;
-    const list = res.units.filter(u => dt.scope === "geral" || u.group === "uby" || u.group === "partner");
+    const list = res.units.filter(u => dt.scope === "geral" || u.group === (dt.scope === "partner" ? "partner" : "uby"));
     // Comparação sempre com o dia anterior do calendário (mesma base dos cartões e da rede).
     const prevDate = fromYmd(day.key); prevDate.setDate(prevDate.getDate() - 1);
     const prevTxt = prevDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
     const dd = (cur, prev, opts = {}) => delta(cur, prev || 0, { hasBase: true, label: `vs ${prevTxt}`, ...opts });
-    const net = res.network[dt.scope === "geral" ? "geral" : "uby"];
+    const net = res.network[dt.scope] || res.network.uby;
     const nd = net.day, np = net.previous || {};
     const sumH = (i, k) => list.reduce((s, u) => s + u.hourly[i][k], 0);
     // Rede: % dos pontos de recarga em uso naquela hora (minutos ocupados ÷ (pontos de todos os carregadores × 60)).
@@ -226,9 +226,9 @@
     box.innerHTML = `
       <div class="section-head"><div><p class="kicker">Resultado do dia</p><h2>Resultado diário da rede</h2>
           <p>Números do dia e a curva hora a hora da rede; abaixo, cada carregador. Falhas contam à parte e não inflam recargas, faturamento ou energia.</p></div>
-        <div class="meta">Regra: sessões válidas (isExecutedCharge)<br>${dt.scope === "uby" ? "Rede UBY: operação própria + parceiros" : "Geral: todos os carregadores"}</div></div>
+        <div class="meta">Regra: sessões válidas (isExecutedCharge)<br>${dt.scope === "uby" ? "Rede UBY: só operação própria (parceiros à parte)" : dt.scope === "partner" ? "Parceiros: carregadores em parceria (royalty UBY)" : "Geral: todos os carregadores"}</div></div>
       <div class="toolbar" style="margin-bottom:12px">
-        <div class="seg" id="dtScope">${[["uby", "Rede UBY"], ["geral", "Geral"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${dt.scope === v ? "on" : ""}">${l}</button>`).join("")}</div>
+        <div class="seg" id="dtScope">${[["uby", "Rede UBY"], ["partner", "Parceiros"], ["geral", "Geral"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${dt.scope === v ? "on" : ""}">${l}</button>`).join("")}</div>
         <div class="seg"><button type="button" id="dtPrev" ${day.prevKey ? "" : "disabled"} title="Dia anterior com recarga">‹</button><button type="button" id="dtNext" ${day.nextKey ? "" : "disabled"} title="Próximo dia com recarga">›</button></div>
         <input class="select" type="date" id="dtDay" value="${esc(day.key)}" min="${esc(res.dayKeys[0] || "")}" max="${esc(res.dayKeys.at(-1) || "")}">
         <span class="spacer"></span>
@@ -244,12 +244,12 @@
         ${kpi("Falhas registradas", fmt.int(nd.failures), "tentativas com falha", dd(nd.failures, np.failures, { inverse: true }), nd.failures ? "bad" : "")}
       </div>
       ${list.length ? `<div class="dt-card dt-total">
-          <div class="dt-name"><strong>${dt.scope === "uby" ? "Rede UBY" : "Todos os carregadores"} · hora a hora</strong> <small>faturamento somado e média de tempo em uso dos carregadores</small></div>
+          <div class="dt-name"><strong>${dt.scope === "uby" ? "Rede UBY" : dt.scope === "partner" ? "Parceiros" : "Todos os carregadores"} · hora a hora</strong> <small>faturamento somado e média de tempo em uso dos carregadores</small></div>
           ${dayWave(totalHourly, tScale, day.nowHour, true)}
         </div>
         <h3 class="dt-sub">Por carregador <small>mesma escala em todos os cartões · clique no nome para abrir o carregador</small></h3>
-        <div class="dt-grid ${dtCols(list.length) > 3 ? "dt-many" : ""}" style="--dt-cols:${dtCols(list.length)}">${list.map(card).join("")}</div>` : `<div class="note">Nenhum carregador ${dt.scope === "uby" ? "da rede UBY " : ""}com recarga neste dia ou no anterior.</div>`}
-      <p class="source-line">Ocupação do dia = energia ÷ (potência × horas disponíveis da estação no dia${day.isToday ? ", até agora" : ""}), mesma regra do motor. Por hora: valor de cada recarga válida distribuído entre início e fim; linha = parte da capacidade do ponto com carro conectado (minutos conectados ÷ 60 × pontos de recarga; 100% = todos os pontos ocupados a hora inteira; na rede, somando os pontos de todos os carregadores). Passe o mouse no gráfico para ver cada hora. ${dt.scope === "uby" ? "“Geral” inclui também só gestão P3 e carregadores fora da UBY." : ""}</p>`;
+        <div class="dt-grid ${dtCols(list.length) > 3 ? "dt-many" : ""}" style="--dt-cols:${dtCols(list.length)}">${list.map(card).join("")}</div>` : `<div class="note">Nenhum carregador ${dt.scope === "uby" ? "da rede UBY " : dt.scope === "partner" ? "parceiro " : ""}com recarga neste dia ou no anterior.</div>`}
+      <p class="source-line">Ocupação do dia = energia ÷ (potência × horas disponíveis da estação no dia${day.isToday ? ", até agora" : ""}), mesma regra do motor. Por hora: valor de cada recarga válida distribuído entre início e fim; linha = parte da capacidade do ponto com carro conectado (minutos conectados ÷ 60 × pontos de recarga; 100% = todos os pontos ocupados a hora inteira; na rede, somando os pontos de todos os carregadores). Passe o mouse no gráfico para ver cada hora. ${dt.scope === "uby" ? "Parceiros (ex.: JK AC) ficam fora das métricas da Rede UBY; veja em “Parceiros”. “Geral” inclui também só gestão P3 e carregadores fora da UBY." : ""}</p>`;
 
     const redraw = () => drawDayTrack(box, defaultDay);
     box.querySelectorAll("#dtScope button").forEach(b => b.onclick = () => { dt.scope = b.dataset.v; redraw(); });

@@ -62,7 +62,7 @@
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">${esc(r.label)} · ${esc(r.stationLabel)}</p><h2>Ranking de clientes (${r.ranking.length})</h2><p>Ordenado pelo faturamento. Recargas válidas; falhas ficam de fora.${r.byDates ? "" : " Sem datas, vale o mês do seletor no topo."}</p></div></div>
         <div class="toolbar" style="box-shadow:none">
-          <select class="select" id="rkStation"><option value="">Todas as estações</option>${r.stations.map(x => `<option value="${esc(x.ref)}" ${x.ref === r.station ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select>
+          <select class="select" id="rkStation"><option value="">Rede UBY (sem parceiros)</option>${r.stations.map(x => `<option value="${esc(x.ref)}" ${x.ref === r.station ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select>
           <label>De <input class="select" type="date" id="rkFrom" value="${esc(ui.rk.from)}"></label>
           <label>Até <input class="select" type="date" id="rkTo" value="${esc(ui.rk.to)}"></label>
           ${ui.rk.from || ui.rk.to ? `<button class="btn" type="button" id="rkClear">Limpar datas</button>` : ""}

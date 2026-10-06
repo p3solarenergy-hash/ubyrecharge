@@ -98,6 +98,17 @@
     };
   }
 
+  // Parceiros (modelo parceria, ex.: JK AC) ficam fora das métricas de operação da Rede UBY
+  // (médias, ocupação, clientes, rankings); no financeiro entram só como royalty (06/10/2026).
+  // Classificação pelo modelo do último mês com recarga do carregador, para não mudar de grupo mês a mês.
+  const rowKey = row => `${row.workId}|${normalizeStationForCompare(row.station || row.stationName || "")}`;
+  function isPartnerRow(row) {
+    if (!row || !row.included) return false;
+    const ms = (row.charges || []).map(chargeMonthKey).filter(isPlausibleMonthKey).sort();
+    return normalizeOperationModel(financeSettingsForUbyRow(row, ms.at(-1) || "").operationModel) === "third_party_management";
+  }
+  const partnerKeys = rows => new Set(rows.filter(isPartnerRow).map(rowKey));
+
   function months() {
     const rows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
     return [...new Set(rows.flatMap(row => row.charges).map(chargeMonthKey).filter(key => key !== "unknown"))]
@@ -113,7 +124,9 @@
   function command(requestedMonth) {
     const sourceUnitData = getGeneralUnitData();
     const sourceRows = getUbyChargerRows(sourceUnitData);
-    const sourceIncluded = sourceRows.filter(row => row.included);
+    const partnerSet = partnerKeys(sourceRows);
+    const isPartner = row => partnerSet.has(rowKey(row));
+    const sourceIncluded = sourceRows.filter(row => row.included && !isPartner(row));
     const sourceUbyCharges = sourceIncluded.flatMap(row => row.charges);
     const sourceMonths = [...new Set(sourceUbyCharges.map(chargeMonthKey).filter(key => key !== "unknown"))].filter(isPlausibleMonthKey).sort();
     const latestMonth = sourceMonths.at(-1) || "";
@@ -124,12 +137,12 @@
       row,
       isMonthView ? row.charges.filter(charge => chargeMonthKey(charge) === currentGeneralMonth) : row.charges
     ));
-    let included = visibleRows.filter(row => row.included && row.count > 0);
+    let included = visibleRows.filter(row => row.included && row.count > 0 && !isPartner(row));
     const monthFallbackToAccumulated = isMonthView && !included.length && sourceUbyCharges.length;
     if (monthFallbackToAccumulated) {
       isMonthView = false;
       visibleRows = sourceRows.map(row => summarizeUbyChargerRow(row, row.charges));
-      included = visibleRows.filter(row => row.included && row.count > 0);
+      included = visibleRows.filter(row => row.included && row.count > 0 && !isPartner(row));
     }
     included.sort((a, b) => b.revenue - a.revenue);
     const allUbyCharges = included.flatMap(row => row.charges);
@@ -139,7 +152,7 @@
 
     const primaryDcRows = included.filter(row => row.kind === "dc" && isOwnedUbyRow(row));
     const primaryAcRows = included.filter(row => row.kind === "ac" && isOwnedUbyRow(row));
-    const partnerRows = included.filter(row => modelOf(row) === "third_party_management");
+    const partnerRows = visibleRows.filter(row => row.included && row.count > 0 && isPartner(row));
     const primaryDcCharges = primaryDcRows.flatMap(row => row.charges);
     const primaryAcCharges = primaryAcRows.flatMap(row => row.charges);
     const partnerCharges = partnerRows.flatMap(row => row.charges);
@@ -460,7 +473,7 @@
       const prevKeyDay = `${prevStart.getFullYear()}-${String(prevStart.getMonth() + 1).padStart(2, "0")}-${String(prevStart.getDate()).padStart(2, "0")}`;
       return { day: pick(key) || { revenue: 0, energy: 0, sessions: 0, clients: 0, newClients: 0, failures: 0 }, previous: pick(prevKeyDay) };
     };
-    const network = { uby: networkFor(g => g === "uby" || g === "partner"), geral: networkFor(() => true) };
+    const network = { uby: networkFor(g => g === "uby"), partner: networkFor(g => g === "partner"), geral: networkFor(() => true) };
 
     const idx = dayKeys.indexOf(key);
     return { dayKeys, network, day: { key, date: iso(dayStart), isToday, nowHour: isToday ? now.getHours() + now.getMinutes() / 60 : 24,
@@ -793,7 +806,7 @@
     // Mesmos conjuntos do painel Operação UBY: sourceUbyCharges (histórico) e
     // allUbyCharges (período, via summarizeUbyChargerRow).
     const unitData = getGeneralUnitData();
-    const sourceIncluded = getUbyChargerRows(unitData).filter(row => row.included);
+    const sourceIncluded = getUbyChargerRows(unitData).filter(row => row.included && !isPartnerRow(row));
     const history = sourceIncluded.flatMap(row => row.charges);
     const monthKeys = [...new Set(history.map(chargeMonthKey).filter(k => k !== "unknown"))].filter(isPlausibleMonthKey).sort();
     const mk = monthKey === "" ? "" : (monthKeys.includes(monthKey) ? monthKey : monthKeys.at(-1) || "");
@@ -861,7 +874,7 @@
 
     return {
       period: { monthKey: mk, label: mk ? monthLabel(mk) : "Acumulado", months: monthKeys },
-      summary: { clients: new Set(valid.map(clientKeyFromCharge).filter(Boolean)).size, sessions: valid.length, revenue: sumBy(valid, c => c.revenue),
+      summary: { clients: new Set(valid.map(clientKeyFromCharge).filter(Boolean)).size, sessions: valid.length, revenue: sumBy(period, c => c.revenue),
         newNetwork: insight.newNetwork.length, newStation: insight.newStationExisting.length, multiStation: insight.multiStation,
         withPhone: newRows.filter(r => r.phone).length, recurrence, periodRecurrence, absent: absent.length,
         absentRevenue: sumBy(absent, a => a.revenue), absentOfficial, spottSessions: spottHistory.length, historySessions: history.length },
@@ -880,9 +893,9 @@
     const unitData = getGeneralUnitData();
     const rows = getUbyChargerRows(unitData).filter(row => row.included);
     const refOf = row => `${row.workId}|${row.station}`;
-    const stations = rows.filter(row => (row.charges || []).length).map(row => ({ ref: refOf(row), label: abbreviatedStationLabel(row.station), workId: row.workId, station: row.station }))
-      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-    const picked = stationRef ? rows.filter(row => refOf(row) === stationRef) : rows;
+    const stations = rows.filter(row => (row.charges || []).length).map(row => ({ ref: refOf(row), label: abbreviatedStationLabel(row.station) + (isPartnerRow(row) ? " (parceiro)" : ""), partner: isPartnerRow(row), workId: row.workId, station: row.station }))
+      .sort((a, b) => a.partner - b.partner || a.label.localeCompare(b.label, "pt-BR"));
+    const picked = stationRef ? rows.filter(row => refOf(row) === stationRef) : rows.filter(row => !isPartnerRow(row));
     const history = rows.flatMap(row => row.charges || []);
     const monthKeys = [...new Set(history.map(chargeMonthKey).filter(k => k !== "unknown"))].filter(isPlausibleMonthKey).sort();
     const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -919,7 +932,8 @@
     const br = k => k ? k.split("-").reverse().join("/") : "";
     const label = byDates ? (from && to ? `${br(from)} a ${br(to)}` : from ? `desde ${br(from)}` : `até ${br(to)}`) : mk ? monthLabel(mk) : "Acumulado";
     const st = stationRef ? stations.find(x => x.ref === stationRef) : null;
-    return { label, monthKey: mk, from: from || "", to: to || "", byDates, station: stationRef || "", stationLabel: st ? st.label : "Todas as estações", stations, ranking,
+    const allLabel = "Rede UBY (sem parceiros)";
+    return { label, monthKey: mk, from: from || "", to: to || "", byDates, station: stationRef || "", stationLabel: st ? st.label : allLabel, stations, ranking,
       summary: { clients: ranking.length, valid: ranking.reduce((s, u) => s + u.valid, 0), revenue: totalRevenue, energy: ranking.reduce((s, u) => s + u.energy, 0) } };
   }
 
@@ -1075,8 +1089,10 @@
       rows = getGeneralStationRows(unitData).filter(r => String(r.workId) === String(scope.workId) && normalizeStationForCompare(r.stationName) === normalizeStationForCompare(scope.station));
     } else if (kind === "all") {
       rows = getGeneralStationRows(unitData).filter(r => (r.charges || []).length);
+    } else if (kind === "partner") {
+      rows = getUbyChargerRows(unitData).filter(r => r.included && isPartnerRow(r)).map(r => ({ ...r, stationName: r.station }));
     } else {
-      rows = getUbyChargerRows(unitData).filter(r => r.included).map(r => ({ ...r, stationName: r.station }));
+      rows = getUbyChargerRows(unitData).filter(r => r.included && !isPartnerRow(r)).map(r => ({ ...r, stationName: r.station }));
     }
     const history = rows.flatMap(r => r.charges || []);
     const monthList = [...new Set(history.map(chargeMonthKey).filter(k => k !== "unknown"))].filter(isPlausibleMonthKey).sort();
