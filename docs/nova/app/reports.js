@@ -132,7 +132,8 @@
     try { u = UBY.data("usage", { kind: "station", workId, station, monthKey: s.monthKey }).kpis; } catch (_) {}
     const model = f.model;
     const opRevenue = s.revenueLines.filter(l => l.scope !== "non_operational"), mkt = s.revenueLines.filter(l => l.scope === "non_operational");
-    const localCosts = s.costLines.filter(l => !l.matrix), matrix = s.costLines.filter(l => l.matrix);
+    // Custo lançado na matriz para um carregador só (ex.: seguro) aparece como custo dele, não como rateio.
+    const localCosts = s.costLines.filter(l => !l.matrix || l.dedicated), matrix = s.costLines.filter(l => l.matrix && !l.dedicated);
     const dest = {
       uby: () => row("Resultado do ponto para a UBY", f.ubyNet, "t"),
       hybrid: () => dest.uby() + (f.p3SocietyProfit ? row("Participação P3 (sociedade AC/DC)", f.p3SocietyProfit) : ""),

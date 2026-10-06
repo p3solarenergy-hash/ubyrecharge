@@ -1545,7 +1545,9 @@
       }
       if (idx < 0 || !(shares[idx] > 0)) return [];
       return [{ id: item.id, label: item.name, category: item.category || "Outros custos", amount: shares[idx], cashAmount: cashShares[idx],
-        coverageMonths: matrizCoverageMonths(item), rule: `${matrizMethodLabel(item.allocation)} | ${active.length} destino(s)` }];
+        // Lançado na matriz mas para um carregador só (ex.: seguro do Aurora DC): custo exclusivo dele, não rateio.
+        dedicated: (item.targets || []).length === 1,
+        coverageMonths: matrizCoverageMonths(item), rule: (item.targets || []).length === 1 ? "exclusivo deste carregador (lançado na matriz)" : `${matrizMethodLabel(item.allocation)} | ${active.length} destino(s)` }];
     });
   }
 
@@ -1805,7 +1807,7 @@
     // DRE consolidada da rede: ativos UBY + royalties − impostos, com reservas e cotistas pela regra corrigida.
     const ownedDre = aggs.filter(x => ["uby", "hybrid"].includes(x.f.operationModel));
     const sumF = (list, k) => list.reduce((s, x) => s + n0(x.f[k]), 0);
-    const owned = Object.fromEntries(["revenue", "extraRevenue", "marketingRevenue", "energyCost", "extraCosts", "matrizCost", "matrizTaxCost", "taxes", "areaParticipation", "management", "platform", "operationNet", "ubyRoyalty"].map(k => [k, sumF(ownedDre, k)]));
+    const owned = Object.fromEntries(["revenue", "extraRevenue", "marketingRevenue", "energyCost", "extraCosts", "matrizCost", "matrizTaxCost", "matrizDedicatedCost", "taxes", "areaParticipation", "management", "platform", "operationNet", "ubyRoyalty"].map(k => [k, sumF(ownedDre, k)]));
     const net = fv2Network();
     const policy = loadNetworkDistribution();
     const nm = isMonthView ? (net.months.find(m => m.monthKey === mk) || {}) : null;
@@ -1821,7 +1823,8 @@
       ownedCount: ownedDre.length, partnerCount: partnerRows.length,
       rechargeRevenue: n0(owned.revenue), extraRevenue: n0(owned.extraRevenue), royalties, marketing: n0(owned.marketingRevenue),
       networkRevenue, energyCost: n0(owned.energyCost), directOperation: Math.max(0, n0(owned.extraCosts) - n0(owned.matrizCost)),
-      taxes: n0(owned.taxes), matrizTaxCost: n0(owned.matrizTaxCost), otherMatriz: Math.max(0, n0(owned.matrizCost) - n0(owned.matrizTaxCost)), matrizCost: n0(owned.matrizCost),
+      taxes: n0(owned.taxes), matrizTaxCost: n0(owned.matrizTaxCost), matrizDedicated: n0(owned.matrizDedicatedCost),
+      otherMatriz: Math.max(0, n0(owned.matrizCost) - n0(owned.matrizTaxCost) - n0(owned.matrizDedicatedCost)), matrizCost: n0(owned.matrizCost),
       management: n0(owned.management), platform: n0(owned.platform), areaParticipation: n0(owned.areaParticipation),
       networkTaxes, networkTaxBase: pick("taxBase"), taxRatePct: isMonthView ? taxRateFor(mk) : n0(policy.taxRatePct), taxesTotal: n0(owned.taxes) + networkTaxes,
       operationalResult, networkResult, margin: networkRevenue ? networkResult / networkRevenue * 100 : 0,
@@ -1895,7 +1898,7 @@
     const mk = rowMonths.includes(monthKey) ? monthKey : rowMonths.at(-1) || "";
     const v2Pick = r => ({ model: r.operationModel, revenue: r.revenue, extraRevenue: r.extraRevenue, marketingRevenue: r.marketingRevenue, totalRevenue: r.totalRevenue,
       energy: r.energy, commercialEnergy: r.commercialEnergy, energyCost: r.energyCost, taxes: r.taxes, localExtraCosts: r.localExtraCosts, matrizCost: r.matrizCost,
-      matrizTaxCost: r.matrizTaxCost, matrizCash: r.matrizCash, management: r.management, platform: r.platform, ubyRoyalty: r.ubyRoyalty, areaParticipation: r.areaParticipation,
+      matrizTaxCost: r.matrizTaxCost, matrizDedicatedCost: r.matrizDedicatedCost, matrizCash: r.matrizCash, management: r.management, platform: r.platform, ubyRoyalty: r.ubyRoyalty, areaParticipation: r.areaParticipation,
       areaSharePct: r.areaSharePct, totalOperatingCost: r.totalOperatingCost, operationNet: r.operationNet, operationMargin: r.operationMargin, totalCostPerKWh: r.totalCostPerKWh,
       resultPerKWh: r.energy > 0 ? r.operationNet / r.energy : null, ubyNet: r.ubyNet, p3OperationalResult: r.p3OperationalResult, p3SocietyProfit: r.p3SocietyProfit,
       partnerShare: r.partnerShare, saRetention: r.saRetention, investorDistribution: r.investorDistribution, partnerInvestorDistribution: r.partnerInvestorDistribution,
@@ -1927,7 +1930,7 @@
       energyComposition: v?.energyComposition ? JSON.parse(JSON.stringify(v.energyComposition)) : null,
       costLines: v ? [
         ...v.costRuleDetails.filter(d => d.enabled !== false && (n0(d.actual) || n0(d.planned))).map(d => ({ id: d.id || "", label: d.label, rule: d.displayRule || "", actual: n0(d.actual), planned: n0(d.planned), perKWh: v.energy > 0 ? n0(d.actual) / v.energy : null, matrix: false })),
-        ...v.matrixItems.map(i => ({ id: i.id || "", label: /tribut|impost|taxa/i.test(`${i.category || ""} ${i.label || ""}`) ? `Tributo centralizado — ${i.label}` : i.label, rule: i.rule || "Rateio da matriz", actual: n0(i.amount), planned: n0(i.amount), perKWh: v.energy > 0 ? n0(i.amount) / v.energy : null, matrix: true }))
+        ...v.matrixItems.map(i => ({ id: i.id || "", label: /tribut|impost|taxa/i.test(`${i.category || ""} ${i.label || ""}`) ? `Tributo centralizado — ${i.label}` : i.label, rule: i.rule || "Rateio da matriz", actual: n0(i.amount), planned: n0(i.amount), perKWh: v.energy > 0 ? n0(i.amount) / v.energy : null, matrix: true, dedicated: !!i.dedicated }))
       ] : [],
       revenueLines: v ? v.revenueRuleDetails.filter(d => d.enabled !== false && (n0(d.actual) || n0(d.planned))).map(d => ({ id: d.id || "", label: d.label, rule: d.displayRule || "", actual: n0(d.actual), planned: n0(d.planned), scope: d.scope || "" })) : [],
       planning: legacy?.planning ? { planningKWh: legacy.planning.planningKWh, planningRevenue: legacy.planning.planningRevenue, salePricePerKWh: legacy.planning.salePricePerKWh,
@@ -2259,12 +2262,13 @@
       return { revenue: m.revenue, energy: m.energy, sessions: m.clean.executed.length, clients: m.clients, avgTicket: m.avgTicket, revenuePerKwh: m.revenuePerKwh,
         avgKwh: m.avgKwh, avgDuration: formatRechargeDuration(m.avgDuration), idleValue: n0(m.idleValue), power, occupancy: maxKWh > 0 ? occEnergy / maxKWh * 100 : 0 };
     };
-    const FIN = ["totalRevenue", "energyCost", "management", "platform", "areaParticipation", "matrizCost", "localExtraCosts", "taxes", "ubyRoyalty", "totalOperatingCost", "operationNet", "energy"];
+    const FIN = ["totalRevenue", "energyCost", "management", "platform", "areaParticipation", "matrizCost", "matrizDedicatedCost", "localExtraCosts", "taxes", "ubyRoyalty", "totalOperatingCost", "operationNet", "energy"];
     const finOf = m => {
       const s = stationFinance(m.workId, m.station, mk || months.at(-1) || "");
       const list = (s?.monthly || []).filter(x => periodMonths.includes(x.key));
       const out = Object.fromEntries(FIN.map(k => [k, list.reduce((a, x) => a + n0(x[k]), 0)]));
       out.investment = n0(s?.settings?.investmentValue || s?.finance?.investmentValue);
+      out.dedicatedLabels = [...new Set((s?.costLines || []).filter(c => c.dedicated && c.actual > 0).map(c => c.label))];
       out.monthly = (s?.monthly || []).map(x => ({ key: x.key, revenue: n0(x.totalRevenue), result: n0(x.operationNet), cost: n0(x.totalOperatingCost), energy: n0(x.energy) }));
       return out;
     };
@@ -2275,6 +2279,7 @@
     });
     const combinedCharges = members.flatMap(m => m.charges.filter(inPeriod));
     const fin = Object.fromEntries(FIN.map(k => [k, per.reduce((a, p) => a + n0(p.fin[k]), 0)]));
+    fin.dedicatedLabels = [...new Set(per.flatMap(p => p.fin.dedicatedLabels || []))];
     fin.investment = per.reduce((a, p) => a + p.fin.investment, 0);
     const seen = new Map();
     per.forEach(p => p.keys.forEach(k => seen.set(k, (seen.get(k) || 0) + 1)));

@@ -190,6 +190,8 @@
     const matrizCost = matrixItems.reduce((s, i) => s + num(i.amount), 0);
     const matrizTaxCost = matrixItems.filter(i => /tribut|impost|taxa/i.test(`${i.category || ""} ${i.label || ""}`)).reduce((s, i) => s + num(i.amount), 0);
     const matrizCash = matrixItems.reduce((s, i) => s + num(i.cashAmount), 0);
+    // Parte da matriz lançada para um carregador só (custo exclusivo dele, não rateio).
+    const matrizDedicatedCost = matrixItems.filter(i => i.dedicated).reduce((s, i) => s + num(i.amount), 0);
     const localExtraCosts = costEval.actual;
     const extraCosts = localExtraCosts + matrizCost;
 
@@ -248,7 +250,7 @@
       revenue, chargingRevenue: revenue, energy, commercialEnergy, acRevenue, dcRevenue,
       extraRevenue, marketingRevenue, totalRevenue,
       management, platform, ubyRoyalty, feesOnNet, taxes, energyCost, energyComposition: comp, courtesyInvoiceExcluded,
-      localExtraCosts, matrizCost, matrizTaxCost, matrizCash, extraCosts, areaSharePct, areaParticipation, areaParticipationCalc,
+      localExtraCosts, matrizCost, matrizTaxCost, matrizDedicatedCost, matrizCash, extraCosts, areaSharePct, areaParticipation, areaParticipationCalc,
       preAreaNet, operationNet, acNet, dcNet, unknownNet,
       ubyNet, p3SocietyProfit, p3AcEquity: model === "hybrid" ? acNet * num(cfg.p3AcEquityPct) / 100 : 0, p3DcEquity: model === "hybrid" ? dcNet * num(cfg.p3DcEquityPct) / 100 : 0,
       partnerShare, p3Gross: management + p3SocietyProfit, p3OperationalResult, ownResult,
@@ -268,7 +270,7 @@
 
   // Campos que somam entre meses/carregadores.
   const ADDITIVE = ["revenue", "chargingRevenue", "energy", "commercialEnergy", "acRevenue", "dcRevenue", "extraRevenue", "marketingRevenue", "totalRevenue",
-    "management", "platform", "ubyRoyalty", "taxes", "energyCost", "courtesyInvoiceExcluded", "localExtraCosts", "matrizCost", "matrizTaxCost", "matrizCash", "extraCosts",
+    "management", "platform", "ubyRoyalty", "taxes", "energyCost", "courtesyInvoiceExcluded", "localExtraCosts", "matrizCost", "matrizTaxCost", "matrizDedicatedCost", "matrizCash", "extraCosts",
     "areaParticipation", "preAreaNet", "operationNet", "ubyNet", "p3SocietyProfit", "partnerShare", "p3Gross", "p3OperationalResult", "ownResult", "paybackBase",
     "saRetention", "ubyDistributable", "investorDistribution", "partnerInvestorDistribution", "finalDistribution", "ubyRetained", "totalOperatingCost",
     "courtesyCharges", "courtesyEnergy", "courtesyEnergyCost", "courtesyCostExcluded"];

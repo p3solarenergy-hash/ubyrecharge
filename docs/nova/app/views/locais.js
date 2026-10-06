@@ -13,7 +13,7 @@
   // Cores fixas por carregador (o tema night troca pelas equivalentes nos gráficos).
   const CHART = ["#187457", "#3d6f8e", "#b98527"];
   const INLINE = () => night() ? ["#00E07A", "#00E5FF", "#FFB020"] : CHART;
-  const FLOW = () => night() ? ["#FFB020", "#B79CFF", "#00E5FF", "#FF9E6B", "#8A95A5", "#00E07A"] : ["#b98527", "#77637d", "#3d6f8e", "#a0663f", "#68746b", "#187457"];
+  const FLOW = () => night() ? ["#FFB020", "#B79CFF", "#00E5FF", "#FF9E6B", "#8A95A5", "#00E07A", "#FF6B6B"] : ["#b98527", "#77637d", "#3d6f8e", "#a0663f", "#68746b", "#187457", "#b75450"];
   // Modo apresentação da tela de Clientes vale aqui também.
   const masked = () => { try { return localStorage.getItem("uby-nova-mask") === "1"; } catch (_) { return false; } };
   const who = name => masked() ? String(name || "").split(/\s+/).map(p => p ? p[0] + "•••" : "").join(" ") : esc(name);
@@ -146,7 +146,8 @@
       { label: "Gestão P3", value: f.management, color: fc[1] },
       { label: "App / plataforma", value: f.platform, color: fc[2] },
       { label: "Energia", value: f.energyCost, color: fc[3] },
-      { label: "Matriz, outros custos e impostos", value: f.matrizCost + f.localExtraCosts + f.taxes + f.ubyRoyalty, color: fc[4] },
+      { label: `Custos exclusivos${(f.dedicatedLabels || []).length ? ` (${f.dedicatedLabels.join(", ")})` : ""}`, value: f.matrizDedicatedCost || 0, color: fc[6 % fc.length] },
+      { label: "Matriz (rateio), outros custos e impostos", value: f.matrizCost - (f.matrizDedicatedCost || 0) + f.localExtraCosts + f.taxes + f.ubyRoyalty, color: fc[4] },
       { label: "Resultado", value: Math.max(f.operationNet, 0), color: fc[5] }
     ];
     const c = v.clients;
@@ -226,7 +227,8 @@
           ${line("Gestão P3", c2 => fmt.brl(c2.fin.management))}
           ${line("App / plataforma", c2 => fmt.brl(c2.fin.platform))}
           ${line("Repasse da área", c2 => fmt.brl(c2.fin.areaParticipation))}
-          ${line("Matriz (rateio)", c2 => fmt.brl(c2.fin.matrizCost))}
+          ${line(`Custos exclusivos${(f.dedicatedLabels || []).length ? `<small>${esc(f.dedicatedLabels.join(" · "))}</small>` : ""}`, c2 => fmt.brl(c2.fin.matrizDedicatedCost || 0))}
+          ${line("Matriz (rateio)", c2 => fmt.brl(c2.fin.matrizCost - (c2.fin.matrizDedicatedCost || 0)))}
           ${line("Outros custos e impostos", c2 => fmt.brl(otherCosts(c2)))}
           ${line("<strong>Custo total</strong>", c2 => fmt.brl(c2.fin.totalOperatingCost))}
           ${line("Custo por kWh", c2 => perKwh(c2.fin.energy > 0 ? c2.fin.totalOperatingCost / c2.fin.energy : null))}

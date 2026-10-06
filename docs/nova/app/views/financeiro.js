@@ -48,7 +48,8 @@
       : ec.totalCost > 0 ? [["Copel", ec.copelCost], ["Arrendamento", ec.leaseCost]]
       : [[`Energia pela tarifa cadastrada (${fmt.brl(st.energyCostPerKWh || 0)}/kWh)`, f.energyCost]]).filter(([, v]) => Number(v) > 0);
     const AREA = "ownerRevenueSharePct,ownerNetProfitSharePct";
-    const otherCosts = [...s.costLines.map(c => [c.matrix ? `Matriz · ${c.label}` : c.label, c.actual, costHref(c)]),
+    const costName = c => c.matrix && !c.dedicated ? `Matriz · ${c.label}` : c.label;
+    const otherCosts = [...s.costLines.map(c => [costName(c), c.actual, costHref(c)]),
       ["Gestão P3", f.management, edit("carregador", "managementPct")], ["App / plataforma", f.platform, edit("carregador", "platformPct")], ["Royalty UBY", f.ubyRoyalty, edit("carregador", "ubyRoyaltyPct")],
       [`Repasse da área${f.areaSharePct ? ` (${fmt.pct1(f.areaSharePct)})` : ""}`, f.areaParticipation, edit("carregador", AREA)], ["Impostos", f.taxes, edit("carregador", "taxRatePct")]].filter(([, v]) => Number(v) > 0);
     const otherTotal = otherCosts.reduce((a, [, v]) => a + Number(v || 0), 0);
@@ -85,7 +86,7 @@
           </tbody><tfoot><tr><td>Faturamento total</td><td class="num">${fmt.brl(f.totalRevenue)}</td></tr></tfoot><tbody>
           <tr><th colspan="2" style="position:static">Custos</th></tr>
           ${line(go("Energia", energyHref), `${fmt.brl(f.energyCost)}${pct(f.energyCost)}`, [energyParts.map(([l, v]) => `${l} ${fmt.brl(v)}`).join(" + "), `${perKwh(perSold(f.energyCost))} sobre ${fmt.kwh(kwhSold)} vendidos`].filter(Boolean).join(" · "))}
-          ${s.costLines.map(c => line(go(c.matrix ? `Matriz · ${esc(c.label)}` : esc(c.label), costHref(c)), `${fmt.brl(c.actual)}${pct(c.actual)}`, [c.rule, c.perKWh != null ? `${perKwh(c.perKWh)}` : ""].filter(Boolean).join(" · "))).join("")}
+          ${s.costLines.map(c => line(go(esc(costName(c)), costHref(c)), `${fmt.brl(c.actual)}${pct(c.actual)}`, [c.rule, c.perKWh != null ? `${perKwh(c.perKWh)}` : ""].filter(Boolean).join(" · "))).join("")}
           ${line(go("Gestão P3", edit("carregador", "managementPct")), `${fmt.brl(f.management)}${pct(f.management)}`, partner || f.model === "management_only" ? "sobre o líquido (faturamento − plataforma)" : "sobre o faturamento total")}
           ${line(go("App / plataforma", edit("carregador", "platformPct")), `${fmt.brl(f.platform)}${pct(f.platform)}`, "só sobre recargas e ociosidade")}
           ${f.ubyRoyalty ? line(go("Royalty UBY", edit("carregador", "ubyRoyaltyPct")), `${fmt.brl(f.ubyRoyalty)}${pct(f.ubyRoyalty)}`, "uso da marca · sobre o líquido (faturamento − plataforma)") : ""}
@@ -335,7 +336,8 @@
           ${cost("Operação direta por ativo", d.directOperation, "Despesas próprias dos carregadores, sem tributos e sem rateio da matriz.", "#/parametros/carregador")}
           ${cost(`Impostos sobre o faturamento${d.taxRatePct ? ` (${Number(d.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%)` : ""}`, d.taxes, "Alíquota central da UBY (Parâmetros → Cotas, impostos e rodadas) sobre o faturamento de cada carregador próprio.", "#/parametros/cotas")}
           ${cost("Tributos corporativos centralizados", d.matrizTaxCost, "Impostos da matriz, distribuídos entre os destinos do rateio.", matrizHref)}
-          ${cost("Demais custos centralizados da matriz", d.otherMatriz, "Seguro, aluguel, sistemas e outros custos compartilhados.", matrizHref)}
+          ${d.matrizDedicated ? cost("Custos exclusivos de carregadores", d.matrizDedicated, "Lançados na matriz para um carregador só (ex.: seguro do Aurora DC); não são rateio.", matrizHref) : ""}
+          ${cost("Demais custos centralizados da matriz", d.otherMatriz, "Aluguel, sistemas e outros custos divididos entre os carregadores.", matrizHref)}
           ${cost("Gestão P3", d.management, "Percentual sobre o faturamento total conforme contrato.", "#/parametros/carregador")}
           ${cost("App / plataforma", d.platform, "Somente sobre recargas e ociosidade; não incide sobre marketing ou royalties.", "#/parametros/carregador")}
           ${cost("Participação de área", d.areaParticipation, "Repasse ao parceiro da área sobre o faturamento total.", "#/parametros/area")}
