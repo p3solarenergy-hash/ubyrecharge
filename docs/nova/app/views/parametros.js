@@ -1045,6 +1045,9 @@
     const inv = UBY.data("investorDistribution");
     const m = inv.months.find(x => x.key === mk);
     if (!m || m.status === "pendente") throw new Error("Aprove a competência antes de publicar.");
+    // O documento publicado é definitivo: só sai se os números de agora forem os aprovados.
+    const diff = closingDiff(inv, inv.months.indexOf(m));
+    if (!m.snapshot || diff.length) throw new Error(`Os números de ${m.label} mudaram depois da aprovação (${diff.join("; ") || "aprovação sem números guardados"}). Reaprove a competência e publique de novo, para o documento sair igual ao aprovado.`);
     const label = m.label;
     const snap = m.snapshot || null;
     const published = [];

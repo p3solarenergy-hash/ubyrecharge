@@ -45,7 +45,7 @@
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Prestadora de serviço da UBY · gestão e engenharia</p><h1>P3 Solar · gestão</h1>
         <p class="lead">O que a P3 recebe pela gestão da rede: a taxa de gestão de cada carregador operado para a UBY e parceiros, a gestão dos carregadores que são só da P3 e o resultado da sociedade P3. Os números da UBY continuam nas telas da UBY; aqui é a visão da prestadora.</p></div>
-        <div class="callout"><strong>${fmt.brl(d.total)} recebidos no acumulado</strong><small>${d.check !== null ? (Math.abs(d.check - d.total) < 0.05 ? "confere com o motor financeiro (Destinos do resultado)" : `atenção: Destinos do resultado mostra ${fmt.brl(d.check)}`) : ""}</small></div></div>
+        <div class="callout"><strong>${fmt.brl(d.total)} devidos à P3 no acumulado</strong><small>Calculado por competência (o que a P3 tem a receber), não o que já entrou na conta. ${d.check !== null ? (Math.abs(d.check - d.total) < 0.05 ? "Confere com o motor financeiro (Destinos do resultado)." : `Atenção: Destinos do resultado mostra ${fmt.brl(d.check)}.`) : ""}</small></div></div>
       <section class="section"><div class="grid g5">
         ${kpi(`Receita P3 · ${esc(last.label)}`, fmt.brl(last.total), prev ? UBY.delta(last.total, prev.total) : "", "", "lead")}
         ${kpi("Gestão da operação UBY", fmt.brl(sum("uby")), "acumulado · taxa sobre os ativos UBY")}

@@ -2,7 +2,9 @@
    Dados sempre vêm da rede (Supabase). Os arquivos da plataforma usam
    "rede primeiro": a versão nova entra na hora; o cache só serve se estiver
    sem internet, para o app abrir e avisar em vez de mostrar erro do navegador. */
-const CACHE = "uby-nova-v2";
+const CACHE = "uby-nova-v3";
+// O endereço (github.io) é compartilhado com outros sites: só mexe nos caches deste app.
+const OWN = "uby-nova-";
 const SHELL = ["./", "index.html", "login.html", "offline.html", "app/app.css", "app/storage-ns.js", "app/shell.js", "assets/brand.svg", "assets/brand-night.svg", "assets/pwa/icon-192.png"];
 
 self.addEventListener("install", event => {
@@ -11,8 +13,11 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith(OWN) && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
+
+// Lê só do cache deste app (nunca de caches de outros sites do mesmo endereço).
+const fromOwn = (req, opts) => caches.open(CACHE).then(cache => cache.match(req, opts));
 
 self.addEventListener("fetch", event => {
   const req = event.request;
@@ -32,14 +37,14 @@ self.addEventListener("fetch", event => {
       // Durante uma publicação o GitHub Pages responde 404/5xx por alguns segundos:
       // usa a última cópia boa do arquivo em vez de repassar o erro.
       if (res.status === 404 || res.status >= 500) {
-        const hit = await caches.match(req, { ignoreSearch: true });
+        const hit = await fromOwn(req, { ignoreSearch: true });
         if (hit) return hit;
       }
       return res;
     }).catch(async () => {
-      const hit = await caches.match(req, { ignoreSearch: true });
+      const hit = await fromOwn(req, { ignoreSearch: true });
       if (hit) return hit;
-      if (req.mode === "navigate") return caches.match("offline.html");
+      if (req.mode === "navigate") return fromOwn("offline.html");
       return Response.error();
     })
   );
