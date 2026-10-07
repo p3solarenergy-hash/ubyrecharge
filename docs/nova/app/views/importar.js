@@ -239,6 +239,23 @@
   const monthName = mk => { const [y, m] = mk.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(". de ", "/").replace(" de ", "/"); };
 
   // Estado legível pelo robô (sem os arquivos): window.UBY_SPOTT_STATE.
+  // Registra a rodada no histórico de auditoria (app_audit_log, liberado na importação),
+  // para a barra do topo mostrar quando foi a última importação automática e se deu certo.
+  async function logRun(w, robot) {
+    try {
+      const sb = w.UBY_SUPABASE_CLIENT;
+      if (!sb) return;
+      const { data } = await sb.auth.getUser();
+      const g = ui.auto.groups, bad = g.filter(x => !["ok", "igual"].includes(x.status)).length + ui.auto.errors.length;
+      await sb.from("app_audit_log").insert({
+        modulo: "recargas", entidade_tipo: "importacao_automatica", entidade_id: "spott", acao: "importacao_automatica",
+        resumo: { origem: robot ? "robo" : "manual", em: new Date().toISOString(), ok: !bad, problemas: bad,
+          locais: g.map(x => ({ local: x.local, mes: x.month, obra: x.workId, status: x.status, recargas: x.unique })) },
+        usuario_id: data?.user?.id || null, usuario_email: data?.user?.email || null
+      });
+    } catch (err) { console.warn("Registro da importação automática não gravado:", err?.message || err); }
+  }
+
   function publishState() {
     const a = ui.auto;
     window.UBY_SPOTT_STATE = {
@@ -464,7 +481,7 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
       if (robot) a.groups.filter(g => g.status === "pronto" && (!g.auto || !g.workId || !g.month))
         .forEach(g => { g.status = "ignorado"; g.msg = "Sem destino certo: o robô não importa. Confira e importe manualmente."; });
       const todo = a.groups.filter(g => g.status === "pronto" && g.workId && g.month);
-      if (!todo.length) { publishState(); return; }
+      if (!todo.length) { if (a.groups.length) await logRun(w, robot); publishState(); return; }
       const obras = new Set(todo.map(g => g.workId)).size;
       if (!robot && !confirm(`Importar ${todo.length} planilha(s) (${[...new Set(todo.map(g => g.platform))].join(" e ")}) em ${obras} obra(s), no modo "Consolidar no mês"?\n\nRecargas que já estão na base são reconhecidas e não duplicam. Cada importação pode ser desfeita no histórico de backups.`)) return;
       a.running = true;
@@ -505,6 +522,7 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
         } catch (err) { g.status = "erro"; g.msg = err.message; log(`${g.platform} ${g.local} ${g.month} → ${err.message}`, "bad"); }
       }
       a.running = false;
+      await logRun(w, robot);
       publishState();
       if (okCount) { refreshPanels(); log(`Importação automática: ${okCount} de ${todo.length} planilha(s) gravadas. Painéis atualizados.`, "ok"); }
       if (location.hash.startsWith("#/importar")) draw(target, w, works);
@@ -512,4 +530,43 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
   }
 
   UBY.register("importar", { render });
+
+  // ---- Selo "Spott ✓ há X min" na barra do topo (todas as telas) ----------------
+  // Lê a última rodada registrada por logRun. Amarelo se passou de 2 h sem rodada
+  // (o agendamento do GitHub pode atrasar/pular); vermelho se a última teve problema.
+  async function paintRobotPill() {
+    const anchor = document.getElementById("dataStatus");
+    let sb = null;
+    try { sb = document.getElementById("motorFrame")?.contentWindow?.UBY_SUPABASE_CLIENT; } catch (_) {}
+    if (!anchor || !sb) return false;
+    const { data, error } = await sb.from("app_audit_log").select("created_at,resumo")
+      .eq("acao", "importacao_automatica").order("created_at", { ascending: false }).limit(1);
+    let pill = document.getElementById("robotStatus");
+    if (error || !data?.length) { if (pill) pill.remove(); return true; }
+    const row = data[0], r = row.resumo || {}, at = new Date(row.created_at);
+    const min = Math.max(0, Math.round((Date.now() - at) / 60000));
+    const ago = min < 60 ? `há ${min} min` : min < 48 * 60 ? `há ${Math.floor(min / 60)} h` : `há ${Math.floor(min / 1440)} dias`;
+    const cls = r.ok === false ? "err" : min > 120 ? "warn" : "";
+    const icon = r.ok === false ? "✗" : min > 120 ? "⚠" : "✓";
+    const locais = (r.locais || []).map(l => `${l.local}: ${l.status === "igual" ? "sem novidade" : l.status}`).join("\n");
+    if (!pill) {
+      pill = document.createElement("a");
+      pill.id = "robotStatus";
+      pill.href = "#/importar";
+      anchor.insertAdjacentElement("afterend", pill);
+    }
+    pill.className = `pill hide-sm ${cls}`;
+    pill.style.textDecoration = "none";
+    pill.title = `Última importação automática da Spott (${r.origem === "robo" ? "robô" : "manual"}): ${at.toLocaleString("pt-BR")}` +
+      (r.ok === false ? ` — ${r.problemas} ponto(s) para conferir` : " — tudo conferido") + (locais ? `\n\n${locais}` : "");
+    pill.innerHTML = `<i class="dot"></i><span>Spott ${icon} ${esc(ago)}</span>`;
+    return true;
+  }
+  (function watchRobot() {
+    let tries = 0;
+    const first = setInterval(() => {
+      paintRobotPill().then(done => { if (done || ++tries > 60) clearInterval(first); }).catch(() => { if (++tries > 60) clearInterval(first); });
+    }, 5000);
+    setInterval(() => { paintRobotPill().catch(() => {}); }, 5 * 60000);
+  })();
 })();
