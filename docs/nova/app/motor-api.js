@@ -1603,8 +1603,10 @@
       }
     }
     const cfg = fv2Cfg(settings);
-    // Imposto central da UBY (11,33% até dez/2026 etc.) em cada carregador próprio, salvo alíquota própria.
-    if (fixes.centralTax && ["uby", "hybrid"].includes(cfg.operationModel) && !(n0(cfg.taxRatePct) > 0)) cfg.taxRatePct = taxRateFor(mk);
+    // Imposto da UBY é centralizado (decisão de 08/10/2026): a guia é emitida pela matriz sobre tudo o
+    // que a UBY faturou, não por carregador. O resultado de cada carregador próprio fica antes do imposto;
+    // a rede cobra o imposto inteiro (taxBase × alíquota ou valor da guia) numa linha própria.
+    if (fixes.centralTax && ["uby", "hybrid"].includes(cfg.operationModel)) cfg.taxRatePct = 0;
     const stationName = row.stationName || row.station;
     const courtesy = courtesyFinanceBreakdown(charges, stationAvailabilityFor(row.workId, stationName, row.workName), cfg.energyCostPerKWh);
     const planning = financePlanningContext(charges, mk, cfg, row.charges || [], workPowerById(row.workId));

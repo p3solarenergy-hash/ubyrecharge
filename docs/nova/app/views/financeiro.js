@@ -334,7 +334,7 @@
           ${group("Custos reconhecidos na rede")}
           ${cost("Energia", d.energyCost, "Fatura de energia vinculada às recargas dos ativos UBY.", "#/parametros/energia")}
           ${cost("Operação direta por ativo", d.directOperation, "Despesas próprias dos carregadores, sem tributos e sem rateio da matriz.", "#/parametros/carregador")}
-          ${cost(`Impostos sobre o faturamento${d.taxRatePct ? ` (${Number(d.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%)` : ""}`, d.taxes, "Alíquota central da UBY (Parâmetros → Cotas, impostos e rodadas) sobre o faturamento de cada carregador próprio.", "#/parametros/cotas")}
+          ${d.taxes ? cost("Impostos lançados por carregador (regra antiga)", d.taxes, "O imposto agora é central (guia da matriz) e sai no resultado final da rede; este valor só aparece se algum carregador ainda tiver alíquota própria.", "#/parametros/cotas") : ""}
           ${cost("Tributos corporativos centralizados", d.matrizTaxCost, "Impostos da matriz, distribuídos entre os destinos do rateio.", matrizHref)}
           ${d.matrizDedicated ? cost("Custos exclusivos de carregadores", d.matrizDedicated, "Lançados na matriz para um carregador só (ex.: seguro do Aurora DC); não são rateio.", matrizHref) : ""}
           ${cost("Demais custos centralizados da matriz", d.otherMatriz, "Aluguel, sistemas e outros custos divididos entre os carregadores.", matrizHref)}
@@ -345,7 +345,7 @@
           ${group("Resultado final da rede")}
           ${line("Resultado operacional UBY", d.operationalResult)}
           ${line("+ Royalties UBY", d.royalties)}
-          ${line("− Impostos sobre royalties e ajuste da guia", d.networkTaxes || 0, d.taxesTotal ? `impostos do período: ${fmt.brl(d.taxesTotal)} sobre ${fmt.brl(d.networkTaxBase || 0)} faturados pela UBY (a maior parte já saiu de cada carregador)` : "ainda não lançados — cadastre em Parâmetros e custos → Cotas, impostos e rodadas")}
+          ${line(`− Impostos sobre o faturamento (guia da matriz)${d.taxRatePct ? ` · ${Number(d.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : ""}`, d.networkTaxes || 0, d.taxesTotal ? `sobre ${fmt.brl(d.networkTaxBase || 0)} faturados pela UBY (recargas dos ativos próprios + royalties) · valor exato quando a guia for lançada em Parâmetros → Cotas, impostos e rodadas` : "ainda sem alíquota ou guia lançada para o período")}
           </tbody><tfoot><tr><td>= Resultado consolidado antes da distribuição</td><td class="num">${signed(d.networkResult)}</td></tr></tfoot><tbody>
           ${group("Destinação do resultado")}
           ${d.lossCarried ? line("Prejuízo de meses anteriores compensado", d.lossCarried, "o lucro só é distribuído depois de cobrir prejuízos acumulados") : ""}
