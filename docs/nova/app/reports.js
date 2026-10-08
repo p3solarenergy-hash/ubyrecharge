@@ -80,7 +80,7 @@
       ${changed ? `<div class="note" style="border-color:#e0a4a0;background:#fdf0ef;color:#8a2f2a"><strong>Os números mudaram depois da aprovação.</strong> Aprovado: resultado ${signed(m.snapshot.result)} · pool ${fmt.brl(m.snapshot.investorPool)} (${fmt.brl(m.snapshot.perQuota)} por cota). Agora: resultado ${signed(m.result)} · pool ${fmt.brl(m.investorPool)}. Revise em Parâmetros e custos → Fechamentos.</div>` : ""}
       <div class="kpis">
         ${kpi("Faturamento UBY", fmt.brl(d.networkRevenue + d.royalties), `${fmt.int(sessions)} recargas · ${fmt.kwh0(energy)}`)}
-        ${kpi("Resultado após impostos", signed(d.networkResult), d.networkTaxes ? `impostos ${fmt.brl(d.networkTaxes)}` : "sem imposto lançado")}
+        ${kpi("Resultado após impostos", signed(d.networkResult), d.taxesTotal ? `impostos do período ${fmt.brl(d.taxesTotal)}` : "sem imposto lançado")}
         ${kpi("Reservas", fmt.brl(d.reserve), `legal ${fmt.pct1(p.legalReservePct)} · expansão ${fmt.pct1(p.expansionReservePct)}`)}
         ${kpi("Pool dos cotistas", fmt.brl(d.investorPool), acc ? "soma das competências" : `${fmt.brl(m?.perQuota || 0)} por cota`, true)}
       </div>
@@ -98,7 +98,8 @@
         ${row("Energia", -d.energyCost)}${d.directOperation ? row("Operação direta dos carregadores", -d.directOperation) : ""}${d.matrizCost ? row("Custos centrais da matriz (rateio)", -d.matrizCost) : ""}
         ${d.taxes ? row("Tributos por carregador", -d.taxes) : ""}${row("Gestão P3", -d.management)}${d.platform ? row("App / plataforma", -d.platform) : ""}${d.areaParticipation ? row("Participação da área", -d.areaParticipation) : ""}
         ${row("Resultado operacional + royalties", d.operationalResult + d.royalties, "t")}
-        ${row(`Impostos sobre o faturamento${m?.taxSource ? ` (${m.taxSource})` : ""}`, -(d.networkTaxes || 0), "", d.networkTaxes ? `base de cálculo: ${fmt.brl(d.networkTaxBase || 0)}` : "nenhum imposto lançado no período")}
+        ${row(d.taxes ? "Impostos restantes (royalties e ajuste à guia)" : `Impostos sobre o faturamento${m?.taxSource ? ` (${m.taxSource})` : ""}`, -(d.networkTaxes || 0), "",
+          d.taxesTotal ? `total de impostos do período: ${fmt.brl(d.taxesTotal)}${m?.taxSource ? ` (${m.taxSource})` : ""} sobre ${fmt.brl(d.networkTaxBase || 0)} faturados${d.taxes ? ` · ${fmt.brl(d.taxes)} já descontados em "Tributos por carregador"` : ""}` : "nenhum imposto lançado no período")}
         ${row("Resultado após impostos", d.networkResult, "t")}
         <tr class="g"><td colspan="2">Destinação</td></tr>
         ${!acc && m && m.carryIn < 0 ? row("Compensação de prejuízo de meses anteriores", m.carryIn, "s") : ""}
@@ -119,7 +120,7 @@
         ${cotistas.map(i => `<tr><td>${esc(i.name)}<div class="sub">desde ${esc(monthName(i.eligibleFrom))}</div></td><td class="n">${i.quotas}</td><td class="n">${fmt.brl(i.quotaValue)}</td><td class="n">${fmt.brl(i.investment)}</td><td class="n">${acc ? fmt.pct(i.returnRate * 100) : fmt.brl(m?.perQuota || 0)}</td><td class="n"><strong>${fmt.brl(i.value)}</strong></td></tr>`).join("") || `<tr><td colspan="6">Nenhum cotista habilitado.</td></tr>`}
         <tr class="t"><td>Total</td><td class="n">${cotistas.reduce((s, i) => s + n(i.quotas), 0)}</td><td></td><td class="n">${fmt.brl(cotistas.reduce((s, i) => s + n(i.investment), 0))}</td><td></td><td class="n">${fmt.brl(cotistas.reduce((s, i) => s + n(i.value), 0))}</td></tr>
       </tbody></table>
-      <div class="note">Cada competência é dividida somente entre as cotas habilitadas no primeiro dia do mês. O lucro só é distribuído depois de cobrir prejuízos de meses anteriores. Carregadores só de gestão P3 ficam fora do resultado da UBY; parceiros entram apenas pelo royalty. ${d.networkTaxes ? "" : "<strong>Atenção: não há imposto lançado no período.</strong> "}Confira documentos e aprove antes de pagar.</div>
+      <div class="note">Cada competência é dividida somente entre as cotas habilitadas no primeiro dia do mês. O lucro só é distribuído depois de cobrir prejuízos de meses anteriores. Carregadores só de gestão P3 ficam fora do resultado da UBY; parceiros entram apenas pelo royalty. ${d.taxesTotal ? "" : "<strong>Atenção: não há imposto lançado no período.</strong> "}Confira documentos e aprove antes de pagar.</div>
       <div class="sign"><div>Responsável financeiro · UBY Recharge</div><div>Aprovação</div></div>${foot()}`;
   }
 
