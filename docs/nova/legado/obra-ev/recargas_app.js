@@ -3840,7 +3840,12 @@ function readLocalFinanceReports() {
 }
 
 function writeLocalFinanceReports(items = financeReportArchive) {
-  writeJson(FINANCE_REPORTS_LOCAL_KEY, sortFinanceReports(items).slice(0, 600));
+  // Cópia local é só cache (a base guarda tudo): mantém os 30 mais recentes, todos os de área e, sem limite,
+  // os que só existem aqui (ids "local-…"), para o navegador não lotar e derrubar a sessão do banco.
+  const sorted = sortFinanceReports(items);
+  const keepAlways = item => /^local-/.test(String(item?.id || '')) || item?.reportType === 'partner_area';
+  const recent = sorted.filter(item => !keepAlways(item)).slice(0, 30);
+  writeJson(FINANCE_REPORTS_LOCAL_KEY, sortFinanceReports([...sorted.filter(keepAlways), ...recent]));
 }
 
 function isLegacyCrossMonthAreaReport(report = {}) {
