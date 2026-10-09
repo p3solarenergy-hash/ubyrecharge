@@ -65,12 +65,10 @@
   /*
     Faturas de energia por período de leitura (Copel + arrendamento).
     Cada fatura cobre [start, end): o dia da leitura final pertence à próxima.
-    O custo entra na competência do consumo, não na do pagamento: os kWh e o
-    valor são divididos pelos dias do período na proporção da energia que o
-    carregador entregou em cada dia (sem entrega no período inteiro: por dia).
-    Dias com entrega sem fatura lançada (ex.: fim do mês, fatura ainda não
-    chegou) entram como estimativa, pela tarifa por kWh entregue da fatura
-    mais próxima, e ficam marcados até a fatura chegar.
+    O custo da fatura entra inteiro na competência dela (ref) e o pagamento
+    fica no vencimento. Mês com entrega sem fatura lançada entra como
+    estimativa, pela tarifa por kWh entregue da fatura mais recente, e fica
+    marcado até a fatura chegar.
     invoices: [{id, ref, start, end, kwh, copelAmount, leaseKWh, leaseRate}]
     dailyKWh: { "AAAA-MM-DD": kWh entregue }
   */
@@ -81,47 +79,47 @@
     const lease = pos(inv.leaseAmount) > 0 ? Math.round(pos(inv.leaseAmount) * 100) / 100 : Math.round(leaseKWh * leaseRate * 100) / 100;
     return { copel, lease, leaseKWh, leaseRate, total: copel + lease, kwh: pos(inv.kwh) };
   }
+  // Regra do usuário (09/10/2026): a fatura entra INTEIRA na competência dela (ref "AAAA-MM";
+  // ex.: fatura Ago/2026 = custo de agosto), e é paga no vencimento (mês seguinte). O período de
+  // leitura serve para os kWh entregues e a tarifa. Sem ref, vale o mês do último dia lido.
+  const invoiceRef = i => /^\d{4}-\d{2}$/.test(i.ref || "") ? i.ref : addDays(i.end, -1).slice(0, 7);
   function energyInvoiceMonths(invoices, dailyKWh = {}) {
     const list = (invoices || []).filter(i => /^\d{4}-\d{2}-\d{2}$/.test(i.start || "") && /^\d{4}-\d{2}-\d{2}$/.test(i.end || "") && i.end > i.start)
-      .map(i => ({ ...i, ...invoiceTotals(i) })).sort((a, b) => a.start.localeCompare(b.start));
+      .map(i => ({ ...i, ...invoiceTotals(i), ref: invoiceRef(i) })).sort((a, b) => a.start.localeCompare(b.start));
     const months = {};
     const month = mk => (months[mk] = months[mk] || { kwh: 0, copel: 0, lease: 0, leaseKWh: 0, total: 0, deliveredKWh: 0, parts: [], estimatedKWh: 0, estimatedCost: 0, estimatedDeliveredKWh: 0, estimatedFrom: "", estimatedTo: "" });
-    const covered = new Set();
     list.forEach(inv => {
       const days = [];
-      for (let d = inv.start; d < inv.end; d = addDays(d, 1)) { days.push(d); covered.add(d); }
+      for (let d = inv.start; d < inv.end; d = addDays(d, 1)) days.push(d);
       const delivered = days.reduce((s, d) => s + pos(dailyKWh[d]), 0);
       inv.days = days.length; inv.deliveredKWh = delivered;
       inv.ratePerDelivered = delivered > 0 ? inv.total / delivered : 0;
       inv.ratePerMetered = inv.kwh > 0 ? inv.total / inv.kwh : 0;
-      const byMonth = new Map();
-      days.forEach(d => { const mk = d.slice(0, 7); byMonth.set(mk, (byMonth.get(mk) || 0) + (delivered > 0 ? pos(dailyKWh[d]) : 1)); });
-      const keys = [...byMonth.keys()], weights = keys.map(k => byMonth.get(k));
-      const copel = allocate(inv.copel, weights), lease = allocate(inv.lease, weights);
-      const wsum = weights.reduce((s, x) => s + x, 0) || 1;
-      keys.forEach((mk, i) => {
-        const share = weights[i] / wsum;
-        if (!(share > 0)) return;
-        const m = month(mk);
-        const part = { id: inv.id, ref: inv.ref || "", start: inv.start, end: inv.end, share, kwh: inv.kwh * share, leaseKWh: inv.leaseKWh * share, copel: copel[i], lease: lease[i], total: copel[i] + lease[i],
-          deliveredKWh: delivered > 0 ? byMonth.get(mk) : 0, from: days.find(d => d.startsWith(mk)), to: days.filter(d => d.startsWith(mk)).pop() };
-        m.parts.push(part);
-        m.kwh += part.kwh; m.leaseKWh += part.leaseKWh; m.copel += part.copel; m.lease += part.lease; m.total += part.total; m.deliveredKWh += part.deliveredKWh;
-      });
+      const m = month(inv.ref);
+      const part = { id: inv.id, ref: inv.ref, start: inv.start, end: inv.end, share: 1, kwh: inv.kwh, leaseKWh: inv.leaseKWh, copel: inv.copel, lease: inv.lease, total: inv.total,
+        deliveredKWh: delivered, from: inv.start, to: addDays(inv.end, -1) };
+      m.parts.push(part);
+      m.kwh += part.kwh; m.leaseKWh += part.leaseKWh; m.copel += part.copel; m.lease += part.lease; m.total += part.total; m.deliveredKWh += part.deliveredKWh;
     });
+    // Dias com entrega que nenhuma fatura cobre: estimativa (kWh × tarifa por kWh entregue da fatura
+    // mais recente) no mês em que a próxima fatura vai entrar — o próprio mês, ou o seguinte se o mês
+    // já tem fatura (ex.: 24 a 30/09 vão para a fatura de outubro). Some quando a fatura é lançada.
     if (list.length) {
-      Object.keys(dailyKWh).sort().forEach(d => {
-        const kwh = pos(dailyKWh[d]);
-        if (!(kwh > 0) || covered.has(d)) return;
-        const ref = list.filter(i => i.start <= d && i.ratePerDelivered > 0).pop() || list.find(i => i.ratePerDelivered > 0);
+      const covered = d => list.some(i => i.start <= d && d < i.end);
+      const nextMonth = mk => { const [y, m] = mk.split("-").map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`; };
+      const target = d => { let mk = d.slice(0, 7); while (months[mk]?.parts.length) mk = nextMonth(mk); return mk; };
+      const byMonth = {};
+      Object.keys(dailyKWh).sort().forEach(d => { const kwh = pos(dailyKWh[d]); if (!(kwh > 0) || covered(d)) return; const mk = target(d); (byMonth[mk] = byMonth[mk] || []).push([d, kwh]); });
+      Object.keys(byMonth).sort().forEach(mk => {
+        const ref = list.filter(i => i.ref <= mk && i.ratePerDelivered > 0).pop() || list.find(i => i.ratePerDelivered > 0);
         if (!ref) return;
-        const m = month(d.slice(0, 7));
-        m.estimatedDeliveredKWh += kwh;
-        m.estimatedCost += kwh * ref.ratePerDelivered;
-        m.estimatedKWh += ref.deliveredKWh > 0 ? kwh * ref.kwh / ref.deliveredKWh : 0;
+        const kwh = byMonth[mk].reduce((s, [, k]) => s + k, 0);
+        const m = month(mk);
+        m.estimatedDeliveredKWh = kwh;
+        m.estimatedCost = kwh * ref.ratePerDelivered;
+        m.estimatedKWh = ref.deliveredKWh > 0 ? kwh * ref.kwh / ref.deliveredKWh : 0;
         m.estimatedRef = ref.ref || ref.id;
-        if (!m.estimatedFrom || d < m.estimatedFrom) m.estimatedFrom = d;
-        if (!m.estimatedTo || d > m.estimatedTo) m.estimatedTo = d;
+        m.estimatedFrom = byMonth[mk][0][0]; m.estimatedTo = byMonth[mk].at(-1)[0];
       });
     }
     Object.values(months).forEach(m => { m.estimatedCost = Math.round(m.estimatedCost * 100) / 100; m.cost = Math.round((m.total + m.estimatedCost) * 100) / 100; });
