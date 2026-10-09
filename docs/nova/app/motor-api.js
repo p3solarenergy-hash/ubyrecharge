@@ -109,6 +109,16 @@
   }
   const partnerKeys = rows => new Set(rows.filter(isPartnerRow).map(rowKey));
 
+  // Teto de competência para o consolidado "do início até o fechamento de X": só vale dentro de withUntil().
+  let UNTIL = "";
+  const capMonths = list => (UNTIL ? list.filter(m => m <= UNTIL) : list);
+  const fv2Months = () => capMonths(FV2.months);
+  function withUntil(until, fn) {
+    const prev = UNTIL;
+    UNTIL = /^\d{4}-\d{2}$/.test(until || "") ? until : "";
+    try { return fn(); } finally { UNTIL = prev; }
+  }
+
   function months() {
     const rows = getUbyChargerRows(getGeneralUnitData()).filter(row => row.included);
     return [...new Set(rows.flatMap(row => row.charges).map(chargeMonthKey).filter(key => key !== "unknown"))]
@@ -128,20 +138,21 @@
     const isPartner = row => partnerSet.has(rowKey(row));
     const sourceIncluded = sourceRows.filter(row => row.included && !isPartner(row));
     const sourceUbyCharges = sourceIncluded.flatMap(row => row.charges);
-    const sourceMonths = [...new Set(sourceUbyCharges.map(chargeMonthKey).filter(key => key !== "unknown"))].filter(isPlausibleMonthKey).sort();
+    const sourceMonths = capMonths([...new Set(sourceUbyCharges.map(chargeMonthKey).filter(key => key !== "unknown"))].filter(isPlausibleMonthKey).sort());
+    const capCharges = list => (UNTIL ? list.filter(c => { const k = chargeMonthKey(c); return k === "unknown" || k <= UNTIL; }) : list);
     const latestMonth = sourceMonths.at(-1) || "";
     const currentGeneralMonth = requestedMonth === undefined ? latestMonth : (sourceMonths.includes(requestedMonth) ? requestedMonth : "");
     let isMonthView = !!currentGeneralMonth;
 
     let visibleRows = sourceRows.map(row => summarizeUbyChargerRow(
       row,
-      isMonthView ? row.charges.filter(charge => chargeMonthKey(charge) === currentGeneralMonth) : row.charges
+      isMonthView ? row.charges.filter(charge => chargeMonthKey(charge) === currentGeneralMonth) : capCharges(row.charges)
     ));
     let included = visibleRows.filter(row => row.included && row.count > 0 && !isPartner(row));
     const monthFallbackToAccumulated = isMonthView && !included.length && sourceUbyCharges.length;
     if (monthFallbackToAccumulated) {
       isMonthView = false;
-      visibleRows = sourceRows.map(row => summarizeUbyChargerRow(row, row.charges));
+      visibleRows = sourceRows.map(row => summarizeUbyChargerRow(row, capCharges(row.charges)));
       included = visibleRows.filter(row => row.included && row.count > 0 && !isPartner(row));
     }
     included.sort((a, b) => b.revenue - a.revenue);
@@ -1713,9 +1724,9 @@
   // Meses que entram para o carregador: com zeroSaleMonths, do primeiro mês com
   // venda em diante (com ou sem venda); sem a correção, como a plataforma original.
   function fv2RowMonths(row, fixes, monthKey) {
-    const own = [...(FV2.rowMonths.get(row.fv2Id)?.keys() || [])].filter(isPlausibleMonthKey).sort();
+    const own = capMonths([...(FV2.rowMonths.get(row.fv2Id)?.keys() || [])].filter(isPlausibleMonthKey).sort());
     if (monthKey) return fixes.zeroSaleMonths ? (own[0] && monthKey >= own[0] ? [monthKey] : []) : [monthKey];
-    return fixes.zeroSaleMonths ? FV2.months.filter(m => own[0] && m >= own[0]) : own;
+    return fixes.zeroSaleMonths ? fv2Months().filter(m => own[0] && m >= own[0]) : own;
   }
   // Alíquota de impostos da UBY na competência: a última "a partir de" até o mês; senão a alíquota geral.
   function taxRateFor(mk) {
@@ -1732,7 +1743,7 @@
   }
   function fv2NetworkMonthly(fixes) {
     const included = FV2.rows.filter(r => r.included);
-    return FV2.months.map(mk => {
+    return fv2Months().map(mk => {
       let ownedNet = 0, royalties = 0, taxBase = 0, taxesApplied = 0;
       const rows = [];
       included.forEach(row => {
@@ -1868,7 +1879,7 @@
 
   function finance(monthKey) {
     fv2Ensure();
-    const sourceMonths = FV2.months;
+    const sourceMonths = fv2Months();
     const isMonthView = !!monthKey && sourceMonths.includes(monthKey);
     const mk = isMonthView ? monthKey : "";
     const aggs = FV2.rows.filter(r => r.included).map(r => fv2RowAgg(r, mk)).filter(x => x.results.length)
@@ -2519,7 +2530,7 @@
     return { list: out, total: out.reduce((s, p) => s + p.amount, 0) };
   }
 
-  window.UBY_MOTOR_API = { alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
+  window.UBY_MOTOR_API = { withUntil, alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, clientRanking, customerWatch, pricingBase, club, financeV2, financeV2Parity, financeV2Impact,

@@ -35,7 +35,7 @@
       </div>
       <section class="section"><div class="section-head"><div><p class="kicker">${esc(type[1])}</p><h2>O que entra</h2><p>${esc(type[2])}</p></div></div>
         <div class="toolbar" style="margin:0;flex-wrap:wrap;gap:10px">
-          ${needsMonth ? `<label>Competência <select class="select" id="repMonth">${allowAcc ? `<option value="" ${ui.month === "" ? "selected" : ""}>Acumulado</option>` : ""}${months.map(m => `<option value="${m}" ${m === ui.month ? "selected" : ""}>${esc(UBY.state.api.monthName(m))}</option>`).join("")}</select></label>` : ""}
+          ${needsMonth ? `<label>Competência <select class="select" id="repMonth">${allowAcc ? `${months.length > 1 ? `<optgroup label="Consolidado do início até o fechamento de…">${months.slice(1).map(m => `<option value="until:${m}" ${ui.month === `until:${m}` ? "selected" : ""}>Consolidado até ${esc(UBY.state.api.monthName(m))}</option>`).join("")}</optgroup>` : ""}<optgroup label="Todo o período"><option value="" ${ui.month === "" ? "selected" : ""}>Acumulado (até hoje)</option></optgroup><optgroup label="Um mês">` : ""}${months.map(m => `<option value="${m}" ${m === ui.month ? "selected" : ""}>${esc(UBY.state.api.monthName(m))}</option>`).join("")}${allowAcc ? "</optgroup>" : ""}</select></label>` : ""}
           ${ui.kind === "carregador" || ui.kind === "area" ? `<label>Carregador <select class="select" id="repStation">
             <optgroup label="Operação UBY e parceiros">${stations.filter(s => UBY.isUbyModel(s.model)).map(s => `<option value="${esc(`${s.workId}|${s.station}`)}" ${ui.station === `${s.workId}|${s.station}` ? "selected" : ""}>${esc(s.station)}</option>`).join("")}</optgroup>
             <optgroup label="Fora da UBY (só gestão P3 / sociedade)">${stations.filter(s => !UBY.isUbyModel(s.model)).map(s => `<option value="${esc(`${s.workId}|${s.station}`)}" ${ui.station === `${s.workId}|${s.station}` ? "selected" : ""}>${esc(s.station)}</option>`).join("")}</optgroup></select></label>` : ""}
@@ -52,7 +52,7 @@
       </section>`;
 
     const $ = s => target.querySelector(s);
-    target.querySelectorAll("#repKind button").forEach(b => b.onclick = () => { ui.kind = b.dataset.v; ui.html = ""; if (ui.kind !== "unificado" && ui.month === "") ui.month = months[0] || ""; render(target); });
+    target.querySelectorAll("#repKind button").forEach(b => b.onclick = () => { ui.kind = b.dataset.v; ui.html = ""; if (ui.kind !== "unificado" && (ui.month === "" || /^until:/.test(ui.month))) ui.month = months[0] || ""; render(target); });
     if ($("#repMonth")) $("#repMonth").onchange = e => { ui.month = e.target.value; ui.html = ""; render(target); };
     if ($("#repStation")) $("#repStation").onchange = e => { ui.station = e.target.value; ui.html = ""; render(target); };
     if ($("#repInvestor")) $("#repInvestor").onchange = e => { ui.investor = e.target.value; ui.html = ""; render(target); };
@@ -60,7 +60,8 @@
     $("#repGen").onclick = () => {
       const [workId, station] = ui.station.split("|");
       try {
-        ui.html = UBY.reports.build(ui.kind, { month: ui.month, workId, station, name: ui.investor, includeOutside: ui.includeOutside });
+        const until = /^until:\d{4}-\d{2}$/.test(ui.month) ? ui.month.slice(6) : "";
+        ui.html = UBY.reports.build(ui.kind, { month: until ? "" : ui.month, until, workId, station, name: ui.investor, includeOutside: ui.includeOutside });
       } catch (err) { ui.html = `<p style="font-family:Inter,Arial;padding:24px">Não foi possível gerar: ${esc(err.message)}</p>`; }
       render(target);
     };

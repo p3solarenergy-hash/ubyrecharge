@@ -63,9 +63,11 @@
   const row = (label, value, cls = "", note = "") => `<tr class="${cls}"><td>${label}${note ? `<div class="sub">${esc(note)}</div>` : ""}</td><td class="n">${signed(value)}</td></tr>`;
 
   // ---------------------------------------------------------------- unificado
-  function pageUnificado(mk) {
+  function pageUnificado(mk, until) {
     const acc = !mk;
-    const f = UBY.data("finance", mk || ""), inv = UBY.data("investorDistribution"), cmd = UBY.data("command", mk || "");
+    // Consolidado "do início até o fechamento de X": o motor calcula só até X (teto de competência).
+    const capped = until && acc ? UBY.state.api.withUntil(until, () => ({ f: UBY.state.api.finance(""), inv: UBY.state.api.investorDistribution(), cmd: UBY.state.api.command("") })) : null;
+    const f = capped ? capped.f : UBY.data("finance", mk || ""), inv = capped ? capped.inv : UBY.data("investorDistribution"), cmd = capped ? capped.cmd : UBY.data("command", mk || "");
     const d = f.dre, p = d.policy;
     const idx = acc ? -1 : inv.months.findIndex(x => x.key === mk);
     const m = idx >= 0 ? inv.months[idx] : null;
@@ -76,7 +78,7 @@
     const status = acc ? "pendente" : (m?.status || "pendente");
     const approval = !acc && m?.approvedAt ? ` · aprovado em ${fmt.dt(m.approvedAt)}${m.approvedBy ? ` por ${esc(m.approvedBy)}` : ""}${m.paidAt ? ` · pago em ${fmt.date(m.paidAt + "T12:00:00")}` : ""}` : "";
     const changed = !acc && m?.snapshot && (Math.abs(n(m.snapshot.investorPool) - n(m.investorPool)) > 0.009 || Math.abs(n(m.snapshot.result) - n(m.result)) > 0.009);
-    return `${header(`Relatório unificado da operação · ${monthName(mk)}`, `${d.ownedCount} ativo(s) UBY e ${d.partnerCount} parceiro(s) com royalty · ${inv.investors.length} cotista(s) · ${esc(p.roundLabel || "")}${acc ? ` · ${inv.months.length} competência(s) de distribuição` : ""}${approval}`, status)}
+    return `${header(`Relatório unificado da operação · ${capped ? `consolidado do início até o fechamento de ${monthName(until)}` : monthName(mk)}`,`${d.ownedCount} ativo(s) UBY e ${d.partnerCount} parceiro(s) com royalty · ${inv.investors.length} cotista(s) · ${esc(p.roundLabel || "")}${acc ? ` · ${inv.months.length} competência(s) de distribuição` : ""}${approval}`, status)}
       ${changed ? `<div class="note" style="border-color:#e0a4a0;background:#fdf0ef;color:#8a2f2a"><strong>Os números mudaram depois da aprovação.</strong> Aprovado: resultado ${signed(m.snapshot.result)} · pool ${fmt.brl(m.snapshot.investorPool)} (${fmt.brl(m.snapshot.perQuota)} por cota). Agora: resultado ${signed(m.result)} · pool ${fmt.brl(m.investorPool)}. Revise em Parâmetros e custos → Fechamentos.</div>` : ""}
       <div class="kpis">
         ${kpi("Faturamento UBY", fmt.brl(d.networkRevenue + d.royalties), `${fmt.int(sessions)} recargas · ${fmt.kwh0(energy)}`)}
@@ -256,6 +258,7 @@
   function build(kind, o = {}) {
     const latest = UBY.state.months.at(-1) || "";
     if (kind === "area") return doc(fileTitle("Prestação de contas", o.station, o.month || latest), [pageArea(o.workId, o.station, o.month)]);
+    if (kind === "unificado" && o.until) return doc(`UBY Recharge — Consolidado até ${mmYY(o.until)}`, [pageUnificado("", o.until)]);
     if (kind === "unificado") return doc(fileTitle("Relatório unificado", "", o.month), [pageUnificado(o.month)]);
     if (kind === "carregador") {
       const s = UBY.data("stationFinance", o.workId, o.station, o.month);
