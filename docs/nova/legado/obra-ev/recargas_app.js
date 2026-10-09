@@ -5816,8 +5816,45 @@ function normalizeNetworkInvestors(raw) {
     investedAt: /^\d{4}-\d{2}-\d{2}$/.test(String(item?.investedAt || '')) ? String(item.investedAt) : '',
     investment: Number(item?.investment) > 0 ? Math.round(Number(item.investment) * 100) / 100 : 0,
     // E-mail de acesso do cotista aos próprios extratos (documentos publicados).
-    email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(item?.email || '').trim()) ? String(item.email).trim().toLowerCase() : ''
+    email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(item?.email || '').trim()) ? String(item.email).trim().toLowerCase() : '',
+    // Carregador cuja entrada em operação libera o dividendo desta cota (não é rateio de faturamento).
+    linkedStation: safeText(item?.linkedStation || '').slice(0, 120)
   })).filter(item => item.name && item.quotas > 0);
+}
+
+// Mês em que a cota passa a receber: o maior entre o mês do aporte (eligibleFrom guardado) e o mês
+// de início da operação do carregador vinculado (dia 1º vale o próprio mês; depois, o mês seguinte).
+function investorOperationMonth(station) {
+  if (!station) return '';
+  try {
+    const key = normalizeStationForCompare(station);
+    const row = getUbyChargerRows(getGeneralUnitData()).find(r => normalizeStationForCompare(r.station || r.stationName || r.workName || '') === key);
+    if (!row) return '';
+    const start = operationStartForCharges(row.charges || [], { ...row, stationName: row.station || row.stationName });
+    if (!start || Number.isNaN(start.getTime())) return '';
+    const first = start.getDate() === 1 ? new Date(start.getFullYear(), start.getMonth(), 1) : new Date(start.getFullYear(), start.getMonth() + 1, 1);
+    return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}`;
+  } catch (_) { return ''; }
+}
+
+// Ordem uniforme em toda a plataforma e nos relatórios: por início do recebimento, depois data do
+// aporte e nome; quem aguarda operação vai para o fim.
+function compareInvestorsByStart(a, b) {
+  return String(a.eligibleFrom || '9999-99').localeCompare(String(b.eligibleFrom || '9999-99'))
+    || String(a.investedAt || a.baseEligibleFrom || '9999').localeCompare(String(b.investedAt || b.baseEligibleFrom || '9999'))
+    || String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR');
+}
+
+function applyInvestorOperationStart(investors) {
+  const cache = new Map();
+  return investors.map(inv => {
+    if (!inv.linkedStation) return { ...inv, baseEligibleFrom: inv.eligibleFrom, operationFrom: '' };
+    if (!cache.has(inv.linkedStation)) cache.set(inv.linkedStation, investorOperationMonth(inv.linkedStation));
+    const operationFrom = cache.get(inv.linkedStation);
+    // Carregador vinculado ainda sem operação (ou não cadastrado): a cota aguarda, sem dividendo.
+    if (!operationFrom) return { ...inv, baseEligibleFrom: inv.eligibleFrom, operationFrom: '', waitingOperation: true, eligibleFrom: '2099-12' };
+    return { ...inv, baseEligibleFrom: inv.eligibleFrom, operationFrom, eligibleFrom: operationFrom > inv.eligibleFrom ? operationFrom : inv.eligibleFrom };
+  });
 }
 
 function normalizeDistributionLedger(raw) {
@@ -12207,7 +12244,7 @@ function networkUnifiedReportModel(options = {}) {
 function networkInvestorDistributionModel() {
   const accumulated = networkUnifiedReportModel({ accumulated: true });
   const sourceMonths = [...new Set(accumulated.rows.flatMap(row => row.charges || []).map(chargeMonthKey).filter(key => /^\d{4}-\d{2}$/.test(key) && key >= (accumulated.policy.distributionStartMonth || '2026-06')))].sort();
-  const investors = normalizeNetworkInvestors(accumulated.policy.investors);
+  const investors = applyInvestorOperationStart(normalizeNetworkInvestors(accumulated.policy.investors)).sort(compareInvestorsByStart);
   const months = sourceMonths.map(monthKey => {
     const finance = networkUnifiedReportModel({ monthKey });
     const eligible = investors.filter(investor => investor.eligibleFrom <= monthKey);
