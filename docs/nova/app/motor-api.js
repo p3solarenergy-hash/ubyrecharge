@@ -937,84 +937,6 @@
       summary: { clients: ranking.length, valid: ranking.reduce((s, u) => s + u.valid, 0), revenue: totalRevenue, energy: ranking.reduce((s, u) => s + u.energy, 0) } };
   }
 
-  // ---------------------------------------------------------------------
-  // Base de cálculo de clientes e preço (app/analytics-core.js, funções puras).
-  // Aqui só se normalizam as recargas e se leem os custos já calculados pelo
-  // financeiro v2; nenhuma conta nova de resultado é feita neste arquivo.
-  // ---------------------------------------------------------------------
-  // scope "uby" (padrão): operação UBY sem parceiros (mesma regra da tela de Clientes);
-  // "all": todos os carregadores com recargas (inclui os só-gestão P3, para os estudos de preço).
-  function analyticsSessions(scope) {
-    const pad = n => String(n).padStart(2, "0");
-    const rows = getUbyChargerRows(getGeneralUnitData()).filter(r => scope === "all" ? (r.charges || []).length : r.included && !isPartnerRow(r));
-    const out = [];
-    rows.forEach(row => {
-      const site = abbreviatedStationLabel(row.station);
-      (row.charges || []).forEach(c => {
-        const d = c.startDate;
-        if (!(d instanceof Date) || Number.isNaN(d.getTime())) return;
-        const revenue = Number(c.revenue || 0);
-        // cortesia (receita 0) não é recarga paga: fica de fora das contas de preço e de cliente
-        out.push({ key: clientKeyFromCharge(c) || "", name: c.userName || c.userEmail || "", email: c.userEmail || "", phone: c.userPhone || "", site, ref: `${row.workId}|${row.station}`,
-          own: !!row.included, t: d.getTime(), day: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, hour: d.getHours(), dow: d.getDay(),
-          kwh: Number(c.energyKWh || 0), revenue, valid: isExecutedCharge(c) && revenue > 0, voucher: String(c.voucher || "") });
-      });
-    });
-    return out;
-  }
-
-  function customerWatch() {
-    return JSON.parse(JSON.stringify(window.UBY_ANALYTICS_CORE.customerWatch(analyticsSessions("uby"))));
-  }
-
-  // Parâmetros de cada carregador próprio lidos do financeiro do último mês completo
-  // (custo de energia por kWh, % variáveis, custos fixos), mais preço, perfil de carga e
-  // reajustes detectados. As telas deixam editar os parâmetros só na simulação.
-  function pricingBase() {
-    const core = window.UBY_ANALYTICS_CORE;
-    const pad = n => String(n).padStart(2, "0");
-    const all = analyticsSessions("all");
-    const asOf = all.reduce((t, s) => s.valid ? Math.max(t, s.t) : t, 0);
-    const asOfDate = new Date(asOf);
-    const curMk = `${asOfDate.getFullYear()}-${pad(asOfDate.getMonth() + 1)}`;
-    const sites = getUbyChargerRows(getGeneralUnitData()).filter(r => r.included && !isPartnerRow(r)).map(row => {
-      const ref = `${row.workId}|${row.station}`;
-      const mine = all.filter(s => s.ref === ref);
-      if (!mine.some(s => s.valid)) return null;
-      const months = [...new Set((row.charges || []).map(chargeMonthKey).filter(isPlausibleMonthKey))].sort();
-      let mk = months.at(-1) || "";
-      if (mk === curMk && months.length > 1 && asOfDate.getDate() < 28) mk = months.at(-2);
-      let s = null;
-      try { s = stationFinance(row.workId, row.station, mk); } catch (_) {}
-      const f = s?.finance;
-      if (!f || !(f.energy > 0) || !(f.revenue > 0)) return null;
-      const ageDays = (asOf - mine.reduce((m, x) => Math.min(m, x.t), Infinity)) / 86400000;
-      const power = Number(workPowerById(row.workId) || 0);
-      // capacidade do mês = potência × horas disponíveis (mesma conta da ocupação do Comando/Análise de uso)
-      const [cy, cm] = mk.split("-").map(Number);
-      let capacityKwh = 0;
-      try { capacityKwh = power * stationAvailableHours(stationAvailabilityFor(row.workId, row.station, row.workName), new Date(cy, cm - 1, 1), new Date(cy, cm, 1)); } catch (_) {}
-      const profiles = core.customerProfiles(mine, asOf);
-      const freq = profiles.filter(p => p.n >= core.DEFAULTS.frequentSessions);
-      const sum = k => freq.reduce((t, p) => t + p[k], 0);
-      return {
-        site: abbreviatedStationLabel(row.station), ref, workId: row.workId, station: row.station, kind: row.kind, power, capacityKwh, model: s.modelLabel || "",
-        month: mk, monthLabel: monthLabel(mk), ageDays: Math.round(ageDays), short: ageDays < 56,
-        params: { kwh: f.energy, price: f.revenue / f.energy, listNow: core.listPrice(mine, asOf) || f.revenue / f.energy,
-          energyPerKwh: f.energyCost / f.energy, pctCost: (f.areaParticipation + f.platform + f.management + f.ubyRoyalty + f.taxes) / f.revenue,
-          fixedMonth: Number(f.matrizCost || 0) + Number(f.localExtraCosts || 0) + Number(f.matrizTaxCost || 0) },
-        result: { operationNet: f.operationNet, margin: f.operationMargin },
-        costParts: { area: f.areaParticipation / f.revenue, platform: f.platform / f.revenue, management: f.management / f.revenue, tax: f.taxes / f.revenue },
-        ladder: core.priceLadder(mine.filter(x => asOf - x.t < 90 * 86400000)),
-        profile: core.loadProfile(mine, asOf, power, 56),
-        freq: { clients: freq.length, active: freq.filter(p => p.n30 > 0).length, kwh30: sum("kwh30"), rev30: sum("rev30"), kwhP30: sum("kwhP30"), price30: sum("kwh30") ? sum("rev30") / sum("kwh30") : 0 }
-      };
-    }).filter(Boolean);
-    const ownBySite = new Map(all.map(s => [s.site, s.own]));
-    const events = core.priceEvents(all.filter(s => s.valid), asOf).map(e => ({ ...e, own: ownBySite.get(e.site) !== false }));
-    return JSON.parse(JSON.stringify({ asOf: asOf ? new Date(asOf).toISOString() : null, sites, events }));
-  }
-
   function club(monthKey) {
     try { ensureClubParticipantsAutoSync(); } catch (_) {}
     const unitData = getGeneralUnitData();
@@ -2282,21 +2204,6 @@
       });
     }
 
-    // 5) Clientes e carregadores (base de cálculo em app/analytics-core.js; detalhes em Clientes → Alertas).
-    try {
-      const w = customerWatch();
-      const crit = w.alerts.filter(a => a.level === "critico" && a.type !== "perdido");
-      if (crit.length) {
-        const risk = crit.reduce((s, a) => s + a.monthlyValue, 0);
-        const int = v => Math.round(v).toLocaleString("pt-BR");
-        add("atencao", "cliente", `${crit.length} cliente(s) importante(s) reduziram ou pararam de carregar`, `Cerca de R$ ${int(risk)} de receita por mês em risco. Veja quem são e o que fazer.`, "#/clientes/alertas");
-      }
-      w.sites.filter(s => s.mature && (s.level === "critico" || s.level === "atencao")).forEach(s => {
-        add(s.level === "critico" ? "atencao" : "info", "cliente", `${s.site}: energia vendida ${n1(s.changePct)}% em 28 dias`,
-          `${Math.round(s.kwh28).toLocaleString("pt-BR")} kWh nas últimas 4 semanas contra ${Math.round(s.kwhPrev28).toLocaleString("pt-BR")} nas 4 anteriores.`, "#/clientes/alertas");
-      });
-    } catch (err) { console.warn("[alertas de clientes]", err.message); }
-
     const billLevel = b => (b.bucket === "vencida" || b.bucket === "hoje") ? "critico" : (b.bucket === "3dias" || b.bucket === "7dias") ? "atencao" : "info";
     const counts = { critico: 0, atencao: 0, info: 0 };
     bills.forEach(b => { counts[billLevel(b)] += 1; });
@@ -2522,7 +2429,7 @@
   window.UBY_MOTOR_API = { alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
-    customerRegistry, clientIntelligence, clientRanking, customerWatch, pricingBase, club, financeV2, financeV2Parity, financeV2Impact,
+    customerRegistry, clientIntelligence, clientRanking, club, financeV2, financeV2Parity, financeV2Impact,
     financeLegacy, investorDistributionLegacy, stationFinanceLegacy, destinationsLegacy };
   document.dispatchEvent(new CustomEvent("uby:motor-api-ready"));
 })();
