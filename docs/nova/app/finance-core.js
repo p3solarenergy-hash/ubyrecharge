@@ -103,8 +103,9 @@
     });
     // Dias com entrega que nenhuma fatura cobre vão para o mês em que a próxima fatura vai entrar — o
     // próprio mês, ou o seguinte se o mês já tem fatura (ex.: 24 a 30/09 vão para a fatura de outubro).
-    // Estimativa desse mês = a fatura do mês anterior repetida (Copel + arrendamento), até a fatura do
-    // mês ser lançada (usuário, 09/10/2026). Antes da primeira fatura: kWh × tarifa da primeira.
+    // Estimativa desse mês = kWh entregues × custo médio por kWh entregue da fatura do mês anterior,
+    // separado em Copel e arrendamento (usuário, 09/10/2026), até a fatura do mês ser lançada.
+    // Antes da primeira fatura, vale o custo médio da primeira.
     if (list.length) {
       const covered = d => list.some(i => i.start <= d && d < i.end);
       const nextMonth = mk => { const [y, m] = mk.split("-").map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`; };
@@ -113,14 +114,16 @@
       Object.keys(dailyKWh).sort().forEach(d => { const kwh = pos(dailyKWh[d]); if (!(kwh > 0) || covered(d)) return; const mk = target(d); (byMonth[mk] = byMonth[mk] || []).push([d, kwh]); });
       Object.keys(byMonth).sort().forEach(mk => {
         const kwh = byMonth[mk].reduce((s, [, k]) => s + k, 0);
-        const prev = list.filter(i => i.ref < mk && i.total > 0).sort((a, b) => a.ref.localeCompare(b.ref) || a.start.localeCompare(b.start)).pop();
-        const ref = prev || list.find(i => i.ratePerDelivered > 0);
+        const usable = list.filter(i => i.ratePerDelivered > 0).sort((a, b) => a.ref.localeCompare(b.ref) || a.start.localeCompare(b.start));
+        const ref = usable.filter(i => i.ref < mk).pop() || usable[0];
         if (!ref) return;
         const m = month(mk);
         m.estimatedDeliveredKWh = kwh;
-        m.estimatedCost = prev ? prev.total : kwh * ref.ratePerDelivered;
-        m.estimatedKWh = prev ? prev.kwh : (ref.deliveredKWh > 0 ? kwh * ref.kwh / ref.deliveredKWh : 0);
-        m.estimatedRule = prev ? "fatura do mês anterior" : "tarifa da primeira fatura";
+        m.estimatedCopel = Math.round(kwh * ref.copel / ref.deliveredKWh * 100) / 100;
+        m.estimatedLease = Math.round(kwh * ref.lease / ref.deliveredKWh * 100) / 100;
+        m.estimatedCost = m.estimatedCopel + m.estimatedLease;
+        m.estimatedCopelRate = ref.copel / ref.deliveredKWh; m.estimatedLeaseRate = ref.lease / ref.deliveredKWh;
+        m.estimatedKWh = kwh * ref.kwh / ref.deliveredKWh;
         m.estimatedRef = ref.ref || ref.id;
         m.estimatedFrom = byMonth[mk][0][0]; m.estimatedTo = byMonth[mk].at(-1)[0];
       });
