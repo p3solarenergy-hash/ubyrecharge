@@ -48,7 +48,7 @@
   const fileTitle = (type, place, mk) => [`UBY Recharge — ${type}`, place ? placeName(place) : "", mmYY(mk)].filter(Boolean).map(p => p.replace(/[\\/:*?"<>|]+/g, "-")).join(" - ");
   function doc(title, pages) {
     return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${CSS}</style></head><body>
-      <div class="actions"><button onclick="window.print()">Imprimir / salvar PDF</button></div>${pages.map(p => `<div class="page">${p}</div>`).join("")}</body></html>`;
+      <div class="actions"><button onclick="var o=parent.document.title;try{parent.document.title=document.title}catch(e){}window.addEventListener('afterprint',function(){try{parent.document.title=o}catch(e){}},{once:true});window.print()">Imprimir / salvar PDF</button></div>${pages.map(p => `<div class="page">${p}</div>`).join("")}</body></html>`;
   }
   function open(html) {
     const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));

@@ -70,7 +70,15 @@
     if (frame) {
       frame.srcdoc = ui.html;
       frame.onload = () => { try { frame.style.height = Math.max(800, frame.contentDocument.documentElement.scrollHeight + 20) + "px"; } catch (_) {} };
-      $("#repPrint").onclick = () => { try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (_) { UBY.reports.open(ui.html); } };
+      // O nome sugerido ao salvar em PDF vem do título da página principal; empresta o título do relatório durante a impressão.
+      $("#repPrint").onclick = () => {
+        const old = document.title;
+        try {
+          document.title = frame.contentDocument.title || old;
+          window.addEventListener("afterprint", () => { document.title = old; }, { once: true });
+          frame.contentWindow.focus(); frame.contentWindow.print();
+        } catch (_) { document.title = old; UBY.reports.open(ui.html); }
+      };
     }
   }
 
