@@ -1097,6 +1097,15 @@
     })));
     const inp = (k, label, type = "number", extra = "") => field(label, `<input class="select" data-pol="${k}" type="${type}" value="${esc(e[k] ?? "")}" ${extra} style="width:100%">`);
     const derived = w.applyInvestorOperationStart(e.investors.map(i => deriveInvestor(i, e.quotaValue)));
+    // A ordem só é recalculada ao abrir/salvar: reordenar a cada edição fazia a linha "fugir" e o vínculo caía no cotista errado.
+    if (!ui.rowOrder || ui.rowOrder.length !== e.investors.length) {
+      ui.rowOrder = ui.rowOrder && e.investors.length === ui.rowOrder.length + 1
+        ? [...ui.rowOrder, e.investors.length - 1]
+        : e.investors.map((i, k) => k).sort((a, b) => w.compareInvestorsByStart(derived[a], derived[b]));
+    }
+    const firstEligible = derived.map(d => d.eligibleFrom).filter(m => m && m < "2099").sort()[0] || "";
+    const startWarn = firstEligible && e.distributionStartMonth && e.distributionStartMonth > firstEligible
+      ? `<div class="note" style="margin:10px 0;border-color:#e0a4a0"><strong>Atenção:</strong> "Distribuição a partir de" está em ${esc(UBY.state.api?.monthName?.(e.distributionStartMonth) || e.distributionStartMonth)}, mas há cotas habilitadas desde ${esc(UBY.state.api?.monthName?.(firstEligible) || firstEligible)}. Os meses anteriores ao início da distribuição não aparecem no histórico nem na rentabilidade dos cotistas.</div>` : "";
     const stationNames = (w.getUbyChargerRows(w.getGeneralUnitData()) || []).filter(r => r.included).map(r => r.station || r.stationName || r.workName).filter(Boolean);
     const quotasSum = derived.reduce((s, i) => s + Number(i.quotas || 0), 0);
     const investedSum = derived.reduce((s, i) => s + Number(i.investment || 0), 0);
@@ -1109,6 +1118,7 @@
           ${inp("soldQuotas", "Cotas vendidas", "number", 'min="0" step="1"')}${inp("roundLabel", "Nome da rodada atual", "text")}
         </div>
       </section>
+      ${startWarn}
       <section class="section"><div class="section-head"><div><p class="kicker">Impostos da UBY</p><h2>Impostos sobre o faturamento</h2><p>Incidem sobre tudo o que a UBY faturou no mês (recargas e receitas dos ativos próprios + royalties) e saem do resultado antes das reservas e dos cotistas. Use o percentual e, quando a guia sair, lance o valor exato do mês — ele substitui o percentual naquela competência.</p></div></div>
         <div class="grid g4" style="gap:8px">${inp("taxRatePct", "Alíquota sobre o faturamento (%)", "number", 'min="0" max="100" step="0.01"')}</div>
         <p class="meta" style="margin:10px 0 6px">A alíquota sai do resultado de cada carregador próprio da UBY (e dos relatórios). Quando ela mudar, cadastre a nova "a partir de" um mês: os meses anteriores continuam com a antiga.</p>
@@ -1123,7 +1133,7 @@
           <button class="btn" id="pmInvAdd" type="button">＋ Cotista</button></div>
         <datalist id="pmStationList">${stationNames.map(n => `<option value="${esc(n)}"></option>`).join("")}</datalist>
         <div class="table-wrap"><table><thead><tr><th>Cotista</th><th>E-mail (acesso aos extratos)</th><th>Data do aporte</th><th class="num">Valor investido (R$)</th><th class="num">Valor da cota</th><th class="num">Cotas</th><th>Carregador vinculado</th><th>Participa a partir de</th><th>Situação</th><th></th></tr></thead>
-          <tbody>${e.investors.map((i, k) => k).sort((a, b) => w.compareInvestorsByStart(derived[a], derived[b])).map(k => { const i = e.investors[k], d = derived[k]; return `<tr>
+          <tbody>${ui.rowOrder.map(k => { const i = e.investors[k], d = derived[k]; return `<tr>
             <td><input class="select" data-inv="${k}|name" value="${esc(i.name)}" style="width:100%"></td>
             <td><input class="select" type="email" data-inv="${k}|email" value="${esc(i.email || "")}" placeholder="opcional" style="width:100%"></td>
             <td><input class="select" type="date" data-inv="${k}|investedAt" value="${esc(i.investedAt || "")}"></td>
@@ -1767,7 +1777,7 @@
     target.querySelectorAll("[data-inv]").forEach(el => el.onchange = () => { const [i, k] = el.dataset.inv.split("|"); ui.policyEdits.investors[Number(i)][k] = ["investment", "quotaValue"].includes(k) ? Number(el.value || 0) : el.value; draw(target, w); });
     if ($("#pmInvAdd")) $("#pmInvAdd").onclick = () => { const qv = Number(ui.policyEdits.quotaValue) || window.UBY_CONFIG.quotaValueDefault; ui.policyEdits.investors.push({ name: "Novo cotista", investedAt: new Date().toISOString().slice(0, 10), investment: qv, quotaValue: qv, status: "pendente" }); draw(target, w); };
     target.querySelectorAll("[data-inv-del]").forEach(b => b.onclick = () => { const i = Number(b.dataset.invDel); if (confirm(`Remover ${ui.policyEdits.investors[i].name} da lista de cotistas?`)) { ui.policyEdits.investors.splice(i, 1); draw(target, w); } });
-    if ($("#pmPolReset")) $("#pmPolReset").onclick = () => { ui.policyEdits = null; draw(target, w); };
+    if ($("#pmPolReset")) $("#pmPolReset").onclick = () => { ui.policyEdits = null; ui.rowOrder = null; draw(target, w); };
     if ($("#pmPolSave")) $("#pmPolSave").onclick = () => run(target, w, "Política de cotas", async () => {
       await resyncMatrix(w);
       const current = w.loadNetworkDistribution();
@@ -1776,7 +1786,7 @@
       const saved = w.saveNetworkDistribution(next);
       const fb = await awaitMatrixSave(w);
       if (Number(saved.quotaValue) !== Number(next.quotaValue) || Number(saved.taxRatePct || 0) !== Number(next.taxRatePct || 0) || JSON.stringify(saved.taxRateFrom || {}) !== JSON.stringify(next.taxRateFrom || {})) throw new Error("A política não foi aceita pela plataforma original (valor da cota ou impostos).");
-      ui.policyEdits = null;
+      ui.policyEdits = null; ui.rowOrder = null;
       return fb || "política salva na nuvem";
     });
   }
