@@ -5823,7 +5823,7 @@ function normalizeNetworkInvestors(raw) {
 }
 
 // Mês em que a cota passa a receber: o maior entre o mês do aporte (eligibleFrom guardado) e o mês
-// de início da operação do carregador vinculado (dia 1º vale o próprio mês; depois, o mês seguinte).
+// de início da operação do carregador vinculado (a operação vale desde o próprio mês em que começou).
 function investorOperationMonth(station) {
   if (!station) return '';
   try {
@@ -5832,8 +5832,8 @@ function investorOperationMonth(station) {
     if (!row) return '';
     const start = operationStartForCharges(row.charges || [], { ...row, stationName: row.station || row.stationName });
     if (!start || Number.isNaN(start.getTime())) return '';
-    const first = start.getDate() === 1 ? new Date(start.getFullYear(), start.getMonth(), 1) : new Date(start.getFullYear(), start.getMonth() + 1, 1);
-    return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}`;
+    // Vale o mês em que o carregador entrou em operação, qualquer que seja o dia.
+    return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
   } catch (_) { return ''; }
 }
 
