@@ -201,8 +201,19 @@
     bar.id = "sessionBanner";
     bar.setAttribute("role", "alert");
     bar.style.cssText = "position:sticky;top:0;z-index:50;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px 16px;background:#fdf0ef;color:#8a2f2a;border-bottom:1px solid #e0a4a0;font-weight:600";
-    bar.innerHTML = `<span>Sua sessão com o banco expirou: o que aparece é só uma cópia parcial (mês atual) e não vale para fechamentos.</span><button type="button" class="btn" style="font-weight:700">Sair e entrar de novo</button>`;
-    bar.querySelector("button").onclick = () => $("#logoutButton").click();
+    // Sessão guardada mas ilegível = o navegador ficou sem espaço (a biblioteca do banco testa a gravação antes de ler).
+    let cheio = false;
+    try { cheio = !!localStorage.getItem("sb-csxafzuaqbbsbdatuhrd-auth-token"); } catch (_) {}
+    const msg = cheio
+      ? "O armazenamento do navegador está cheio e a plataforma não consegue ler a sua sessão: o que aparece é só uma cópia parcial (mês atual) e não vale para fechamentos."
+      : "Sua sessão com o banco expirou: o que aparece é só uma cópia parcial (mês atual) e não vale para fechamentos.";
+    bar.innerHTML = `<span>${msg}</span><button type="button" class="btn" style="font-weight:700">${cheio ? "Liberar espaço e recarregar" : "Sair e entrar de novo"}</button>`;
+    bar.querySelector("button").onclick = () => {
+      if (!cheio) return $("#logoutButton").click();
+      // Só o cache de recargas da Nova (refeito a partir da nuvem); nada da plataforma antiga, nem desfazer importação, nem dados lançados.
+      ["uby-recargas-db-v1"].forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+      location.reload();
+    };
     document.body.prepend(bar);
   }
 
