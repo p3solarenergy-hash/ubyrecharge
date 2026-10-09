@@ -185,6 +185,27 @@
     });
   }
 
+  // Sem sessão no banco as leituras voltam vazias (sem erro) e a tela mostra só a cópia local do mês:
+  // avisa em vez de exibir números parciais como se fossem completos.
+  async function checkCloudSession() {
+    const old = document.getElementById("sessionBanner");
+    try {
+      const sb = $("#motorFrame").contentWindow.UBY_SUPABASE?.client?.();
+      if (!sb) return;
+      const { data, error } = await sb.auth.getUser();
+      if (data?.user) { if (old) old.remove(); return; }
+      if (error && !/auth|jwt|session|token/i.test(error.message || "")) return; // sem rede: não é sessão expirada
+    } catch (_) { return; }
+    if (old) return;
+    const bar = document.createElement("div");
+    bar.id = "sessionBanner";
+    bar.setAttribute("role", "alert");
+    bar.style.cssText = "position:sticky;top:0;z-index:50;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px 16px;background:#fdf0ef;color:#8a2f2a;border-bottom:1px solid #e0a4a0;font-weight:600";
+    bar.innerHTML = `<span>Sua sessão com o banco expirou: o que aparece é só uma cópia parcial (mês atual) e não vale para fechamentos.</span><button type="button" class="btn" style="font-weight:700">Sair e entrar de novo</button>`;
+    bar.querySelector("button").onclick = () => $("#logoutButton").click();
+    document.body.prepend(bar);
+  }
+
   async function connect() {
     try {
       const mark = n => { try { performance.mark("uby:" + n); } catch (_) {} };
@@ -194,6 +215,7 @@
       setStatus("Lendo Supabase…", "warn");
       await api.waitForReady();
       mark("pronto");
+      checkCloudSession();
       refreshMeta();
       setStatus(`Mês atual carregado · ${fmt.int(state.status.charges)} sessões`, "warn");
       rerender();
@@ -562,6 +584,6 @@
     return href ? `<a class="edit-link" href="${href}" title="Abrir o centro de custos deste carregador">${esc(label)}<span aria-hidden="true"> ↗</span></a>` : esc(label);
   };
 
-  window.UBY = { start, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, obrasEdit, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel, stationHref, stationLink,
+  window.UBY = { start, checkCloudSession, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, obrasEdit, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel, stationHref, stationLink,
     register: (id, view) => { VIEWS[id] = view; }, go: hash => { location.hash = hash; }, ROUTES };
 })();
