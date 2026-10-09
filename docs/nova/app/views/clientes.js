@@ -2,8 +2,8 @@
 (function () {
   "use strict";
   const { fmt, esc, kpi } = UBY;
-  const TABS = [["visao", "Inteligência"], ["ranking", "Ranking do período"], ["ausentes", "Recuperação"], ["coortes", "Coortes"], ["cadastro", "Cadastro oficial"]];
-  const ui = { search: "", sort: "spent", mask: readMask(), rk: { station: "", from: "", to: "" } };
+  const TABS = [["visao", "Inteligência"], ["alertas", "Alertas e risco"], ["ranking", "Ranking do período"], ["ausentes", "Recuperação"], ["coortes", "Coortes"], ["cadastro", "Cadastro oficial"]];
+  const ui = { search: "", sort: "spent", mask: readMask(), rk: { station: "", from: "", to: "" }, al: { level: "", type: "", site: "", q: "" } };
   let registry = null, registryKey = "";
 
   function readMask() { try { return localStorage.getItem("uby-nova-mask") === "1"; } catch (_) { return false; } }
@@ -31,6 +31,10 @@
       : { cls: "neutral", t: "Tendência de 7 dias", d: `${fmt.brl(g.seven)} nos últimos 7 dias. Sem histórico anterior confirmado para comparar.` });
     signals.push({ cls: s.recurrence.pct >= 30 ? "ok" : "neutral", t: "Recorrência", d: `${s.recurrence.recurring} de ${s.recurrence.total} clientes históricos voltaram (${fmt.pct1(s.recurrence.pct)}).` });
     if (g.spottAbsent) signals.push({ cls: "warn", t: "Recuperação de receita", d: `${g.spottAbsent} recorrente(s) Spott ausentes há 7+ dias. Veja a aba Recuperação.` });
+    try {
+      const w = UBY.data("customerWatch");
+      if (w.counts.critico) signals.push({ cls: "warn", t: "Clientes importantes em risco", d: `${w.counts.critico} cliente(s) pesados reduziram ou pararam de carregar. Veja quem são na aba Alertas e risco.` });
+    } catch (_) {}
     if (g.failures7) signals.push({ cls: "warn", t: "Operação", d: `${g.failures7} falha(s) nos últimos 7 dias. Confira antes de fazer campanhas.` });
 
     return `
@@ -103,6 +107,107 @@
       </section>`;
   }
 
+  // ---------------------------------------------------------------------
+  // Alertas e risco: quem reduziu ou parou de carregar, tendência por carregador,
+  // segmentos e clientes-chave. Contas em app/analytics-core.js (motor: customerWatch).
+  // O valor em risco é mostrado em receita E em margem: a margem por kWh muda muito de
+  // um carregador para outro (energia, área, impostos), então o mesmo cliente vale
+  // coisas bem diferentes dependendo de onde carrega.
+  // ---------------------------------------------------------------------
+  const SEG = { frequente: ["ok", "Frequente"], regular: ["neutral", "Regular"], ocasional: ["neutral", "Ocasional"], unico: ["neutral", "Único"] };
+  const LV = { critico: ["bad", "Urgente"], atencao: ["warn", "Atenção"], info: ["neutral", "Informativo"] };
+  const TYPE = { queda: "Consumo caiu", sumiu: "Sumiu", perdido: "Parado" };
+
+  function watchData() {
+    let w;
+    try { w = UBY.data("customerWatch"); } catch (err) { return { error: err.message }; }
+    let pb = null;
+    try { pb = UBY.data("pricingBase"); } catch (_) {}
+    const core = window.UBY_ANALYTICS_CORE, margin = {};
+    (pb?.sites || []).forEach(s => { margin[s.site] = core.margin(s.params, s.params.price); });
+    return { w, pb, margin };
+  }
+  const marginAtRisk = (a, margin) => margin[a.site] === undefined ? null : a.kwhAtRisk * margin[a.site];
+  const filteredAlerts = (w) => w.alerts.filter(a => (!ui.al.level || a.level === ui.al.level) && (!ui.al.type || a.type === ui.al.type) && (!ui.al.site || a.site === ui.al.site)
+    && (!ui.al.q || `${a.name} ${a.email} ${a.phone}`.toLowerCase().includes(ui.al.q.trim().toLowerCase())));
+
+  function alertas(wd) {
+    if (wd.error) return `<section class="section"><div class="note">Não foi possível calcular os alertas: ${esc(wd.error)}</div></section>`;
+    const { w, margin } = wd;
+    const list = filteredAlerts(w), act = w.alerts.filter(a => a.level !== "info" && a.type !== "perdido");
+    const revRisk = act.reduce((s, a) => s + a.monthlyValue, 0);
+    const marRisk = act.reduce((s, a) => { const m = marginAtRisk(a, margin); return s + (m === null ? 0 : m); }, 0);
+    const sites = [...new Set(w.alerts.map(a => a.site))].sort();
+    const c = w.settings;
+    const sel = (id, label, opts, cur) => `<select class="select" id="${id}"><option value="">${label}</option>${opts.map(([v, l]) => `<option value="${esc(v)}" ${cur === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+    const trend = p => p === null || p === undefined ? "—" : `<span class="badge ${p <= -25 ? "bad" : p <= -10 ? "warn" : p >= 10 ? "ok" : "neutral"}">${p >= 0 ? "+" : ""}${fmt.pct1(p)}</span>`;
+    return `
+      <section class="section"><div class="section-head"><div><p class="kicker">Clientes e carregadores</p><h2>O que pede ação agora</h2>
+          <p>Calculado sobre a última recarga importada (${esc(fmt.dt(w.asOf))}), não sobre o relógio: se a planilha atrasar, ninguém aparece como sumido por isso. Só operação UBY, sem parceiros.</p></div>
+          <div class="meta">${fmt.int(w.totals.clients)} clientes · ${fmt.int(w.totals.active30)} ativos em 30 dias</div></div>
+        <div class="grid g6">
+          ${kpi("Urgentes", fmt.int(w.counts.critico), "clientes importantes que caíram ou sumiram", "", w.counts.critico ? "warn" : "lead")}
+          ${kpi("Atenção", fmt.int(w.counts.atencao), "queda menor ou ausência moderada")}
+          ${kpi("Receita mensal em risco", fmt.brl0(revRisk), "urgentes + atenção")}
+          ${kpi("Margem mensal em risco", marRisk ? fmt.brl0(marRisk) : "—", "kWh em risco × margem do carregador", "", "")}
+          ${kpi(`Top ${w.concentration.top} clientes`, fmt.pct1(w.concentration.pct), `da receita dos últimos 30 dias`, "", w.concentration.warn ? "warn" : "")}
+          ${kpi("Novos sem 2ª recarga", fmt.int(w.totals.newNoReturn), "1ª recarga há 14 a 45 dias")}
+        </div>
+      </section>
+
+      <div class="split" style="margin-bottom:18px">
+        <section class="section"><div class="section-head"><div><p class="kicker">Carregadores</p><h2>Energia vendida por semana</h2><p>Últimas 8 semanas até a última recarga importada.</p></div></div>
+          <div class="chart-box" style="height:260px"><canvas id="chSiteWeekly"></canvas></div></section>
+        <section class="section"><div class="section-head"><div><p class="kicker">Tendência de 28 dias</p><h2>Cada carregador contra as 4 semanas anteriores</h2></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Carregador</th><th class="num">kWh (28 d)</th><th class="num">Anteriores</th><th class="num">Variação</th><th>Leitura</th></tr></thead>
+            <tbody>${w.sites.map(s => `<tr><td><strong>${esc(s.site)}</strong><small>${s.ageDays} dias de operação</small></td><td class="num">${fmt.kwh0(s.kwh28)}</td><td class="num">${fmt.kwh0(s.kwhPrev28)}</td><td class="num">${trend(s.changePct)}</td>
+              <td>${!s.mature ? `<span class="badge neutral">novo · sem alerta</span>` : s.level === "critico" ? `<span class="badge bad">queda forte</span>` : s.level === "atencao" ? `<span class="badge warn">queda</span>` : `<span class="badge ok">estável ou subindo</span>`}</td></tr>`).join("")}</tbody></table></div>
+        </section>
+      </div>
+
+      <section class="section"><div class="section-head"><div><p class="kicker">Lista de ação</p><h2>Clientes que reduziram ou pararam (${fmt.int(list.length)})</h2>
+          <p><strong>Consumo caiu</strong>: carregou menos de ${100 - c.dropPct}% do que carregava nos 30 dias anteriores (queda de ${c.dropPct}% ou mais, com pelo menos ${c.dropMinBaseKwh} kWh antes). <strong>Sumiu</strong>: está ausente há mais de ${c.gapFactor}× o intervalo normal dele (mínimo ${c.gapMinDays} dias). Urgente = cliente pesado (${c.heavyKwh}+ kWh/mês) com queda de ${c.dropCriticalPct}% ou mais, ou R$ ${c.valueUrgent}+ por mês.</p></div></div>
+        <div class="toolbar" style="box-shadow:none">
+          ${sel("alLevel", "Todos os níveis", [["critico", "Urgente"], ["atencao", "Atenção"], ["info", "Informativo"]], ui.al.level)}
+          ${sel("alType", "Todos os tipos", Object.entries(TYPE), ui.al.type)}
+          ${sel("alSite", "Todos os carregadores", sites.map(s => [s, s]), ui.al.site)}
+          <input class="search" id="alSearch" placeholder="Buscar nome, e-mail ou telefone" value="${esc(ui.al.q)}">
+          <span class="spacer"></span><button class="btn" type="button" id="alCsv" ${list.length ? "" : "disabled"}>Baixar lista (CSV)</button></div>
+        <div class="table-wrap" style="max-height:620px"><table><thead><tr><th>Cliente</th><th>Carregador</th><th>Perfil</th><th>Situação</th><th>Última recarga</th><th class="num">Preço pago</th><th class="num">Receita/mês em risco</th><th class="num">Margem/mês em risco</th></tr></thead>
+          <tbody>${list.slice(0, 120).map(a => { const m = marginAtRisk(a, margin); return `<tr><td><strong>${who(a.name)}</strong><small>${contact(a.phone || a.email)}</small></td><td>${esc(a.site)}</td>
+            <td><span class="badge ${SEG[a.segment][0]}">${SEG[a.segment][1]}</span></td>
+            <td style="white-space:normal;min-width:260px"><span class="badge ${LV[a.level][0]}">${LV[a.level][1]}</span> <strong>${esc(a.title)}</strong><small style="display:block;white-space:normal">${esc(a.reason)}</small><small style="display:block;white-space:normal">${esc(a.suggest)}</small></td>
+            <td>${fmt.date(a.lastT)}<small>${a.daysSince} dia(s)</small></td><td class="num">${fmt.brl(a.pricePaid)}<small>${Math.round(a.voucherShare * 100)}% com cupom</small></td>
+            <td class="num"><strong>${fmt.brl(a.monthlyValue)}</strong></td><td class="num">${m === null ? "—" : fmt.brl(m)}</td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">Nenhum cliente com esse filtro.</td></tr>`}</tbody></table></div>
+        ${list.length > 120 ? `<small>Mostrando 120 de ${list.length}; o CSV leva a lista inteira do filtro.</small>` : ""}
+        <div class="note" style="margin-top:10px">A <strong>margem</strong> usa o resultado por kWh de cada carregador no último mês completo (energia, área, plataforma, gestão e impostos). Onde a margem é pequena, perder um cliente dói na receita mais do que no resultado: por isso a lista mostra as duas. Detalhes e simulações em <a href="#/precos">Estudos de preço</a>.</div>
+      </section>
+
+      <section class="section"><div class="section-head"><div><p class="kicker">Segmentos</p><h2>Quem são e quanto valem</h2><p>Pelo histórico de recargas válidas: frequente ${c.frequentSessions}+, regular ${c.regularSessions}–${c.frequentSessions - 1}, ocasional ${c.occasionalSessions}–${c.regularSessions - 1}, único 1.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Perfil</th><th class="num">Clientes</th><th class="num">Ativos em 30 d</th><th class="num">% da receita</th><th class="num">R$/kWh pago</th><th class="num">Uso de cupom</th><th class="num">kWh 30 d</th><th class="num">kWh 30 d anteriores</th><th class="num">Variação</th></tr></thead>
+          <tbody>${w.segments.map(s => `<tr><td><span class="badge ${SEG[s.id][0]}">${SEG[s.id][1]}</span></td><td class="num">${fmt.int(s.clients)}</td><td class="num">${fmt.int(s.active30)}</td><td class="num">${fmt.pct1(s.revenueShare)}</td>
+            <td class="num">${fmt.brl(s.pricePaid)}</td><td class="num">${fmt.pct1(s.voucherShare)}</td><td class="num">${fmt.kwh0(s.kwh30)}</td><td class="num">${fmt.kwh0(s.kwhP30)}</td><td class="num">${trend(s.kwhP30 ? (s.kwh30 / s.kwhP30 - 1) * 100 : null)}</td></tr>`).join("")}</tbody></table></div>
+      </section>
+
+      <section class="section"><div class="section-head"><div><p class="kicker">Clientes-chave</p><h2>Maiores receitas dos últimos 90 dias</h2><p>Mesmos critérios dos alertas; quem não aparece na lista acima está dentro do normal dele.</p></div></div>
+        <div class="table-wrap" style="max-height:520px"><table><thead><tr><th>#</th><th>Cliente</th><th>Carregador</th><th>Perfil</th><th class="num">Receita 90 d</th><th class="num">kWh 30 d</th><th class="num">Variação</th><th class="num">R$/kWh</th><th class="num">Cupom</th><th>Última</th></tr></thead>
+          <tbody>${w.keyClients.map((k, i) => `<tr><td>${i + 1}</td><td><strong>${who(k.name)}</strong><small>${contact(k.phone || k.email)}</small></td><td>${esc(k.site)}</td><td><span class="badge ${SEG[k.segment][0]}">${SEG[k.segment][1]}</span></td>
+            <td class="num"><strong>${fmt.brl(k.revenue90)}</strong></td><td class="num">${fmt.kwh0(k.kwh30)}</td><td class="num">${trend(k.trendPct)}</td><td class="num">${fmt.brl(k.pricePaid)}</td><td class="num">${fmt.pct1(k.voucherShare * 100)}</td><td>${k.daysSince} d</td></tr>`).join("")}</tbody></table></div>
+      </section>`;
+  }
+
+  function alertasCsv(wd) {
+    const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const head = ["Cliente", "Telefone", "E-mail", "Carregador", "Perfil", "Nível", "Situação", "Detalhe", "Última recarga", "Dias sem recarga", "R$/kWh pago", "Receita/mês em risco", "Margem/mês em risco"];
+    const rows = filteredAlerts(wd.w).map(a => { const m = marginAtRisk(a, wd.margin);
+      return [a.name, a.phone, a.email, a.site, SEG[a.segment][1], LV[a.level][1], a.title, a.reason, new Date(a.lastT).toLocaleDateString("pt-BR"), a.daysSince,
+        a.pricePaid.toFixed(2).replace(".", ","), a.monthlyValue.toFixed(2).replace(".", ","), m === null ? "" : m.toFixed(2).replace(".", ",")]; });
+    const blob = new Blob(["﻿" + [head, ...rows].map(r => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `alertas-clientes-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
   function cadastro(target) {
     if (!registry) return `<section class="section"><div class="loading" style="min-height:180px"><div class="spinner"></div><p>Lendo recharge_customers no Supabase…</p></div></section>`;
     if (registry.error) return `<section class="section"><div class="note">Não foi possível ler o cadastro: ${esc(registry.error)}</div></section>`;
@@ -131,7 +236,9 @@
     const tab = TABS.some(([id]) => id === params[0]) ? params[0] : "visao";
     const r = UBY.data("clientIntelligence", monthArg());
     let body = "";
+    let wd = null;
     if (tab === "visao") body = visao(r);
+    else if (tab === "alertas") { wd = watchData(); body = alertas(wd); }
     else if (tab === "ranking") body = ranking(UBY.data("clientRanking", monthArg(), ui.rk.from, ui.rk.to, ui.rk.station));
     else if (tab === "ausentes") body = ausentes(r);
     else if (tab === "coortes") body = coortes(r);
@@ -156,6 +263,20 @@
     if (search) {
       search.oninput = () => { ui.search = search.value; clearTimeout(search._t); search._t = setTimeout(() => { render(target, ["cadastro"]); const el = target.querySelector("#regSearch"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
       target.querySelector("#regSort").onchange = e => { ui.sort = e.target.value; render(target, ["cadastro"]); };
+    }
+    if (tab === "alertas" && wd && !wd.error) {
+      const al = (k, v) => { ui.al[k] = v; render(target, ["alertas"]); };
+      target.querySelector("#alLevel").onchange = e => al("level", e.target.value);
+      target.querySelector("#alType").onchange = e => al("type", e.target.value);
+      target.querySelector("#alSite").onchange = e => al("site", e.target.value);
+      target.querySelector("#alCsv").onclick = () => alertasCsv(wd);
+      const s = target.querySelector("#alSearch");
+      s.oninput = () => { ui.al.q = s.value; clearTimeout(s._t); s._t = setTimeout(() => { render(target, ["alertas"]); const el = target.querySelector("#alSearch"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
+      // curva suave com área, como o hora a hora do Comando
+      const labels = Array.from({ length: 8 }, (_, i) => { const d = new Date(wd.w.asOf - (7 - i) * 7 * 86400000); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`; });
+      UBY.chart("chSiteWeekly", { type: "line", data: { labels, datasets: wd.w.sites.map((s, i) => { const col = UBY.PALETTE[i % UBY.PALETTE.length];
+        return { label: s.site, data: s.weekly.map(x => x.kwh), borderColor: col, backgroundColor: col + "26", fill: true, tension: 0.42, pointRadius: 0, borderWidth: 2 }; }) },
+        options: UBY.baseChartOptions({ scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: v => `${v} kWh` } } } }) });
     }
     if (tab === "coortes") {
       const c = r.cohorts.slice().reverse();

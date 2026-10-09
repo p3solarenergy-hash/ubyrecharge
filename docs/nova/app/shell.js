@@ -25,6 +25,7 @@
       { id: "locais", icon: "⧉", label: "Shopping Aurora (AC + DC)", type: "view", period: true },
       { id: "uso", icon: "◔", label: "Análise de uso", type: "view", period: true },
       { id: "clientes", icon: "◎", label: "Clientes", type: "view", period: true },
+      { id: "precos", icon: "⇅", label: "Estudos de preço", type: "view" },
       { id: "clube", icon: "✦", label: "Clube UBY", type: "view" },
       { id: "sessoes", icon: "✓", label: "Sessões importadas (consulta)", type: "classic", src: LEGACY + "recargas.html", tab: "detalhes" },
       { id: "recargas", icon: "⌁", label: "Recargas · tela original", type: "classic", src: LEGACY + "recargas.html", tab: "geral" }
