@@ -432,7 +432,7 @@
         revenue: cur.revenue, energy: cur.energy, sessions: cur.count, valid: clean.executed.length, failures: clean.failed.length,
         clients: cur.clients, hoursAvail, maxKWh: power * hoursAvail,
         occupancy: power * hoursAvail > 0 ? cur.energy / (power * hoursAvail) * 100 : 0,
-        prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count, prevMaxKWh: power * prevHours,
+        prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count, prevValid: cleanOperationStats(before).executed.length, prevMaxKWh: power * prevHours,
         prevOccupancy: power * prevHours > 0 ? prev.energy / (power * prevHours) * 100 : 0,
         lastStart: iso(today.map(c => c.startDate).filter(valid).sort((a, b) => b - a)[0] || null),
         hourly: spread(today, power) };

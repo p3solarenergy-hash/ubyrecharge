@@ -217,6 +217,7 @@
         <div class="dt-nums">
           <div><small>Ocupação</small><strong class="dt-o">${fmt.pct1(u.occupancy)}</strong>${dd(u.occupancy, u.prevOccupancy)}</div>
           <div><small>Faturamento</small><strong class="dt-r">${fmt.brl(u.revenue)}</strong>${dd(u.revenue, u.prevRevenue)}</div>
+          <div class="dt-span"><small>Recargas no dia</small><strong class="dt-c">${fmt.int(u.valid)}</strong>${dd(u.valid, u.prevValid)}</div>
         </div>
         ${dayWave(u.hourly, scale, day.nowHour, false)}
         <div class="dt-foot">${fmt.int(u.valid)} recarga(s) · ${fmt.kwh(u.energy)}${u.failures ? ` · <span class="dt-bad">${u.failures} falha(s)</span>` : ""} · ${lastTxt(u)}</div>
@@ -244,6 +245,8 @@
       </div>
       ${list.length ? `<div class="dt-card dt-total">
           <div class="dt-name"><strong>${dt.scope === "uby" ? "Rede UBY" : "Todos os carregadores"} · hora a hora</strong> <small>faturamento somado e média de tempo em uso dos carregadores</small></div>
+          <div class="dt-nums"><div class="dt-span"><small>Recargas no dia · ${dt.scope === "uby" ? "rede UBY" : "geral"}</small><strong class="dt-c">${fmt.int(tot("valid"))}</strong>${dd(tot("valid"), tot("prevValid"))}</div></div>
+          <div class="dt-foot" style="white-space:normal">${list.filter(u => u.valid).map(u => `${esc(u.station)}: ${fmt.int(u.valid)}`).join(" · ") || "nenhuma recarga válida no dia"}</div>
           ${dayWave(totalHourly, tScale, day.nowHour, true)}
         </div>
         <h3 class="dt-sub">Por carregador <small>mesma escala em todos os cartões · clique no nome para abrir o carregador</small></h3>

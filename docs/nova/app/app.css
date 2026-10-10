@@ -403,6 +403,7 @@ a.dt-name:hover strong{text-decoration:underline}
 .dt-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .dt-nums>div{display:flex;flex-direction:column;gap:2px;min-width:0}
 .dt-nums .delta{align-self:flex-start;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-nums .dt-span{grid-column:1/-1}
 .dt-nums small{color:var(--uby-muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 .dt-nums strong{font-size:18px;line-height:1.1;font-weight:800}
 .dt-total .dt-nums strong{font-size:22px}
