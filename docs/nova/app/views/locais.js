@@ -45,7 +45,7 @@
     const use = smoothPath([[0, base], ...upto.map((h, i) => [x(i), yUse(h.use)]), [last / 24 * W, upto.length ? yUse(upto.at(-1).use) : base]], top, base);
     const endX = (last / 24 * W).toFixed(1);
     const hl = h => `${String(h).padStart(2, "0")}h`;
-    const tips = hourly.map((h, i) => `<rect x="${(i / 24 * W).toFixed(1)}" y="0" width="${(W / 24).toFixed(2)}" height="${H}" fill="transparent"><title>${hl(i)}–${hl(i + 1)} · em uso ${fmt.pct(h.use)} da hora · ${fmt.brl(h.revenue)} · ${fmt.kwh(h.energy)}</title></rect>`).join("");
+    const tips = hourly.map((h, i) => `<rect x="${(i / 24 * W).toFixed(1)}" y="0" width="${(W / 24).toFixed(2)}" height="${H}" fill="transparent"><title>${hl(i)}–${hl(i + 1)} · ${fmt.int(h.starts || 0)} recarga(s) iniciada(s) · em uso ${fmt.pct(h.use)} da hora · ${fmt.brl(h.revenue)} · ${fmt.kwh(h.energy)}</title></rect>`).join("");
     return `<svg class="dt-wave" style="height:${H}px" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Faturamento e uso por hora">
       ${[6, 12, 18].map(h => `<line x1="${h / 24 * W}" x2="${h / 24 * W}" y1="${top}" y2="${base}" class="dt-gridline"/>`).join("")}
       <line x1="0" x2="${W}" y1="${base}" y2="${base}" class="dt-base"/>
@@ -95,7 +95,7 @@
     const points = have.reduce((s, u) => s + Number(u.points || 1), 0) || 1;
     const joined = Array.from({ length: 24 }, (_, h) => {
       const sum = k => have.reduce((s, u) => s + Number(u.hourly?.[h]?.[k] || 0), 0);
-      return { revenue: sum("revenue"), energy: sum("energy"), use: sum("busyMin") / (points * 60) * 100 };
+      return { revenue: sum("revenue"), energy: sum("energy"), starts: sum("starts"), use: sum("busyMin") / (points * 60) * 100 };
     });
     const scale = Math.max(...have.flatMap(u => (u.hourly || []).map(h => h.revenue)), 0);
     const nowHour = res.day.nowHour;
@@ -109,7 +109,7 @@
             u ? `${fmt.int(u.valid)} recarga(s) · ${fmt.kwh(u.energy)} · ocupação ${fmt.pct1(u.occupancy)}${u.lastStart ? ` · última às ${hhmm(u.lastStart)}` : ""}${u.failures ? ` · <span style="color:var(--uby-red)">${u.failures} falha(s)</span>` : ""}` : "sem recarga no dia",
             u ? dd(u.revenue, u.prevRevenue) : "")).join("")}
         </div>
-        <div class="dt-card dt-total" style="margin-top:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>${esc(v.place.label)} · hora a hora</strong>
+        <div class="dt-card dt-total" style="margin-top:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>${esc(v.place.label)} · hora a hora · AC + DC ${fmt.brl(tot("revenue"))} · ${fmt.int(tot("valid"))} recarga(s) · ${fmt.kwh(tot("energy"))}</strong>
           <small class="dt-legend"><i class="dt-lg-rev"></i>Faturamento somado <i class="dt-lg-occ"></i>Em uso na hora</small></div>
           ${wave(joined, Math.max(...joined.map(h => h.revenue), 0), nowHour, 120)}</div>
         <div class="grid g${Math.max(Math.min(units.length, 4), 1)}" style="margin-top:12px">${units.map((u, i) => `<div class="dt-card ${u && u.sessions ? "" : "dt-idle"}">
@@ -209,6 +209,7 @@
           ${group("Operação")}
           ${line("Ocupação", c2 => fmt.pct1(c2.ops.occupancy))}
           ${line("Recargas", c2 => fmt.int(c2.ops.sessions))}
+          ${line("Recargas por dia", c2 => fmt.n1(c2.ops.perDay || 0))}
           ${cmp ? line(`<small>Recargas em ${esc(cmp.label)}</small>`, c2 => `<small>${fmt.int(cmpOf(c2, "sessions"))}</small>`) : ""}
           ${line("Clientes", c2 => fmt.int(c2.clients))}
           ${line("Energia entregue", c2 => fmt.kwh0(c2.ops.energy))}
@@ -274,17 +275,21 @@
     const lineOpts = (extra = {}) => ({ ...base, ...extra, scales: { ...(base.scales || {}), y: { ...(base.scales?.y || {}), beginAtZero: true }, ...(extra.scales || {}) } });
     UBY.chart("chPlace", { type: "line", data: { labels: v.monthly.map(m => m.label), datasets: [
       ...v.members.map((m, i) => curve(`Faturamento ${m.kind}`, v.monthly.map(x => x.members[i].revenue), CHART[i % CHART.length], { pointRadius: 3 })),
+      curve("Faturamento AC + DC", v.monthly.map(x => x.revenue), "#77637d", { fill: false, borderWidth: 3, pointRadius: 3 }),
       curve("Resultado juntos", v.monthly.map(x => x.result), "#b98527", { fill: false, borderDash: [5, 4], pointRadius: 3 })
     ] }, options: lineOpts() });
     if ((v.daily || []).length) UBY.chart("chPlaceDaily", { type: "line", data: { labels: v.daily.map(d => String(d.day).padStart(2, "0")), datasets: [
-      ...v.members.map((m, i) => curve(`Faturamento ${m.kind}`, v.daily.map(d => d.members[i].revenue), CHART[i % CHART.length], { yAxisID: "y" })),
+      ...v.members.map((m, i) => curve(`Faturamento ${m.kind}`, v.daily.map(d => d.members[i].revenue), CHART[i % CHART.length], { yAxisID: "y", sessions: v.daily.map(d => d.members[i].sessions) })),
+      curve("Faturamento AC + DC", v.daily.map(d => Math.round(d.revenue * 100) / 100), "#77637d", { yAxisID: "y", fill: false, borderWidth: 3, sessions: v.daily.map(d => d.sessions) }),
       curve("Ocupação juntos (%)", v.daily.map(d => Math.round(d.occ * 10) / 10), "#b98527", { yAxisID: "y1", fill: false, borderDash: [4, 3], borderWidth: 1.6 })
-    ] }, options: lineOpts({ scales: { y1: { position: "right", beginAtZero: true, grid: { display: false }, border: { display: false }, ticks: { callback: x => `${x}%`, font: { size: 10 } } } } }) });
+    ] }, options: lineOpts({ plugins: { ...(base.plugins || {}), tooltip: { ...(base.plugins?.tooltip || {}), callbacks: { label: ctx => ctx.dataset.sessions ? `${ctx.dataset.label}: ${fmt.brl(ctx.parsed.y)} · ${fmt.int(ctx.dataset.sessions[ctx.dataIndex] || 0)} recarga(s)` : `${ctx.dataset.label}: ${fmt.pct1(ctx.parsed.y)}` } } }, scales: { y1: { position: "right", beginAtZero: true, grid: { display: false }, border: { display: false }, ticks: { callback: x => `${x}%`, font: { size: 10 } } } } }) });
     UBY.chart("chPlaceHour", { type: "line", data: { labels: v.hourly.map(h => `${h.hour}h`), datasets:
-      v.members.map((m, i) => curve(m.kind, v.hourly.map(h => h.members[i].sessions), CHART[i % CHART.length])) },
+      [...v.members.map((m, i) => curve(m.kind, v.hourly.map(h => h.members[i].sessions), CHART[i % CHART.length])),
+        curve("AC + DC", v.hourly.map(h => h.members.reduce((s, x) => s + x.sessions, 0)), "#77637d", { fill: false, borderWidth: 3 })] },
       options: lineOpts({ scales: { y: { ...(base.scales?.y || {}), beginAtZero: true, ticks: { ...(base.scales?.y?.ticks || {}), precision: 0 } } } }) });
     UBY.chart("chPlaceWeek", { type: "line", data: { labels: v.weekday.map(w => w.label), datasets:
-      v.members.map((m, i) => curve(m.kind, v.weekday.map(w => Math.round(w.members[i].revenue * 100) / 100), CHART[i % CHART.length], { sessions: v.weekday.map(w => w.members[i].sessions), pointRadius: 3 })) },
+      [...v.members.map((m, i) => curve(m.kind, v.weekday.map(w => Math.round(w.members[i].revenue * 100) / 100), CHART[i % CHART.length], { sessions: v.weekday.map(w => w.members[i].sessions), pointRadius: 3 })),
+        curve("AC + DC", v.weekday.map(w => Math.round(w.members.reduce((s, x) => s + x.revenue, 0) * 100) / 100), "#77637d", { sessions: v.weekday.map(w => w.members.reduce((s, x) => s + x.sessions, 0)), fill: false, borderWidth: 3, pointRadius: 3 })] },
       options: lineOpts({ plugins: { ...(base.plugins || {}), tooltip: { ...(base.plugins?.tooltip || {}), callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt.brl(ctx.parsed.y)} · ${ctx.dataset.sessions[ctx.dataIndex]} recarga(s)` } } } }) });
   }
 

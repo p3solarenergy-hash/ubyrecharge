@@ -129,7 +129,8 @@
         { label: "Faturamento (R$)", data: d.days.map(x => x.revenue), borderColor: revGradient(.9, 1), backgroundColor: revGradient(.02, .32), borderWidth: 2.4, fill: "origin", pointRadius: 0, pointHoverRadius: 4, cubicInterpolationMode: "monotone", yAxisID: "y" },
         { label: "Falhas", data: d.days.map(x => x.failures), borderColor: "rgba(183,84,80,.55)", backgroundColor: "rgba(183,84,80,.55)", borderWidth: 1.4, borderDash: [4, 3], pointRadius: 0, pointHoverRadius: 3, cubicInterpolationMode: "monotone", yAxisID: "y1" }
       ] },
-      options: opts({ scales: { ...opts().scales, y: { ...opts().scales.y, beginAtZero: true }, y1: { beginAtZero: true, suggestedMax: Math.max(3, ...d.days.map(x => x.failures || 0)) * 3, position: "right", grid: { display: false }, ticks: { precision: 0, font: { size: 10 }, color: "rgba(183,84,80,.6)" } } } })
+      options: opts({ plugins: { ...opts().plugins, tooltip: { ...(opts().plugins?.tooltip || {}), callbacks: { footer: items => items.length ? `Recargas: ${fmt.int(d.days[items[0].dataIndex]?.sessions || 0)}` : "" } } },
+        scales: { ...opts().scales, y: { ...opts().scales.y, beginAtZero: true }, y1: { beginAtZero: true, suggestedMax: Math.max(3, ...d.days.map(x => x.failures || 0)) * 3, position: "right", grid: { display: false }, ticks: { precision: 0, font: { size: 10 }, color: "rgba(183,84,80,.6)" } } } })
     });
   }
 

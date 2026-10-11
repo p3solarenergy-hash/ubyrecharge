@@ -78,7 +78,7 @@
         <strong class="wk-occ">${fmt.pct1(w.occ)}</strong>
         <div class="wk-meter" title="Ocupação ${fmt.pct1(w.occ)}"><span style="height:${Math.max(w.occ / maxOcc * 100, 3)}%"></span></div>
         <small><b>${fmt.brl(w.revenue)}</b> · ${fmt.brl(w.avgRevenue)}/dia</small>
-        <small>${w.count} recargas${w.failed ? ` · <span style="color:var(--uby-red)">${w.failed} falha(s)</span>` : ""} · ${w.days} dia(s)</small>
+        <small><b>${fmt.n1(w.days ? w.valid / w.days : 0)} recargas/dia</b> · ${w.valid} em ${w.days} dia(s)${w.failed ? ` · <span style="color:var(--uby-red)">${w.failed} falha(s)</span>` : ""}</small>
         <small>${fmt.kwh0(w.energy)} · ticket ${fmt.brl(w.avgTicket)}</small>
       </article>`).join("")}</div>`;
   }
@@ -115,7 +115,7 @@
         <div class="grid g4">
           ${kpi("Ocupação média", t.occupancy === null || t.occupancy === undefined ? "—" : fmt.pct(t.occupancy), t.occupancy === null || t.occupancy === undefined ? "atualize a página (Ctrl+F5)" : `${fmt.int(t.power)} kW · horário de cada carregador`, "", "lead big")}
           ${kpi("Faturamento", fmt.brl(t.revenue), `${fmt.brl(t.sessions ? t.revenue / t.sessions : 0)} por recarga`, "", "lead big")}
-          ${kpi("Recargas", fmt.int(t.sessions), "todas as tentativas")}
+          ${kpi("Recargas", fmt.int(t.sessions), (() => { const v = u.days.reduce((s, d) => s + (d.sessions || 0), 0); return `${fmt.n1(u.days.length ? v / u.days.length : 0)} válidas por dia · ${fmt.int(v)} válidas em ${u.days.length} dia(s)`; })())}
           ${kpi("Energia", fmt.kwh0(t.energy), t.energy > 0 ? `${fmt.brl(t.revenue / t.energy)}/kWh em média` : "", "", "warn")}
         </div>
       </section>`}
@@ -126,8 +126,8 @@
 
       <section class="section"><div class="section-head"><div><p class="kicker">Dinâmica semanal</p><h2>Ocupação por dia da semana</h2><p>Horas disponíveis de cada dia, recortadas ao período; hoje conta só as horas já passadas.</p></div></div>
         ${weekdayCards(u.weekday)}
-        <div class="table-wrap"><table><thead><tr><th>Dia</th><th class="num">Dias</th><th class="num">Recargas</th><th class="num">Falhas</th><th class="num">Faturamento</th><th class="num">Média/dia</th><th class="num">Energia</th><th class="num">Ticket</th><th style="min-width:120px">Ocupação</th></tr></thead>
-          <tbody>${u.weekday.map(w => `<tr><td><strong>${esc(w.label)}</strong></td><td class="num">${w.days}</td><td class="num">${w.count}</td><td class="num">${w.failed || ""}</td><td class="num">${fmt.brl(w.revenue)}</td>
+        <div class="table-wrap"><table><thead><tr><th>Dia</th><th class="num">Dias</th><th class="num">Recargas</th><th class="num">Recargas/dia</th><th class="num">Falhas</th><th class="num">Faturamento</th><th class="num">Média/dia</th><th class="num">Energia</th><th class="num">Ticket</th><th style="min-width:120px">Ocupação</th></tr></thead>
+          <tbody>${u.weekday.map(w => `<tr><td><strong>${esc(w.label)}</strong></td><td class="num">${w.days}</td><td class="num">${w.valid}</td><td class="num"><strong>${fmt.n1(w.days ? w.valid / w.days : 0)}</strong></td><td class="num">${w.failed || ""}</td><td class="num">${fmt.brl(w.revenue)}</td>
             <td class="num">${fmt.brl(w.avgRevenue)}</td><td class="num">${fmt.kwh0(w.energy)}</td><td class="num">${fmt.brl(w.avgTicket)}</td>
             <td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="flex:1"><span style="width:${Math.min(w.occ * 3, 100)}%"></span></div><strong>${fmt.pct1(w.occ)}</strong></div></td></tr>`).join("")}</tbody></table></div>
       </section>

@@ -285,6 +285,8 @@
         revenue: row.revenue, occupancy: occupancy.pct, availability: clean.total ? clean.executed.length / clean.total * 100 : 0,
         completed: clean.executed.length, attempts: clean.total, energy: row.energy, sessions: row.count, clients: row.clients,
         avgTicket: row.avgTicket, avgKwh: row.count ? row.energy / row.count : 0, failures: clean.failed.length,
+        // Recargas válidas por dia: do primeiro ao último dia com recarga no período (mesma regra de "Média por dia").
+        perDay: clean.executed.length / (daysCovered(clean.executed) || 1),
         daily: dailySeries(row.charges)
       };
     }).sort((a, b) => b.revenue - a.revenue || String(a.station).localeCompare(String(b.station), "pt-BR"));
@@ -303,7 +305,8 @@
       .map(unit => {
         const occ = stationOccupancyForMonths(unit, accessMonthKeys, "mtd");
         const band = occupationBand(occ.pct);
-        return { workId: unit.workId, workName: unit.workName, station: unit.stationName || unit.workName, kind: unit.kind, model: modelOf(unit),
+        const valid = cleanOperationStats(unit.charges || []).executed;
+        return { perDay: valid.length / (daysCovered(valid) || 1), validSessions: valid.length, workId: unit.workId, workName: unit.workName, station: unit.stationName || unit.workName, kind: unit.kind, model: modelOf(unit),
           revenue: unit.revenue, sessions: unit.count, energy: unit.energy, clients: unit.clients, occupancy: occ.pct, occupancyHours: occ.hours,
           band: band.label, bandClass: band.className, lastDate: iso(unit.lastDate) };
       });
@@ -316,6 +319,7 @@
     });
 
     const days = dailySeries(allUbyCharges, sourceUbyCharges);
+    const networkValid = cleanOperationStats(allUbyCharges).executed;
     const dates = allUbyCharges.map(charge => charge.startDate).filter(Boolean);
     const firstPeriod = windows.length ? new Date(Math.min(...windows.map(w => w.start).filter(Boolean))) : (dates.length ? new Date(Math.min(...dates)) : null);
     const lastPeriod = windows.length ? new Date(Math.max(...windows.map(w => w.end).filter(Boolean))) : (dates.length ? new Date(Math.max(...dates)) : null);
@@ -330,6 +334,7 @@
       },
       network: {
         revenue, energy, sessions: totalCharges, clients: clientsOf(allUbyCharges), chargers: included.length,
+        validSessions: networkValid.length, perDay: networkValid.length / (daysCovered(networkValid) || 1), daysCovered: daysCovered(networkValid),
         units: new Set(included.map(row => row.workId)).size, occupancy: totalOcc, occupancyBand: occBand.label, occupancyRange: occBand.range,
         ownRevenue: dc.revenue + ac.revenue, projectedRevenue: sumBy(forecasts, f => f.projectedRevenue),
         projectedEnergy: sumBy(forecasts, f => f.projectedEnergy), projectionUnits: forecasts.length, projectionMonth,
@@ -416,9 +421,11 @@
 
     // points = quantos carros o ponto atende ao mesmo tempo (maior entre carregadores e conectores cadastrados).
     const spread = (charges, power, points = 1) => {
-      const hours = Array.from({ length: 24 }, () => ({ revenue: 0, energy: 0, busyMin: 0 }));
+      const hours = Array.from({ length: 24 }, () => ({ revenue: 0, energy: 0, busyMin: 0, starts: 0 }));
       charges.filter(isExecutedCharge).forEach(c => {
         const start = c.startDate;
+        // Recargas que começaram nesta hora (para o balão do gráfico hora a hora).
+        if (start >= dayStart && start < dayEnd) hours[start.getHours()].starts += 1;
         const end = valid(c.endDate) && c.endDate > start ? c.endDate : new Date(start.getTime() + Math.max(durToHours(c.duration), 1 / 60) * 3_600_000);
         const total = end - start;
         for (let h = start.getHours(); h < 24; h++) {
@@ -436,7 +443,7 @@
       // Antes dividia só por 60: um carro a hora inteira já dava 100% num ponto com 5 carregadores.
       // occupancy = kWh da hora ÷ potência (regra de energia).
       const cap = 60 * Math.max(1, Number(points) || 1);
-      return hours.map(x => ({ revenue: x.revenue, energy: x.energy, busyMin: Math.min(x.busyMin, cap), points: Math.max(1, Number(points) || 1),
+      return hours.map(x => ({ revenue: x.revenue, energy: x.energy, starts: x.starts, busyMin: Math.min(x.busyMin, cap), points: Math.max(1, Number(points) || 1),
         use: Math.min(x.busyMin, cap) / cap * 100, occupancy: power > 0 ? Math.min(x.energy / power * 100, 100) : 0 }));
     };
 
@@ -461,7 +468,7 @@
         revenue: cur.revenue, energy: cur.energy, sessions: cur.count, valid: clean.executed.length, failures: clean.failed.length,
         clients: cur.clients, hoursAvail, maxKWh: power * hoursAvail,
         occupancy: power * hoursAvail > 0 ? cur.energy / (power * hoursAvail) * 100 : 0,
-        prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count, prevMaxKWh: power * prevHours,
+        prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count, prevValid: cleanOperationStats(before).executed.length, prevMaxKWh: power * prevHours,
         prevOccupancy: power * prevHours > 0 ? prev.energy / (power * prevHours) * 100 : 0,
         lastStart: iso(today.map(c => c.startDate).filter(valid).sort((a, b) => b - a)[0] || null),
         points: Math.max(1, Number(config.acChargers || 0) + Number(config.dcChargers || 0), Number(config.acPlugs || 0) + Number(config.dcPlugs || 0)),
@@ -2366,7 +2373,9 @@
         const o = stationOccupancyForMonths(r, withCharges, "mtd");
         occEnergy += n0(o.energy); maxKWh += n0(o.maxKWh); power += n0(o.power);
       });
-      return { revenue: m.revenue, energy: m.energy, sessions: m.clean.executed.length, clients: m.clients, avgTicket: m.avgTicket, revenuePerKwh: m.revenuePerKwh,
+      const vd = m.clean.executed.map(c => c.startDate).filter(d => d instanceof Date && !Number.isNaN(d.getTime()));
+      const spanDays = vd.length ? Math.round((dateOnly(new Date(Math.max(...vd))) - dateOnly(new Date(Math.min(...vd)))) / 86400000) + 1 : 0;
+      return { perDay: spanDays ? m.clean.executed.length / spanDays : 0, revenue: m.revenue, energy: m.energy, sessions: m.clean.executed.length, clients: m.clients, avgTicket: m.avgTicket, revenuePerKwh: m.revenuePerKwh,
         avgKwh: m.avgKwh, avgDuration: formatRechargeDuration(m.avgDuration), idleValue: n0(m.idleValue), power, occupancy: maxKWh > 0 ? occEnergy / maxKWh * 100 : 0 };
     };
     const FIN = ["totalRevenue", "energyCost", "management", "platform", "areaParticipation", "matrizCost", "matrizDedicatedCost", "localExtraCosts", "taxes", "ubyRoyalty", "totalOperatingCost", "operationNet", "energy"];

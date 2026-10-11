@@ -172,7 +172,7 @@
     const occPts = [[0, base], ...upto.map((h, i) => [x(i), yOcc(h.use)]), [last / 24 * W, upto.length ? yOcc(upto.at(-1).use) : base]];
     const rev = smoothPath(revPts, top, base), occ = smoothPath(occPts, top, base);
     const endX = (last / 24 * W).toFixed(1);
-    const tips = hourly.map((h, i) => `<rect x="${(i / 24 * W).toFixed(1)}" y="0" width="${(W / 24).toFixed(2)}" height="${H}" fill="transparent"><title>${hourLabel(i)}–${hourLabel(i + 1)} · em uso ${fmt.pct(h.use)} da hora · ${fmt.brl(h.revenue)} · ${fmt.kwh(h.energy)}</title></rect>`).join("");
+    const tips = hourly.map((h, i) => `<rect x="${(i / 24 * W).toFixed(1)}" y="0" width="${(W / 24).toFixed(2)}" height="${H}" fill="transparent"><title>${hourLabel(i)}–${hourLabel(i + 1)} · ${fmt.int(h.starts || 0)} recarga(s) iniciada(s) · em uso ${fmt.pct(h.use)} da hora · ${fmt.brl(h.revenue)} · ${fmt.kwh(h.energy)}</title></rect>`).join("");
     return `<svg class="dt-wave ${big ? "big" : ""}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Ocupação e faturamento por hora">
       ${[6, 12, 18].map(h => `<line x1="${h / 24 * W}" x2="${h / 24 * W}" y1="${top}" y2="${base}" class="dt-gridline"/>`).join("")}
       <line x1="0" x2="${W}" y1="${base}" y2="${base}" class="dt-base"/>
@@ -198,10 +198,10 @@
     const dd = (cur, prev, opts = {}) => delta(cur, prev || 0, { hasBase: true, label: `vs ${prevTxt}`, ...opts });
     const net = res.network[dt.scope] || res.network.uby;
     const nd = net.day, np = net.previous || {};
-    const sumH = (i, k) => list.reduce((s, u) => s + u.hourly[i][k], 0);
+    const sumH = (i, k) => list.reduce((s, u) => s + (Number(u.hourly[i][k]) || 0), 0);
     // Rede: % dos pontos de recarga em uso naquela hora (minutos ocupados ÷ (pontos de todos os carregadores × 60)).
     const totalPoints = list.reduce((s, u) => s + Math.max(1, Number(u.points) || 1), 0);
-    const totalHourly = Array.from({ length: 24 }, (_, i) => ({ revenue: sumH(i, "revenue"), energy: sumH(i, "energy"),
+    const totalHourly = Array.from({ length: 24 }, (_, i) => ({ revenue: sumH(i, "revenue"), energy: sumH(i, "energy"), starts: sumH(i, "starts"),
       use: totalPoints ? sumH(i, "busyMin") / (totalPoints * 60) * 100 : 0 }));
     const tot = k => list.reduce((s, u) => s + Number(u[k] || 0), 0);
     const totOcc = tot("maxKWh") > 0 ? tot("energy") / tot("maxKWh") * 100 : 0;
@@ -219,6 +219,7 @@
           <div><small>Ocupação</small><strong class="dt-o">${fmt.pct1(u.occupancy)}</strong>${dd(u.occupancy, u.prevOccupancy)}</div>
           <div><small>Faturamento</small><strong class="dt-r">${fmt.brl(u.revenue)}</strong>${dd(u.revenue, u.prevRevenue)}</div>
         </div>
+        <div class="dt-rc" style="font-size:11px;color:var(--uby-muted);margin:4px 0 -2px">${fmt.int(u.valid)} recarga(s) no dia${u.prevValid !== undefined ? ` · ${fmt.int(u.prevValid)} em ${prevTxt}` : ""}</div>
         ${dayWave(u.hourly, scale, day.nowHour, false)}
         <div class="dt-foot">${fmt.int(u.valid)} recarga(s) · ${fmt.kwh(u.energy)}${u.failures ? ` · <span class="dt-bad">${u.failures} falha(s)</span>` : ""} · ${lastTxt(u)}</div>
       </article>`;
@@ -277,11 +278,13 @@
       <section class="section">
         <div class="section-head"><div><p class="kicker">Fechamento por origem</p><h2>Rede consolidada</h2><p>Consolidação não apaga a diferença entre operação própria e parceiros.</p></div>
           <div class="meta">AC ${fmt.int(n.acdc.acCharges)} recargas · DC ${fmt.int(n.acdc.dcCharges)} recargas</div></div>
-        <div class="grid g6">
+        <div class="grid g4">
           ${kpi("Ocupação média", fmt.pct(n.occupancy), `faixa ${esc(n.occupancyBand)} (${esc(n.occupancyRange)})`, "", "lead big")}
           ${kpi("Faturamento consolidado", fmt.brl(n.revenue), "todas as operações visíveis", "", "lead big")}
           ${kpi("Faturamento próprio UBY", fmt.brl(n.ownRevenue), "DC + AC próprios")}
           ${kpi("Energia entregue", fmt.kwh0(n.energy), `${fmt.int(n.sessions)} recarga(s)`, "", "warn")}
+          ${kpi("Recargas por dia", fmt.n1(n.perDay || 0), `${fmt.int(n.validSessions || 0)} válidas em ${fmt.int(n.daysCovered || 0)} dia(s)`)}
+          ${kpi("Faturamento por dia", fmt.brl(n.daysCovered ? n.revenue / n.daysCovered : 0), `média dos ${fmt.int(n.daysCovered || 0)} dia(s) do período`)}
           ${kpi("Clientes únicos", fmt.int(n.clients), "e-mail ou nome da sessão")}
           ${kpi("Projeção do mês", fmt.brl(n.projectedRevenue), n.projectionMonth ? `${esc(UBY.state.api.monthName(n.projectionMonth))} · ${n.projectionUnits} unidade(s)` : "sem base para projetar")}
         </div>
@@ -309,11 +312,11 @@
       <section class="section">
         <div class="section-head"><div><p class="kicker">Comparativo DC</p><h2>Comparativo por carregador DC próprio</h2><p>Identidade exata de cada carregador; Central JK AC e DC nunca se juntam.</p></div><div class="meta">${esc(r.period.label)}<br>${r.dcComparison.length} carregador(es) DC</div></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Carregador</th><th class="num">Faturamento</th><th class="num">Ocupação</th><th class="num">Disponibilidade real</th><th class="num">Energia</th><th class="num">Recargas</th><th class="num">Clientes</th><th class="num">Ticket médio</th><th class="num">kWh / recarga</th><th class="num">Falhas</th></tr></thead>
+          <thead><tr><th>Carregador</th><th class="num">Faturamento</th><th class="num">Ocupação</th><th class="num">Disponibilidade real</th><th class="num">Energia</th><th class="num">Recargas</th><th class="num">Recargas/dia</th><th class="num">Clientes</th><th class="num">Ticket médio</th><th class="num">kWh / recarga</th><th class="num">Falhas</th></tr></thead>
           <tbody>${r.dcComparison.map(row => `<tr class="clickable" data-unit="${esc(row.workId)}" data-station="${esc(row.station)}">
             <td><strong>${esc(row.station)}</strong><small>${esc(row.workName)}</small></td><td class="num">${fmt.brl(row.revenue)}</td><td class="num">${fmt.pct(row.occupancy)}</td>
-            <td class="num"><strong>${fmt.pct(row.availability)}</strong><small>${row.completed} de ${row.attempts}</small></td><td class="num">${fmt.kwh(row.energy)}</td><td class="num">${fmt.int(row.sessions)}</td>
-            <td class="num">${fmt.int(row.clients)}</td><td class="num">${fmt.brl(row.avgTicket)}</td><td class="num">${fmt.kwh(row.avgKwh)}</td><td class="num">${row.failures ? `<span class="badge bad">${row.failures}</span>` : "0"}</td></tr>`).join("") || `<tr><td colspan="10" class="empty">Sem recargas DC próprias no período.</td></tr>`}</tbody>
+            <td class="num"><strong>${fmt.pct(row.availability)}</strong><small>${row.completed} de ${row.attempts}</small></td><td class="num">${fmt.kwh(row.energy)}</td><td class="num">${fmt.int(row.sessions)}</td><td class="num"><strong>${fmt.n1(row.perDay || 0)}</strong></td>
+            <td class="num">${fmt.int(row.clients)}</td><td class="num">${fmt.brl(row.avgTicket)}</td><td class="num">${fmt.kwh(row.avgKwh)}</td><td class="num">${row.failures ? `<span class="badge bad">${row.failures}</span>` : "0"}</td></tr>`).join("") || `<tr><td colspan="11" class="empty">Sem recargas DC próprias no período.</td></tr>`}</tbody>
         </table></div>
         <div class="chart-box" style="margin-top:14px"><canvas id="chDcDaily"></canvas></div>
       </section>
@@ -333,11 +336,11 @@
 
       <div class="split" style="margin-bottom:18px">
         <section class="section"><div class="section-head"><div><p class="kicker">Unidades</p><h2>Ranking de unidades</h2><p>Clique para abrir o detalhe da estação.</p></div></div>
-          <div class="table-wrap"><table><thead><tr><th>Estação</th><th>Origem</th><th class="num">Faturamento</th><th class="num">Recargas</th><th class="num">Energia</th><th>Ocupação</th></tr></thead>
+          <div class="table-wrap"><table><thead><tr><th>Estação</th><th>Origem</th><th class="num">Faturamento</th><th class="num">Recargas</th><th class="num">Recargas/dia</th><th class="num">Energia</th><th>Ocupação</th></tr></thead>
           <tbody>${r.units.map(u => `<tr class="clickable" data-unit="${esc(u.workId)}" data-station="${esc(u.station)}"><td><strong>${esc(u.station)}</strong><small>${esc(u.workName)} · ${u.clients} cliente(s)</small></td>
             <td><span class="badge ${u.model === "third_party_management" ? "partner" : u.kind}">${u.model === "third_party_management" ? "Parceiro" : kindLabel(u.kind)}</span></td>
-            <td class="num">${fmt.brl(u.revenue)}</td><td class="num">${fmt.int(u.sessions)}</td><td class="num">${fmt.kwh0(u.energy)}</td>
-            <td><div style="display:flex;align-items:center;gap:8px"><div class="bar ${u.bandClass}" style="flex:1"><span style="width:${Math.min(u.occupancy, 100)}%"></span></div><strong style="min-width:52px;text-align:right">${fmt.pct(u.occupancy)}</strong></div></td></tr>`).join("") || `<tr><td colspan="6" class="empty">Nenhuma unidade UBY com recargas no período.</td></tr>`}</tbody></table></div>
+            <td class="num">${fmt.brl(u.revenue)}</td><td class="num">${fmt.int(u.sessions)}</td><td class="num"><strong>${fmt.n1(u.perDay || 0)}</strong></td><td class="num">${fmt.kwh0(u.energy)}</td>
+            <td><div style="display:flex;align-items:center;gap:8px"><div class="bar ${u.bandClass}" style="flex:1"><span style="width:${Math.min(u.occupancy, 100)}%"></span></div><strong style="min-width:52px;text-align:right">${fmt.pct(u.occupancy)}</strong></div></td></tr>`).join("") || `<tr><td colspan="7" class="empty">Nenhuma unidade UBY com recargas no período.</td></tr>`}</tbody></table></div>
         </section>
         <section class="section"><div class="section-head"><div><p class="kicker">Saúde e auditoria</p><h2>Saúde operacional</h2><p>Sessões fora da regra seguem preservadas para auditoria.</p></div></div>
           <div class="grid g2">
@@ -376,7 +379,8 @@
         { type: "bar", label: "Faturamento (R$)", data: days.map(d => d.revenue), backgroundColor: "#187457", borderRadius: 4, yAxisID: "y" },
         { type: "line", label: "Energia (kWh)", data: days.map(d => d.energy), borderColor: "#b98527", backgroundColor: "#b98527", pointRadius: 0, tension: .3, yAxisID: "y1" }
       ] },
-      options: opts({ scales: { ...opts().scales, y1: { position: "right", grid: { display: false }, ticks: { font: { size: 10 }, color: "#b98527" } } } })
+      options: opts({ plugins: { ...opts().plugins, tooltip: { ...(opts().plugins?.tooltip || {}), callbacks: { footer: items => items.length ? `Recargas: ${fmt.int(days[items[0].dataIndex]?.sessions || 0)}` : "" } } },
+        scales: { ...opts().scales, y1: { position: "right", grid: { display: false }, ticks: { font: { size: 10 }, color: "#b98527" } } } })
     });
     UBY.chart("chMonthly", {
       type: "bar",
@@ -391,9 +395,10 @@
       type: "line",
       data: { labels: keys.map(k => `${k.slice(8, 10)}/${k.slice(5, 7)}`), datasets: r.dcComparison.map((row, i) => {
         const map = new Map(row.daily.map(d => [d.key, d.revenue]));
-        return { label: row.station, data: keys.map(k => map.get(k) || 0), borderColor: UBY.PALETTE[i % UBY.PALETTE.length], backgroundColor: UBY.PALETTE[i % UBY.PALETTE.length], pointRadius: 0, tension: .25 };
+        const ses = new Map(row.daily.map(d => [d.key, d.sessions]));
+        return { label: row.station, sessions: keys.map(k => ses.get(k) || 0), data: keys.map(k => map.get(k) || 0), borderColor: UBY.PALETTE[i % UBY.PALETTE.length], backgroundColor: UBY.PALETTE[i % UBY.PALETTE.length], pointRadius: 0, tension: .25 };
       }) },
-      options: opts({ plugins: { ...opts().plugins, title: { display: true, text: "Faturamento diário por carregador DC (R$)", font: { size: 11, family: "Inter", weight: "700" }, color: "#202821", align: "start" } } })
+      options: opts({ plugins: { ...opts().plugins, tooltip: { ...(opts().plugins?.tooltip || {}), callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt.brl(ctx.parsed.y)} · ${fmt.int(ctx.dataset.sessions?.[ctx.dataIndex] || 0)} recarga(s)` } }, title: { display: true, text: "Faturamento diário por carregador DC (R$)", font: { size: 11, family: "Inter", weight: "700" }, color: "#202821", align: "start" } } })
     });
   }
 
