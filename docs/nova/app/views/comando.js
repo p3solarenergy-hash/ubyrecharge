@@ -219,7 +219,6 @@
           <div><small>Ocupação</small><strong class="dt-o">${fmt.pct1(u.occupancy)}</strong>${dd(u.occupancy, u.prevOccupancy)}</div>
           <div><small>Faturamento</small><strong class="dt-r">${fmt.brl(u.revenue)}</strong>${dd(u.revenue, u.prevRevenue)}</div>
         </div>
-        <div class="dt-rc" style="font-size:11px;color:var(--uby-muted);margin:4px 0 -2px">${fmt.int(u.valid)} recarga(s) no dia${u.prevValid !== undefined ? ` · ${fmt.int(u.prevValid)} em ${prevTxt}` : ""}</div>
         ${dayWave(u.hourly, scale, day.nowHour, false)}
         <div class="dt-foot">${fmt.int(u.valid)} recarga(s) · ${fmt.kwh(u.energy)}${u.failures ? ` · <span class="dt-bad">${u.failures} falha(s)</span>` : ""} · ${lastTxt(u)}</div>
       </article>`;
