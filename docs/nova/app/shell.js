@@ -39,8 +39,14 @@
       { id: "analisadores", icon: "∿", label: "Analisadores de energia", type: "view" },
       { id: "mercado", icon: "◌", label: "Mercado EV", type: "view" }
     ] },
+    // Financeiro no modelo de ERP (Conta Azul): contas a pagar, conciliação e o resultado por competência.
+    // Itens com href abrem a aba certa de Parâmetros (onde a gravação é liberada).
+    { label: "FINANCEIRO", items: [
+      { id: "fin-pagar", icon: "⇣", label: "Contas a pagar", type: "view", href: "#/parametros/contas" },
+      { id: "fin-conciliar", icon: "🏦", label: "Conciliação bancária", type: "view", href: "#/parametros/pagamentos" },
+      { id: "financeiro", icon: "R$", label: "Resultado e fechamento", type: "view", period: true }
+    ] },
     { label: "GESTÃO E GOVERNANÇA", items: [
-      { id: "financeiro", icon: "R$", label: "Financeiro e fechamento", type: "view", period: true },
       { id: "relatorios", icon: "▤", label: "Gerador de relatórios", type: "view" },
       { id: "arquivo", icon: "🗄", label: "Arquivo de fechamentos", type: "view" },
       { id: "configuracao", icon: "⚙", label: "Configuração da rede", type: "view" },
@@ -424,7 +430,7 @@
   function renderNav() {
     $("#nav").innerHTML = GROUPS.map(group => `
       <section class="nav-group"><p class="nav-title">${group.label}</p>
-        ${group.items.map(item => `<a class="nav-item" data-route="${item.id}" href="#/${item.id}"><i>${item.icon}</i><span>${item.label}</span><b class="${item.type === "view" ? "new" : "classic"}">${item.type === "view" ? "NOVO" : "ORIGINAL"}</b></a>`).join("")}
+        ${group.items.map(item => `<a class="nav-item" data-route="${item.id}" ${item.href ? `data-hash="${item.href}"` : ""} href="${item.href || `#/${item.id}`}"><i>${item.icon}</i><span>${item.label}</span><b class="${item.type === "view" ? "new" : "classic"}">${item.type === "view" ? "NOVO" : "ORIGINAL"}</b></a>`).join("")}
       </section>`).join("");
   }
 
@@ -436,9 +442,13 @@
     if (id === "abrir" && /^legado\/[\w\-./?=&%]+$/.test(params[0] || "") && !params[0].includes("..")) {
       def = { id: "abrir", type: "classic", src: params[0], writes: /^legado\/obra-ev\/gestao_obra_ev_detalhe\.html/.test(params[0]) ? "obras" : false, tab: params[1] || "", label: params[2] || "Tela original", group: params[3] || "GESTÃO DE OBRAS" };
     }
+    // Atalho de menu (ex.: #/fin-pagar) leva para a tela de verdade.
+    if (def.href && id === def.id) { location.replace(def.href); return; }
     state.route = def; state.params = params;
     document.body.classList.remove("menu-open");
-    document.querySelectorAll(".nav-item").forEach(a => a.classList.toggle("active", a.dataset.route === def.id));
+    // Itens com href (ex.: Contas a pagar → #/parametros/contas) ficam ativos pela própria rota.
+    const hashHit = [...document.querySelectorAll(".nav-item[data-hash]")].find(a => location.hash.startsWith(a.dataset.hash));
+    document.querySelectorAll(".nav-item").forEach(a => a.classList.toggle("active", hashHit ? a === hashHit : a.dataset.route === def.id));
     $("#crumbGroup").textContent = `UBY Recharge / ${def.group.charAt(0) + def.group.slice(1).toLowerCase()}`;
     $("#crumbTitle").textContent = def.label;
     $("#periodWrap").hidden = !(def.type === "view" && def.period);

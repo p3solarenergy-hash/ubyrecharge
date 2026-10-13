@@ -11,7 +11,7 @@
   "use strict";
   const { fmt, esc, kpi } = UBY;
   const SRC = "legado/obra-ev/recargas.html?nova_params=1";
-  const ui = { tab: "pagamentos", charger: "", month: "", edits: {}, rules: null, matrixMonth: "", editingCost: "", costForm: null, payMonth: new Date().toISOString().slice(0, 7), payForm: null, policyEdits: null, log: [] };
+  const ui = { tab: "contas", charger: "", month: "", edits: {}, rules: null, matrixMonth: "", editingCost: "", costForm: null, payMonth: new Date().toISOString().slice(0, 7), payForm: null, policyEdits: null, log: [] };
   let frame = null, readyPromise = null, busy = false;
 
   // ---------- motor original oculto ----------
@@ -459,6 +459,101 @@
     const covered = b => from && to && (b.paidAt || b.due) >= from && (b.paidAt || b.due) <= to;
     return { p, tx, from, to, rec, byKey, covered, bills };
   }
+  const billKindLabel = b => b.kind === "energia" ? "Energia" : b.kind === "area" ? "Repasse à área" : b.source || "Custo";
+  const billSched = b => b.kind === "matriz" && b.source === "Pagamento programado";
+  // Cada conta leva para onde ela é editada.
+  const billEditHref = b => {
+    const key = encodeURIComponent(`${b.workId || ""}|${b.station || ""}`);
+    if (b.kind === "energia") return `#/parametros/energia/${key}/${encodeURIComponent(`inv:${b.invoiceId}`)}`;
+    if (b.kind === "area") return `#/parametros/area/${key}`;
+    if (billSched(b)) return `#/parametros/programados/-/${encodeURIComponent(`pay:${b.billId}`)}/${b.monthKey}`;
+    return `#/parametros/matriz/-/${encodeURIComponent(`cost:${b.billId}`)}/${b.monthKey}`;
+  };
+  // Categoria (plano de contas simplificado) e centro de custo de cada conta.
+  const billCategory = b => b.kind === "energia" ? "Energia" : b.kind === "area" ? "Repasse à área" : /impost|tribut/i.test(`${b.category} ${b.name}`) ? "Impostos" : (b.category || "Outros custos");
+  const billCenter = b => b.station ? String(b.station).replace(/^UBY RECHARGE\s*-\s*/i, "") : "Rede UBY · central";
+
+  // ---------- contas a pagar (estilo ERP) ----------
+  // Todas as contas de todas as origens (programadas, matriz, energia, repasses, impostos) numa lista só,
+  // com visões rápidas (vencidas, hoje, 7 dias, em aberto, do mês, pagas), filtros por categoria, centro
+  // de custo e fornecedor, conferência com o extrato e baixa individual (com valor pago) ou em lote.
+  function contasTab(w, data) {
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const today = new Date().toISOString().slice(0, 10);
+    const plus = n => { const d = new Date(`${today}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+    const in7 = plus(7);
+    const bs = bankState(data);
+    const f = ui.cf || (ui.cf = { view: "abertas", month: today.slice(0, 7), cat: "", cc: "", sup: "", q: "" });
+    const dueOf = b => String(b.due || "").slice(0, 10);
+    const paidOf = b => String(b.paidAt || "").slice(0, 10);
+    const sit = b => b.paid ? "paga" : dueOf(b) < today ? "vencida" : dueOf(b) === today ? "hoje" : dueOf(b) <= in7 ? "7dias" : "aberta";
+    const SIT = { paga: ["ok", "Paga"], vencida: ["bad", "Vencida"], hoje: ["warn", "Vence hoje"], "7dias": ["warn", "Próximos 7 dias"], aberta: ["neutral", "Em aberto"] };
+    const all = bs.bills.filter(b => b.amount > 0);
+    const VIEWS = [["vencidas", "Vencidas", b => sit(b) === "vencida"], ["hoje", "Vencem hoje", b => sit(b) === "hoje"], ["7dias", "Próximos 7 dias", b => !b.paid && dueOf(b) >= today && dueOf(b) <= in7],
+      ["abertas", "Todas em aberto", b => !b.paid], ["mes", "Vencem no mês", b => dueOf(b).slice(0, 7) === f.month], ["pagas", "Pagas no mês", b => b.paid && paidOf(b).slice(0, 7) === f.month]];
+    const view = VIEWS.find(v => v[0] === f.view) || VIEWS[3];
+    const q = String(f.q || "").toLowerCase();
+    const rows = all.filter(view[2]).filter(b => (!f.cat || billCategory(b) === f.cat) && (!f.cc || billCenter(b) === f.cc) && (!f.sup || (b.supplier || "—") === f.sup)
+      && (!q || `${b.name} ${b.supplier} ${b.station} ${b.category}`.toLowerCase().includes(q)))
+      .sort((a, b) => f.view === "pagas" ? paidOf(b).localeCompare(paidOf(a)) : dueOf(a).localeCompare(dueOf(b)));
+    const sum = list => list.reduce((s, b) => s + b.amount, 0);
+    const k = { late: all.filter(b => sit(b) === "vencida"), today: all.filter(b => sit(b) === "hoje"), week: all.filter(b => !b.paid && dueOf(b) > today && dueOf(b) <= in7),
+      open: all.filter(b => !b.paid), paid: all.filter(b => b.paid && paidOf(b).slice(0, 7) === f.month) };
+    const opts = (list, cur) => list.map(v => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(v)}</option>`).join("");
+    const uniq = fn => [...new Set(all.map(fn))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const recOf = b => { const r = bs.byKey.get(b.key); if (!r || r.status === "aberto" || r.status === "sem-extrato") return bs.covered(b) && r ? r : null; return r; };
+    const recTxt = b => { const r = recOf(b); if (!bs.tx.length || !r) return ""; const [cls, label] = REC[r.status]; return `<span class="badge ${cls}" style="font-size:10px">${label}</span>`; };
+    const sel = ui.cfSel || (ui.cfSel = new Set());
+    [...sel].forEach(key => { if (!rows.some(b => b.key === key && !b.paid)) sel.delete(key); });
+    const panel = b => {
+      const r = recOf(b);
+      const isArea = b.kind === "area", isMatrix = b.kind === "matriz";
+      const due = Number(b.dueAmount ?? b.amount);
+      return `<tr><td colspan="9"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        ${field("Pago em", `<input class="select" type="date" data-c-date value="${esc(r?.bankDate || today)}" style="width:150px">`)}
+        ${isArea || isMatrix ? field(`Valor pago (${isArea ? "devido" : "previsto"} ${fmt.brl(due)})`, `<input class="select" type="number" step="0.01" min="0" data-c-amount data-due="${esc(due.toFixed(2))}" value="${esc((r && !r.sharedWith.length && r.tx.length ? r.paidTotal : due).toFixed(2))}" style="width:150px">`) : `<small style="padding-bottom:8px">Valor: <strong>${fmt.brl(b.amount)}</strong> · para mudar, edite a fatura em Energia</small>`}
+        ${isArea ? field("Se o valor pago for diferente", `<select class="select" data-c-diff style="width:240px"><option value="next">Levar a diferença para o mês seguinte</option><option value="drop">Zerar a diferença</option></select>`) : ""}
+        <button class="btn primary" data-c-confirm="${esc(b.key)}" type="button" ${can}>Confirmar pagamento</button>
+        <button class="btn ghost" data-c-cancel type="button">Cancelar</button></div></td></tr>`;
+    };
+    const selTotal = sum(rows.filter(b => sel.has(b.key)));
+    return `
+      <div class="grid g5" style="margin-bottom:14px">
+        ${kpi("Vencido", fmt.brl(sum(k.late)), `${fmt.int(k.late.length)} conta(s)`, "", k.late.length ? "bad" : "")}
+        ${kpi("Vence hoje", fmt.brl(sum(k.today)), `${fmt.int(k.today.length)} conta(s)`, "", k.today.length ? "warn" : "")}
+        ${kpi("Próximos 7 dias", fmt.brl(sum(k.week)), `${fmt.int(k.week.length)} conta(s)`)}
+        ${kpi("Total em aberto", fmt.brl(sum(k.open)), `${fmt.int(k.open.length)} conta(s)`, "", "lead")}
+        ${kpi(`Pago em ${esc(UBY.state.api?.monthName?.(f.month) || f.month)}`, fmt.brl(sum(k.paid)), `${fmt.int(k.paid.length)} conta(s)`)}
+      </div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Financeiro</p><h2>Contas a pagar</h2><p>Todas as contas numa lista só: internet, aluguel, seguro, energia (Copel e arrendamento), repasses às áreas e impostos. Pague aqui (com o valor real, se teve desconto ou juros), em lote, ou concilie com o extrato.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn primary" href="#/parametros/pagamentos">＋ Nova conta</a><a class="btn" href="#/parametros/pagamentos">🏦 Conciliar extrato</a></div></div>
+        <div class="seg" id="cfView" style="margin-bottom:10px">${VIEWS.map(([v, l, fn]) => `<button type="button" data-v="${v}" class="${f.view === v ? "on" : ""}">${esc(l)}${["vencidas", "hoje", "7dias"].includes(v) ? ` <b>${all.filter(fn).length}</b>` : ""}</button>`).join("")}</div>
+        <div class="toolbar" style="box-shadow:none;margin-bottom:10px">
+          ${["mes", "pagas"].includes(f.view) ? `<input class="select" type="month" data-cff="month" value="${esc(f.month)}">` : ""}
+          <select class="select" data-cff="cat"><option value="">Todas as categorias</option>${opts(uniq(billCategory), f.cat)}</select>
+          <select class="select" data-cff="cc"><option value="">Todos os centros de custo</option>${opts(uniq(billCenter), f.cc)}</select>
+          <select class="select" data-cff="sup"><option value="">Todos os fornecedores</option>${opts(uniq(b => b.supplier || "—"), f.sup)}</select>
+          <input class="search" data-cff="q" placeholder="Buscar conta, fornecedor…" value="${esc(f.q)}">
+          <span class="spacer"></span><small>${fmt.int(rows.length)} conta(s) · ${fmt.brl(sum(rows))}</small></div>
+        ${sel.size ? `<div class="note" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><strong>${fmt.int(sel.size)} selecionada(s) · ${fmt.brl(selTotal)}</strong>
+          pagas em <input class="select" type="date" id="cfBulkDate" value="${esc(today)}" style="width:150px">
+          <button class="btn primary" id="cfBulkPay" type="button" ${can}>Marcar como pagas (valor previsto)</button><button class="btn ghost" id="cfBulkClear" type="button">Limpar seleção</button></div>` : ""}
+        <div class="table-wrap"><table><thead><tr><th style="width:28px"><input type="checkbox" id="cfAll" ${rows.some(b => !b.paid) && rows.filter(b => !b.paid).every(b => sel.has(b.key)) ? "checked" : ""}></th><th>Vencimento</th><th>Conta</th><th>Centro de custo</th><th>Categoria</th><th class="num">Valor</th><th>Situação</th><th>Extrato</th><th></th></tr></thead>
+          <tbody>${rows.map(b => `<tr${sit(b) === "vencida" ? ' style="background:rgba(183,84,80,.06)"' : ""}>
+            <td>${b.paid ? "" : `<input type="checkbox" data-cf-sel="${esc(b.key)}" ${sel.has(b.key) ? "checked" : ""}>`}</td>
+            <td><strong>${fmtDay(dueOf(b))}</strong>${sit(b) === "vencida" ? `<small style="color:var(--uby-red)">há ${Math.round((new Date(`${today}T12:00:00`) - new Date(`${dueOf(b)}T12:00:00`)) / 86400000)} dia(s)</small>` : ""}</td>
+            <td style="white-space:normal"><a class="edit-link" href="${billEditHref(b)}" title="Abrir onde esta conta é editada"><strong>${esc(b.name)}</strong><span aria-hidden="true"> ✎</span></a><small>${esc(billKindLabel(b))}${b.supplier ? ` · ${esc(b.supplier)}` : ""}</small></td>
+            <td>${b.workId ? UBY.stationLink(b.workId, billCenter(b)) : esc(billCenter(b))}</td>
+            <td><small>${esc(billCategory(b))}</small></td>
+            <td class="num"><strong>${fmt.brl(b.amount)}</strong>${b.paidAmount !== null && b.paidAmount !== undefined && Math.abs(b.paidAmount - b.dueAmount) > 0.009 ? `<small>${b.kind === "area" ? "devido" : "previsto"} ${fmt.brl(b.dueAmount)}</small>` : ""}</td>
+            <td><span class="badge ${SIT[sit(b)][0]}">${SIT[sit(b)][1]}</span>${b.paid && paidOf(b) ? `<small>em ${fmtDay(paidOf(b))}</small>` : ""}</td>
+            <td>${recTxt(b)}</td>
+            <td style="white-space:nowrap">${b.paid ? `<button class="btn ghost" data-c-unpay="${esc(b.key)}" type="button" ${can}>Desfazer</button>` : `<button class="btn primary" data-c-pay="${esc(b.key)}" type="button" ${can}>Pagar</button>`}</td></tr>
+            ${ui.cPay === b.key && !b.paid ? panel(b) : ""}`).join("") || `<tr><td colspan="9" class="empty">Nenhuma conta nesta visão.</td></tr>`}</tbody>
+          <tfoot><tr><td colspan="5">Total da visão</td><td class="num">${fmt.brl(sum(rows))}</td><td colspan="3"></td></tr></tfoot></table></div>
+      </section>`;
+  }
+
   function centralTab(w, data) {
     const mk = ui.payMonth;
     const can = canWrite(w) && !busy ? "" : "disabled";
@@ -469,16 +564,7 @@
     const recOf = b => { const r = bs.byKey.get(b.key); if (!r) return null; if (r.status === "aberto" || r.status === "sem-extrato") return bs.covered(b) ? r : null; return r; };
     const nRec = rows.map(recOf).filter(Boolean);
     const conf = nRec.filter(r => r.status === "conferido").length;
-    const kindLabel = b => b.kind === "energia" ? "Energia" : b.kind === "area" ? "Repasse à área" : b.source || "Custo";
-    // Cada conta leva para onde ela é editada.
-    const sched = b => b.kind === "matriz" && b.source === "Pagamento programado";
-    const billHref = b => {
-      const key = encodeURIComponent(`${b.workId || ""}|${b.station || ""}`);
-      if (b.kind === "energia") return `#/parametros/energia/${key}/${encodeURIComponent(`inv:${b.invoiceId}`)}`;
-      if (b.kind === "area") return `#/parametros/area/${key}`;
-      if (sched(b)) return `#/parametros/programados/-/${encodeURIComponent(`pay:${b.billId}`)}/${b.monthKey}`;
-      return `#/parametros/matriz/-/${encodeURIComponent(`cost:${b.billId}`)}/${b.monthKey}`;
-    };
+    const kindLabel = billKindLabel, sched = billSched, billHref = billEditHref;
     // Possível duplicidade: mesmo carregador e mesmo valor no mês (ex.: pagamento programado da Copel
     // e a fatura da Copel lançada em Energia). Só o programado pode ser removido daqui.
     const normSt = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/^uby recharge\s*-\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
@@ -1197,8 +1283,8 @@
   // 5 grupos (usuário: "muitas abas… tudo que for de energia em uma só, outros custos em outra");
   // as subabas continuam com os ids antigos para os links diretos (#/parametros/<id>/…).
   const GROUPS = [
+    ["Contas a pagar", [["contas", "Contas a pagar"], ["pagamentos", "Conciliação e extrato"]]],
     ["Fechamento do mês", [["checklist", "O que falta no mês"]]],
-    ["Pagamentos e extrato", [["pagamentos", "Pagamentos e extrato"]]],
     ["Energia", [["energia", "Faturas de energia"], ["area", "Repasse à área"]]],
     ["Outros custos", [["matriz", "Custos da matriz"], ["programados", "Pagamentos programados"], ["documentos", "Documentos"]]],
     ["Carregadores", [["carregador", "Por carregador"], ["operacao", "Operação e carregadores"]]],
@@ -1264,12 +1350,12 @@
       }
     } else {
       data.months = (UBY.state.months && UBY.state.months.length ? UBY.state.months : (w.getMonths?.() || [])).slice();
-      if (ui.tab === "energia" || ui.tab === "area" || ui.tab === "pagamentos" || ui.tab === "checklist") {
+      if (ui.tab === "energia" || ui.tab === "area" || ui.tab === "pagamentos" || ui.tab === "contas" || ui.tab === "checklist") {
         // Depois de gravar, o motor principal recarrega: espera ele voltar com o histórico completo.
         for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
         try { await Promise.race([UBY.state.api.loadFull(), new Promise(r => setTimeout(r, 15000))]); } catch (_) {}
       }
-      if (ui.tab === "pagamentos") {
+      if (ui.tab === "pagamentos" || ui.tab === "contas") {
         try { data.bills = UBY.state.api.allBills(); } catch (err) { data.bills = []; }
         try { data.bank = (await w.UBY_SUPABASE.loadBankData()).payload || null; data.bankError = ""; }
         catch (err) { data.bank = null; data.bankError = err.message; }
@@ -1288,12 +1374,14 @@
     if (seq !== drawSeq) return;
     const c = data.chargers.find(x => x.key === ui.charger);
     target.innerHTML = `
-      <div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
-        <p class="lead">Modelo, splits, energia, capital, metas e regras de cada carregador por competência; custos centrais da matriz; calendário de pagamentos; rodadas e cotistas. As contas e a gravação são as mesmas da plataforma original.</p></div>
+      ${ui.tab === "contas" || ui.tab === "pagamentos" ? `<div class="hero"><div><p class="eyebrow">Financeiro</p><h1>${ui.tab === "contas" ? "Contas a pagar" : "Conciliação bancária"}</h1>
+        <p class="lead">${ui.tab === "contas" ? "Tudo o que a UBY tem a pagar, de todas as origens, numa lista só: vencidas, a vencer, pagas, por categoria, centro de custo e fornecedor." : "Anexe o extrato do banco: a plataforma sugere a conta de cada saída, você confirma, e a conta fica paga na data e no valor do banco."}</p></div>`
+      : `<div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
+        <p class="lead">Modelo, splits, energia, capital, metas e regras de cada carregador por competência; custos centrais da matriz; calendário de pagamentos; rodadas e cotistas. As contas e a gravação são as mesmas da plataforma original.</p></div>`}
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
       <div class="seg" id="pmTabs" style="margin-bottom:${groupOf(ui.tab)[1].length > 1 ? 8 : 14}px">${GROUPS.map(g => `<button type="button" data-v="${g[1][0][0]}" data-group="${esc(g[0])}" class="${groupOf(ui.tab) === g ? "on" : ""}">${esc(g[0])}</button>`).join("")}</div>
       ${groupOf(ui.tab)[1].length > 1 ? `<div class="seg" id="pmSubTabs" style="margin-bottom:14px;font-size:12px">${groupOf(ui.tab)[1].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${esc(l)}</button>`).join("")}</div>` : ""}
-      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "area" ? areaTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : ui.tab === "checklist" ? checklistTab() : quotasTab(w)}
+      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "area" ? areaTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "contas" ? contasTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : ui.tab === "checklist" ? checklistTab() : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
@@ -1334,6 +1422,19 @@
     target.querySelectorAll("#pmSubTabs button").forEach(b => b.onclick = () => { ui.tab = b.dataset.v; ui.lastSub = { ...(ui.lastSub || {}), [groupOf(ui.tab)[0]]: ui.tab }; draw(target, w); });
     // --- pagamentos (central) + extrato ---
     const cBill = key => (data.bills || []).find(b => b.key === key);
+    // Contas a pagar: visão rápida, filtros, seleção e baixa em lote.
+    target.querySelectorAll("#cfView button").forEach(b => b.onclick = () => { ui.cf.view = b.dataset.v; ui.cPay = ""; draw(target, w); });
+    target.querySelectorAll("select[data-cff], input[type=month][data-cff]").forEach(el => el.onchange = () => { ui.cf[el.dataset.cff] = el.value; draw(target, w); });
+    target.querySelectorAll("input.search[data-cff]").forEach(el => el.oninput = () => { clearTimeout(el._t); el._t = setTimeout(() => { ui.cf.q = el.value; draw(target, w).then(() => { const n = target.querySelector("input.search[data-cff]"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }); }, 300); });
+    target.querySelectorAll("[data-cf-sel]").forEach(cb => cb.onchange = () => { if (cb.checked) ui.cfSel.add(cb.dataset.cfSel); else ui.cfSel.delete(cb.dataset.cfSel); draw(target, w); });
+    if ($("#cfAll")) $("#cfAll").onchange = e => { target.querySelectorAll("[data-cf-sel]").forEach(cb => { if (e.target.checked) ui.cfSel.add(cb.dataset.cfSel); else ui.cfSel.delete(cb.dataset.cfSel); }); draw(target, w); };
+    if ($("#cfBulkClear")) $("#cfBulkClear").onclick = () => { ui.cfSel.clear(); draw(target, w); };
+    if ($("#cfBulkPay")) $("#cfBulkPay").onclick = () => {
+      const date = $("#cfBulkDate")?.value || new Date().toISOString().slice(0, 10);
+      const list = [...ui.cfSel].map(cBill).filter(b => b && !b.paid);
+      if (!list.length || !confirm(`Marcar ${list.length} conta(s) como pagas em ${fmtDay(date)}, com o valor previsto de cada uma (${fmt.brl(list.reduce((s, b) => s + b.amount, 0))})?`)) return;
+      run(target, w, `${list.length} conta(s) pagas em ${fmtDay(date)}`, async () => { for (const b of list) await setBillPaid(w, b, date); ui.cfSel.clear(); return "salvo"; });
+    };
     if ($("#pmCentralMonth")) $("#pmCentralMonth").onchange = e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { ui.payMonth = e.target.value; ui.cPay = ""; draw(target, w); } };
     target.querySelectorAll("[data-c-pay]").forEach(b => b.onclick = () => { ui.cPay = ui.cPay === b.dataset.cPay ? "" : b.dataset.cPay; draw(target, w); });
     target.querySelectorAll("[data-c-cancel]").forEach(b => b.onclick = () => { ui.cPay = ""; draw(target, w); });
