@@ -453,7 +453,7 @@
     const from = (p.statements || []).map(s => s.from).filter(Boolean).sort()[0] || "";
     const to = (p.statements || []).map(s => s.to).filter(Boolean).sort().at(-1) || "";
     const bills = data.bills || [];
-    const rec = B && tx.length ? B.reconcile(tx, bills, p.links || {}) : { bills: [], outflows: [], unmatched: [] };
+    const rec = B && tx.length ? B.reconcile(tx, bills, p.links || {}, p.rules || {}) : { bills: [], outflows: [], unmatched: [] };
     const byKey = new Map(rec.bills.map(b => [b.key, b]));
     // Só vale "não achado" para contas cujo vencimento/pagamento cai dentro do período dos extratos.
     const covered = b => from && to && (b.paidAt || b.due) >= from && (b.paidAt || b.due) <= to;
@@ -489,17 +489,19 @@
       if (!r) return `<small style="color:var(--uby-muted)">fora do período do extrato</small>`;
       const [cls, label] = REC[r.status];
       const txt = r.tx.length ? `${r.tx.map(t => `${fmtDay(t.date)} · ${fmt.brl(t.value)}`).join(" + ")}${r.sharedWith.length ? ` (junto com ${r.sharedWith.length} outra(s) conta(s))` : ""}${r.diff ? ` · diferença ${fmt.brl(r.diff)}` : ""}` : "";
-      return `<span class="badge ${cls}">${label}</span>${txt ? `<small>${esc(txt)}</small>` : ""}${!b.paid && (r.status === "pago-nao-marcado" || r.status === "diferenca") ? `<button class="btn" data-c-paybank="${esc(b.key)}|${esc(r.bankDate)}|${r.sharedWith.length ? "" : r.paidTotal}" type="button" style="margin-top:4px" ${can}>Marcar pago em ${fmtDay(r.bankDate)}${b.kind === "area" && r.diff && !r.sharedWith.length ? ` com ${fmt.brl(r.paidTotal)} (diferença vai ao mês seguinte)` : ""}</button>` : ""}`;
+      return `<span class="badge ${cls}">${label}</span>${txt ? `<small>${esc(txt)}</small>` : ""}${!b.paid && (r.status === "pago-nao-marcado" || r.status === "diferenca") ? `<button class="btn" data-c-paybank="${esc(b.key)}|${esc(r.bankDate)}|${r.sharedWith.length ? "" : r.paidTotal}" type="button" style="margin-top:4px" ${can}>Marcar pago em ${fmtDay(r.bankDate)}${b.kind === "area" && r.diff && !r.sharedWith.length ? ` com ${fmt.brl(r.paidTotal)} (diferença vai ao mês seguinte)` : b.kind === "matriz" && r.diff && !r.sharedWith.length ? ` com ${fmt.brl(r.paidTotal)}` : ""}</button>` : ""}`;
     };
     const payPanel = b => {
       const r = recOf(b);
       const date = r?.bankDate || today;
-      const isArea = b.kind === "area";
-      const due = isArea ? Number(b.dueAmount ?? b.amount) : b.amount;
+      const isArea = b.kind === "area", isMatrix = b.kind === "matriz";
+      const due = isArea || isMatrix ? Number(b.dueAmount ?? b.amount) : b.amount;
       return `<tr><td colspan="7"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
         ${field("Pago em", `<input class="select" type="date" data-c-date value="${esc(date)}" style="width:150px">`)}
         ${isArea ? `${field(`Valor pago (devido ${fmt.brl(due)})`, `<input class="select" type="number" step="0.01" data-c-amount data-due="${esc(due.toFixed(2))}" value="${esc((r && !r.sharedWith.length && r.tx.length ? r.paidTotal : due).toFixed(2))}" style="width:150px">`)}
-          ${field("Se o valor pago for diferente do devido", `<select class="select" data-c-diff style="width:260px"><option value="next">Levar a diferença para o mês seguinte</option><option value="drop">Zerar a diferença</option></select>`)}` : `<small style="padding-bottom:8px">Valor: <strong>${fmt.brl(b.amount)}</strong>${b.kind === "energia" ? " · para mudar o valor, edite a fatura em Energia" : " · para mudar o valor, edite o custo em Outros custos"}</small>`}
+          ${field("Se o valor pago for diferente do devido", `<select class="select" data-c-diff style="width:260px"><option value="next">Levar a diferença para o mês seguinte</option><option value="drop">Zerar a diferença</option></select>`)}`
+        : isMatrix ? `${field(`Valor pago (previsto ${fmt.brl(due)})`, `<input class="select" type="number" step="0.01" min="0" data-c-amount data-due="${esc(due.toFixed(2))}" value="${esc((r && !r.sharedWith.length && r.tx.length ? r.paidTotal : due).toFixed(2))}" style="width:150px">`)}
+          <small style="padding-bottom:8px">Desconto, juros ou mês proporcional: informe o valor do boleto pago. O previsto não muda para os próximos meses.</small>` : `<small style="padding-bottom:8px">Valor: <strong>${fmt.brl(b.amount)}</strong>${b.kind === "energia" ? " · para mudar o valor, edite a fatura em Energia" : " · para mudar o valor, edite o custo em Outros custos"}</small>`}
         <button class="btn primary" data-c-confirm="${esc(b.key)}" type="button" ${can}>Confirmar pagamento</button>
         <button class="btn ghost" data-c-cancel type="button">Cancelar</button></div></td></tr>`;
     };
@@ -509,7 +511,8 @@
     const linkOptions = t => {
       const near = bs.bills.filter(b => Math.abs((new Date(`${b.due}T12:00:00`) - new Date(`${t.date}T12:00:00`)) / 86400000) <= 75)
         .sort((a, b) => Math.abs(a.amount - t.value) - Math.abs(b.amount - t.value)).slice(0, 25);
-      return `<option value="">Vincular a uma conta…</option>${near.map(b => `<option value="${esc(b.key)}">${esc(fmtDay(b.due))} · ${esc(fmt.brl(b.amount))} · ${esc(b.name)}</option>`).join("")}<option value="__new">＋ Lançar como conta nova (já paga)</option><option value="__ignore">Não é conta (transferência, retirada…)</option>`;
+      const where = b => String(b.station || b.workName || "").replace(/^UBY RECHARGE\s*-\s*/i, "");
+      return `<option value="">Vincular a uma conta…</option>${near.map(b => `<option value="${esc(b.key)}">${esc(fmtDay(b.due))} · ${esc(fmt.brl(b.amount))} · ${esc(b.name)}${where(b) ? ` · ${esc(where(b))}` : ""}${b.paid ? " · já paga" : ""}</option>`).join("")}<option value="__new">＋ Lançar como conta nova (já paga)</option><option value="__ignore">Não é conta (transferência, retirada…)</option>`;
     };
     // Painel "lançar como conta nova": pagamento avulso do mês, já pago na data do banco.
     const targets = (() => { try { w.renderScheduledPayments(w.getGeneralUnitData()); return [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text })); } catch (_) { return []; } })();
@@ -539,7 +542,7 @@
               ${(() => { const d = dupsOf(b); if (!d.length) return ""; return `<div style="margin-top:4px"><span class="badge warn">possível duplicidade</span><small>mesmo carregador e mesmo valor que: ${d.map(o => `"${esc(o.name)}"`).join(", ")}${!sched(b) && d.some(sched) ? " · remova o pagamento programado e mantenha este" : ""}</small>
                 ${sched(b) ? `<button class="btn ghost" data-pay-end="${esc(b.billId)}" data-month="${esc(mk)}" type="button" style="color:var(--uby-red);margin-top:4px" ${can}>Remover este (daqui em diante)</button>` : ""}</div>`; })()}</td>
             <td>${b.workId ? UBY.stationLink(b.workId, b.station || b.workName) : esc(b.station || "—")}${b.workName ? `<small>${esc(b.workName)}</small>` : ""}</td>
-            <td class="num"><strong>${fmt.brl(b.amount)}</strong>${b.kind === "area" && b.paidAmount !== null && b.paidAmount !== undefined && Math.abs(b.paidAmount - b.dueAmount) > 0.009 ? `<small>devido ${fmt.brl(b.dueAmount)}</small>` : ""}</td>
+            <td class="num"><strong>${fmt.brl(b.amount)}</strong>${(b.kind === "area" || b.kind === "matriz") && b.paidAmount !== null && b.paidAmount !== undefined && Math.abs(b.paidAmount - b.dueAmount) > 0.009 ? `<small>${b.kind === "area" ? "devido" : "previsto"} ${fmt.brl(b.dueAmount)}</small>` : ""}</td>
             <td><span class="badge ${b.paid ? "ok" : b.status === "overdue" ? "bad" : "warn"}">${esc(b.statusLabel || (b.paid ? "Pago" : "A pagar"))}</span>${b.paidAt ? `<small>em ${fmtDay(b.paidAt)}</small>` : ""}</td>
             <td style="white-space:normal;min-width:200px">${recCell(b)}</td>
             <td style="white-space:nowrap">${b.paid ? `<button class="btn ghost" data-c-unpay="${esc(b.key)}" type="button" ${can}>Desfazer</button>` : `<button class="btn primary" data-c-pay="${esc(b.key)}" type="button" ${can}>Marcar pago</button>`}</td></tr>
@@ -566,15 +569,39 @@
           <span style="font-size:12px;font-weight:800">🏦 Anexar extrato</span><small style="display:block;color:var(--uby-muted)">.xlsx, .xls, .csv ou .ofx</small>
           <input id="pmBankFile" type="file" accept=".xlsx,.xls,.csv,.ofx,.txt" style="margin-top:6px;width:100%" ${can}></label>
         ${data.bankError ? `<div class="note" style="border-color:var(--uby-red)">Não consegui ler os extratos guardados: ${esc(data.bankError)}</div>` : ""}
-        ${(bs.p.statements || []).length ? `<div class="list" style="margin-bottom:12px">${bs.p.statements.slice().reverse().map(s => `<div class="list-row"><span><strong>${esc(s.fileName || "extrato")}</strong> · ${esc(s.bank || "")}${s.account ? ` · conta ${esc(s.account)}` : ""}<br><small>${fmtDay(s.from)} a ${fmtDay(s.to)} · ${fmt.int(s.count)} lançamento(s), ${fmt.int(s.added)} novo(s) · anexado ${esc(fmt.dt(s.importedAt))}</small></span></div>`).join("")}</div>` : ""}
+        ${(bs.p.statements || []).length ? `<div class="list" style="margin-bottom:12px">${bs.p.statements.slice().reverse().map(s => `<div class="list-row"><span><strong>${esc(s.fileName || "extrato")}</strong> · ${esc(s.bank || "")}${s.account ? ` · conta ${esc(s.account)}` : ""}<br><small>${fmtDay(s.from)} a ${fmtDay(s.to)} · ${fmt.int(s.count)} lançamento(s), ${fmt.int(s.added)} novo(s) · anexado ${esc(fmt.dt(s.importedAt))}</small></span><button class="btn ghost" data-bank-del-st="${esc(s.id)}" type="button" style="color:var(--uby-red)" ${can}>Remover</button></div>`).join("")}</div>` : ""}
         ${bs.tx.length ? `
-          <h3 style="margin:14px 0 8px;font-size:13px">Saídas do banco em ${esc(UBY.state.api?.monthName?.(mk) || mk)} ${bs.rec.unmatched.length ? `<span class="badge warn">${fmt.int(bs.rec.unmatched.length)} sem conta no total</span>` : ""}</h3>
+          ${(() => {
+            // Conciliação: cada saída do banco é conciliada (conta paga), sugestão a confirmar, sem conta ou "não é conta".
+            const n = st => outs.filter(t => t.state === st).length;
+            const exact = outs.filter(t => t.state === "confirmar" && Math.abs(t.diff) <= 0.009);
+            const sugg = t => {
+              const names = t.bills.map(k => `<strong>${esc(billName(k))}</strong>`).join("<br>");
+              const why = t.how === "grupo" ? "soma de pagamentos" : Math.abs(t.diff) <= 0.009 ? "valor exato" : `previsto ${fmt.brl(t.expected)} · pago ${fmt.brl(t.value)} (${t.diff < 0 ? "desconto" : "acréscimo"} ${fmt.brl(Math.abs(t.diff))})`;
+              return `${names}<small><span class="badge warn">é esta?</span> ${esc(why)}</small>`;
+            };
+            const hint = t => t.hint ? `<small style="display:block;margin-bottom:4px">Parece: <strong>${esc(t.hint.name)}</strong>${t.hint.supplier ? ` · ${esc(t.hint.supplier)}` : ""} (${esc(t.hint.station || "—")}, ${fmt.brl(t.hint.amount)}) — valor não bate. Se for de outro carregador, lance como conta nova.</small>` : "";
+            const cell = t => t.state === "conciliado" ? `${t.bills.map(k => `<small>${esc(billName(k))}</small>`).join("")}<span class="badge ok">conciliado</span>${Math.abs(t.diff) > 0.009 ? `<small>pago ${fmt.brl(t.value)} · previsto ${fmt.brl(t.expected)}</small>` : ""}`
+              : t.state === "confirmar" ? sugg(t)
+              : t.state === "ignorado" ? `<span class="badge neutral">não é conta</span>${t.note ? `<small>${esc(t.note)}</small>` : ""}`
+              : `${hint(t)}<select class="select" data-bank-link="${esc(t.id)}" style="max-width:360px" ${can}>${linkOptions(t)}</select>`;
+            const act = t => t.state === "confirmar" ? `<button class="btn primary" data-bank-confirm="${esc(t.id)}" type="button" ${can}>Confirmar</button>
+                <select class="select" data-bank-link="${esc(t.id)}" style="max-width:180px;margin-top:4px" ${can}>${linkOptions(t).replace("Vincular a uma conta…", "Não, é outra…")}</select>`
+              : (bs.p.links || {})[t.id] ? `<button class="btn ghost" data-bank-unlink="${esc(t.id)}" type="button" ${can}>Desfazer</button>` : "";
+            return `
+          <h3 style="margin:14px 0 8px;font-size:13px">Conciliação · saídas do banco em ${esc(UBY.state.api?.monthName?.(mk) || mk)}</h3>
+          <div class="toolbar" style="box-shadow:none;margin-bottom:8px">
+            <span class="badge ok">${fmt.int(n("conciliado"))} conciliada(s)</span><span class="badge warn">${fmt.int(n("confirmar"))} a confirmar</span><span class="badge bad">${fmt.int(n("sem-conta"))} sem conta</span>${n("ignorado") ? `<span class="badge neutral">${fmt.int(n("ignorado"))} não é conta</span>` : ""}
+            <span class="spacer"></span>
+            ${exact.length ? `<button class="btn primary" id="pmBankConfirmExact" type="button" ${can}>Confirmar as ${exact.length} de valor exato</button>` : ""}</div>
           <div class="table-wrap"><table><thead><tr><th>Data</th><th>Descrição no extrato</th><th class="num">Valor</th><th>Conta</th><th></th></tr></thead><tbody>
-            ${outs.map(t => `<tr><td>${fmtDay(t.date)}</td><td>${esc(t.description)}<small>${esc(t.type || "")}</small></td><td class="num"><strong>${fmt.brl(t.value)}</strong></td>
-              <td style="white-space:normal">${t.bills.length ? `${t.bills.map(k => `<small>${esc(billName(k))}</small>`).join("")}<span class="badge ${t.how === "manual" ? "neutral" : t.how === "aproximado" ? "warn" : "ok"}">${t.how === "manual" ? "vinculado à mão" : t.how === "grupo" ? "casado (soma)" : t.how === "aproximado" ? "casado (valor próximo)" : "casado"}</span>` : t.ignored ? `<span class="badge neutral">não é conta</span>${t.note ? `<small>${esc(t.note)}</small>` : ""}` : `<select class="select" data-bank-link="${esc(t.id)}" style="max-width:360px" ${can}>${linkOptions(t)}</select>`}</td>
-              <td>${(bs.p.links || {})[t.id] ? `<button class="btn ghost" data-bank-unlink="${esc(t.id)}" type="button" ${can}>Desfazer</button>` : ""}</td></tr>
+            ${outs.map(t => `<tr${t.state === "confirmar" ? ' style="background:var(--uby-amber-soft,#fbf3e4)"' : ""}><td>${fmtDay(t.date)}</td><td>${esc(t.description)}<small>${esc(t.type || "")}</small></td><td class="num"><strong>${fmt.brl(t.value)}</strong></td>
+              <td style="white-space:normal">${cell(t)}</td>
+              <td style="white-space:nowrap">${act(t)}</td></tr>
               ${ui.bankNew === t.id && !t.bills.length ? newPanel(t) : ""}`).join("") || `<tr><td colspan="5" class="empty">Nenhuma saída no extrato neste mês.</td></tr>`}
           </tbody></table></div>
+          <p class="source-line">Confirmar marca a conta como paga na data e no valor do banco (desconto ou juros ficam registrados) e ensina a plataforma: na próxima vez, o mesmo lançamento já vem sugerido para essa conta.</p>`;
+          })()}
           <h3 style="margin:18px 0 8px;font-size:13px">Entradas por mês e origem</h3>
           <div class="table-wrap"><table><thead><tr><th>Mês</th>${inflSrc.map(s => `<th class="num">${esc(s)}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>
             ${inflMonths.map(m => `<tr><td><strong>${esc(UBY.state.api?.monthName?.(m) || m)}</strong></td>${inflSrc.map(s => `<td class="num">${infl[m][s] ? fmt.brl(infl[m][s]) : "—"}</td>`).join("")}<td class="num"><strong>${fmt.brl(Object.values(infl[m]).reduce((a, v) => a + v, 0))}</strong></td></tr>`).join("")}
@@ -590,7 +617,8 @@
       const item = list.find(i => i.id === b.costId);
       if (!item) throw new Error("Custo não encontrado na matriz. Nada foi gravado.");
       const now = new Date().toISOString();
-      item.paymentLedger = { ...(item.paymentLedger || {}), [b.monthKey]: date ? { status: "paid", paidAt: `${date}T12:00:00`, updatedAt: now } : { status: "pending", paidAt: "", updatedAt: now } };
+      const paidAmount = opts.amount !== undefined && Math.abs(Number(opts.amount) - Number(opts.due ?? b.dueAmount ?? b.amount)) > 0.009 ? Math.round(Number(opts.amount) * 100) / 100 : undefined;
+      item.paymentLedger = { ...(item.paymentLedger || {}), [b.monthKey]: date ? { status: "paid", paidAt: `${date}T12:00:00`, updatedAt: now, ...(paidAmount !== undefined ? { amount: paidAmount } : {}) } : { status: "pending", paidAt: "", updatedAt: now } };
       item.updatedAt = now;
       w.saveMatrizCosts(list);
       return await awaitMatrixSave(w);
@@ -1308,7 +1336,7 @@
     target.querySelectorAll("[data-c-paybank]").forEach(btn => btn.onclick = () => {
       const [key, date, amount] = btn.dataset.cPaybank.split("|");
       const bill = cBill(key); if (!bill) return;
-      const opts = bill.kind === "area" && amount !== "" ? { amount: Number(amount), due: Number(bill.dueAmount ?? bill.amount), diffMode: "next" } : {};
+      const opts = (bill.kind === "area" || bill.kind === "matriz") && amount !== "" ? { amount: Number(amount), due: Number(bill.dueAmount ?? bill.amount), diffMode: "next" } : {};
       run(target, w, `${bill.name} pago em ${fmtDay(date)} (extrato)`, () => setBillPaid(w, bill, date, opts));
     });
     target.querySelectorAll("[data-c-unpay]").forEach(btn => btn.onclick = () => {
@@ -1322,7 +1350,13 @@
       let parsed;
       try {
         if (/\.(ofx|txt)$/i.test(file.name)) parsed = B.parseOFX(await file.text());
-        else {
+        else if (/\.csv$/i.test(file.name)) {
+          // CSV lido aqui (vírgula decimal e dia/mês certos); acentos em UTF-8 ou Windows-1252.
+          const buf = await file.arrayBuffer();
+          let text = new TextDecoder("utf-8").decode(buf);
+          if (text.includes("�")) text = new TextDecoder("windows-1252").decode(buf);
+          parsed = B.parseCSV(text);
+        } else {
           // A biblioteca de planilhas é carregada sob demanda pela plataforma original.
           let X = w.XLSX;
           if (!X && typeof w.ensureSpreadsheetLibrary === "function") { try { X = await w.ensureSpreadsheetLibrary(); } catch (_) {} X = X || w.XLSX; }
@@ -1342,13 +1376,58 @@
         return `${res.total} lançamento(s) de ${fmtDay(parsed.meta.from)} a ${fmtDay(parsed.meta.to)}, ${res.added} novo(s)`;
       });
     };
+    target.querySelectorAll("[data-bank-del-st]").forEach(btn => btn.onclick = () => {
+      const st = (data.bank?.statements || []).find(s => s.id === btn.dataset.bankDelSt); if (!st) return;
+      const n = (data.bank?.transactions || []).filter(t => t.statementId === st.id).length;
+      if (!confirm(`Remover o extrato "${st.fileName || "extrato"}" (${fmtDay(st.from)} a ${fmtDay(st.to)}) e os ${n} lançamento(s) que ele trouxe? Contas já marcadas como pagas continuam pagas.`)) return;
+      let removed = 0;
+      run(target, w, `Extrato ${st.fileName || ""} removido`, async () => {
+        await w.UBY_SUPABASE.saveBankData(p => { const r = window.UBY_BANK.removeStatement(p, st.id); removed = r.removed; return r.payload; }, { acao: "remove_statement", arquivo: st.fileName, de: st.from, ate: st.to });
+        return `${removed} lançamento(s) removido(s)`;
+      });
+    });
     const saveLinks = (label, mutate) => run(target, w, label, async () => { await w.UBY_SUPABASE.saveBankData(p => { const links = { ...(p.links || {}) }; mutate(links); return { statements: [], transactions: [], ...p, links }; }, { acao: "bank_link" }); return "salvo"; });
+    // Conciliar: marca a(s) conta(s) como paga(s) na data e no valor do banco, guarda o vínculo e
+    // aprende a regra (esta descrição do banco paga esta conta) para sugerir sozinho na próxima vez.
+    const outRow = id => bankState(data).rec.outflows.find(t => t.id === id);
+    const confirmTx = async (t, keys) => {
+      const Bk = window.UBY_BANK;
+      const list = keys.map(k => cBill(k)).filter(Boolean);
+      if (!list.length) throw new Error("Conta não encontrada. Nada foi gravado.");
+      for (const bill of list) {
+        if (bill.paid) continue;
+        const opts = list.length === 1 && (bill.kind === "area" || bill.kind === "matriz") ? { amount: t.value, due: Number(bill.dueAmount ?? bill.amount), diffMode: "next" } : {};
+        await setBillPaid(w, bill, t.date, opts);
+      }
+      await w.UBY_SUPABASE.saveBankData(p => {
+        const links = { ...(p.links || {}) }, rules = { ...(p.rules || {}) };
+        if (list.length === 1) links[t.id] = { bill: list[0].key };
+        const k = Bk.norm(t.description);
+        rules[k] = [...new Set([...(rules[k] || []), ...list.map(Bk.billBase)])].slice(-20);
+        return { statements: [], transactions: [], ...p, links, rules };
+      }, { acao: "bank_confirm", conta: list.map(b => b.name).join(" + "), valor: t.value, data: t.date });
+      return `${list.map(b => b.name).join(" + ")} paga em ${fmtDay(t.date)} (${fmt.brl(t.value)})`;
+    };
+    target.querySelectorAll("[data-bank-confirm]").forEach(btn => btn.onclick = () => {
+      const t = outRow(btn.dataset.bankConfirm); if (!t || !t.bills.length) return;
+      run(target, w, "Conciliação", () => confirmTx(t, t.bills));
+    });
+    if ($("#pmBankConfirmExact")) $("#pmBankConfirmExact").onclick = () => {
+      const list = bankState(data).rec.outflows.filter(t => t.date.slice(0, 7) === ui.payMonth && t.state === "confirmar" && Math.abs(t.diff) <= 0.009);
+      if (!list.length || !confirm(`Confirmar ${list.length} pagamento(s) de valor exato? Cada conta fica paga na data do banco.`)) return;
+      run(target, w, "Conciliação (valor exato)", async () => { const done = []; for (const t of list) done.push(await confirmTx(t, t.bills)); return `${done.length} conciliado(s)`; });
+    };
     target.querySelectorAll("[data-bank-link]").forEach(sel => sel.onchange = () => {
       const id = sel.dataset.bankLink, v = sel.value;
       if (!v) return;
-      if (v === "__new") { ui.bankNew = id; ui.bankNewForm = {}; draw(target, w); return; }
+      if (v === "__new") {
+        // Conta nova já preenchida com a conta parecida (ex.: internet de outro carregador).
+        const h = outRow(id)?.hint;
+        ui.bankNew = id; ui.bankNewForm = h ? { name: h.name, supplier: h.supplier, category: h.category || "Outros custos" } : {};
+        draw(target, w); return;
+      }
       if (v === "__ignore") { const note = prompt("Motivo (opcional): ex.: transferência entre contas, retirada de sócio", "") ; if (note === null) { sel.value = ""; return; } saveLinks("Saída marcada como não sendo conta", l => { l[id] = { ignore: true, note: note.trim() }; }); }
-      else saveLinks("Saída vinculada à conta", l => { l[id] = { bill: v }; });
+      else { const t = outRow(id); if (!t) return; run(target, w, "Conciliação", () => confirmTx(t, [v])); }
     });
     target.querySelectorAll("[data-bn]").forEach(el => el.onchange = () => { ui.bankNewForm = { ...(ui.bankNewForm || {}), [el.dataset.bn]: el.value }; });
     target.querySelectorAll("[data-bank-new-cancel]").forEach(b => b.onclick = () => { ui.bankNew = ""; ui.bankNewForm = null; draw(target, w); });
@@ -1370,7 +1449,10 @@
           targets: [{ scope: opt.value, workId, station: opt.dataset.station || "", workName: opt.dataset.workName || "", startMonth: mk, share: 100 }] });
         w.saveMatrizCosts([...w.loadMatrizCosts(), item]);
         await awaitMatrixSave(w);
-        await w.UBY_SUPABASE.saveBankData(p => ({ statements: [], transactions: [], ...p, links: { ...(p.links || {}), [tx.id]: { bill: `${id}|${mk}` } } }), { acao: "bank_new_bill" });
+        // Vincula e aprende: a mesma descrição do banco vai sugerir esta conta nos próximos meses.
+        const nk = window.UBY_BANK.norm(tx.description);
+        await w.UBY_SUPABASE.saveBankData(p => ({ statements: [], transactions: [], ...p, links: { ...(p.links || {}), [tx.id]: { bill: `${id}|${mk}` } },
+          rules: { ...(p.rules || {}), [nk]: [...new Set([...((p.rules || {})[nk] || []), id])].slice(-20) } }), { acao: "bank_new_bill" });
         return "salvo";
       });
     });

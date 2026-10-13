@@ -93,6 +93,27 @@
     return { meta: { ...meta, from: dates[0], to: dates.at(-1) }, transactions: withIds(out) };
   }
 
+  // CSV lido aqui mesmo (o leitor de planilhas tratava "115,10" como 11510 e trocava dia/mês).
+  // Separador ";" ou "," (o que aparecer mais no cabeçalho), aspas respeitadas; tudo vira texto.
+  function parseCSV(text) {
+    const src = String(text || "").replace(/^﻿/, "");
+    const firstLines = src.split(/\r?\n/).slice(0, 15).join("\n");
+    const count = c => firstLines.split(c).length - 1;
+    const sep = [";", "\t", ","].sort((a, b) => count(b) - count(a))[0];
+    const rows = [];
+    let row = [], cell = "", q = false;
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+      if (q) { if (ch === '"') { if (src[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; continue; }
+      if (ch === '"') q = true;
+      else if (ch === sep) { row.push(cell); cell = ""; }
+      else if (ch === "\n") { row.push(cell.replace(/\r$/, "")); rows.push(row); row = []; cell = ""; }
+      else cell += ch;
+    }
+    if (cell || row.length) { row.push(cell.replace(/\r$/, "")); rows.push(row); }
+    return parseRows(rows.map(r => r.map(c => c.trim() === "" ? null : c.trim())));
+  }
+
   function parseOFX(text) {
     const tag = (blk, t) => ((blk.match(new RegExp(`<${t}>([^<\\r\\n]*)`, "i")) || [])[1] || "").trim();
     const out = [...String(text).matchAll(/<STMTTRN>([\s\S]*?)(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>)/gi)].map(m => {
@@ -125,9 +146,14 @@
     return "Outras entradas";
   }
 
+  // Base estável de uma conta (sem o mês), para lembrar "esta descrição do banco paga esta conta".
+  const billBase = b => String(b.billId || b.costId || String(b.key || "").split("|")[0]);
+
   // Conferência. Casa cada saída (ou grupo de saídas ao mesmo favorecido em até 3 dias) com
   // uma conta (ou com contas do mesmo fornecedor que somam o mesmo valor), por valor e data.
-  function reconcile(transactions, bills, links = {}) {
+  // rules: { [descrição normalizada]: [base da conta…] } — aprendido com as confirmações.
+  // Cada saída sai com state: "conciliado" (confirmada/paga), "confirmar" (sugestão), "sem-conta" ou "ignorado".
+  function reconcile(transactions, bills, links = {}, rules = {}) {
     const outs = transactions.filter(t => t.amount < 0).map(t => ({ ...t, value: r2(-t.amount), who: norm(t.description) }));
     const byKey = new Map(bills.map(b => [b.key, b]));
     const billTx = new Map(), txBill = new Map(), ignored = new Map();
@@ -146,7 +172,8 @@
     const freeBills = () => bills.filter(b => !billTx.has(b.key) && b.amount > 0);
     const ref = b => b.paidAt || b.due;
     const near = (t, b) => { const d = days(t.date, ref(b)); return b.paidAt ? Math.abs(d) <= 10 : d >= -20 && d <= 45; };
-    const similar = (t, b) => norm(`${b.supplier} ${b.name}`).split(" ").filter(x => x.length >= 4).some(x => t.who.includes(x));
+    const learned = (t, b) => (rules[t.who] || []).includes(billBase(b));
+    const similar = (t, b) => learned(t, b) || norm(`${b.supplier} ${b.name}`).split(" ").filter(x => x.length >= 4).some(x => t.who.includes(x));
     const score = (t, b) => Math.abs(days(t.date, ref(b))) - (similar(t, b) ? 30 : 0);
     // 2) uma saída = uma conta (valor exato, até 2 centavos)
     freeBills().slice().sort((a, b) => b.amount - a.amount).forEach(b => {
@@ -158,6 +185,14 @@
       const tol = Math.max(Math.min(b.amount * 0.02, 5), 0.02);
       const c = freeTx().filter(t => Math.abs(t.value - b.amount) <= tol && near(t, b) && similar(t, b)).sort((x, y) => Math.abs(x.value - b.amount) - Math.abs(y.value - b.amount))[0];
       if (c) link([c], [b.key], "aproximado");
+    });
+    // 2c) sugestão: mesmo favorecido (nome parecido ou já confirmado antes) e valor até 10% diferente
+    // (desconto, juros, mês proporcional — ex.: internet de 120,00 paga com 115,10). Sempre pede confirmação.
+    freeBills().slice().sort((a, b) => b.amount - a.amount).forEach(b => {
+      const tol = Math.min(Math.max(b.amount * 0.10, 3), 300);
+      const c = freeTx().filter(t => Math.abs(t.value - b.amount) <= tol && near(t, b) && similar(t, b))
+        .sort((x, y) => Math.abs(x.value - b.amount) - Math.abs(y.value - b.amount) || Math.abs(days(x.date, ref(b))) - Math.abs(days(y.date, ref(b))))[0];
+      if (c) link([c], [b.key], "sugerido");
     });
     // 3) grupos de saídas ao mesmo favorecido (até 3 dias) = uma conta ou contas do mesmo fornecedor
     const groups = [];
@@ -194,7 +229,20 @@
       const status = !tx.length ? (b.paid ? "sem-extrato" : "aberto") : Math.abs(diff) > 0.009 ? "diferenca" : b.paid ? "conferido" : "pago-nao-marcado";
       return { ...b, status, tx, paidTotal, diff, sharedWith, bankDate: tx.map(t => t.date).sort().at(-1) || "", how: tx.length ? txBill.get(tx[0].id).how : "" };
     });
-    const txRows = outs.map(t => ({ ...t, bills: txBill.get(t.id)?.keys || [], how: txBill.get(t.id)?.how || "", ignored: ignored.has(t.id), note: ignored.get(t.id) || "" }));
+    // Pista para saída sem conta: conta parecida pelo nome (ou já confirmada antes), mesmo se o valor
+    // não bate — serve para lançar a conta nova já preenchida (ex.: internet do Aurora, mês proporcional).
+    const hintFor = t => {
+      const c = bills.filter(b => similar(t, b)).sort((a, b) => (learned(t, a) ? 0 : 1) - (learned(t, b) ? 0 : 1) || Math.abs(a.amount - t.value) - Math.abs(b.amount - t.value))[0];
+      return c ? { key: c.key, name: c.name, supplier: c.supplier || "", category: c.category || "", station: c.station || "", workId: c.workId || "", amount: c.amount } : null;
+    };
+    const txRows = outs.map(t => {
+      const keys = txBill.get(t.id)?.keys || [], how = txBill.get(t.id)?.how || "";
+      const allPaid = keys.length && keys.every(k => byKey.get(k)?.paid);
+      const state = ignored.has(t.id) ? "ignorado" : !keys.length ? "sem-conta" : how === "manual" || allPaid ? "conciliado" : "confirmar";
+      const expected = r2(keys.reduce((s, k) => s + (byKey.get(k)?.amount || 0), 0));
+      return { ...t, bills: keys, how, state, expected, diff: keys.length ? r2(t.value - expected) : 0, ignored: ignored.has(t.id), note: ignored.get(t.id) || "",
+        hint: state === "sem-conta" ? hintFor(t) : null };
+    });
     return { bills: billRows, outflows: txRows, unmatched: txRows.filter(t => !t.bills.length && !t.ignored) };
   }
 
@@ -209,5 +257,13 @@
     return out;
   }
 
-  global.UBY_BANK = Object.freeze({ parseRows, parseOFX, merge, reconcile, inflows, inflowSource, isoDate, num, norm });
+  // Remove um extrato anexado (ex.: lido errado) e os lançamentos que ele trouxe, com os vínculos deles.
+  function removeStatement(payload, statementId) {
+    const p = { statements: [], transactions: [], links: {}, ...(payload || {}) };
+    const gone = new Set(p.transactions.filter(t => t.statementId === statementId).map(t => t.id));
+    const links = Object.fromEntries(Object.entries(p.links || {}).filter(([id]) => !gone.has(id)));
+    return { payload: { ...p, statements: p.statements.filter(s => s.id !== statementId), transactions: p.transactions.filter(t => !gone.has(t.id)), links }, removed: gone.size };
+  }
+
+  global.UBY_BANK = Object.freeze({ parseRows, parseCSV, parseOFX, merge, removeStatement, reconcile, inflows, inflowSource, isoDate, num, norm, billBase });
 })(typeof window !== "undefined" ? window : globalThis);

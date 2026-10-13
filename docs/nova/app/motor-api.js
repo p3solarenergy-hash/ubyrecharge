@@ -787,11 +787,15 @@
       .map(item => {
         const target = scheduledPaymentTarget(item);
         const status = scheduledPaymentStatus(item, mk);
-        const amount = item.scheduledPayment ? Number(item.amount || 0) : matrizCashAmount(item, mk);
+        const planned = item.scheduledPayment ? Number(item.amount || 0) : matrizCashAmount(item, mk);
+        // Pago com valor diferente (desconto, juros, mês proporcional): vale o pago; o previsto fica em dueAmount.
+        const led = item.paymentLedger?.[mk];
+        const paidAmount = led?.status === "paid" && led.amount !== undefined && led.amount !== null && led.amount !== "" ? Number(led.amount) : null;
+        const amount = paidAmount !== null ? paidAmount : planned;
         return { id: item.id, kind: "matriz", costId: item.id, workId: target.targetCount === 1 ? target.workId : "", targetCount: target.targetCount, name: item.name, category: item.category, supplier: item.supplier || "", source: item.scheduledPayment ? "Pagamento programado" : "Custo da matriz",
           station: target.station || (item.scheduledPayment && !target.targetCount ? "Rede UBY · central" : "Carregador não identificado"), workName: target.workName || (target.targetCount > 1 ? `rateado para ${target.targetCount} carregadores` : ""),
           due: iso(scheduledPaymentDueDate(item, mk)), dueDay: item.dueDay, amount, status: status.key, statusLabel: status.label,
-          paidAt: item.paymentLedger?.[mk]?.paidAt || "" };
+          paidAt: item.paymentLedger?.[mk]?.paidAt || "", paidAmount, dueAmount: planned };
       }).concat(energyPayments(mk), areaPayments(mk)).sort((a, b) => String(a.due).localeCompare(String(b.due)));
     const totals = list.reduce((acc, p) => { acc.total += p.amount; if (p.status === "paid") acc.paid += p.amount; else acc.pending += p.amount; if (p.status === "overdue") acc.overdue += p.amount; return acc; }, { total: 0, paid: 0, pending: 0, overdue: 0 });
     return { monthKey: mk, label: monthLabel(mk), list, totals };

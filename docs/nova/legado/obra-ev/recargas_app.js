@@ -6229,7 +6229,9 @@ function matrizNormalizeCost(raw = {}) {
         if (!/^\d{4}-\d{2}$/.test(monthKeyValue)) return ledger;
         ledger[monthKeyValue] = {
           status: entry?.status === 'paid' ? 'paid' : 'pending',
-          paidAt: String(entry?.paidAt || ''), updatedAt: String(entry?.updatedAt || '')
+          paidAt: String(entry?.paidAt || ''), updatedAt: String(entry?.updatedAt || ''),
+          // NOVA PLATAFORMA (13/10/2026): valor efetivamente pago (desconto, juros, mês proporcional).
+          ...(entry?.status === 'paid' && entry?.amount !== undefined && entry?.amount !== null && entry?.amount !== '' && Number.isFinite(Number(entry.amount)) ? { amount: Math.max(0, Number(entry.amount)) } : {})
         };
         return ledger;
       }, {}) : {},
