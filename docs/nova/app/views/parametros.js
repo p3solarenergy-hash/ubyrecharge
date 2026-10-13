@@ -508,11 +508,28 @@
     // Saídas do extrato no mês (para conferir e vincular à mão o que não casou sozinho).
     const outs = bs.rec.outflows.filter(t => t.date.slice(0, 7) === mk);
     const billName = k => { const b = bs.bills.find(x => x.key === k); return b ? `${b.name}${b.station ? ` · ${b.station}` : ""}` : k; };
+    // Opções de vínculo com critério (como num conciliador): só contas em aberto e ainda sem lançamento
+    // do banco, com valor parecido (até 30% ou R$ 10) e vencimento perto da data do pagamento; as mais
+    // prováveis primeiro (valor, nome do fornecedor, data). "Ver todas" abre as demais contas em aberto.
+    const linkedKeys = new Set(bs.rec.bills.filter(b => b.tx.length).map(b => b.key));
     const linkOptions = t => {
-      const near = bs.bills.filter(b => Math.abs((new Date(`${b.due}T12:00:00`) - new Date(`${t.date}T12:00:00`)) / 86400000) <= 75)
-        .sort((a, b) => Math.abs(a.amount - t.value) - Math.abs(b.amount - t.value)).slice(0, 25);
+      const Bk = window.UBY_BANK;
+      const who = Bk ? Bk.norm(t.description) : "";
+      const ddays = b => Math.round((new Date(`${b.due}T12:00:00`) - new Date(`${t.date}T12:00:00`)) / 86400000);
+      const like = b => !!who && Bk.norm(`${b.supplier} ${b.name}`).split(" ").some(x => x.length >= 4 && who.includes(x));
+      const open = bs.bills.filter(b => !b.paid && !linkedKeys.has(b.key) && b.amount > 0 && !t.bills.includes(b.key));
+      const tol = Math.max(t.value * 0.3, 10);
+      const fit = open.filter(b => Math.abs(b.amount - t.value) <= tol && ddays(b) >= -45 && ddays(b) <= 60)
+        .sort((a, b) => (Math.abs(a.amount - t.value) / t.value + Math.abs(ddays(a)) / 60 - (like(a) ? 0.5 : 0)) - (Math.abs(b.amount - t.value) / t.value + Math.abs(ddays(b)) / 60 - (like(b) ? 0.5 : 0)));
+      const all = ui.bankAll === t.id;
+      const rest = all ? open.filter(b => !fit.includes(b)).sort((a, b) => String(a.due).localeCompare(String(b.due))) : [];
       const where = b => String(b.station || b.workName || "").replace(/^UBY RECHARGE\s*-\s*/i, "");
-      return `<option value="">Vincular a uma conta…</option>${near.map(b => `<option value="${esc(b.key)}">${esc(fmtDay(b.due))} · ${esc(fmt.brl(b.amount))} · ${esc(b.name)}${where(b) ? ` · ${esc(where(b))}` : ""}${b.paid ? " · já paga" : ""}</option>`).join("")}<option value="__new">＋ Lançar como conta nova (já paga)</option><option value="__ignore">Não é conta (transferência, retirada…)</option>`;
+      const opt = b => `<option value="${esc(b.key)}">${esc(fmtDay(b.due))} · ${esc(fmt.brl(b.amount))} · ${esc(b.name)}${where(b) ? ` · ${esc(where(b))}` : ""}${Math.abs(b.amount - t.value) > 0.009 ? ` (dif. ${esc(fmt.brl(t.value - b.amount))})` : ""}</option>`;
+      return `<option value="">Vincular a uma conta…</option>
+        ${fit.length ? `<optgroup label="Mais prováveis (valor e data parecidos)">${fit.slice(0, 12).map(opt).join("")}</optgroup>` : `<option value="" disabled>Nenhuma conta em aberto com valor parecido</option>`}
+        ${rest.length ? `<optgroup label="Outras contas em aberto">${rest.map(opt).join("")}</optgroup>` : ""}
+        ${all ? "" : `<option value="__all">Ver todas as contas em aberto…</option>`}
+        <option value="__new">＋ Lançar como conta nova (já paga)</option><option value="__ignore">Não é conta (transferência, retirada…)</option>`;
     };
     // Painel "lançar como conta nova": pagamento avulso do mês, já pago na data do banco.
     const targets = (() => { try { w.renderScheduledPayments(w.getGeneralUnitData()); return [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text })); } catch (_) { return []; } })();
@@ -1420,6 +1437,7 @@
     target.querySelectorAll("[data-bank-link]").forEach(sel => sel.onchange = () => {
       const id = sel.dataset.bankLink, v = sel.value;
       if (!v) return;
+      if (v === "__all") { ui.bankAll = id; draw(target, w); return; }
       if (v === "__new") {
         // Conta nova já preenchida com a conta parecida (ex.: internet de outro carregador).
         const h = outRow(id)?.hint;
