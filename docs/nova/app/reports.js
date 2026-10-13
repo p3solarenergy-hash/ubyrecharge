@@ -16,6 +16,12 @@
   const signed = v => `${v < 0 ? "−" : ""}${fmt.brl(Math.abs(v || 0))}`;
   const monthName = mk => (mk ? UBY.state.api.monthName(mk) : "Acumulado");
   const n = v => Number(v || 0);
+  // Modo apresentação: "Amanda Bufalo" → "A.B."; nome de uma palavra só (ex.: R.EBP) fica como está.
+  const initials = name => {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length < 2) return parts[0] || "";
+    return parts.map(p => p.replace(/[^\p{L}]/gu, "").charAt(0).toUpperCase()).filter(Boolean).join(".") + ".";
+  };
 
   const CSS = `
     *{box-sizing:border-box} body{margin:0;background:#eef1ec;font-family:Inter,Arial,sans-serif;color:#1d2a22;font-size:12.5px}
@@ -119,7 +125,7 @@
       </tbody></table>
       <h2>Repasse por cotista</h2>
       <table><thead><tr><th>Cotista</th><th class="n">Cotas</th><th class="n">Valor da cota</th><th class="n">Investido</th>${acc ? `<th class="n">Retorno acum.</th>` : `<th class="n">Por cota</th>`}<th class="n">${acc ? "Total a receber" : "Repasse do mês"}</th></tr></thead><tbody>
-        ${cotistas.map(i => `<tr><td>${esc(i.name)}<div class="sub">${i.waitingOperation ? "aguardando operação de "+esc(i.linkedStation) : "desde "+esc(monthName(i.eligibleFrom))}</div></td><td class="n">${i.quotas}</td><td class="n">${fmt.brl(i.quotaValue)}</td><td class="n">${fmt.brl(i.investment)}</td><td class="n">${acc ? fmt.pct(i.returnRate * 100) : fmt.brl(m?.perQuota || 0)}</td><td class="n"><strong>${fmt.brl(i.value)}</strong></td></tr>`).join("") || `<tr><td colspan="6">Nenhum cotista habilitado.</td></tr>`}
+        ${cotistas.map(i => `<tr><td>${esc(initials(i.name))}</td><td class="n">${i.quotas}</td><td class="n">${fmt.brl(i.quotaValue)}</td><td class="n">${fmt.brl(i.investment)}</td><td class="n">${acc ? fmt.pct(i.returnRate * 100) : fmt.brl(m?.perQuota || 0)}</td><td class="n"><strong>${fmt.brl(i.value)}</strong></td></tr>`).join("") || `<tr><td colspan="6">Nenhum cotista habilitado.</td></tr>`}
         <tr class="t"><td>Total</td><td class="n">${cotistas.reduce((s, i) => s + n(i.quotas), 0)}</td><td></td><td class="n">${fmt.brl(cotistas.reduce((s, i) => s + n(i.investment), 0))}</td><td></td><td class="n">${fmt.brl(cotistas.reduce((s, i) => s + n(i.value), 0))}</td></tr>
       </tbody></table>
       <div class="note">Cada competência é dividida somente entre as cotas habilitadas no primeiro dia do mês. O lucro só é distribuído depois de cobrir prejuízos de meses anteriores. Carregadores só de gestão P3 ficam fora do resultado da UBY; parceiros entram apenas pelo royalty. ${d.taxesTotal ? "" : "<strong>Atenção: não há imposto lançado no período.</strong> "}Confira documentos e aprove antes de pagar.</div>
