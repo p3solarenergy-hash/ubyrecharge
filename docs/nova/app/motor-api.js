@@ -376,7 +376,7 @@
       const prev = summarizeUbyChargerRow(row, (row.charges || []).filter(c => inRange(c, prevStart, prevEnd)));
       const clean = cleanOperationStats(cur.charges);
       const model = row.included ? normalizeOperationModel(financeSettingsForUbyRow(row, monthKey).operationModel) : "";
-      return { workId: row.workId, workName: row.workName, station: row.station, kind: row.kind, included: row.included, model,
+      return { power: Number(workPowerById(row.workId) || 0), workId: row.workId, workName: row.workName, station: row.station, kind: row.kind, included: row.included, model,
         revenue: cur.revenue, energy: cur.energy, sessions: cur.count, valid: clean.executed.length, failures: clean.failed.length, clients: cur.clients,
         prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count };
     }).filter(u => u.sessions || u.prevSessions);

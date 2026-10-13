@@ -3,7 +3,7 @@
 (function () {
   "use strict";
   const { fmt, esc, kpi } = UBY;
-  const ui = { place: "" };
+  const ui = { place: "", day: "" };
 
   function monthArg() { const p = UBY.periodArg(); return p === undefined ? UBY.state.months.at(-1) || "" : p; }
   const signed = v => `<span style="color:${v >= 0 ? "var(--uby-green)" : "var(--uby-red)"}">${fmt.brl(v)}</span>`;
@@ -80,10 +80,10 @@
   }
 
   // Hoje (ou último dia com recarga) de cada carregador, com a mesma conta do Resultado do dia.
+  // Dia escolhido (padrão: hoje ou o último dia com recarga), com as setas e o calendário do Comando.
   function todayStrip(v) {
-    if (!v.live) return "";
     let res;
-    try { res = UBY.data("dayTracking", ""); } catch (_) { return ""; }
+    try { res = UBY.data("dayTracking", ui.day || ""); } catch (_) { return ""; }
     if (!res || !res.day) return "";
     const units = v.members.map(m => res.units.find(u => String(u.workId) === String(m.workId) && String(u.station).toUpperCase() === String(m.station).toUpperCase()) || null);
     const when = new Date(res.day.date);
@@ -100,8 +100,12 @@
     const scale = Math.max(...have.flatMap(u => (u.hourly || []).map(h => h.revenue)), 0);
     const nowHour = res.day.nowHour;
     return `
-      <section class="section"><div class="section-head"><div><p class="kicker">${res.day.isToday ? "Hoje · até agora" : "Último dia com recarga"}</p><h2>${esc(when.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }))}</h2></div>
-          <div class="meta"><a href="#/comando">Resultado do dia da rede →</a></div></div>
+      <section class="section"><div class="section-head"><div><p class="kicker">${res.day.isToday ? "Hoje · até agora" : "Resultado do dia"}</p><h2>${esc(when.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }))}</h2></div>
+          <div class="toolbar" style="box-shadow:none;margin:0">
+            <div class="seg"><button type="button" id="plDayPrev" ${res.day.prevKey ? "" : "disabled"} title="Dia anterior com recarga">‹</button><button type="button" id="plDayNext" ${res.day.nextKey ? "" : "disabled"} title="Próximo dia com recarga">›</button></div>
+            <input class="select" type="date" id="plDay" value="${esc(res.day.key)}" min="${esc(res.dayKeys[0] || "")}" max="${esc(res.dayKeys.at(-1) || "")}">
+            ${ui.day ? `<button class="btn ghost" type="button" id="plDayToday">Hoje</button>` : ""}
+            <a href="#/comando" style="font-size:12px">Resultado do dia da rede →</a></div></div>
         <div class="grid g4">
           ${kpi("Faturamento do dia", fmt.brl(tot("revenue")), `${fmt.int(tot("valid"))} recarga(s) · ${fmt.kwh(tot("energy"))}`, dd(tot("revenue"), tot("prevRevenue")), "lead")}
           ${kpi("Ocupação do dia", fmt.pct1(occ), "energia ÷ capacidade dos dois", dd(occ, prevOcc))}
@@ -271,6 +275,12 @@
       </section>`;
 
     target.querySelectorAll("#placeTabs button").forEach(b => b.onclick = () => { ui.place = b.dataset.place; render(target); });
+    const day = UBY.data("dayTracking", ui.day || "").day || {};
+    const goDay = k => { ui.day = k || ""; render(target); };
+    target.querySelector("#plDayPrev")?.addEventListener("click", () => goDay(day.prevKey));
+    target.querySelector("#plDayNext")?.addEventListener("click", () => goDay(day.nextKey));
+    target.querySelector("#plDay")?.addEventListener("change", e => { if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) goDay(e.target.value); });
+    target.querySelector("#plDayToday")?.addEventListener("click", () => goDay(""));
     const base = UBY.baseChartOptions();
     const lineOpts = (extra = {}) => ({ ...base, ...extra, scales: { ...(base.scales || {}), y: { ...(base.scales?.y || {}), beginAtZero: true }, ...(extra.scales || {}) } });
     UBY.chart("chPlace", { type: "line", data: { labels: v.monthly.map(m => m.label), datasets: [

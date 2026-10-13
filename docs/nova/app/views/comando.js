@@ -76,7 +76,7 @@
     const prevLabel = res.range ? `${new Date(res.range.prevStart).toLocaleDateString("pt-BR")} a ${new Date(res.range.prevEnd).toLocaleDateString("pt-BR")}` : "—";
     const withOp = res.groups.flatMap(g => g.units.map(u => ({ ...u, op: g.id })));
     const opBadge = id => `<span class="badge ${OP_BADGE[id][0]}">${OP_BADGE[id][1]}</span>`;
-    const unitLink = u => `<a class="co-name" href="#/unidades/${encodeURIComponent(u.workId)}/${encodeURIComponent(u.station)}"><span class="badge ${u.kind === "ac" ? "ac" : "dc"}">${u.kind === "ac" ? "AC" : "DC"}</span> ${esc(u.station)} ${u.op ? opBadge(u.op) : ""} <small>${fmt.int(u.sessions)} recargas${u.failures ? ` · ${u.failures} falha(s)` : ""}</small></a>`;
+    const unitLink = u => `<a class="co-name" href="#/unidades/${encodeURIComponent(u.workId)}/${encodeURIComponent(u.station)}"><span class="badge ${u.kind === "ac" ? "ac" : "dc"}">${u.kind === "ac" ? "AC" : "DC"}</span> ${esc(u.station)} ${u.op ? opBadge(u.op) : ""} <small>${u.power ? `${fmt.int(u.power)} kW · ` : ""}${fmt.int(u.sessions)} recargas${u.failures ? ` · ${u.failures} falha(s)` : ""}</small></a>`;
     const unitRows = (u, maxRev, maxEn, share) => `<div class="co-row"><span class="co-lbl">Faturamento</span>${companyBar("rev", u.revenue, maxRev, `<strong>${fmt.brl(u.revenue)}</strong>${share ? ` <small>${maxRev ? fmt.pct1(u.revenue / maxRev * 100) : "—"}</small>` : dd(u.revenue, u.prevRevenue)}`)}</div>
       <div class="co-row"><span class="co-lbl">Energia</span>${companyBar("en", u.energy, maxEn, `<strong>${fmt.kwh(u.energy)}</strong>${share ? ` <small>${maxEn ? fmt.pct1(u.energy / maxEn * 100) : "—"}</small>` : dd(u.energy, u.prevEnergy)}`)}</div>`;
 
