@@ -480,7 +480,7 @@
 
   // ---------- checklist do fechamento ----------
   // Uma tela só com o que falta no mês; cada item leva direto para onde se resolve.
-  function checklistTab() {
+  function checklistTab(extra = [], embedded = false) {
     const api = UBY.state.api;
     const months = (UBY.state.months || []).slice();
     const mk = months.includes(ui.ckMonth) ? ui.ckMonth : months.at(-1) || "";
@@ -549,12 +549,19 @@
       if (m && !/aprovado|pago|paid/i.test(m.status || "")) add("Fechamento", "warn", `Fechamento de ${mName(mk)} ainda não aprovado`, `Pool dos cotistas ${fmt.brl(m.investorPool)} (${fmt.brl(m.perQuota)} por cota, ${m.eligibleQuotas} cotas). Aprove depois de resolver o resto da lista.`, "#/parametros/fechamentos", "Aprovar");
     });
 
-    const cats = ["Recargas", "Energia", "Custos do carregador", "Impostos", "Custos da matriz", "Pagamentos", "Fechamento"];
+    extra.forEach(i => add(i.cat, i.status, i.title, i.detail, i.href, i.action));
+    const cats = ["Recargas", "Energia", "Custos do carregador", "Impostos", "Custos da matriz", "Pagamentos", "Recebidos", "Fechamento"];
     cats.filter(c => !items.some(i => i.cat === c)).forEach(c => add(c, "ok", `${c}: tudo certo`, "", "", ""));
     const order = { bad: 0, warn: 1, ok: 2 };
     items.sort((a, b) => order[a.status] - order[b.status] || cats.indexOf(a.cat) - cats.indexOf(b.cat));
     const open = items.filter(i => i.status !== "ok");
     const badge = { bad: ["bad", "resolver"], warn: ["warn", "conferir"], ok: ["ok", "ok"] };
+    if (embedded) return { open: open.length, bad: items.filter(i => i.status === "bad").length, html: `
+        <div class="table-wrap"><table><thead><tr><th>Situação</th><th>Item</th><th></th></tr></thead><tbody>
+          ${items.map(i => `<tr><td><span class="badge ${badge[i.status][0]}">${badge[i.status][1]}</span><small>${esc(i.cat)}</small></td>
+            <td style="white-space:normal"><strong>${esc(i.title)}</strong>${i.detail ? `<small>${esc(i.detail)}</small>` : ""}</td>
+            <td style="white-space:nowrap">${!i.href ? "" : i.href.startsWith("#fc-") ? `<button class="btn" type="button" data-jump="${esc(i.href.slice(1))}">${esc(i.action)} ↓</button>` : `<a class="btn ${i.status === "bad" ? "primary" : ""} link-btn" href="${i.href}">${esc(i.action)} →</a>`}</td></tr>`).join("")}
+        </tbody></table></div>` };
     return `
       <div class="toolbar"><label>Competência <select class="select" id="pmCkMonth">${months.slice().reverse().map(m => `<option value="${m}" ${m === mk ? "selected" : ""}>${esc(mName(m))}</option>`).join("")}</select></label>
         <span class="spacer"></span><small>Recarregue a lista depois de resolver cada item</small></div>
@@ -1563,22 +1570,115 @@
       </section>`;
   }
 
+  // ---------- fechamento do mês (uma página só) ----------
+  // Usuário (14/10/2026): fechamento aparecia em três lugares. Aqui, em ordem: o que falta → conferência
+  // dos recebidos (UBY e P3 × o que caiu de fato) → aprovar e publicar → documentos publicados.
+  // A Spott paga a competência M por volta do dia 10 de M+1, já sem os 8% e sem o split da P3: o
+  // "recebido pela UBY" de M é conferido com as entradas da Spott no extrato de M+1. O split da P3 não
+  // passa pela conta da UBY: o valor que a P3 recebeu é informado aqui (fica no extrato, em "received").
+  function receivedRows(bank) {
+    const api = UBY.state.api;
+    const B = window.UBY_BANK;
+    const tx = bank?.transactions || [];
+    const infl = B && tx.length ? B.inflows(tx, bank.links || {}) : {};
+    const lastTx = tx.map(t => t.date).sort().at(-1) || "";
+    const rec = bank?.received || {};
+    return (UBY.state.months || []).map(mk => {
+      let d = null;
+      try { d = UBY.data("finance", mk).dre; } catch (_) {}
+      if (!d) return null;
+      const nx = nextMonthKey(mk);
+      const uby = Math.round((d.networkRevenue - d.platform - d.management + d.royalties) * 100) / 100;
+      const p3 = Math.round((d.management + (d.partnerManagement || 0)) * 100) / 100;
+      const got = infl[nx]?.Spott;
+      const covered = lastTx >= `${nx}-15`;
+      const ubyGot = rec[mk]?.uby != null ? Number(rec[mk].uby) : got != null ? got : null;
+      const p3Got = rec[mk]?.p3 != null ? Number(rec[mk].p3) : null;
+      return { mk, nx, uby, p3, ubyGot, ubyManual: rec[mk]?.uby != null, covered, p3Got, p3At: rec[mk]?.p3At || "", note: rec[mk]?.note || "",
+        ubyDiff: ubyGot == null ? null : Math.round((ubyGot - uby) * 100) / 100, p3Diff: p3Got == null ? null : Math.round((p3Got - p3) * 100) / 100 };
+    }).filter(Boolean);
+  }
+  const TOL = 0.05;
+  // Conferência vale de set/2026 em diante (usuário: "o que ficou para trás pode deixar"; jun–ago era Move/transição).
+  const RCV_FROM = "2026-09";
+  function receivedItems(rows, mk) {
+    const r = rows.find(x => x.mk === mk);
+    if (!r || mk < RCV_FROM) return [];
+    const mName = m => UBY.state.api?.monthName?.(m) || m;
+    const out = [];
+    if (r.ubyGot == null) out.push({ cat: "Recebidos", status: r.covered ? "bad" : "warn", title: r.covered ? `Repasse da Spott de ${mName(mk)} não achado no extrato` : `Repasse da Spott de ${mName(mk)} ainda não conferido`, detail: r.covered ? `Previsto ${fmt.brl(r.uby)} em ${mName(r.nx)}; nenhuma entrada da Spott nesse mês.` : `Previsto ${fmt.brl(r.uby)} por volta de 10/${r.nx.slice(5)}. Anexe o extrato de ${mName(r.nx)}.`, href: "#/parametros/pagamentos", action: r.covered ? "Ver extrato" : "Anexar extrato" });
+    else if (Math.abs(r.ubyDiff) > TOL) out.push({ cat: "Recebidos", status: "bad", title: `Recebido pela UBY não bate: diferença de ${fmt.brl(r.ubyDiff)}`, detail: `Plataforma ${fmt.brl(r.uby)} × ${r.ubyManual ? "informado" : "extrato"} ${fmt.brl(r.ubyGot)}. Confira recargas, ajustes de fechamento da Spott e o split.`, href: "#fc-recebidos", action: "Conferir" });
+    if (r.p3Got == null) out.push({ cat: "Recebidos", status: "warn", title: `Quanto a P3 recebeu em ${mName(mk)} não foi informado`, detail: `Previsto pela plataforma: ${fmt.brl(r.p3)}.`, href: "#fc-recebidos", action: "Informar" });
+    else if (Math.abs(r.p3Diff) > TOL) out.push({ cat: "Recebidos", status: "bad", title: `Recebido pela P3 não bate: diferença de ${fmt.brl(r.p3Diff)}`, detail: `Plataforma ${fmt.brl(r.p3)} × informado ${fmt.brl(r.p3Got)}.`, href: "#fc-recebidos", action: "Conferir" });
+    return out;
+  }
+  function closingPage(w, data) {
+    const api = UBY.state.api;
+    const months = (UBY.state.months || []).slice();
+    if (!months.length || !api) return `<div class="note">Sem competências carregadas ainda. Abra esta aba de novo em alguns segundos.</div>`;
+    if (!months.includes(ui.ckMonth)) ui.ckMonth = months.at(-1);
+    const mk = ui.ckMonth;
+    const mName = m => api.monthName?.(m) || m;
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const rows = receivedRows(data.bank);
+    const cur = rows.find(r => r.mk === mk);
+    const ck = checklistTab(receivedItems(rows, mk), true);
+    let inv = null;
+    try { inv = UBY.data("investorDistribution").months.find(x => x.key === mk) || null; } catch (_) {}
+    const head = (id, kicker, title, sub, extra = "") => `<div class="cc-head" id="fc-${id}" data-focus="sec:${id}"><div><p class="kicker">${kicker}</p><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ""}</div>${extra}</div>`;
+    const okBadge = (diff, got, m) => m < RCV_FROM ? `<span class="badge neutral">histórico</span>` : got == null ? `<span class="badge neutral">a conferir</span>` : Math.abs(diff) <= TOL ? `<span class="badge ok">bate</span>${diff ? `<small>${fmt.brl(diff)} (arredondamento)</small>` : ""}` : `<span class="badge bad">${fmt.brl(diff)}</span>`;
+    const recTable = rows.slice().reverse().map(r => `<tr class="${r.mk === mk ? "on" : ""}" ${r.mk === mk ? 'style="background:var(--uby-green-soft)"' : ""}>
+        <td><strong>${esc(mName(r.mk))}</strong></td>
+        <td class="num">${fmt.brl(r.uby)}</td>
+        <td class="num">${r.ubyGot == null ? `<small>${r.covered ? "sem entrada da Spott" : `extrato de ${esc(mName(r.nx))} pendente`}</small>` : `${fmt.brl(r.ubyGot)}<small>${r.ubyManual ? "informado" : `extrato · ${esc(mName(r.nx))}`}</small>`}</td>
+        <td>${okBadge(r.ubyDiff, r.ubyGot, r.mk)}</td>
+        <td class="num">${fmt.brl(r.p3)}</td>
+        <td class="num"><input class="select" type="number" step="0.01" min="0" data-rcv-p3="${esc(r.mk)}" value="${r.p3Got == null ? "" : esc(r.p3Got.toFixed(2))}" placeholder="informar" style="width:110px" ${can}>${r.p3At ? `<small>em ${fmt.date(r.p3At + "T12:00:00")}</small>` : ""}</td>
+        <td>${okBadge(r.p3Diff, r.p3Got, r.mk)}</td></tr>`).join("");
+    return `
+      <div class="toolbar cc-bar"><label>Competência <select class="select" id="pmCkMonth">${months.slice().reverse().map(m => `<option value="${m}" ${m === mk ? "selected" : ""}>${esc(mName(m))}</option>`).join("")}</select></label>
+        <span class="spacer"></span><small>Resolva de cima para baixo; a lista se atualiza depois de cada gravação</small></div>
+      <div class="grid g4" style="margin-bottom:6px">
+        ${kpi("Pendências", fmt.int(ck.open), ck.open ? `${fmt.int(ck.bad)} para resolver` : "pronto para aprovar", "", "lead")}
+        ${kpi("Recebido pela UBY", cur ? fmt.brl(cur.uby) : "—", cur ? (cur.ubyGot == null ? "extrato a conferir" : Math.abs(cur.ubyDiff) <= TOL ? `bate com ${cur.ubyManual ? "o informado" : "o extrato"}` : `extrato ${fmt.brl(cur.ubyGot)} · diferença ${fmt.brl(cur.ubyDiff)}`) : "")}
+        ${kpi("Recebido pela P3", cur ? fmt.brl(cur.p3) : "—", cur ? (cur.p3Got == null ? "informe quanto caiu" : Math.abs(cur.p3Diff) <= TOL ? "bate com o informado" : `informado ${fmt.brl(cur.p3Got)} · diferença ${fmt.brl(cur.p3Diff)}`) : "")}
+        ${kpi("Fechamento", inv ? esc(inv.status) : "—", inv ? `pool ${fmt.brl(inv.investorPool)} · ${fmt.brl(inv.perQuota)} por cota` : "")}
+      </div>
+      <nav class="cc-jump" aria-label="Ir para">${[["falta", "1. O que falta"], ["recebidos", "2. Recebidos"], ["aprovar", "3. Aprovar e publicar"]].map(([id, l]) => `<button type="button" data-jump="fc-${id}">${l}</button>`).join("")}<a class="btn ghost link-btn" href="#/arquivo" style="height:28px">Documentos publicados →</a></nav>
+      ${head("falta", "1 · Conferir", `O que falta em ${esc(mName(mk))}`, "Recargas, energia, custos, impostos, pagamentos e recebidos. Cada item leva para onde se resolve.")}
+      ${ck.html}
+      ${head("recebidos", "2 · Recebidos", "O que a plataforma calcula × o que caiu", "UBY: faturamento − Spott − P3 + royalties, conferido com a entrada da Spott no extrato do mês seguinte. P3: gestão dos ativos UBY + gestão de parceiros, conferida com o valor que você informa.")}
+      ${data.bankError ? `<div class="note">Não consegui ler o extrato: ${esc(data.bankError)}</div>` : ""}
+      <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">UBY · plataforma</th><th class="num">UBY · caiu</th><th>UBY</th><th class="num">P3 · plataforma</th><th class="num">P3 · recebeu</th><th>P3</th></tr></thead><tbody>${recTable}</tbody></table></div>
+      <p class="source-line">A conferência vale de ${esc(mName(RCV_FROM))} em diante; os meses anteriores (Move e transição para a Spott) ficam como histórico, sem correção. Diferença de até ${fmt.brl(TOL)} é arredondamento. Valor da P3 é gravado ao sair do campo. Diferença no recebido da UBY? Se faltou algo nas planilhas da Spott, lance uma receita extra "Ajuste de fechamento Spott" (avulso) no carregador, em Por carregador › Receitas extras: ela entra como recarga, com a taxa da Spott e o split.</p>
+      ${head("aprovar", "3 · Aprovar e publicar", "Fechamentos da distribuição", "Aprovar congela os números do mês; publicar guarda os documentos de forma definitiva.")}
+      ${closingsTab(w)}`;
+  }
+
   // ---------- render ----------
   // As abas ficam no topo do painel (shell.js · NAV); aqui só os ids. Energia, repasse à área,
   // operação e contas mensais viraram blocos da página do carregador: os links antigos
   // (#/parametros/energia/<carregador>/inv:<id>…) abrem o bloco certo dela.
   const GROUPS = [
     ["Contas a pagar", [["contas", "Contas a pagar"], ["pagamentos", "Conciliação e extrato"]]],
-    ["Parâmetros e custos", [["carregador", "Por carregador"], ["matriz", "Custos centrais"], ["documentos", "Documentos"], ["checklist", "O que falta no mês"], ["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]]]
+    ["Parâmetros e custos", [["carregador", "Por carregador"], ["matriz", "Custos centrais"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"]]],
+    ["Resultado e fechamento", [["fechamento", "Fechamento do mês"]]]
   ];
   const LEGACY = { energia: "energia", area: "area", operacao: "operacao", programados: "custos" };
   const TAB_IDS = [...GROUPS.flatMap(g => g[1].map(t => t[0])), "programados"];
+  // "O que falta no mês" e "Fechamentos" viraram blocos do Fechamento do mês.
+  const CLOSING_ALIAS = { checklist: "falta", fechamentos: "aprovar" };
   async function render(target, params = []) {
     if (!params[0]) { location.replace(`#/parametros/${TAB_IDS.includes(ui.tab) && ui.tab !== "programados" ? ui.tab : "carregador"}`); return; }
     if (LEGACY[params[0]]) {
       const ref = params[1] && params[1] !== "-" ? decodeURIComponent(params[1]) : "-";
       const month = /^\d{4}-\d{2}$/.test(params[3] || "") ? `/${params[3]}` : "";
       location.replace(`#/parametros/carregador/${encodeURIComponent(ref)}/${encodeURIComponent(params[2] || `sec:${LEGACY[params[0]]}`)}${month}`);
+      return;
+    }
+    if (CLOSING_ALIAS[params[0]]) {
+      const month = /^\d{4}-\d{2}$/.test(params[3] || "") ? `/${params[3]}` : "";
+      location.replace(`#/parametros/fechamento/-/${encodeURIComponent(`sec:${CLOSING_ALIAS[params[0]]}`)}${month}`);
       return;
     }
     if (TAB_IDS.includes(params[0])) {
@@ -1595,7 +1695,7 @@
       if (ui.tab === "carregador" && ui.focus.startsWith("inv:")) { ui.enEditId = ui.focus.slice(4); ui.enDraft = null; }
       // Conta mensal: o carregador sai do próprio pagamento (achado quando o motor abrir).
       if (ui.tab === "carregador" && ui.focus.startsWith("pay:")) { ui.payEditing = ui.focus.slice(4); ui.payForm = null; ui.payLookup = ref ? "" : ui.payEditing; }
-      if (month && (ui.tab === "pagamentos" || ui.tab === "checklist")) { if (ui.tab === "pagamentos") ui.payMonth = month; else ui.ckMonth = month; }
+      if (month && (ui.tab === "pagamentos" || ui.tab === "fechamento")) { if (ui.tab === "pagamentos") ui.payMonth = month; else ui.ckMonth = month; }
     }
     target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Abrindo parâmetros e custos</h2><p>Carregando a plataforma original com a base completa. Na primeira vez leva alguns segundos.</p></div>`;
     let w;
@@ -1648,10 +1748,14 @@
       }
     } else {
       data.months = (UBY.state.months && UBY.state.months.length ? UBY.state.months : (w.getMonths?.() || [])).slice();
-      if (ui.tab === "energia" || ui.tab === "area" || ui.tab === "pagamentos" || ui.tab === "contas" || ui.tab === "checklist") {
+      if (ui.tab === "energia" || ui.tab === "area" || ui.tab === "pagamentos" || ui.tab === "contas" || ui.tab === "fechamento") {
         // Depois de gravar, o motor principal recarrega: espera ele voltar com o histórico completo.
         for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
         try { await Promise.race([UBY.state.api.loadFull(), new Promise(r => setTimeout(r, 15000))]); } catch (_) {}
+      }
+      if (ui.tab === "fechamento") {
+        try { data.bank = (await w.UBY_SUPABASE.loadBankData()).payload || null; data.bankError = ""; }
+        catch (err) { data.bank = null; data.bankError = err.message; }
       }
       if (ui.tab === "pagamentos" || ui.tab === "contas") {
         try { data.bills = UBY.state.api.allBills(); } catch (err) { data.bills = []; }
@@ -1676,12 +1780,13 @@
       pagamentos: ["Financeiro", "Conciliação bancária", "Anexe o extrato do banco: a plataforma sugere a conta de cada saída, você confirma, e a conta fica paga na data e no valor do banco."],
       carregador: ["Parâmetros e custos", "Centro de custos do carregador", "Tudo de um carregador numa página: resultado, contrato e splits, energia, repasse à área, custos e contas, operação e documentos."],
       matriz: ["Parâmetros e custos", "Custos centrais", "Custos divididos entre os carregadores UBY (aluguel da sede, contador, seguros gerais…), com o rateio gravado por competência."],
-      programados: ["Parâmetros e custos", "Contas mensais", "Contas mensais da rede, por competência."]
+      programados: ["Parâmetros e custos", "Contas mensais", "Contas mensais da rede, por competência."],
+      fechamento: ["Resultado e fechamento", "Fechamento do mês", "Tudo do fechamento numa página: o que falta, conferência dos recebidos da UBY e da P3, aprovação e documentos publicados."]
     }[ui.tab] || ["Parâmetros e custos", "Parâmetros e custos", "Documentos, fechamento do mês, cotas, impostos e rodadas. As contas e a gravação são as mesmas da plataforma original."];
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">${esc(hero[0])}</p><h1>${esc(hero[1])}</h1><p class="lead">${esc(hero[2])}</p></div>
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
-      ${ui.tab === "carregador" ? chargerPage(w, data) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "contas" ? contasTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : ui.tab === "checklist" ? checklistTab() : quotasTab(w)}
+      ${ui.tab === "carregador" ? chargerPage(w, data) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "contas" ? contasTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamento" ? closingPage(w, data) : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
@@ -2134,6 +2239,21 @@
       });
     };
     if ($("#pmCkMonth")) $("#pmCkMonth").onchange = e => { ui.ckMonth = e.target.value; draw(target, w); };
+    target.querySelectorAll("[data-rcv-p3]").forEach(el => el.onchange = () => {
+      const mk = el.dataset.rcvP3, raw = String(el.value || "").replace(",", ".").trim();
+      const v = raw === "" ? null : Math.round(Number(raw) * 100) / 100;
+      if (v !== null && !(v >= 0)) { alert("Informe um valor válido."); return; }
+      run(target, w, `Recebido pela P3 · ${UBY.state.api?.monthName?.(mk) || mk}`, async () => {
+        await w.UBY_SUPABASE.saveBankData(p => {
+          const received = { ...(p.received || {}) };
+          const cur = { ...(received[mk] || {}) };
+          if (v === null) { delete cur.p3; delete cur.p3At; } else { cur.p3 = v; cur.p3At = new Date().toISOString().slice(0, 10); }
+          if (Object.keys(cur).length) received[mk] = cur; else delete received[mk];
+          return { statements: [], transactions: [], ...p, received };
+        }, { acao: "received_p3", competencia: mk, valor: v });
+        return v === null ? "apagado" : fmt.brl(v);
+      });
+    });
     if ($("#pmPayAddBox")) $("#pmPayAddBox").addEventListener("toggle", e => { ui.payAddOpen = e.target.open; });
     target.querySelectorAll("[data-pay-edit]").forEach(b => b.onclick = () => { ui.payEditing = b.dataset.payEdit; ui.payForm = null; ui.focus = `pay:${b.dataset.payEdit}`; draw(target, w); });
     if ($("#pmPayEditCancel")) $("#pmPayEditCancel").onclick = () => { ui.payEditing = ""; ui.payForm = null; draw(target, w); };
@@ -2293,7 +2413,7 @@
     };
     // --- fechamentos ---
     target.querySelectorAll("[data-close-report]").forEach(b => b.onclick = () => UBY.reports.competencia(b.dataset.closeReport));
-    if (ui.tab === "fechamentos" && !ui.docs && !ui.docsLoading) { ui.docsLoading = true; loadDocs(w).finally(() => { ui.docsLoading = false; draw(target, w); }); }
+    if (ui.tab === "fechamento" && !ui.docs && !ui.docsLoading) { ui.docsLoading = true; loadDocs(w).finally(() => { ui.docsLoading = false; draw(target, w); }); }
     target.querySelectorAll("[data-publish]").forEach(b => b.onclick = () => {
       const mk = b.dataset.publish;
       if (!confirm(`Publicar os documentos de ${UBY.state.api.monthName(mk)}? Eles ficam guardados de forma definitiva (não podem ser alterados, só substituídos por uma nova versão).`)) return;

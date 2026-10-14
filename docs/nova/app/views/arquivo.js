@@ -24,8 +24,8 @@
     const people = new Set(active.filter(d => d.destinatario_email).map(d => d.destinatario_email));
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Gestão e governança · documentos publicados</p><h1>Arquivo de fechamentos</h1>
-        <p class="lead">Versões finais publicadas a partir de Parâmetros → Fechamentos. Não podem ser alteradas nem apagadas; um mês reaprovado ganha uma nova versão e as anteriores continuam guardadas.</p></div>
-        <div class="callout"><strong>Publicar um mês</strong><small>Aprove em <a href="#/parametros/fechamentos">Parâmetros → Fechamentos</a> e clique em "Publicar documentos".</small></div></div>
+        <p class="lead">Versões finais publicadas a partir de Fechamento do mês. Não podem ser alteradas nem apagadas; um mês reaprovado ganha uma nova versão e as anteriores continuam guardadas.</p></div>
+        <div class="callout"><strong>Publicar um mês</strong><small>Aprove em <a href="#/parametros/fechamento">Fechamento do mês</a> e clique em "Publicar documentos".</small></div></div>
       ${error ? `<div class="note" style="margin-bottom:14px">${esc(error)}</div>` : ""}
       <section class="section"><div class="grid g4">
         ${kpi("Documentos ativos", fmt.int(active.length), `${fmt.int(docs.length - active.length)} revogado(s)`, "", "lead")}

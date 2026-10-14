@@ -75,8 +75,8 @@
     ] },
     { label: "FINANCEIRO", items: [
       { icon: "⇣", label: "Contas a pagar", tabs: [["#/parametros/contas", "Contas a pagar"], ["#/parametros/pagamentos", "Conciliação bancária"]] },
-      { icon: "R$", label: "Resultado e fechamento", tabs: [["financeiro", "Resultado e fechamento"], ["relatorios", "Relatórios"], ["arquivo", "Arquivo de fechamentos"]] },
-      { icon: "✎", label: "Parâmetros e custos", tabs: [["#/parametros/carregador", "Por carregador"], ["#/parametros/matriz", "Custos centrais"], ["#/parametros/documentos", "Documentos"], ["#/parametros/checklist", "O que falta no mês"], ["#/parametros/cotas", "Cotas e impostos"], ["#/parametros/fechamentos", "Fechamentos"], ["auditoria", "Auditoria do motor"], ["operacao-uby", "Relatórios antigos"]] }
+      { icon: "R$", label: "Resultado e fechamento", tabs: [["financeiro", "Resultado"], ["#/parametros/fechamento", "Fechamento do mês"], ["relatorios", "Relatórios"], ["arquivo", "Documentos publicados"]] },
+      { icon: "✎", label: "Parâmetros e custos", tabs: [["#/parametros/carregador", "Por carregador"], ["#/parametros/matriz", "Custos centrais"], ["#/parametros/documentos", "Documentos"], ["#/parametros/cotas", "Cotas e impostos"], ["auditoria", "Auditoria do motor"], ["operacao-uby", "Relatórios antigos"]] }
     ] },
     { label: "OBRAS", items: [
       { icon: "⌑", label: "Obras e implantação", tabs: [["obras", "Obras e pendências"], ["tarefas", "Tarefas"], ["mapa", "Mapa de implantação"], ["engenharia", "Engenharia e concessionária"], ["analisadores", "Analisadores de energia"], ["mercado", "Mercado EV"], ["obras-classico", "Obras · edição"], ["mapa-classico", "Mapa · vínculos"], ["tarefas-classico", "Tarefas · edição"]] }
