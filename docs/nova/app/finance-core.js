@@ -341,7 +341,7 @@
       }
       const legalReserve = distributable * legalPct / 100, expansionReserve = distributable * expPct / 100;
       const investorPool = (distributable - legalReserve - expansionReserve) * invPct / 100;
-      return { monthKey: m.monthKey, ownedNet: num(m.ownedNet), royalties: num(m.royalties), rows: m.rows || [], taxBase, taxes, taxesTotal, taxesApplied, taxSource: manual ? "valor lançado" : (pct ? `${pct}% do faturamento` : "sem imposto lançado"), preTax, result, carryIn, carryOut: carry, distributable, legalReserve, expansionReserve, investorPool, inDistribution: m.monthKey >= start };
+      return { monthKey: m.monthKey, ownedNet: num(m.ownedNet), royalties: num(m.royalties), rows: m.rows || [], taxBase, taxes, taxesTotal, taxesApplied, taxSource: manual ? "valor lançado" : (pct ? `${String(pct).replace(".", ",")}% do recebido pela UBY` : "sem imposto lançado"), preTax, result, carryIn, carryOut: carry, distributable, legalReserve, expansionReserve, investorPool, inDistribution: m.monthKey >= start };
     });
     const all = policy.investors || [];
     const investors = all.map(inv => {

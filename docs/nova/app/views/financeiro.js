@@ -345,7 +345,7 @@
           ${group("Resultado final da rede")}
           ${line("Resultado operacional UBY", d.operationalResult)}
           ${line("+ Royalties UBY", d.royalties)}
-          ${line(`− Impostos sobre o faturamento (guia da matriz)${d.taxRatePct ? ` · ${Number(d.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : ""}`, d.networkTaxes || 0, d.taxesTotal ? `sobre ${fmt.brl(d.networkTaxBase || 0)} faturados pela UBY (recargas dos ativos próprios + royalties) · valor exato quando a guia for lançada em Parâmetros → Cotas, impostos e rodadas` : "ainda sem alíquota ou guia lançada para o período")}
+          ${line(`− Impostos sobre o recebido pela UBY (guia da matriz)${d.taxRatePct ? ` · ${Number(d.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : ""}`, d.networkTaxes || 0, d.taxesTotal ? `sobre ${fmt.brl(d.networkTaxBase || 0)} recebidos pela UBY (faturamento dos ativos próprios menos Spott e P3, mais royalties) · valor exato quando a guia for lançada em Parâmetros → Cotas, impostos e rodadas` : "ainda sem alíquota ou guia lançada para o período")}
           </tbody><tfoot><tr><td>= Resultado consolidado antes da distribuição</td><td class="num">${signed(d.networkResult)}</td></tr></tfoot><tbody>
           ${group("Destinação do resultado")}
           ${d.lossCarried ? line("Prejuízo de meses anteriores compensado", d.lossCarried, "o lucro só é distribuído depois de cobrir prejuízos acumulados") : ""}

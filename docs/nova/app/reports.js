@@ -87,7 +87,7 @@
     return `${header(`Relatório unificado da operação · ${capped ? `consolidado do início até o fechamento de ${monthName(until)}` : monthName(mk)}`,`${d.ownedCount} ativo(s) UBY e ${d.partnerCount} parceiro(s) com royalty · ${inv.investors.length} cotista(s) · ${esc(p.roundLabel || "")}${acc ? ` · ${inv.months.length} competência(s) de distribuição` : ""}${approval}`, status)}
       ${changed ? `<div class="note" style="border-color:#e0a4a0;background:#fdf0ef;color:#8a2f2a"><strong>Os números mudaram depois da aprovação.</strong> Aprovado: resultado ${signed(m.snapshot.result)} · pool ${fmt.brl(m.snapshot.investorPool)} (${fmt.brl(m.snapshot.perQuota)} por cota). Agora: resultado ${signed(m.result)} · pool ${fmt.brl(m.investorPool)}. Revise em Parâmetros e custos → Fechamentos.</div>` : ""}
       <div class="kpis">
-        ${kpi("Faturamento UBY", fmt.brl(d.networkRevenue + d.royalties), `${fmt.int(sessions)} recargas · ${fmt.kwh0(energy)}`)}
+        ${kpi("Recebido pela UBY", fmt.brl(d.networkRevenue - d.platform - d.management + d.royalties), `faturamento bruto ${fmt.brl(d.networkRevenue)} · ${fmt.int(sessions)} recargas`)}
         ${kpi("Resultado após impostos", signed(d.networkResult), d.taxesTotal ? `impostos do período ${fmt.brl(d.taxesTotal)}` : "sem imposto lançado")}
         ${kpi("Reservas", fmt.brl(d.reserve), `legal ${fmt.pct1(p.legalReservePct)} · expansão ${fmt.pct1(p.expansionReservePct)}`)}
         ${kpi("Pool dos cotistas", fmt.brl(d.investorPool), acc ? "soma das competências" : `${fmt.brl(m?.perQuota || 0)} por cota`, true)}
@@ -99,15 +99,20 @@
       </tbody></table>
       <h2>Demonstração do resultado da rede</h2>
       <table><tbody>
-        <tr class="g"><td colspan="2">Receitas</td></tr>
-        ${row("Recargas dos ativos UBY", d.rechargeRevenue)}${d.extraRevenue ? row("Receitas operacionais complementares", d.extraRevenue) : ""}${d.marketing ? row("Marketing e contratos", d.marketing) : ""}${row("Royalties de parceiros", d.royalties)}
-        ${row("Faturamento UBY", d.networkRevenue + d.royalties, "t")}
-        <tr class="g"><td colspan="2">Custos</td></tr>
-        ${row("Energia", -d.energyCost)}${d.directOperation ? row("Operação direta dos carregadores", -d.directOperation) : ""}${d.matrizCost ? row("Custos centrais da matriz (rateio)", -d.matrizCost) : ""}
-        ${d.taxes ? row("Tributos por carregador", -d.taxes) : ""}${row("Gestão P3", -d.management)}${d.platform ? row("App / plataforma", -d.platform) : ""}${d.areaParticipation ? row("Participação da área", -d.areaParticipation) : ""}
-        ${row("Resultado operacional + royalties", d.operationalResult + d.royalties, "t")}
-        ${row(d.taxes ? "Impostos restantes (royalties e ajuste à guia)" : `Impostos sobre o faturamento${m?.taxSource ? ` (${m.taxSource})` : ""}`, -(d.networkTaxes || 0), "",
-          d.taxesTotal ? `total de impostos do período: ${fmt.brl(d.taxesTotal)}${m?.taxSource ? ` (${m.taxSource})` : ""} sobre ${fmt.brl(d.networkTaxBase || 0)} faturados${d.taxes ? ` · ${fmt.brl(d.taxes)} já descontados em "Tributos por carregador"` : ""}` : "nenhum imposto lançado no período")}
+        <tr class="g"><td colspan="2">Faturamento</td></tr>
+        ${row("Recargas dos ativos UBY (faturamento bruto)", d.rechargeRevenue)}${d.extraRevenue ? row("Receitas operacionais complementares", d.extraRevenue) : ""}${d.marketing ? row("Marketing e contratos", d.marketing) : ""}
+        ${row("Faturamento bruto", d.networkRevenue, "t")}
+        <tr class="g"><td colspan="2">Splits retidos antes do repasse</td></tr>
+        ${d.platform ? row("App / plataforma (Spott)", -d.platform, "", "retido pela Spott no repasse") : ""}${d.management ? row("Gestão P3", -d.management, "", "split pago direto à P3") : ""}
+        ${row("Repasse dos ativos UBY (cai na conta)", d.networkRevenue - d.platform - d.management, "t")}
+        ${d.royalties ? row("Royalties de parceiros", d.royalties) : ""}
+        ${row("Recebido pela UBY", d.networkRevenue - d.platform - d.management + d.royalties, "t")}
+        <tr class="g"><td colspan="2">Custos da UBY</td></tr>
+        ${row("Energia", -d.energyCost)}${d.directOperation ? row("Operação direta dos carregadores", -d.directOperation) : ""}${d.matrizDedicated ? row("Custos exclusivos de carregadores", -d.matrizDedicated) : ""}${d.otherMatriz ? row("Custos centrais da matriz (rateio)", -d.otherMatriz) : ""}${d.matrizTaxCost ? row("Tributos centralizados da matriz", -d.matrizTaxCost) : ""}
+        ${d.areaParticipation ? row("Participação da área", -d.areaParticipation) : ""}${d.taxes ? row("Tributos por carregador", -d.taxes) : ""}
+        ${row("Resultado antes dos impostos", d.operationalResult + d.royalties, "t")}
+        ${row(`Impostos sobre o recebido pela UBY${m?.taxSource ? ` (${m.taxSource})` : ""}`, -(d.networkTaxes || 0), "",
+          d.taxesTotal ? `base: ${fmt.brl(d.networkTaxBase || 0)} recebidos pela UBY (faturamento bruto menos Spott e P3, mais royalties)${d.taxes ? ` · ${fmt.brl(d.taxes)} já descontados em "Tributos por carregador"` : ""}` : "nenhum imposto lançado no período")}
         ${row("Resultado após impostos", d.networkResult, "t")}
         <tr class="g"><td colspan="2">Destinação</td></tr>
         ${!acc && m && m.carryIn < 0 ? row("Compensação de prejuízo de meses anteriores", m.carryIn, "s") : ""}

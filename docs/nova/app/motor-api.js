@@ -1762,7 +1762,9 @@
         if (fixes.zeroSaleMonths && !active) return;
         const r = fv2Month(row, mk, fixes);
         const owned = r.operationModel === "uby" || r.operationModel === "hybrid";
-        if (owned) { ownedNet += r.operationNet; taxBase += r.totalRevenue; if (fixes.centralTax) taxesApplied += n0(r.taxes); }
+        // Imposto sobre o que a UBY RECEBE (usuário, 14/10/2026): a Spott retém a plataforma e repassa a gestão
+        // da P3 direto (split); só o restante cai na conta da UBY. Com centralTax; sem ele, faturamento total.
+        if (owned) { ownedNet += r.operationNet; taxBase += fixes.centralTax ? n0(r.totalRevenue) - n0(r.platform) - n0(r.management) : r.totalRevenue; if (fixes.centralTax) taxesApplied += n0(r.taxes); }
         else if (r.operationModel === "third_party_management") { royalties += r.ubyRoyalty; taxBase += r.ubyRoyalty; }
         if (owned || r.operationModel === "third_party_management") rows.push({ station: row.stationName, active, model: r.operationModel, revenue: r.revenue, energyCost: r.energyCost,
           localExtraCosts: r.localExtraCosts, matrizCost: r.matrizCost, taxes: r.taxes, operationNet: r.operationNet, royalty: r.ubyRoyalty, flags: r.flags });
