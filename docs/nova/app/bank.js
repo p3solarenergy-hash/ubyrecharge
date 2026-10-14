@@ -249,11 +249,12 @@
     return { bills: billRows, outflows: txRows, unmatched: txRows.filter(t => !t.bills.length && !t.ignored) };
   }
 
-  // Entradas por mês e origem.
-  function inflows(transactions) {
+  // Entradas por mês e origem. links[id].source corrige a origem à mão (ex.: repasse da Spott que
+  // chegou por outra conta).
+  function inflows(transactions, links = {}) {
     const out = {};
     transactions.filter(t => t.amount > 0).forEach(t => {
-      const mk = t.date.slice(0, 7), src = inflowSource(t);
+      const mk = t.date.slice(0, 7), src = links[t.id]?.source || inflowSource(t);
       out[mk] = out[mk] || {};
       out[mk][src] = r2((out[mk][src] || 0) + t.amount);
     });

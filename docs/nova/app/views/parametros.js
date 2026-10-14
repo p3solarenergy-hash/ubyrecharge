@@ -638,7 +638,11 @@
         <button class="btn ghost" data-bank-new-cancel type="button">Cancelar</button></div>
         <small class="source-line">Entra como pagamento avulso de ${esc(UBY.state.api?.monthName?.(t.date.slice(0, 7)) || t.date.slice(0, 7))} (calendário de caixa, já pago). Não muda o resultado: o custo do mês continua vindo das regras em Carregadores.</small></td></tr>`;
     };
-    const infl = window.UBY_BANK ? window.UBY_BANK.inflows(bs.tx) : {};
+    const infl = window.UBY_BANK ? window.UBY_BANK.inflows(bs.tx, bs.p.links || {}) : {};
+    // Entradas do mês, com a origem corrigível à mão (fica guardada no extrato).
+    const SRCS = ["Spott", "Move", "Cartão (vendas)", "Rendimentos", "Outras entradas"];
+    const inMonth = bs.tx.filter(t => t.amount > 0 && t.date.slice(0, 7) === mk).sort((a, b) => a.date.localeCompare(b.date));
+    const srcOf = t => (bs.p.links || {})[t.id]?.source || window.UBY_BANK.inflowSource(t);
     const inflMonths = Object.keys(infl).sort().reverse();
     const inflSrc = ["Spott", "Move", "Cartão (vendas)", "Rendimentos", "Outras entradas"].filter(s => inflMonths.some(m => infl[m][s]));
     return `
@@ -716,6 +720,11 @@
           <div class="table-wrap"><table><thead><tr><th>Mês</th>${inflSrc.map(s => `<th class="num">${esc(s)}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>
             ${inflMonths.map(m => `<tr><td><strong>${esc(UBY.state.api?.monthName?.(m) || m)}</strong></td>${inflSrc.map(s => `<td class="num">${infl[m][s] ? fmt.brl(infl[m][s]) : "—"}</td>`).join("")}<td class="num"><strong>${fmt.brl(Object.values(infl[m]).reduce((a, v) => a + v, 0))}</strong></td></tr>`).join("")}
           </tbody></table></div>
+          ${inMonth.length ? `<details style="margin-top:10px" ${inMonth.some(t => srcOf(t) === "Outras entradas") ? "open" : ""}><summary style="cursor:pointer;font-weight:800;font-size:12px">Entradas de ${esc(UBY.state.api?.monthName?.(mk) || mk)} (${inMonth.length}) · corrigir a origem</summary>
+            <div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Data</th><th>Descrição no extrato</th><th class="num">Valor</th><th>Origem</th></tr></thead><tbody>
+              ${inMonth.map(t => `<tr><td>${fmtDay(t.date)}</td><td>${esc(t.description)}<small>${esc(t.type || "")}</small></td><td class="num"><strong>${fmt.brl(t.amount)}</strong></td>
+                <td><select class="select" data-bank-src="${esc(t.id)}" ${can}>${SRCS.map(x => `<option ${srcOf(t) === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>${(bs.p.links || {})[t.id]?.source ? ' <small class="badge neutral">corrigida à mão</small>' : ""}</td></tr>`).join("")}
+            </tbody></table></div></details>` : ""}
           <p class="source-line">Spott e Move repassam o faturamento das recargas; "Cartão (vendas)" são vendas no crédito que caem na conta. Os repasses chegam depois do mês das recargas, então comparar com o faturamento pede o mês seguinte.</p>` : ""}
       </section>`;
   }
@@ -1501,6 +1510,10 @@
         return `${res.total} lançamento(s) de ${fmtDay(parsed.meta.from)} a ${fmtDay(parsed.meta.to)}, ${res.added} novo(s)`;
       });
     };
+    target.querySelectorAll("[data-bank-src]").forEach(sel => sel.onchange = () => {
+      const id = sel.dataset.bankSrc, v = sel.value;
+      saveLinks(`Entrada classificada como ${v}`, l => { l[id] = { ...(l[id] || {}), source: v }; });
+    });
     target.querySelectorAll("[data-bank-del-st]").forEach(btn => btn.onclick = () => {
       const st = (data.bank?.statements || []).find(s => s.id === btn.dataset.bankDelSt); if (!st) return;
       const n = (data.bank?.transactions || []).filter(t => t.statementId === st.id).length;
