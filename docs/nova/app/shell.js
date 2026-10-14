@@ -62,6 +62,56 @@
     ] }
   ];
   const ROUTES = Object.fromEntries(GROUPS.flatMap(g => g.items.map(item => [item.id, { ...item, group: g.label }])));
+  // Menu enxuto (usuário, 14/10/2026: "menos abas, mais centralizado"): cada item do menu é um painel
+  // com abas no topo para as telas relacionadas. As rotas não mudam (links antigos continuam valendo).
+  // Aba = id de rota ou um caminho "#/..." (ex.: abas de Parâmetros).
+  const NAV = [
+    { label: "VISÃO GERAL", items: [
+      { icon: "▦", label: "Comando da rede", tabs: [["comando", "Comando da rede"], ["resumo", "Resumo executivo"], ["modelo", "Modelo operacional"], ["avisos", "Avisos e contas a vencer"]] }
+    ] },
+    { label: "REDE DE RECARGAS", items: [
+      { icon: "▤", label: "Carregadores e uso", tabs: [["unidades", "Unidades e carregadores"], ["uso", "Análise de uso"], ["locais", "Shopping Aurora (AC + DC)"], ["precos", "Estudos de preço"], ["sessoes", "Sessões importadas"], ["recargas", "Tela original"]] },
+      { icon: "◎", label: "Clientes e Clube", tabs: [["clientes", "Clientes"], ["clube", "Clube UBY"]] }
+    ] },
+    { label: "FINANCEIRO", items: [
+      { icon: "⇣", label: "Contas a pagar", tabs: [["#/parametros/contas", "Contas a pagar"], ["#/parametros/pagamentos", "Conciliação bancária"]] },
+      { icon: "R$", label: "Resultado e fechamento", tabs: [["financeiro", "Resultado e fechamento"], ["relatorios", "Relatórios"], ["arquivo", "Arquivo de fechamentos"]] },
+      { icon: "✎", label: "Parâmetros e custos", tabs: [["parametros", "Parâmetros e custos"], ["configuracao", "Configuração da rede"], ["auditoria", "Auditoria do motor"], ["operacao-uby", "Relatórios antigos"]] }
+    ] },
+    { label: "OBRAS", items: [
+      { icon: "⌑", label: "Obras e implantação", tabs: [["obras", "Obras e pendências"], ["tarefas", "Tarefas"], ["mapa", "Mapa de implantação"], ["engenharia", "Engenharia e concessionária"], ["analisadores", "Analisadores de energia"], ["mercado", "Mercado EV"], ["obras-classico", "Obras · edição"], ["mapa-classico", "Mapa · vínculos"], ["tarefas-classico", "Tarefas · edição"]] }
+    ] },
+    { label: "DADOS", items: [
+      { icon: "⇪", label: "Importar e lançar", tabs: [["importar", "Importar planilhas"], ["lancamentos", "Central de lançamentos"], ["backups", "Backups e restauração"], ["importar-original", "Importação avançada"]] }
+    ] },
+    // A P3 é prestadora de serviço da UBY: sempre depois da UBY.
+    { label: "P3 · PRESTADORA", items: [
+      { icon: "◈", label: "P3 Solar · gestão", tabs: [["p3", "P3 Solar · gestão"]] }
+    ] }
+  ];
+  const tabHref = t => (t[0].startsWith("#/") ? t[0] : `#/${t[0]}`);
+  // Painel (item do menu) da tela atual: primeiro pelos caminhos "#/..." (abas de Parâmetros), depois pelo id da rota.
+  function hubOf(id) {
+    for (const g of NAV) for (let k = 0; k < g.items.length; k++) {
+      const t = g.items[k].tabs.find(x => x[0].startsWith("#/") && location.hash.startsWith(x[0]));
+      if (t) return { hub: g.items[k], tab: t, key: `${g.label}|${k}` };
+    }
+    for (const g of NAV) for (let k = 0; k < g.items.length; k++) {
+      const t = g.items[k].tabs.find(x => x[0] === id);
+      if (t) return { hub: g.items[k], tab: t, key: `${g.label}|${k}` };
+    }
+    return null;
+  }
+  // Abas do painel no topo da tela (some quando o painel tem uma tela só).
+  function renderHubTabs(id) {
+    let bar = document.getElementById("hubTabs");
+    if (!bar) { bar = document.createElement("nav"); bar.id = "hubTabs"; bar.className = "hub-tabs"; bar.setAttribute("aria-label", "Telas deste painel"); document.querySelector("main .topbar").after(bar); }
+    const h = hubOf(id);
+    if (!h || h.hub.tabs.length < 2) { bar.hidden = true; bar.innerHTML = ""; return h; }
+    bar.hidden = false;
+    bar.innerHTML = h.hub.tabs.map(t => `<a href="${tabHref(t)}" class="${t === h.tab ? "on" : ""}">${t[1]}</a>`).join("");
+    return h;
+  }
   const VIEWS = {};
 
   const state = { api: null, status: null, full: false, period: undefined, months: [], cache: new Map(), route: null, params: [], charts: [] };
@@ -428,9 +478,9 @@
   }
 
   function renderNav() {
-    $("#nav").innerHTML = GROUPS.map(group => `
+    $("#nav").innerHTML = NAV.map(group => `
       <section class="nav-group"><p class="nav-title">${group.label}</p>
-        ${group.items.map(item => `<a class="nav-item" data-route="${item.id}" ${item.href ? `data-hash="${item.href}"` : ""} href="${item.href || `#/${item.id}`}"><i>${item.icon}</i><span>${item.label}</span><b class="${item.type === "view" ? "new" : "classic"}">${item.type === "view" ? "NOVO" : "ORIGINAL"}</b></a>`).join("")}
+        ${group.items.map((item, k) => `<a class="nav-item" data-hub="${group.label}|${k}" href="${tabHref(item.tabs[0])}"><i>${item.icon}</i><span>${item.label}</span>${item.tabs.length > 1 ? `<b class="new">${item.tabs.length}</b>` : ""}</a>`).join("")}
       </section>`).join("");
   }
 
@@ -446,9 +496,9 @@
     if (def.href && id === def.id) { location.replace(def.href); return; }
     state.route = def; state.params = params;
     document.body.classList.remove("menu-open");
-    // Itens com href (ex.: Contas a pagar → #/parametros/contas) ficam ativos pela própria rota.
-    const hashHit = [...document.querySelectorAll(".nav-item[data-hash]")].find(a => location.hash.startsWith(a.dataset.hash));
-    document.querySelectorAll(".nav-item").forEach(a => a.classList.toggle("active", hashHit ? a === hashHit : a.dataset.route === def.id));
+    // Menu: fica ativo o painel da tela atual; as telas irmãs aparecem como abas no topo.
+    const hub = renderHubTabs(def.id);
+    document.querySelectorAll(".nav-item").forEach(a => a.classList.toggle("active", !!hub && a.dataset.hub === hub.key));
     $("#crumbGroup").textContent = `UBY Recharge / ${def.group.charAt(0) + def.group.slice(1).toLowerCase()}`;
     $("#crumbTitle").textContent = def.label;
     $("#periodWrap").hidden = !(def.type === "view" && def.period);
