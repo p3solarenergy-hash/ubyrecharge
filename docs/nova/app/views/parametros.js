@@ -640,11 +640,11 @@
     };
     const infl = window.UBY_BANK ? window.UBY_BANK.inflows(bs.tx, bs.p.links || {}) : {};
     // Entradas do mês, com a origem corrigível à mão (fica guardada no extrato).
-    const SRCS = ["Spott", "Move", "Cartão (vendas)", "Rendimentos", "Outras entradas"];
+    const SRCS = ["Spott", "Move", "Cartão (vendas)", "Rendimentos", "Outras entradas", "Não é da UBY (devolver)"];
     const inMonth = bs.tx.filter(t => t.amount > 0 && t.date.slice(0, 7) === mk).sort((a, b) => a.date.localeCompare(b.date));
     const srcOf = t => (bs.p.links || {})[t.id]?.source || window.UBY_BANK.inflowSource(t);
     const inflMonths = Object.keys(infl).sort().reverse();
-    const inflSrc = ["Spott", "Move", "Cartão (vendas)", "Rendimentos", "Outras entradas"].filter(s => inflMonths.some(m => infl[m][s]));
+    const inflSrc = ["Spott", "Move", "Cartão (vendas)", "Rendimentos", "Outras entradas", "Não é da UBY (devolver)"].filter(s => inflMonths.some(m => infl[m][s]));
     return `
       <div class="toolbar"><label>Vencimentos de <input class="select" id="pmCentralMonth" type="month" value="${esc(mk)}"></label>
         <span class="spacer"></span><small>Energia, repasses às áreas, custos da matriz e pagamentos programados · para cotistas, veja Cotas e fechamentos</small></div>
@@ -717,8 +717,8 @@
           <p class="source-line">Confirmar marca a conta como paga na data e no valor do banco (desconto ou juros ficam registrados) e ensina a plataforma: na próxima vez, o mesmo lançamento já vem sugerido para essa conta.</p>`;
           })()}
           <h3 style="margin:18px 0 8px;font-size:13px">Entradas por mês e origem</h3>
-          <div class="table-wrap"><table><thead><tr><th>Mês</th>${inflSrc.map(s => `<th class="num">${esc(s)}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>
-            ${inflMonths.map(m => `<tr><td><strong>${esc(UBY.state.api?.monthName?.(m) || m)}</strong></td>${inflSrc.map(s => `<td class="num">${infl[m][s] ? fmt.brl(infl[m][s]) : "—"}</td>`).join("")}<td class="num"><strong>${fmt.brl(Object.values(infl[m]).reduce((a, v) => a + v, 0))}</strong></td></tr>`).join("")}
+          <div class="table-wrap"><table><thead><tr><th>Mês</th>${inflSrc.map(s => `<th class="num">${esc(s)}</th>`).join("")}<th class="num">Total da UBY</th></tr></thead><tbody>
+            ${inflMonths.map(m => `<tr><td><strong>${esc(UBY.state.api?.monthName?.(m) || m)}</strong></td>${inflSrc.map(s => `<td class="num">${infl[m][s] ? fmt.brl(infl[m][s]) : "—"}</td>`).join("")}<td class="num"><strong>${fmt.brl(Object.entries(infl[m]).filter(([k]) => k !== "Não é da UBY (devolver)").reduce((a, [, v]) => a + v, 0))}</strong></td></tr>`).join("")}
           </tbody></table></div>
           ${inMonth.length ? `<details style="margin-top:10px" ${inMonth.some(t => srcOf(t) === "Outras entradas") ? "open" : ""}><summary style="cursor:pointer;font-weight:800;font-size:12px">Entradas de ${esc(UBY.state.api?.monthName?.(mk) || mk)} (${inMonth.length}) · corrigir a origem</summary>
             <div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Data</th><th>Descrição no extrato</th><th class="num">Valor</th><th>Origem</th></tr></thead><tbody>
