@@ -11,7 +11,7 @@
   "use strict";
   const { fmt, esc, kpi } = UBY;
   const SRC = "legado/obra-ev/recargas.html?nova_params=1";
-  const ui = { tab: "contas", charger: "", month: "", edits: {}, rules: null, matrixMonth: "", editingCost: "", costForm: null, payMonth: new Date().toISOString().slice(0, 7), payForm: null, policyEdits: null, log: [] };
+  const ui = { tab: "carregador", charger: "", month: "", edits: {}, rules: null, matrixMonth: "", editingCost: "", costForm: null, payMonth: new Date().toISOString().slice(0, 7), payForm: null, policyEdits: null, log: [] };
   let frame = null, readyPromise = null, busy = false;
 
   // ---------- motor original oculto ----------
@@ -91,9 +91,24 @@
   async function openCharger(w, key, month) {
     const [workId, station] = key.split("|");
     const wantStation = w.shouldOpenFullRechargeWork?.(workId, station) ? "" : station;
-    if (String(w.eval("currentWorkId")) !== workId || String(w.eval("currentStationReportName") || "") !== wantStation) {
+    // Na primeira abertura a plataforma original já "está" na primeira obra (ex.: Robert Koch) sem ter
+    // carregado as configurações dela: o formulário vinha zerado (internet R$ 0 em vez de R$ 108,64) e
+    // "Salvar competência" gravaria os zeros. Configuração vazia → abre a obra de novo.
+    // As configurações de cada obra chegam depois da base de recargas: na primeira vez espera chegarem
+    // (até 15 s) e reabre a obra, para o formulário não ler o padrão vazio.
+    const recFs = () => w.eval(`(function(id){ const r = allRechargeRecords[id]; const fs = r && (r.financialSettings || (r.summary || {}).financialSettings); return fs ? Object.keys(fs).length : 0; })(${JSON.stringify(workId)})`);
+    w.__novaFsReady = w.__novaFsReady || {};
+    let first = false;
+    if (!w.__novaFsReady[workId]) {
+      for (let i = 0; i < 30 && !recFs(); i++) await new Promise(r => setTimeout(r, 500));
+      w.__novaFsReady[workId] = true; first = true;
+    }
+    const empty = w.eval("!financialSettings || !Object.keys(financialSettings).length");
+    if (first || empty || String(w.eval("currentWorkId")) !== workId || String(w.eval("currentStationReportName") || "") !== wantStation) {
       await w.openWorkReport(workId, "mensal", station);
     }
+    // openWorkReport volta antes das configurações da obra entrarem na tela original: espera.
+    if (recFs()) for (let i = 0; i < 30 && w.eval("!financialSettings || !Object.keys(financialSettings).length"); i++) await new Promise(r => setTimeout(r, 500));
     w.renderFinanceiro(true);
     const sel = w.document.getElementById("financeMonthSelector");
     const months = [...(sel?.options || [])].map(o => o.value);
@@ -192,56 +207,275 @@
       ? [kpi("Receita", fmt.brl(off.finance.totalRevenue || off.finance.revenue), "oficial desta competência"), kpi("Custos totais", fmt.brl(off.finance.totalOperatingCost), hasInv ? "energia pelas faturas por leitura" : ""),
          kpi("Resultado", fmt.brl(off.finance.operationNet), "o mesmo dos relatórios e fechamentos", "", "lead"), (() => { const op = f.summary.find(m => /opera/i.test(m.label)); return kpi("Operação", esc(op?.value || "—"), `${fmt.kwh(off.finance.energy)} entregues`); })()].join("")
       : [kpi("Receita", fmt.brl(0), "sem operação nesta competência"), kpi("Custos totais", fmt.brl(0), "não entram no resultado oficial"), kpi("Resultado", "fora do resultado", firstOp ? `operação começou em ${mName(firstOp)}` : "sem operação", "", "lead"), kpi("Operação", "0 recargas", "")].join("");
-    const energyInvoiceBox = () => `<div class="note" style="border-color:var(--uby-green, #1f9d55)"><strong>Energia desta competência vem das Faturas de energia</strong>
-        ${invMonth && (invMonth.parts.length || invMonth.estimatedCost) ? `<br>${invMonth.parts.map(p => `fatura ${esc(mName(p.ref) || p.start)}: consumo de ${fmtDay(p.from)} a ${fmtDay(p.to)} · Copel ${fmt.brl(p.copel)}${p.lease ? ` + arrendamento ${fmt.brl(p.lease)}` : ""}`).join("<br>")}
-          ${invMonth.estimatedCost ? `<br><span class="badge warn">estimativa</span> ${fmt.brl(invMonth.estimatedCost)} = Copel ${fmt.brl(invMonth.estimatedCopel || 0)}${invMonth.estimatedLease ? ` + arrendamento ${fmt.brl(invMonth.estimatedLease)}` : ""} (kWh entregues × custo médio da fatura anterior, até a fatura do mês ser lançada)` : ""}
-          <br><strong>Energia do mês: ${fmt.brl(invMonth.cost)}</strong>` : `<br>Nenhum consumo deste carregador cai nesta competência.`}
-        <br><small>Os campos de energia por competência deixam de ser usados para este carregador.</small>
-        <br><a class="btn" href="#/parametros/energia/${encodeURIComponent(ui.charger)}" style="margin-top:8px;display:inline-flex">Abrir Faturas de energia →</a></div>`;
-    // Custo fixo do carregador x conta em Pagamentos: mostra a ligação (ou a falta dela) para não lançar em dois lugares sem saber.
-    let schedHere = [];
-    try { schedHere = w.loadMatrizCosts().filter(c => c.scheduledPayment && c.enabled && (c.targets || []).some(t => String(t.workId || String(t.scope || "").split("::")[0]) === String(wid)) && (!c.endMonth || c.endMonth >= ui.month)); } catch (_) {}
-    const cashHint = r => {
-      if (r.basis !== "fixed" || !(Number(r.value) > 0)) return "";
-      const hit = schedHere.find(c => Math.abs(Number(c.amount) - Number(r.value)) < 0.01);
-      return hit ? `<small>no caixa: <a class="edit-link" href="#/parametros/programados/-/${encodeURIComponent(`pay:${hit.id}`)}/${ui.month}">${esc(hit.name)} · dia ${esc(hit.dueDay)}<span aria-hidden="true"> ✎</span></a></small>`
-        : `<small style="color:var(--uby-amber)">não está em Pagamentos (só entra no resultado) · <a href="#/parametros/pagamentos">lançar a conta</a></small>`;
-    };
-    const ruleRows = (kind, arr) => arr.map((r, i) => `<tr data-focus="rule:${esc(r.id || r.label)}" data-focus-alt="rule:${esc(r.label)}">
+    const ruleRows = (kind, arr, keep = () => true) => arr.map((r, i) => !keep(r) ? "" : `<tr data-focus="rule:${esc(r.id || r.label)}" data-focus-alt="rule:${esc(r.label)}">
         <td><input type="checkbox" data-rule="${kind}|${i}|enabled" ${r.enabled ? "checked" : ""}></td>
-        <td><input class="select" data-rule="${kind}|${i}|label" value="${esc(r.label)}" style="width:100%">${kind === "cost" ? cashHint(r) : ""}</td>
+        <td><input class="select" data-rule="${kind}|${i}|label" value="${esc(r.label)}" style="width:100%"></td>
         <td><select class="select" data-rule="${kind}|${i}|basis">${[["fixed", "Fixo mensal"], ["per_kwh", "Por kWh"], ["revenue_pct", "% do faturamento"], ["per_charge", "Por recarga"], ["one_off", "Avulso no mês"]].map(([v, l]) => `<option value="${v}" ${r.basis === v ? "selected" : ""}>${l}</option>`).join("")}</select></td>
         <td><input class="select" type="number" step="0.01" min="0" data-rule="${kind}|${i}|value" value="${esc(r.value)}" style="width:110px"></td>
         ${kind === "revenue" ? `<td><select class="select" data-rule="${kind}|${i}|scope"><option value="operational" ${r.scope !== "non_operational" ? "selected" : ""}>Operacional</option><option value="non_operational" ${r.scope === "non_operational" ? "selected" : ""}>Não operacional (marketing)</option></select></td>` : ""}
         <td><small>${esc(r.previous || "—")}</small></td>
         <td>${r.custom ? `<button class="btn ghost" data-rule-del="${kind}|${i}" type="button">✕</button>` : ""}</td></tr>`).join("");
-    return `
-      <div class="toolbar">
-        <select class="select" id="pmCharger" style="min-width:280px">${groups.map(([label, test]) => { const g = list.filter(test); return g.length ? `<optgroup label="${esc(label)}">${g.map(c => `<option value="${esc(c.key)}" ${c.key === ui.charger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</optgroup>` : ""; }).join("")}</select>
-        <select class="select" id="pmMonth">${data.months.slice().reverse().map(m => `<option value="${m}" ${m === ui.month ? "selected" : ""}>Competência ${esc(UBY.state.api?.monthName?.(m) || m)}</option>`).join("")}</select>
+    const visible = f.rows.filter(r => modelVisible(r, model, transfer) && r.controls.length && !CENTRAL_KEYS.includes(r.key));
+    const rowHtml = r => `
+        <section class="section" style="margin:0" data-focus="${esc(r.key)}"><div class="section-head" style="margin-bottom:8px"><div><p class="kicker">${esc(r.group)}</p><h2 style="font-size:14px">${esc(r.name)}</h2><p>${esc(r.rule)}</p></div>
+          <div class="meta">anterior<br><strong>${esc(r.previous || "—")}</strong></div></div>
+          <div class="grid ${r.controls.length > 2 ? "g3" : "g2"}" style="gap:8px">${r.controls.filter(c => !c.leaseOnly || energyMode === "copel_lease").map(c => control(c, r)).join("")}</div>
+          ${r.key === "energyCostPerKWh" ? `<p class="source-line">${esc(f.energySummary)}</p>` : ""}</section>`;
+    const toolbar = `
+      <div class="toolbar cc-bar">
+        <select class="select" id="pmCharger" style="min-width:280px" aria-label="Carregador">${groups.map(([label, test]) => { const g = list.filter(test); return g.length ? `<optgroup label="${esc(label)}">${g.map(c => `<option value="${esc(c.key)}" ${c.key === ui.charger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</optgroup>` : ""; }).join("")}</select>
+        <select class="select" id="pmMonth" aria-label="Competência">${data.months.slice().reverse().map(m => `<option value="${m}" ${m === ui.month ? "selected" : ""}>Competência ${esc(UBY.state.api?.monthName?.(m) || m)}</option>`).join("")}</select>
         <span class="spacer"></span>
-        <button class="btn" id="pmSimulate" type="button" ${dirty ? "" : "disabled"}>Simular resultado</button>
+        ${dirty ? `<span class="badge warn">contrato ou custos não salvos</span>` : ""}
+        <button class="btn" id="pmSimulate" type="button" ${dirty ? "" : "disabled"}>Simular</button>
         <button class="btn" id="pmDiscard" type="button" ${dirty ? "" : "disabled"}>Descartar</button>
         <button class="btn primary" id="pmSave" type="button" ${dirty && canWrite(w) && !busy ? "" : "disabled"}>Salvar competência</button>
-      </div>
-      ${dirty
-        ? `<div class="grid g5" style="margin-bottom:14px">${f.summary.map((m, i) => kpi(m.label, esc(m.value), esc(m.sub || ""), "", i === 2 ? "lead" : "")).join("")}${kpi("Base desta competência", esc(f.versionSource || "—"), esc(f.versionHelp || ""))}</div>
-           <div class="note" style="margin-bottom:12px">Simulação das alterações ainda não salvas (conta da tela original${hasInv ? ", sem as faturas de energia por leitura" : ""}). Depois de salvar, os cartões voltam a mostrar o resultado oficial.</div>`
-        : `<div class="grid g5" style="margin-bottom:14px">${officialCards}${kpi("Base desta competência", esc(f.versionSource || "—"), esc(f.versionHelp || ""))}</div>
-           ${off && !off.operating ? `<div class="note" style="margin-bottom:12px">Este carregador ainda não operava em ${esc(mName(ui.month))}${firstOp ? ` (primeira competência com recarga: ${esc(mName(firstOp))})` : ""}. Os parâmetros abaixo ficam guardados, mas esta competência não entra no resultado oficial, nos relatórios nem na distribuição.</div>` : ""}`}
-      <div class="grid g2" style="gap:14px">${f.rows.filter(r => modelVisible(r, model, transfer) && r.controls.length && !CENTRAL_KEYS.includes(r.key)).map(r => `
-        <section class="section" style="margin:0" data-focus="${esc(r.key)}"><div class="section-head" style="margin-bottom:8px"><div><p class="kicker">${esc(r.group)}</p><h2 style="font-size:14px">${esc(r.name)}</h2><p>${esc(r.key === "energyCostPerKWh" && hasInv ? "Custo de energia pelas faturas da Copel e do arrendamento, dividido pelo mês de consumo." : r.rule)}</p></div>
-          ${r.key === "energyCostPerKWh" && hasInv ? "" : `<div class="meta">anterior<br><strong>${esc(r.previous || "—")}</strong></div>`}</div>
-          ${r.key === "energyCostPerKWh" && hasInv ? energyInvoiceBox() : `<div class="grid ${r.controls.length > 2 ? "g3" : "g2"}" style="gap:8px">${r.controls.filter(c => !c.leaseOnly || energyMode === "copel_lease").map(c => control(c, r)).join("")}</div>
-          ${r.key === "energyCostPerKWh" ? `<p class="source-line">${esc(f.energySummary)}</p>` : ""}`}</section>`).join("")}</div>
-      ${["uby", "hybrid"].includes(model) ? `<div class="note" style="margin-top:14px">Reserva legal S.A., fundo de expansão e cotistas não são configurados por carregador: valem uma vez só sobre o resultado consolidado da rede, em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a>.</div>` : ""}
-      <section class="section" style="margin-top:14px"><div class="section-head"><div><p class="kicker">Regras do carregador</p><h2>Custos e receitas adicionais</h2><p>Valem nesta competência. "Avulso no mês" não é reaproveitado nos meses seguintes pelo motor novo.</p></div>
-          <div><button class="btn" data-rule-add="cost" type="button">＋ Custo</button> <button class="btn" data-rule-add="revenue" type="button">＋ Receita</button></div></div>
-        <h3 style="margin:4px 0 6px">Custos</h3>
-        <div class="table-wrap"><table><thead><tr><th>Usar</th><th>Item</th><th>Base</th><th>Valor</th><th>Anterior</th><th></th></tr></thead><tbody>${ruleRows("cost", rules.cost)}</tbody></table></div>
-        <h3 style="margin:12px 0 6px">Receitas</h3>
-        <div class="table-wrap"><table><thead><tr><th>Usar</th><th>Item</th><th>Base</th><th>Valor</th><th>Classificação</th><th>Anterior</th><th></th></tr></thead><tbody>${ruleRows("revenue", rules.revenue)}</tbody></table></div>
+      </div>`;
+    const cards = dirty
+      ? `<div class="grid g5" style="margin-bottom:10px">${f.summary.map((m, i) => kpi(m.label, esc(m.value), esc(m.sub || ""), "", i === 2 ? "lead" : "")).join("")}${kpi("Base desta competência", esc(f.versionSource || "—"), esc(f.versionHelp || ""))}</div>
+         <div class="note" style="margin-bottom:12px">Simulação das alterações ainda não salvas (conta da tela original${hasInv ? ", sem as faturas de energia por leitura" : ""}). Depois de salvar, os cartões voltam a mostrar o resultado oficial.</div>`
+      : `<div class="grid g5" style="margin-bottom:10px">${officialCards}${kpi("Base desta competência", esc(f.versionSource || "—"), esc(f.versionHelp || ""))}</div>
+         ${off && !off.operating ? `<div class="note" style="margin-bottom:12px">Este carregador ainda não operava em ${esc(mName(ui.month))}${firstOp ? ` (primeira competência com recarga: ${esc(mName(firstOp))})` : ""}. Os parâmetros abaixo ficam guardados, mas esta competência não entra no resultado oficial, nos relatórios nem na distribuição.</div>` : ""}`;
+    return {
+      toolbar, cards, rules, ruleRows, hasInv, model,
+      contract: `<div class="grid g2" style="gap:14px">${visible.filter(r => r.key !== "energyCostPerKWh").map(rowHtml).join("")}</div>
+        ${["uby", "hybrid"].includes(model) ? `<div class="note" style="margin-top:12px">Reserva legal S.A., fundo de expansão e cotistas não são configurados por carregador: valem uma vez só sobre o resultado consolidado da rede, em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a>.</div>` : ""}`,
+      energyRow: hasInv ? "" : visible.filter(r => r.key === "energyCostPerKWh").map(rowHtml).join("")
+    };
+  }
+
+  // ---------- centro de custos do carregador (uma página só) ----------
+  // Usuário (14/10/2026): "unifique principalmente a aba de lançamento de custos por carregador".
+  // Tudo do carregador numa tela: resultado, contrato e splits, energia, repasse à área, custos e
+  // contas, operação e documentos. Cada bloco grava com as mesmas funções de antes.
+  const normSt = v => String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^uby recharge\s*-\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const CC_SECTIONS = [["resultado", "Resultado"], ["contrato", "Contrato e splits"], ["energia", "Energia"], ["area", "Repasse à área"], ["custos", "Custos e contas"], ["operacao", "Operação"], ["docs", "Documentos"]];
+  const NC_CATS = ["Internet / dados", "Locação / aluguel", "Seguro", "Manutenção", "Licença / plataforma", "Energia", "Outros custos"];
+  // Tipo do custo pelo nome/categoria: liga a linha do resultado à conta mensal do mesmo item mesmo com valor diferente.
+  const COST_KINDS = [/internet|dados|chip|camera|câmera/i, /alug|loca|vaga/i, /segur/i, /manut/i, /limpez|conserva/i, /monitor|telemetr/i, /licen|software/i];
+  const costKindOf = txt => COST_KINDS.findIndex(re => re.test(String(txt || "")));
+  const BASES = [["fixed", "Fixo mensal"], ["per_kwh", "Por kWh"], ["revenue_pct", "% do faturamento"], ["per_charge", "Por recarga"], ["one_off", "Avulso no mês"]];
+  function selectCharger(key) {
+    if (key === ui.charger) return;
+    ui.charger = key; ui.edits = {}; ui.rules = null;
+    ui.enDraft = null; ui.enForm = null; ui.enRead = null; ui.enPendingFile = null; ui.enFiles = {};
+    ui.arForm = null; ui.arPay = ""; ui.arAdjust = ""; ui.opForm = null; ui.piRead = null; ui.piFile = null;
+    ui.payEditing = ""; ui.payForm = null; ui.nc = null; ui.docForm = null; ui.docCopel = null; ui.docFile = null;
+  }
+  // O carregador num alvo de custo da matriz / conta mensal (scope "obra::estação").
+  function targetHits(w, c, list) {
+    const sameWork = list.filter(x => x.workId === c.workId).length;
+    let mine = "";
+    try { mine = w.normalizeStationForCompare(w.canonicalStationNameForWork(c.workId, c.station, c.workName)); } catch (_) {}
+    return t => {
+      const [tw, ts] = String(t.scope || "").split("::");
+      if (String(t.workId || tw || "") !== c.workId) return false;
+      if (sameWork <= 1) return true;
+      return !ts || ts === mine || normSt(t.station) === normSt(c.station);
+    };
+  }
+  function payTargetFor(w, c) {
+    w.renderScheduledPayments(w.getGeneralUnitData());
+    const opts = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value);
+    const same = opts.filter(o => o.value.split("::")[0] === c.workId);
+    const hit = same.find(o => normSt(o.dataset.station) === normSt(c.station)) || (same.length === 1 ? same[0] : null);
+    return { value: hit?.value || "", options: opts.map(o => ({ value: o.value, text: o.text })) };
+  }
+  function matrixScopeFor(w, c, mk) {
+    const rows = w.matrizEligibleRows(w.getGeneralUnitData(), mk).filter(r => String(r.workId) === c.workId);
+    const r = rows.find(x => normSt(x.station || x.workName) === normSt(c.station)) || (rows.length === 1 ? rows[0] : null);
+    return r ? w.matrizScopeKey(r) : "";
+  }
+  // Custos do carregador numa lista: regra do resultado + conta mensal do mesmo item ficam na mesma linha.
+  function chargerCostItems(w, data, c, p) {
+    const mk = ui.month;
+    const hit = targetHits(w, c, data.chargers);
+    const all = w.loadMatrizCosts();
+    const sched = all.filter(i => i.scheduledPayment && i.enabled !== false && (i.targets || []).some(hit) && (w.scheduledPaymentApplies(i, mk) || (i.startMonth && i.startMonth > mk)));
+    const matrix = all.filter(i => !i.scheduledPayment && i.enabled && (i.targets || []).some(hit) && w.matrizApplies(i, mk));
+    const used = new Set();
+    // Primeiro as contas que valem no mês; as que começam depois só se nada do mês servir.
+    const cands = [...sched].sort((a, b) => Number(w.scheduledPaymentApplies(b, mk)) - Number(w.scheduledPaymentApplies(a, mk)));
+    const free = i => !used.has(i.id);
+    const rules = p.rules.cost.map((r, idx) => ({ r, idx, pair: null }));
+    const live = rules.filter(x => x.r.basis === "fixed" && Number(x.r.value) > 0 && x.r.enabled !== false);
+    const tries = [
+      (x, i) => Math.abs(Number(i.amount) - Number(x.r.value)) < 0.01,
+      (x, i) => normSt(i.name) && normSt(i.name) === normSt(x.r.label),
+      (x, i) => { const k = costKindOf(`${x.r.id} ${x.r.label}`); return k >= 0 && k === costKindOf(`${i.name} ${i.category}`); }
+    ];
+    tries.forEach(t => live.forEach(x => { if (x.pair) return; const hit = cands.find(i => free(i) && t(x, i)); if (hit) { x.pair = hit; used.add(hit.id); } }));
+    return { mk, rules, cashOnly: sched.filter(i => !used.has(i.id)), matrix, sched };
+  }
+  function payStatus(w, i, mk) {
+    try { if (!w.scheduledPaymentApplies(i, mk)) return `<span class="badge neutral">começa em ${esc(UBY.state.api?.monthName?.(i.startMonth) || i.startMonth)}</span>`; const st = w.scheduledPaymentStatus(i, mk); return `<span class="badge ${st.key === "paid" ? "ok" : st.key === "overdue" ? "bad" : st.key === "pending" ? "neutral" : "warn"}">${esc(st.label)}</span>`; } catch (_) { return ""; }
+  }
+  function costsSection(w, data, c, p) {
+    const it = chargerCostItems(w, data, c, p);
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const mName = m => UBY.state.api?.monthName?.(m) || m;
+    const payCell = i => `<a class="edit-link" href="#/parametros/contas" title="Ver em Contas a pagar">conta mensal · dia ${esc(i.dueDay)}</a> ${payStatus(w, i, it.mk)} <button class="btn ghost" data-pay-edit="${esc(i.id)}" type="button">Editar conta</button>`;
+    const ruleTr = ({ r, idx, pair }) => `<tr data-focus="rule:${esc(r.id || r.label)}" data-focus-alt="rule:${esc(r.label)}">
+        <td><input type="checkbox" data-rule="cost|${idx}|enabled" ${r.enabled ? "checked" : ""} title="Usar no resultado"></td>
+        <td><input class="select" data-rule="cost|${idx}|label" value="${esc(r.label)}" style="width:100%"><small>${esc(r.previous ? `anterior: ${r.previous}` : "")}</small></td>
+        <td><select class="select" data-rule="cost|${idx}|basis">${BASES.map(([v, l]) => `<option value="${v}" ${r.basis === v ? "selected" : ""}>${l}</option>`).join("")}</select></td>
+        <td class="num"><input class="select" type="number" step="0.01" min="0" data-rule="cost|${idx}|value" value="${esc(r.value)}" style="width:110px"></td>
+        <td><span class="badge ok">no resultado</span></td>
+        <td style="white-space:normal">${pair ? payCell(pair) + (Math.abs(Number(pair.amount) - Number(r.value)) >= 0.01 ? `<br><small style="color:var(--uby-amber)">conta ${fmt.brl(pair.amount)} × resultado ${fmt.brl(r.value)}</small> <button class="btn ghost" data-cc-sync="${idx}|${esc(pair.amount)}" type="button" ${can}>Usar ${fmt.brl(pair.amount)} no resultado</button>` : "") : r.basis === "fixed" && Number(r.value) > 0 ? `<small style="color:var(--uby-amber)">sem conta a pagar</small> <button class="btn ghost" data-cc-mkpay="${idx}" type="button" ${can}>Criar conta mensal</button>` : `<small>não gera conta (custo calculado)</small>`}</td>
+        <td>${r.custom ? `<button class="btn ghost" data-rule-del="cost|${idx}" type="button" title="Tirar do resultado">✕</button>` : ""}</td></tr>`;
+    const cashTr = i => `<tr data-focus-alt="pay:${esc(i.id)}">
+        <td></td><td><strong>${esc(i.name)}</strong><small>${esc([i.supplier, i.category].filter(Boolean).join(" · "))}</small></td>
+        <td>Conta mensal</td><td class="num">${fmt.brl(i.amount)}</td>
+        <td><span class="badge warn">fora do resultado</span> <button class="btn ghost" data-cc-toresult="${esc(i.id)}" type="button" ${can}>Incluir no resultado</button></td>
+        <td style="white-space:normal">${payCell(i)}</td><td></td></tr>`;
+    const matTr = i => { const n = (i.targets || []).length; const excl = n === 1; return `<tr>
+        <td></td><td><strong>${esc(i.name)}</strong><small>${esc([i.supplier, i.category].filter(Boolean).join(" · "))}</small></td>
+        <td>${excl ? "Exclusivo deste carregador" : `Rateado entre ${n || "todos os"} carregadores`}<small>${esc(w.matrizKindLabel(i.costKind))}${i.costKind === "installment" ? ` · ${i.installments} parcela(s) em ${w.matrizCoverageMonths(i)} mês(es)` : ""}</small></td>
+        <td class="num">${fmt.brl(w.matrizCompetencyAmount(i))}${excl ? "" : "<small>total; a parte deste carregador sai no rateio</small>"}</td>
+        <td><span class="badge ok">no resultado</span></td>
+        <td style="white-space:normal"><small>contas geradas pelo custo · dia ${esc(i.dueDay)}</small> <a class="btn ghost link-btn" href="#/parametros/matriz/-/${encodeURIComponent(`cost:${i.id}`)}/${esc(it.mk)}">Editar</a></td><td></td></tr>`; };
+    // Conta mensal em edição (aberta pela lista ou por um link de Contas a pagar).
+    const editing = ui.payEditing ? it.sched.find(i => i.id === ui.payEditing) || w.loadMatrizCosts().find(i => i.id === ui.payEditing && i.scheduledPayment) : null;
+    let editBox = "";
+    if (editing) {
+      const tgt = payTargetFor(w, c);
+      if (!ui.payForm) {
+        const t0 = (editing.targets || [])[0] || {};
+        const scope = tgt.options.some(t => t.value === t0.scope) ? t0.scope : (tgt.options.find(t => t.value.split("::")[0] === String(t0.workId || "")) || {}).value || tgt.value;
+        ui.payForm = { target: scope, name: editing.name, supplier: editing.supplier || "", category: editing.category || "Outros custos", amount: editing.amount, dueDay: editing.dueDay, startMonth: editing.startMonth || "", endMonth: editing.endMonth || "" };
+      }
+      const pf = ui.payForm;
+      const pinp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-pf="${k}" type="${type}" value="${esc(pf[k] ?? "")}" ${extra} style="width:100%">`);
+      const paired = it.rules.find(x => x.pair && x.pair.id === editing.id);
+      editBox = `<div class="note" data-focus="pay:${esc(editing.id)}" style="margin-top:12px;border-color:var(--uby-forest)"><strong>Editando a conta mensal: ${esc(editing.name)}</strong>
+        <div class="grid g4" style="gap:8px;margin-top:8px">${pinp("name", "Conta")}${pinp("supplier", "Fornecedor")}
+          ${field("Categoria", `<select class="select" data-pf="category">${NC_CATS.map(x => `<option ${pf.category === x ? "selected" : ""}>${x}</option>`).join("")}</select>`)}
+          ${pinp("amount", "Valor mensal (R$)", "number", 'min="0" step="0.01"')}${pinp("dueDay", "Dia do vencimento", "number", 'min="1" max="31"')}${pinp("startMonth", "Inicia em", "month")}${pinp("endMonth", "Termina em (opcional)", "month")}</div>
+        <small>Vale para todos os meses desta conta.${paired ? ` Se mudar o valor, a linha "${esc(paired.r.label)}" do resultado é atualizada junto (a partir de ${esc(mName(it.mk))}).` : ""}</small>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn primary" id="pmPayEditSave" type="button" ${can}>Salvar conta</button><button class="btn" id="pmPayEditCancel" type="button">Cancelar</button>
+          <button class="btn ghost" data-pay-end="${esc(editing.id)}" data-month="${esc(it.mk)}" type="button" style="color:var(--uby-red)" ${can}>Encerrar a partir de ${esc(mName(it.mk))}</button></div></div>`;
+    }
+    // ＋ Novo custo: um formulário só; a plataforma escolhe onde gravar.
+    const nc = ui.nc || (ui.nc = { kind: "monthly", name: "", supplier: "", category: "Internet / dados", amount: "", dueDay: 11, startMonth: it.mk, endMonth: "", basis: "fixed", costKind: "recurring", installments: 1, coverage: 12, payOnly: false });
+    const ninp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-nc="${k}" type="${type}" value="${esc(nc[k] ?? "")}" ${extra} style="width:100%">`);
+    const isUby = c.included && ["uby", "hybrid"].includes(c.model);
+    const KINDS = [["monthly", "Conta mensal — entra no resultado e vira conta a pagar (internet, aluguel do ponto…)"], ["result", "Só no resultado — por kWh, % do faturamento, por recarga ou avulso no mês"], ...(isUby ? [["matrix", "Boleto próprio ou parcelado — seguro, equipamento, manutenção grande"]] : [])];
+    const kindHelp = { monthly: "Cria a linha do resultado e a conta mensal com vencimento (Contas a pagar e conciliação), já ligadas.", result: "Entra só no resultado do carregador, sem gerar conta a pagar.", matrix: "Entra no resultado pelo período que cobre e gera cada parcela em Contas a pagar. Fica só neste carregador (não é rateado)." };
+    const form = nc.kind === "monthly" ? `${ninp("name", "Nome (ex.: Internet do ponto)")}${ninp("supplier", "Fornecedor")}
+        ${field("Categoria", `<select class="select" data-nc="category">${NC_CATS.map(x => `<option ${nc.category === x ? "selected" : ""}>${x}</option>`).join("")}</select>`)}
+        ${ninp("amount", "Valor mensal (R$)", "number", 'min="0" step="0.01"')}${ninp("dueDay", "Dia do vencimento", "number", 'min="1" max="31"')}${ninp("startMonth", "Começa em", "month")}${ninp("endMonth", "Termina em (opcional)", "month")}`
+      : nc.kind === "result" ? `${ninp("name", "Nome do custo")}
+        ${field("Como calcula", `<select class="select" data-nc="basis">${BASES.map(([v, l]) => `<option value="${v}" ${nc.basis === v ? "selected" : ""}>${l}</option>`).join("")}</select>`)}
+        ${ninp("amount", nc.basis === "revenue_pct" ? "Percentual (%)" : nc.basis === "per_kwh" ? "R$ por kWh" : nc.basis === "per_charge" ? "R$ por recarga" : "Valor (R$)", "number", 'min="0" step="0.0001"')}`
+      : `${ninp("name", "Nome do custo")}${ninp("supplier", "Fornecedor")}
+        ${field("Categoria", `<select class="select" data-nc="category">${["Seguro", "Manutencao preventiva", "Manutencao corretiva", "Locacao / aluguel", "Licenca / plataforma", "Outros custos"].map(x => `<option ${nc.category === x ? "selected" : ""}>${x}</option>`).join("")}</select>`)}
+        ${field("Tipo", `<select class="select" data-nc="costKind">${[["recurring", "Recorrente mensal"], ["installment", "Parcelado"], ["one_off", "Pontual"]].map(([v, l]) => `<option value="${v}" ${nc.costKind === v ? "selected" : ""}>${l}</option>`).join("")}</select>`)}
+        ${ninp("amount", nc.costKind === "installment" ? "Valor da parcela (R$)" : "Valor (R$)", "number", 'min="0" step="0.01"')}
+        ${nc.costKind === "installment" ? ninp("installments", "Parcelas (boletos)", "number", 'min="1" step="1"') + ninp("coverage", "Meses que o custo cobre", "number", 'min="1" step="1"') : ""}
+        ${ninp("startMonth", "Primeira competência", "month")}${ninp("endMonth", "Fim (opcional)", "month")}${ninp("dueDay", "Dia do vencimento", "number", 'min="1" max="31"')}
+        ${nc.costKind === "installment" ? `<div class="note" id="ccNcCalc" style="margin:0;grid-column:1/-1">${installmentCalc({ amount: nc.amount, installments: nc.installments, coverage: nc.coverage, startMonth: nc.startMonth })}</div>` : ""}`;
+    const hasVal = r => Number(r.value) > 0 || r.custom;
+    const shownRules = it.rules.filter(x => hasVal(x.r) || ui.ccShowZero);
+    const zeroCost = it.rules.length - it.rules.filter(x => hasVal(x.r)).length;
+    const zeroRev = p.rules.revenue.filter(r => !hasVal(r)).length;
+    const nTotal = shownRules.length + it.cashOnly.length + it.matrix.length;
+    const zeroBtn = n => n ? `<button class="btn ghost" data-cc-zero type="button">${ui.ccShowZero ? "Esconder" : "Mostrar"} ${n} ite${n > 1 ? "ns" : "m"} padrão sem valor</button>` : "";
+    return `
+      <div class="table-wrap"><table><thead><tr><th title="Usar no resultado">Usar</th><th>Custo</th><th>Como entra</th><th class="num">Valor</th><th>Resultado</th><th>Conta a pagar</th><th></th></tr></thead>
+        <tbody>${shownRules.map(ruleTr).join("")}${it.cashOnly.map(cashTr).join("")}${it.matrix.map(matTr).join("")}
+          ${nTotal ? "" : `<tr><td colspan="7" class="empty">Nenhum custo lançado neste carregador.</td></tr>`}</tbody></table></div>
+      ${zeroBtn(zeroCost)}
+      <p class="source-line">Energia e repasse à área têm blocos próprios acima. Custos divididos entre todos (aluguel da sede, contador…) ficam em <a href="#/parametros/matriz">Custos centrais</a>. Mudanças nas linhas do resultado valem a partir de ${esc(mName(it.mk))} e gravam em "Salvar competência".</p>
+      ${editBox}
+      <details class="section" style="margin-top:12px" id="ccNewBox" data-focus="nc" ${ui.ncOpen ? "open" : ""}><summary style="cursor:pointer;font-weight:850;color:var(--uby-forest)">＋ Novo custo deste carregador</summary>
+        ${field("Que tipo de custo é?", `<select class="select" data-nc="kind">${KINDS.map(([v, l]) => `<option value="${v}" ${nc.kind === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`)}
+        <p class="source-line" style="margin:6px 0 8px">${nc.payOnly ? "A linha do resultado já existe: aqui só cria a conta mensal ligada a ela." : esc(kindHelp[nc.kind] || "")}</p>
+        <div class="grid g4" style="gap:8px">${form}</div>
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="ccNewSave" type="button" ${can}>${nc.kind === "monthly" ? (nc.payOnly ? "Criar conta mensal" : "Lançar conta mensal") : "Lançar custo"}</button>${nc.payOnly ? `<button class="btn" id="ccNewReset" type="button">Cancelar</button>` : ""}</div>
+      </details>
+      <section class="section" style="margin-top:12px"><div class="section-head"><div><p class="kicker">Receitas extras</p><h2>Receitas além das recargas</h2><p>Ex.: marketing, mídia no ponto. Valem nesta competência.</p></div><button class="btn" data-rule-add="revenue" type="button">＋ Receita</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Usar</th><th>Item</th><th>Base</th><th>Valor</th><th>Classificação</th><th>Anterior</th><th></th></tr></thead><tbody>${p.ruleRows("revenue", p.rules.revenue, r => hasVal(r) || ui.ccShowZero) || `<tr><td colspan="7" class="empty">Nenhuma receita extra lançada.</td></tr>`}</tbody></table></div>
+        ${zeroBtn(zeroRev)}
       </section>`;
+  }
+  function chargerPage(w, data) {
+    const c = data.chargers.find(x => x.key === ui.charger);
+    if (!c || !data.form) return `<div class="note">Nenhum carregador encontrado.</div>`;
+    const p = chargerTab(w, data);
+    const api = UBY.state.api;
+    const head = (id, kicker, title, sub, extra = "") => `<div class="cc-head" id="cc-${id}" data-focus="sec:${id}"><div><p class="kicker">${kicker}</p><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ""}</div>${extra}</div>`;
+    let area = null;
+    try { area = c.included ? api.areaAccount(c.workId, c.station) : null; } catch (_) {}
+    const reimburse = !!area?.config?.reimburseEnergy;
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const energy = (p.energyRow ? `<div class="grid g2" style="gap:14px;margin-bottom:14px">${p.energyRow}</div>` : "")
+      + (reimburse ? `<div class="note" style="margin-bottom:12px">Este ponto usa a energia do local: o custo é o <strong>reembolso ao dono</strong> (kWh vendidos × tarifa do mês), pago junto do repasse à área. Quando tiver padrão próprio, desmarque o reembolso em Repasse à área e lance as faturas da Copel aqui.</div>${postoInvoiceBox(area, c.workId, c.station, can)}`
+        : energyTab(w, data, true));
+    return `${p.toolbar}
+      <nav class="cc-jump" aria-label="Ir para">${CC_SECTIONS.map(([id, l]) => `<button type="button" data-jump="cc-${id}">${l}</button>`).join("")}</nav>
+      ${head("resultado", "Resultado", `${esc(c.station)} · ${esc(UBY.state.api?.monthName?.(ui.month) || ui.month)}`, "", `<a class="btn ghost link-btn" href="#/financeiro/estacao/${encodeURIComponent(c.workId)}">DRE completo do carregador →</a>`)}
+      ${p.cards}
+      ${head("contrato", "Contrato", "Modelo, splits e investimento", "Gestão, plataforma, área, royalty e investimento desta competência. Grava em \"Salvar competência\".")}
+      ${p.contract}
+      ${head("energia", "Energia", reimburse ? "Reembolso de energia ao local" : "Faturas de energia", reimburse ? "" : "Copel + arrendamento, lidos do PDF da Copel ou lançados à mão.")}
+      ${energy}
+      ${head("area", "Área", "Repasse à área", "% do faturamento ao dono do local (e reembolso de energia, quando houver), com vencimento e baixa.")}
+      ${c.included ? areaTab(w, data, true) : `<div class="note">Carregador fora da operação UBY: sem repasse à área por aqui.</div>`}
+      ${head("custos", "Custos e contas", "Tudo que pesa neste carregador", "Uma linha por custo: se entra no resultado e se gera conta a pagar.", `<button class="btn primary" id="ccNewOpen" type="button">＋ Novo custo</button>`)}
+      ${costsSection(w, data, c, p)}
+      ${head("operacao", "Operação", "Horários, potência e cortesias", "Base da ocupação e do rateio por potência.")}
+      ${operationTab(w, true)}
+      ${head("docs", "Documentos", "NF, boletos, faturas e contratos", "Arquivos privados, só para quem está logado.")}
+      ${docsTab(w, data, c)}`;
+  }
+
+  // Grava as regras de custo/receita do carregador numa competência (mesma gravação do "Salvar competência").
+  async function saveChargerRules(w, c, month, mutate) {
+    await resyncMatrix(w);
+    const { months } = await openCharger(w, c.key, month);
+    const form = readForm(w);
+    const rules = { cost: form.cost.map(r => ({ ...r })), revenue: form.revenue.map(r => ({ ...r })) };
+    mutate(rules);
+    ui.edits = {}; ui.rules = rules;
+    applyToEngine(w);
+    w.scheduleFinancialSettingsSave();
+    await w.commitPendingFinancialSettingsSave();
+    ui.edits = {}; ui.rules = null;
+    checkPending(w);
+    return months.includes(month) ? month : "";
+  }
+  const newRule = (label, basis, value) => ({ id: `custom-cost-${Date.now()}`, label, enabled: true, basis, value: Number(value), scope: "operational", custom: true });
+  async function addScheduled(w, p, fallbackMonth) {
+    await resyncMatrix(w);
+    w.renderScheduledPayments(w.getGeneralUnitData());
+    const set = (id, v) => { const el = w.document.getElementById(id); if (el) el.value = v ?? ""; };
+    set("scheduledPaymentTarget", p.target); set("scheduledPaymentName", p.name); set("scheduledPaymentSupplier", p.supplier); set("scheduledPaymentCategory", p.category);
+    set("scheduledPaymentAmount", p.amount); set("scheduledPaymentDueDay", p.dueDay || 11); set("scheduledPaymentStartMonth", p.startMonth || fallbackMonth); set("scheduledPaymentEndMonth", p.endMonth);
+    w.addScheduledPayment();
+    return await awaitMatrixSave(w);
+  }
+  async function saveMatrixCost(w, f, mk, editingId) {
+    await resyncMatrix(w);
+    const monthSel = w.document.getElementById("financeMonthSelector");
+    if (monthSel && [...monthSel.options].some(o => o.value === mk)) monthSel.value = mk;
+    w.renderMatrizCosts(w.getGeneralUnitData());
+    if (editingId) w.editMatrizCost(editingId); else w.resetMatrizCostForm();
+    const set = (id, v) => { const el = w.document.getElementById(id); if (el) el.value = v ?? ""; };
+    set("matrizNewName", f.name); set("matrizNewValue", f.amount); set("matrizCostCategory", f.category); set("matrizCostSupplier", f.supplier);
+    set("matrizCostKind", f.kind); set("matrizCostInstallments", f.kind === "installment" ? f.installments || 1 : 1);
+    // Sem isto o parcelado ficava com cobertura 1: todas as parcelas caíam no resultado do primeiro mês.
+    // A tela original desta página não tem o campo; o motor lê pelo id, então ele é criado oculto.
+    if (!w.document.getElementById("matrizCostCoverageMonths")) {
+      const hidden = w.document.createElement("input");
+      hidden.type = "hidden"; hidden.id = "matrizCostCoverageMonths";
+      w.document.body.appendChild(hidden);
+    }
+    set("matrizCostCoverageMonths", f.kind === "installment" ? Math.max(1, Math.round(Number(f.coverage) || Number(f.installments) || 1)) : 1); set("matrizCostStartMonth", f.startMonth || new Date().toISOString().slice(0, 7)); set("matrizCostEndMonth", f.endMonth);
+    set("matrizCostDueDay", f.dueDay || 1); set("matrizCostMethod", f.method); set("matrizCostCustomShares", f.shares); set("matrizCostDocument", f.documentRef); set("matrizCostNotes", f.notes);
+    const tsel = w.document.getElementById("matrizCostTargets");
+    if (tsel) [...tsel.options].forEach(o => { o.selected = f.targets.includes(o.value); });
+    w.addMatrizCost();
+    return await awaitMatrixSave(w);
   }
 
   // ---------- checklist do fechamento ----------
@@ -771,7 +1005,7 @@
     if (/pendente/i.test(st)) throw new Error(`Não gravou na nuvem: ${st}`);
     return st;
   }
-  function operationTab(w) {
+  function operationTab(w, embedded = false) {
     const rows = w.getUbyChargerRows(w.getGeneralUnitData());
     const key = r => `${r.workId}|${r.station}`;
     const sel = rows.find(r => key(r) === ui.opCharger) || null;
@@ -784,6 +1018,12 @@
     const can = canWrite(w) && !busy ? "" : "disabled";
     const inp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-of="${k}" type="${type}" value="${esc(f[k] ?? "")}" ${extra} style="width:100%">`);
     const works = [...new Set(rows.map(r => String(r.workId)))];
+    if (embedded && !sel) return `<div class="note">Carregador não encontrado na lista de operação.</div>`;
+    const head = embedded ? `<div class="toolbar">
+        <label><input type="checkbox" data-op-toggle="${esc(`${sel.workId}|${sel.key}|${sel.station}`)}" ${sel.included ? "checked" : ""} ${can}> Na operação UBY (resultado, rateio da matriz e cotistas)</label>
+        <label>Potência do local <input class="select" type="number" min="1" max="360" step="0.1" data-op-power="${esc(`${sel.workId}|${sel.station}`)}" value="${esc(w.workPowerById(sel.workId))}" style="width:90px" ${can}> kW</label>
+        <span class="spacer"></span><small>${esc(sel.ruleSource || "")} · a potência vale para o local inteiro</small></div>` : "";
+    if (embedded) return head + cfgBlock();
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Operação UBY</p><h2>Carregadores, inclusão e potência do local</h2>
           <p>Marque quem entra na operação UBY (resultado, rateio da matriz e cotistas). A potência é do local inteiro (ex.: 2 × 7 kW = 14 kW) e vale para ocupação e rateio por potência.</p></div></div>
@@ -795,7 +1035,9 @@
             <td><button class="btn ghost" data-op-cfg="${esc(key(r))}" type="button">${ui.opCharger === key(r) ? "Editando ▾" : "Horários e cortesia"}</button></td></tr>`).join("")}</tbody></table></div>
         <p class="source-line">${works.length} local(is). A potência é salva por local: alterar num carregador altera todos do mesmo local.</p>
       </section>
-      ${sel ? `<section class="section"><div class="section-head"><div><p class="kicker">Configuração do carregador</p><h2>${esc(sel.station)}</h2><p>${esc(sel.workName)} · horários de funcionamento (base da ocupação), início da operação, conectores e cortesias.</p></div></div>
+      ${sel ? cfgBlock() : ""}`;
+    function cfgBlock() {
+      return `<section class="section"><div class="section-head"><div><p class="kicker">Configuração do carregador</p><h2>${esc(sel.station)}</h2><p>${esc(sel.workName)} · horários de funcionamento (base da ocupação), início da operação, conectores e cortesias.</p></div></div>
         <div class="grid g4" style="gap:8px">
           ${inp("plantName", "Nome de exibição")}${inp("operationStart", "Início da operação", "date")}
           ${inp("acChargers", "Carregadores AC", "number", 'min="0"')}${inp("acPlugs", "Conectores AC", "number", 'min="0"')}
@@ -820,21 +1062,46 @@
             <td>${r && r.open24h !== true ? `<input class="select" type="time" data-dh="${v}|closeTime" value="${esc(r.closeTime || "22:00")}">` : ""}</td></tr>`; }).join("")}
         </tbody></table></div>
         ${field("Usuários de cortesia (um por linha: e-mail, nome ou telefone)", `<textarea class="select" data-of="courtesyUsersText" rows="4" style="width:100%;height:auto;padding:8px">${esc(f.courtesyUsersText || "")}</textarea>`)}
-        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="pmOpSave" type="button" ${can}>Salvar configuração</button><button class="btn" id="pmOpCancel" type="button">Fechar</button></div>
-      </section>` : ""}`;
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="pmOpSave" type="button" ${can}>Salvar horários e cortesia</button>${embedded ? "" : `<button class="btn" id="pmOpCancel" type="button">Fechar</button>`}</div>
+      </section>`;
+    }
   }
 
   // ---------- documentos financeiros (NF, boletos, faturas) ----------
-  function docsTab(w, data) {
+  function docsTab(w, data, embedded = null) {
     const mk = ui.docMonth;
     const costs = w.loadMatrizCosts().filter(c => c.enabled !== false);
     const rows = w.getUbyChargerRows(w.getGeneralUnitData()).filter(r => r.included);
     const df = ui.docForm || (ui.docForm = { link: "", documentType: "boleto", supplier: "", category: "Outros custos", documentNumber: "", amount: "", dueDate: "", status: "pending", installmentNumber: "", installmentTotal: "", notes: "" });
     const can = canWrite(w) && !busy ? "" : "disabled";
     const inp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-df="${k}" type="${type}" value="${esc(df[k] ?? "")}" ${extra} style="width:100%">`);
-    const docs = data.docs || [];
+    if (embedded) { ui.docMonth = ui.month; if (ui.docForm.link !== `work|${embedded.workId}`) ui.docForm = { ...df, link: `work|${embedded.workId}` }; }
+    const docs = (embedded ? data.cdocs : data.docs) || [];
     const total = docs.reduce((s, d) => s + Number(d.amount || 0), 0);
     const paid = docs.filter(d => d.status === "paid").reduce((s, d) => s + Number(d.amount || 0), 0);
+    if (embedded) {
+      const d0 = ui.docForm;
+      const einp = (k, label, type = "text", extra = "") => field(label, `<input class="select" data-df="${k}" type="${type}" value="${esc(d0[k] ?? "")}" ${extra} style="width:100%">`);
+      return `${data.docsError ? `<div class="note">Não consegui ler os documentos: ${esc(data.docsError)}</div>` : ""}
+        <div class="table-wrap" style="max-height:360px"><table><thead><tr><th>Competência</th><th>Fornecedor</th><th>Vencimento</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead>
+          <tbody>${docs.map(d => `<tr><td>${esc(UBY.state.api?.monthName?.(d.competence_key) || d.competence_key || "—")}</td>
+            <td><strong>${esc(d.supplier || "Documento")}</strong><small>${esc([d.document_type, d.category, d.document_number, d.installment_number ? `parcela ${d.installment_number}${d.installment_total ? "/" + d.installment_total : ""}` : ""].filter(Boolean).join(" · "))}</small></td>
+            <td>${d.due_date ? fmt.date(d.due_date + "T12:00:00") : "—"}</td><td class="num">${fmt.brl(d.amount)}</td>
+            <td><span class="badge ${d.status === "paid" ? "ok" : d.status === "cancelled" ? "neutral" : "warn"}">${d.status === "paid" ? "Pago" : d.status === "cancelled" ? "Cancelado" : "Pendente"}</span></td>
+            <td style="white-space:nowrap">${d.storage_path ? `<button class="btn ghost" data-doc-open="${esc(d.id)}" type="button">Abrir</button>` : "<small>sem arquivo</small>"}<button class="btn ghost" data-doc-del="${esc(d.id)}" type="button" style="color:var(--uby-red)" ${can}>Excluir</button></td></tr>`).join("") || `<tr><td colspan="6" class="empty">Nenhum documento deste carregador.</td></tr>`}</tbody></table></div>
+        <details class="section" style="margin-top:12px" ${ui.docOpen || ui.docCopel ? "open" : ""} id="ccDocBox"><summary style="cursor:pointer;font-weight:850;color:var(--uby-forest)">＋ Anexar NF, boleto, fatura ou contrato deste carregador (competência ${esc(UBY.state.api?.monthName?.(ui.month) || ui.month)})</summary>
+          <div class="grid g4" style="gap:8px;margin-top:10px">
+            ${field("Tipo", `<select class="select" data-df="documentType">${[["boleto", "Boleto"], ["nota_fiscal", "Nota fiscal"], ["fatura", "Fatura"], ["recibo", "Recibo"], ["contrato", "Contrato"], ["outro", "Outro"]].map(([v, l]) => `<option value="${v}" ${d0.documentType === v ? "selected" : ""}>${l}</option>`).join("")}</select>`)}
+            ${einp("supplier", "Fornecedor")}${einp("category", "Categoria")}${einp("documentNumber", "Número do documento")}
+            ${einp("amount", "Valor (R$)", "number", 'min="0" step="0.01"')}${einp("dueDate", "Vencimento", "date")}
+            ${field("Situação", `<select class="select" data-df="status"><option value="pending" ${d0.status === "pending" ? "selected" : ""}>Pendente</option><option value="paid" ${d0.status === "paid" ? "selected" : ""}>Pago</option><option value="cancelled" ${d0.status === "cancelled" ? "selected" : ""}>Cancelado</option></select>`)}
+            ${einp("notes", "Observações")}
+          </div>
+          ${field("Arquivo (PDF, JPG, PNG ou WEBP até 15 MB · fica privado)", `<input class="select" id="pmDocFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" style="width:100%;padding-top:6px">`)}
+          ${ui.docCopel ? `<div class="note" style="margin-top:8px;border-color:var(--uby-green, #1f9d55)"><strong>É uma fatura da Copel</strong><br>${esc(ui.docCopel.summary)}<br><button class="btn primary" id="pmDocToEnergy" type="button" style="margin-top:8px">Lançar nas faturas de energia ↑</button> <small>ou salve aqui só como documento.</small></div>` : ""}
+          <button class="btn primary" id="pmDocSave" type="button" style="margin-top:12px" ${can}>Salvar documento</button>
+        </details>`;
+    }
     return `
       <div class="toolbar"><label>Competência <select class="select" id="pmDocMonth">${data.months.slice().reverse().map(m => `<option value="${m}" ${m === mk ? "selected" : ""}>${esc(UBY.state.api?.monthName?.(m) || m)}</option>`).join("")}</select></label>
         <span class="spacer"></span><small>${docs.length} documento(s) · ${fmt.brl(total)} · pagos ${fmt.brl(paid)}</small></div>
@@ -928,7 +1195,7 @@
     if (clash) out.push(`período sobreposto à fatura ${clash.ref || clash.start}`);
     return out;
   }
-  function energyTab(w, data) {
+  function energyTab(w, data, embedded = false) {
     const api = UBY.state.api;
     if (!api || typeof api.energyInvoices !== "function") return `<div class="note">O motor está recarregando. Abra esta aba de novo em alguns segundos.</div>`;
     const list = data.chargers.filter(c => c.included || c.model);
@@ -953,15 +1220,16 @@
     const groups = [["Operação UBY", c => c.included && ["uby", "hybrid"].includes(c.model)], ["Parceiros", c => c.included && c.model === "third_party_management"], ["Só gestão P3", c => c.included && ["management_only", "p3_society"].includes(c.model)], ["Fora da operação UBY", c => !c.included]];
     return `
       <div class="toolbar">
-        <select class="select" id="pmEnCharger" style="min-width:280px">${groups.map(([label, test]) => { const g = list.filter(test); return g.length ? `<optgroup label="${esc(label)}">${g.map(c => `<option value="${esc(c.key)}" ${c.key === ui.enCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</optgroup>` : ""; }).join("")}</select>
+        ${embedded ? `<strong style="font-size:12.5px">Faturas de energia deste carregador</strong>` : `<select class="select" id="pmEnCharger" style="min-width:280px">${groups.map(([label, test]) => { const g = list.filter(test); return g.length ? `<optgroup label="${esc(label)}">${g.map(c => `<option value="${esc(c.key)}" ${c.key === ui.enCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</optgroup>` : ""; }).join("")}</select>`}
         <span class="spacer"></span>
         ${dirty ? `<button class="btn" id="pmEnDiscard" type="button">Descartar</button>` : ""}
         <button class="btn primary" id="pmEnSave" type="button" ${dirty ? can : "disabled"}>Salvar faturas</button>
       </div>
       ${info.fullHistory ? "" : `<div class="note" style="margin-bottom:12px">O histórico completo ainda está carregando: a divisão abaixo pode mudar. Aguarde alguns segundos e troque de aba.</div>`}
       ${dirty ? `<div class="note" style="margin-bottom:12px;border-color:var(--uby-amber)">Alterações ainda não salvas. A divisão por mês abaixo já mostra como vai ficar.</div>` : ""}
-      <section class="section"><div class="section-head"><div><p class="kicker">Como funciona</p><h2>Cada fatura no mês dela</h2>
-          <p>Lance cada fatura com o mês dela e as datas da leitura anterior e da atual (o dia da leitura atual já pertence à próxima fatura). O custo — Copel + arrendamento — entra <strong>inteiro no mês da fatura</strong> (ex.: fatura Ago/2026 = custo de agosto) e o pagamento aparece no mês do vencimento (normalmente o seguinte). Mês com recargas e sem fatura lançada entra como <strong>estimativa</strong>: kWh entregues no mês × custo médio por kWh da fatura do mês anterior, separado em Copel e arrendamento, até a fatura do mês ser lançada. O vencimento aparece em Pagamentos no mês em que vence. Com faturas lançadas, os campos de energia por competência deste carregador deixam de ser usados pelo motor.</p></div></div>
+      ${embedded ? `<details class="note" style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:760">Como a energia entra no resultado</summary><p style="margin:8px 0 0">Lance cada fatura com o mês dela e as datas das leituras. O custo — Copel + arrendamento — entra <strong>inteiro no mês da fatura</strong> e o pagamento aparece em Contas a pagar no mês do vencimento. Mês com recargas e sem fatura entra como <strong>estimativa</strong> (kWh entregues × custo médio por kWh da fatura anterior, separado em Copel e arrendamento) até a fatura ser lançada.</p></details>` : ""}
+      <section class="section"><div class="section-head"><div><p class="kicker">${embedded ? "Faturas lançadas" : "Como funciona"}</p><h2>${embedded ? "Copel e arrendamento" : "Cada fatura no mês dela"}</h2>
+          ${embedded ? "" : `<p>Lance cada fatura com o mês dela e as datas da leitura anterior e da atual (o dia da leitura atual já pertence à próxima fatura). O custo — Copel + arrendamento — entra <strong>inteiro no mês da fatura</strong> (ex.: fatura Ago/2026 = custo de agosto) e o pagamento aparece no mês do vencimento (normalmente o seguinte). Mês com recargas e sem fatura lançada entra como <strong>estimativa</strong>: kWh entregues no mês × custo médio por kWh da fatura do mês anterior, separado em Copel e arrendamento, até a fatura do mês ser lançada. O vencimento aparece em Pagamentos no mês em que vence. Com faturas lançadas, os campos de energia por competência deste carregador deixam de ser usados pelo motor.</p>`}</div></div>
         <div class="table-wrap"><table><thead><tr><th>Fatura</th><th>Período de leitura</th><th class="num">kWh medidor</th><th class="num">kWh entregue</th><th class="num">Copel</th><th class="num">Arrendamento</th><th class="num">Total</th><th class="num">R$/kWh entregue</th><th>Vencimento</th><th></th></tr></thead>
           <tbody>${draft.slice().sort((a, b) => String(b.start).localeCompare(String(a.start))).map(i => { const c = byId.get(i.id) || {}; const lease = leaseOf(i); return `<tr>
             <td><strong>${esc(i.ref ? (api.monthName?.(i.ref) || i.ref) : "—")}</strong>${i.notes ? `<small>${esc(i.notes)}</small>` : ""}</td>
@@ -1068,7 +1336,7 @@
     </section>`;
   }
 
-  function areaTab(w, data) {
+  function areaTab(w, data, embedded = false) {
     const api = UBY.state.api;
     if (!api || typeof api.areaAccount !== "function") return `<div class="note">O motor está recarregando. Abra esta aba de novo em alguns segundos.</div>`;
     const list = data.chargers.filter(c => c.included);
@@ -1082,11 +1350,11 @@
     const dirty = f.reimburseEnergy !== a.config.reimburseEnergy || f.payee !== a.config.payee || (f.payeeEmail || "") !== (a.config.payeeEmail || "") || Number(f.dueDay) !== Number(a.config.dueDay) || !a.config.configured;
     const st = s => `<span class="badge ${s === "pago" ? "ok" : s === "vencido" ? "bad" : s === "sem repasse" ? "neutral" : "warn"}">${esc(s)}</span>`;
     return `
-      <div class="toolbar"><select class="select" id="pmArCharger" style="min-width:280px">${list.map(c => `<option value="${esc(c.key)}" ${c.key === ui.arCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</select>
+      <div class="toolbar">${embedded ? `<strong style="font-size:12.5px">Repasse ao dono do local</strong>` : `<select class="select" id="pmArCharger" style="min-width:280px">${list.map(c => `<option value="${esc(c.key)}" ${c.key === ui.arCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</select>`}
         <span class="spacer"></span><button class="btn" id="pmArReport" type="button">Prestação de contas (relatório)</button></div>
       <div class="split" style="margin-bottom:14px">
         <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Regra do repasse</p><h2>${esc(a.station)}</h2>
-            <p>Todo mês o dono do local recebe a participação da área sobre o faturamento bruto${f.reimburseEnergy ? " e o reembolso da energia: kWh vendidos × tarifa do mês" : ""}. O percentual e a tarifa de cada competência ficam em "Por carregador".</p></div></div>
+            <p>Todo mês o dono do local recebe a participação da área sobre o faturamento bruto${f.reimburseEnergy ? " e o reembolso da energia: kWh vendidos × tarifa do mês" : ""}. O percentual de cada competência fica em ${embedded ? "Contrato e splits" : "\"Por carregador\""} e a tarifa em Energia.</p></div></div>
           <div class="grid g2" style="gap:8px">
             ${field("Quem recebe", `<input class="select" data-ar="payee" value="${esc(f.payee || "")}" style="width:100%">`)}
             ${field("Dia do vencimento (mês seguinte)", `<input class="select" type="number" min="1" max="28" data-ar="dueDay" value="${esc(f.dueDay)}" style="width:100%">`)}
@@ -1101,8 +1369,8 @@
             ${kpi("Energia reembolsada", fmt.brl(a.totals.reimbursement), a.config.reimburseEnergy ? "kWh vendidos × tarifa" : "não reembolsa")}${kpi("Participação da área", fmt.brl(a.totals.area), "sobre o faturamento bruto")}</div>
         </section>
       </div>
-      ${a.config.reimburseEnergy ? postoInvoiceBox(a, workId, station, can) : ""}
-      <section class="section"><div class="section-head"><div><p class="kicker">Por competência</p><h2>Repasses ao local</h2><p>${a.config.configured ? `Vence no dia ${a.config.dueDay} do mês seguinte e aparece em Pagamentos.` : "Ative o repasse acima para ele aparecer em Pagamentos."}</p></div></div>
+      ${a.config.reimburseEnergy && !embedded ? postoInvoiceBox(a, workId, station, can) : ""}
+      <section class="section"><div class="section-head"><div><p class="kicker">Por competência</p><h2>Repasses ao local</h2><p>${a.config.configured ? `Vence no dia ${a.config.dueDay} do mês seguinte e aparece em Contas a pagar.` : "Ative o repasse acima para ele aparecer em Contas a pagar."}</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Faturamento</th><th class="num">kWh vendidos</th><th class="num">Tarifa</th><th class="num">Reembolso energia</th><th class="num">% área</th><th class="num">Participação</th><th class="num">Total ao local</th><th>Vencimento</th><th>Situação</th><th></th></tr></thead>
           <tbody>${a.months.slice().reverse().map(m => `<tr><td><strong>${esc(m.label)}</strong><small>${fmt.date(m.periodStart)} a ${fmt.date(m.periodEnd)}</small></td>
             <td class="num">${fmt.brl(m.revenue)}</td><td class="num">${fmt.kwh(m.energy)}</td><td class="num">${m.reimbursement ? `${fmt.brl(m.rate)}/kWh` : "—"}</td><td class="num">${m.reimbursement ? fmt.brl(m.reimbursement) : "—"}</td>
@@ -1296,26 +1564,27 @@
   }
 
   // ---------- render ----------
-  // 5 grupos (usuário: "muitas abas… tudo que for de energia em uma só, outros custos em outra");
-  // as subabas continuam com os ids antigos para os links diretos (#/parametros/<id>/…).
+  // As abas ficam no topo do painel (shell.js · NAV); aqui só os ids. Energia, repasse à área,
+  // operação e contas mensais viraram blocos da página do carregador: os links antigos
+  // (#/parametros/energia/<carregador>/inv:<id>…) abrem o bloco certo dela.
   const GROUPS = [
     ["Contas a pagar", [["contas", "Contas a pagar"], ["pagamentos", "Conciliação e extrato"]]],
-    ["Fechamento do mês", [["checklist", "O que falta no mês"]]],
-    ["Energia", [["energia", "Faturas de energia"], ["area", "Repasse à área"]]],
-    ["Outros custos", [["matriz", "Custos da matriz"], ["programados", "Pagamentos programados"], ["documentos", "Documentos"]]],
-    ["Carregadores", [["carregador", "Por carregador"], ["operacao", "Operação e carregadores"]]],
-    ["Cotas e fechamentos", [["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]]]
+    ["Parâmetros e custos", [["carregador", "Por carregador"], ["matriz", "Custos centrais"], ["documentos", "Documentos"], ["checklist", "O que falta no mês"], ["cotas", "Cotas, impostos e rodadas"], ["fechamentos", "Fechamentos"]]]
   ];
-  const TAB_IDS = GROUPS.flatMap(g => g[1].map(t => t[0]));
-  const groupOf = id => GROUPS.find(g => g[1].some(t => t[0] === id)) || GROUPS[0];
+  const LEGACY = { energia: "energia", area: "area", operacao: "operacao", programados: "custos" };
+  const TAB_IDS = [...GROUPS.flatMap(g => g[1].map(t => t[0])), "programados"];
   async function render(target, params = []) {
+    if (!params[0]) { location.replace(`#/parametros/${TAB_IDS.includes(ui.tab) && ui.tab !== "programados" ? ui.tab : "carregador"}`); return; }
+    if (LEGACY[params[0]]) {
+      const ref = params[1] && params[1] !== "-" ? decodeURIComponent(params[1]) : "-";
+      const month = /^\d{4}-\d{2}$/.test(params[3] || "") ? `/${params[3]}` : "";
+      location.replace(`#/parametros/carregador/${encodeURIComponent(ref)}/${encodeURIComponent(params[2] || `sec:${LEGACY[params[0]]}`)}${month}`);
+      return;
+    }
     if (TAB_IDS.includes(params[0])) {
       ui.tab = params[0];
-      const ref = params[1] ? decodeURIComponent(params[1]) : "";
-      if (ref && ui.tab === "carregador" && ref !== ui.charger) { ui.charger = ref; ui.edits = {}; ui.rules = null; }
-      if (ref && ui.tab === "operacao") { ui.opCharger = ref; ui.opForm = null; }
-      if (ref && ui.tab === "energia" && ref !== ui.enCharger) { ui.enCharger = ref; ui.enDraft = null; ui.enForm = null; }
-      if (ref && ui.tab === "area" && ref !== ui.arCharger) { ui.arCharger = ref; ui.arForm = null; }
+      const ref = params[1] && params[1] !== "-" ? decodeURIComponent(params[1]) : "";
+      if (ref && ui.tab === "carregador") selectCharger(ref);
       // Links dos custos (#/parametros/<aba>/<carregador>/<campo>/<competência>): abre no mês e destaca o campo.
       const month = /^\d{4}-\d{2}$/.test(params[3] || "") ? params[3] : "";
       if (month && ui.tab === "carregador" && month !== ui.month) { ui.month = month; ui.edits = {}; ui.rules = null; }
@@ -1323,12 +1592,10 @@
       ui.focus = params[2] || "";
       const costId = ui.tab === "matriz" && ui.focus.startsWith("cost:") ? ui.focus.slice(5) : "";
       if (costId) { ui.editingCost = costId; ui.costForm = null; }
-      if (ui.tab === "energia" && ui.focus.startsWith("inv:")) { ui.enEditId = ui.focus.slice(4); ui.enDraft = null; }
+      if (ui.tab === "carregador" && ui.focus.startsWith("inv:")) { ui.enEditId = ui.focus.slice(4); ui.enDraft = null; }
+      // Conta mensal: o carregador sai do próprio pagamento (achado quando o motor abrir).
+      if (ui.tab === "carregador" && ui.focus.startsWith("pay:")) { ui.payEditing = ui.focus.slice(4); ui.payForm = null; ui.payLookup = ref ? "" : ui.payEditing; }
       if (month && (ui.tab === "pagamentos" || ui.tab === "checklist")) { if (ui.tab === "pagamentos") ui.payMonth = month; else ui.ckMonth = month; }
-      if (ui.tab === "programados") {
-        if (month) ui.payMonth = month;
-        if (ui.focus.startsWith("pay:")) { ui.payEditing = ui.focus.slice(4); ui.payForm = null; }
-      }
     }
     target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Abrindo parâmetros e custos</h2><p>Carregando a plataforma original com a base completa. Na primeira vez leva alguns segundos.</p></div>`;
     let w;
@@ -1353,6 +1620,17 @@
     // aqui o carregador tem o nome da obra ("POSTO CENTRAL JK"). Acha o mesmo carregador pela obra.
     ["charger", "enCharger", "arCharger", "opCharger"].forEach(k => { ui[k] = resolveKey(data.chargers, ui[k]); });
     const writable = canWrite(w);
+    // Link de uma conta mensal sem carregador no endereço: abre no carregador dela; conta central (sem carregador) abre na lista antiga.
+    if (ui.payLookup) {
+      const it = w.loadMatrizCosts().find(i => i.id === ui.payLookup);
+      ui.payLookup = "";
+      const t0 = (it?.targets || [])[0];
+      const wid = String(t0?.workId || String(t0?.scope || "").split("::")[0] || "");
+      const cand = data.chargers.filter(x => x.workId === wid);
+      const hit = cand.find(x => normSt(x.station) === normSt(t0?.station)) || cand[0];
+      if (hit) { const pe = ui.payEditing; selectCharger(hit.key); ui.payEditing = pe; ui.payForm = null; }
+      else if (it) { ui.tab = "programados"; ui.payMonth = ui.month || ui.payMonth; }
+    }
     if (ui.tab === "carregador") {
       // Resultado oficial por competência precisa do histórico completo no motor principal.
       for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
@@ -1363,6 +1641,10 @@
         data.months = opened.months; ui.month = opened.mk;
         if (Object.keys(ui.edits).length || ui.rules) applyToEngine(w);
         data.form = readForm(w);
+        ui.enCharger = ui.arCharger = ui.opCharger = ui.charger;
+        ui.payMonth = ui.month;
+        try { data.cdocs = await w.UBY_SUPABASE.loadFinanceDocuments({ scope: "charger", workId: ui.charger.split("|")[0], limit: 100 }); data.docsError = ""; }
+        catch (err) { data.cdocs = []; data.docsError = err.message; }
       }
     } else {
       data.months = (UBY.state.months && UBY.state.months.length ? UBY.state.months : (w.getMonths?.() || [])).slice();
@@ -1389,15 +1671,17 @@
     }
     if (seq !== drawSeq) return;
     const c = data.chargers.find(x => x.key === ui.charger);
+    const hero = {
+      contas: ["Financeiro", "Contas a pagar", "Tudo o que a UBY tem a pagar, de todas as origens, numa lista só: vencidas, a vencer, pagas, por categoria, centro de custo e fornecedor."],
+      pagamentos: ["Financeiro", "Conciliação bancária", "Anexe o extrato do banco: a plataforma sugere a conta de cada saída, você confirma, e a conta fica paga na data e no valor do banco."],
+      carregador: ["Parâmetros e custos", "Centro de custos do carregador", "Tudo de um carregador numa página: resultado, contrato e splits, energia, repasse à área, custos e contas, operação e documentos."],
+      matriz: ["Parâmetros e custos", "Custos centrais", "Custos divididos entre os carregadores UBY (aluguel da sede, contador, seguros gerais…), com o rateio gravado por competência."],
+      programados: ["Parâmetros e custos", "Contas mensais", "Contas mensais da rede, por competência."]
+    }[ui.tab] || ["Parâmetros e custos", "Parâmetros e custos", "Documentos, fechamento do mês, cotas, impostos e rodadas. As contas e a gravação são as mesmas da plataforma original."];
     target.innerHTML = `
-      ${ui.tab === "contas" || ui.tab === "pagamentos" ? `<div class="hero"><div><p class="eyebrow">Financeiro</p><h1>${ui.tab === "contas" ? "Contas a pagar" : "Conciliação bancária"}</h1>
-        <p class="lead">${ui.tab === "contas" ? "Tudo o que a UBY tem a pagar, de todas as origens, numa lista só: vencidas, a vencer, pagas, por categoria, centro de custo e fornecedor." : "Anexe o extrato do banco: a plataforma sugere a conta de cada saída, você confirma, e a conta fica paga na data e no valor do banco."}</p></div>`
-      : `<div class="hero"><div><p class="eyebrow">Gestão e governança · edição</p><h1>Parâmetros e custos</h1>
-        <p class="lead">Modelo, splits, energia, capital, metas e regras de cada carregador por competência; custos centrais da matriz; calendário de pagamentos; rodadas e cotistas. As contas e a gravação são as mesmas da plataforma original.</p></div>`}
+      <div class="hero"><div><p class="eyebrow">${esc(hero[0])}</p><h1>${esc(hero[1])}</h1><p class="lead">${esc(hero[2])}</p></div>
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
-      <div class="seg" id="pmTabs" style="margin-bottom:${groupOf(ui.tab)[1].length > 1 ? 8 : 14}px">${GROUPS.map(g => `<button type="button" data-v="${g[1][0][0]}" data-group="${esc(g[0])}" class="${groupOf(ui.tab) === g ? "on" : ""}">${esc(g[0])}</button>`).join("")}</div>
-      ${groupOf(ui.tab)[1].length > 1 ? `<div class="seg" id="pmSubTabs" style="margin-bottom:14px;font-size:12px">${groupOf(ui.tab)[1].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${esc(l)}</button>`).join("")}</div>` : ""}
-      ${ui.tab === "carregador" ? (data.form ? chargerTab(w, data) : `<div class="note">Nenhum carregador encontrado.</div>`) : ui.tab === "energia" ? energyTab(w, data) : ui.tab === "area" ? areaTab(w, data) : ui.tab === "operacao" ? operationTab(w) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "contas" ? contasTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : ui.tab === "checklist" ? checklistTab() : quotasTab(w)}
+      ${ui.tab === "carregador" ? chargerPage(w, data) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "contas" ? contasTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamentos" ? closingsTab(w) : ui.tab === "checklist" ? checklistTab() : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
@@ -1434,8 +1718,6 @@
   function bind(target, w, data) {
     const $ = s => target.querySelector(s);
     const dirty = () => Object.keys(ui.edits).length || ui.rules;
-    target.querySelectorAll("#pmTabs button").forEach(b => b.onclick = () => { const g = GROUPS.find(x => x[0] === b.dataset.group); ui.tab = g && g[1].some(t => t[0] === ui.lastSub?.[g[0]]) ? ui.lastSub[g[0]] : b.dataset.v; draw(target, w); });
-    target.querySelectorAll("#pmSubTabs button").forEach(b => b.onclick = () => { ui.tab = b.dataset.v; ui.lastSub = { ...(ui.lastSub || {}), [groupOf(ui.tab)[0]]: ui.tab }; draw(target, w); });
     // --- pagamentos (central) + extrato ---
     const cBill = key => (data.bills || []).find(b => b.key === key);
     // Contas a pagar: visão rápida, filtros, seleção e baixa em lote.
@@ -1674,6 +1956,11 @@
     target.querySelectorAll("[data-ar-rep]").forEach(b => b.onclick = () => arReport(b.dataset.arRep));
     // --- faturas de energia ---
     if ($("#pmEnCharger")) $("#pmEnCharger").onchange = e => { if (ui.enDraft && !confirm("Descartar as faturas não salvas?")) { e.target.value = ui.enCharger; return; } ui.enCharger = e.target.value; ui.enDraft = null; ui.enForm = null; ui.enRead = null; ui.enPendingFile = null; ui.enFiles = {}; draw(target, w); };
+    const followEnCharger = () => {
+      if (ui.tab !== "carregador" || !ui.enCharger || ui.enCharger === ui.charger) return;
+      const keep = { enForm: ui.enForm, enRead: ui.enRead, enPendingFile: ui.enPendingFile }, k = ui.enCharger;
+      selectCharger(k); Object.assign(ui, keep); ui.enCharger = k;
+    };
     const enStored = () => { const [wid, st] = ui.enCharger.split("|"); return UBY.state.api.energyInvoices(wid, st)?.stored || []; };
     target.querySelectorAll("[data-ef]").forEach(el => el.onchange = () => { ui.enForm[el.dataset.ef] = el.value; draw(target, w); });
     target.querySelectorAll("[data-en-edit]").forEach(b => b.onclick = () => { const it = (ui.enDraft || enStored()).find(i => i.id === b.dataset.enEdit); if (it) { ui.enForm = { ...it }; draw(target, w); } });
@@ -1689,6 +1976,7 @@
       const res = await window.UBY_COPEL.read(file);
       if (!res.ok) { ui.enRead = { ok: false, file: file.name, error: res.error }; draw(target, w); return; }
       applyCopelRead(res, file, data.chargers);
+      followEnCharger();
       draw(target, w);
     };
     if ($("#pmEnNew")) $("#pmEnNew").onclick = () => { ui.enForm = null; ui.enRead = null; ui.enPendingFile = null; draw(target, w); };
@@ -1727,7 +2015,70 @@
       });
     };
     // --- por carregador ---
-    if ($("#pmCharger")) $("#pmCharger").onchange = e => { if (dirty() && !confirm("Descartar as alterações não salvas?")) { e.target.value = ui.charger; return; } ui.charger = e.target.value; ui.edits = {}; ui.rules = null; draw(target, w); };
+    if ($("#pmCharger")) $("#pmCharger").onchange = e => { if ((dirty() || ui.enDraft) && !confirm("Descartar as alterações não salvas?")) { e.target.value = ui.charger; return; } selectCharger(e.target.value); draw(target, w); };
+    target.querySelectorAll("[data-jump]").forEach(b => b.onclick = () => target.querySelector(`#${b.dataset.jump}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    const ccCharger = () => data.chargers.find(x => x.key === ui.charger);
+    if ($("#ccNewOpen")) $("#ccNewOpen").onclick = () => { ui.ncOpen = true; ui.focus = "nc"; draw(target, w); };
+    if ($("#ccNewBox")) $("#ccNewBox").addEventListener("toggle", e => { ui.ncOpen = e.target.open; });
+    if ($("#ccDocBox")) $("#ccDocBox").addEventListener("toggle", e => { ui.docOpen = e.target.open; });
+    target.querySelectorAll("[data-nc]").forEach(el => {
+      el.onchange = () => { ui.nc[el.dataset.nc] = el.value; if (["kind", "costKind", "basis"].includes(el.dataset.nc)) { if (el.dataset.nc === "kind") ui.nc.payOnly = false; draw(target, w); } };
+      el.oninput = () => { ui.nc[el.dataset.nc] = el.value; const calc = $("#ccNcCalc"); if (calc) calc.innerHTML = installmentCalc({ amount: ui.nc.amount, installments: ui.nc.installments, coverage: ui.nc.coverage, startMonth: ui.nc.startMonth }); };
+    });
+    target.querySelectorAll("[data-cc-sync]").forEach(b => b.onclick = () => {
+      const c = ccCharger(); const [idx, amount] = b.dataset.ccSync.split("|"); const r = data.form.cost[Number(idx)]; if (!c || !r) return;
+      if (dirty()) { alert("Salve ou descarte antes as alterações do contrato e dos custos."); return; }
+      if (!confirm(`Usar ${fmt.brl(Number(amount))} em "${r.label}" no resultado de ${c.station}, a partir de ${UBY.state.api?.monthName?.(ui.month) || ui.month}?`)) return;
+      run(target, w, `${r.label} · ${c.station}`, async () => { await saveChargerRules(w, c, ui.month, x => { x.cost[Number(idx)].value = Number(amount); }); return `${fmt.brl(Number(amount))}/mês a partir de ${ui.month}`; });
+    });
+    target.querySelectorAll("[data-cc-zero]").forEach(b => b.onclick = () => { ui.ccShowZero = !ui.ccShowZero; draw(target, w); });
+    if ($("#ccNewReset")) $("#ccNewReset").onclick = () => { ui.nc = null; ui.ncOpen = false; draw(target, w); };
+    target.querySelectorAll("[data-cc-mkpay]").forEach(b => b.onclick = () => {
+      const r = (ui.rules || data.form).cost[Number(b.dataset.ccMkpay)]; if (!r) return;
+      ui.nc = { kind: "monthly", payOnly: true, name: r.label, supplier: "", category: /internet|dados|chip/i.test(r.label) ? "Internet / dados" : /alug|loca/i.test(r.label) ? "Locação / aluguel" : /segur/i.test(r.label) ? "Seguro" : /manut/i.test(r.label) ? "Manutenção" : "Outros custos", amount: r.value, dueDay: 11, startMonth: ui.month, endMonth: "", basis: "fixed", costKind: "recurring", installments: 1, coverage: 12 };
+      ui.ncOpen = true; ui.focus = "nc"; draw(target, w);
+    });
+    target.querySelectorAll("[data-cc-toresult]").forEach(b => b.onclick = () => {
+      const c = ccCharger(); const i = w.loadMatrizCosts().find(x => x.id === b.dataset.ccToresult); if (!c || !i) return;
+      if (dirty()) { alert("Salve ou descarte antes as alterações do contrato e dos custos."); return; }
+      if (!confirm(`Incluir "${i.name}" (${fmt.brl(i.amount)} por mês) no resultado de ${c.station} a partir de ${UBY.state.api?.monthName?.(ui.month) || ui.month}?`)) return;
+      const k = costKindOf(`${i.name} ${i.category}`);
+      run(target, w, `${i.name} no resultado · ${c.station}`, async () => {
+        await saveChargerRules(w, c, ui.month, r => {
+          const slot = k >= 0 ? r.cost.find(x => !(Number(x.value) > 0) && !x.custom && costKindOf(`${x.id} ${x.label}`) === k) : null;
+          if (slot) Object.assign(slot, { enabled: true, basis: "fixed", value: Number(i.amount) }); else r.cost.push(newRule(i.name, "fixed", i.amount));
+        });
+        return `${fmt.brl(i.amount)}/mês a partir de ${ui.month}`;
+      });
+    });
+    if ($("#ccNewSave")) $("#ccNewSave").onclick = () => {
+      const c = ccCharger(), n = ui.nc; if (!c || !n) return;
+      const name = String(n.name || "").trim(), amount = Number(String(n.amount).replace(",", "."));
+      if (!name || !(amount > 0)) { alert("Informe o nome e o valor."); return; }
+      if (dirty()) { alert("Salve ou descarte antes as alterações do contrato e dos custos (botões no topo)."); return; }
+      const start = /^\d{4}-\d{2}$/.test(n.startMonth || "") ? n.startMonth : ui.month;
+      if (n.kind === "monthly") {
+        const payTarget = payTargetFor(w, c).value;
+        if (!payTarget) { alert("Não achei este carregador na lista de contas mensais."); return; }
+        run(target, w, `Conta mensal ${name} · ${c.station}`, async () => {
+          const fb = await addScheduled(w, { target: payTarget, name, supplier: n.supplier, category: n.category, amount, dueDay: Number(n.dueDay) || 11, startMonth: start, endMonth: n.endMonth || "" }, ui.month);
+          let res = "";
+          if (!n.payOnly) { const m = data.months.includes(start) ? start : ui.month; await saveChargerRules(w, c, m, r => r.cost.push(newRule(name, "fixed", amount))); res = ` · no resultado a partir de ${m}`; }
+          ui.nc = null; ui.ncOpen = false;
+          return `${fb || "conta criada"}${res}`;
+        });
+      } else if (n.kind === "result") {
+        run(target, w, `Custo ${name} · ${c.station}`, async () => { await saveChargerRules(w, c, ui.month, r => r.cost.push(newRule(name, n.basis || "fixed", amount))); ui.nc = null; ui.ncOpen = false; return `no resultado a partir de ${ui.month}`; });
+      } else {
+        const scope = matrixScopeFor(w, c, start);
+        if (!scope) { alert("Este carregador não está entre os ativos UBY dessa competência: não dá para lançar boleto próprio nele."); return; }
+        run(target, w, `Custo ${name} · ${c.station}`, async () => {
+          const fb = await saveMatrixCost(w, { name, amount, category: n.category, supplier: n.supplier, kind: n.costKind, installments: n.installments, coverage: n.coverage, startMonth: start, endMonth: n.endMonth || "", dueDay: Number(n.dueDay) || 1, method: "equal", shares: "", documentRef: "", notes: `Exclusivo de ${c.station}`, targets: [scope] }, start, "");
+          ui.nc = null; ui.ncOpen = false;
+          return fb || "salvo";
+        });
+      }
+    };
     if ($("#pmMonth")) $("#pmMonth").onchange = e => { if (dirty() && !confirm("Descartar as alterações não salvas?")) { e.target.value = ui.month; return; } ui.month = e.target.value; ui.edits = {}; ui.rules = null; draw(target, w); };
     target.querySelectorAll("[data-ctl]").forEach(el => el.onchange = () => { ui.edits[el.dataset.ctl] = el.value; draw(target, w); });
     const ensureRules = () => { if (!ui.rules) ui.rules = { cost: data.form.cost.map(r => ({ ...r })), revenue: data.form.revenue.map(r => ({ ...r })) }; };
@@ -1758,28 +2109,7 @@
       const f = ui.costForm;
       if (!String(f.name || "").trim() || !(Number(f.amount) > 0)) { log("Custo da matriz: informe nome e valor.", "bad"); draw(target, w); return; }
       run(target, w, `Custo da matriz ${f.name}`, async () => {
-        await resyncMatrix(w);
-        const mk = ui.matrixMonth || data.months.at(-1) || "";
-        const monthSel = w.document.getElementById("financeMonthSelector");
-        if (monthSel && [...monthSel.options].some(o => o.value === mk)) monthSel.value = mk;
-        w.renderMatrizCosts(w.getGeneralUnitData());
-        if (ui.editingCost) w.editMatrizCost(ui.editingCost); else w.resetMatrizCostForm();
-        const set = (id, v) => { const el = w.document.getElementById(id); if (el) el.value = v ?? ""; };
-        set("matrizNewName", f.name); set("matrizNewValue", f.amount); set("matrizCostCategory", f.category); set("matrizCostSupplier", f.supplier);
-        set("matrizCostKind", f.kind); set("matrizCostInstallments", f.kind === "installment" ? f.installments || 1 : 1);
-        // Sem isto o parcelado ficava com cobertura 1: todas as parcelas caíam no resultado do primeiro mês.
-        // A tela original desta página não tem o campo; o motor lê pelo id, então ele é criado oculto.
-        if (!w.document.getElementById("matrizCostCoverageMonths")) {
-          const hidden = w.document.createElement("input");
-          hidden.type = "hidden"; hidden.id = "matrizCostCoverageMonths";
-          w.document.body.appendChild(hidden);
-        }
-        set("matrizCostCoverageMonths", f.kind === "installment" ? Math.max(1, Math.round(Number(f.coverage) || Number(f.installments) || 1)) : 1); set("matrizCostStartMonth", f.startMonth || new Date().toISOString().slice(0, 7)); set("matrizCostEndMonth", f.endMonth);
-        set("matrizCostDueDay", f.dueDay || 1); set("matrizCostMethod", f.method); set("matrizCostCustomShares", f.shares); set("matrizCostDocument", f.documentRef); set("matrizCostNotes", f.notes);
-        const tsel = w.document.getElementById("matrizCostTargets");
-        if (tsel) [...tsel.options].forEach(o => { o.selected = f.targets.includes(o.value); });
-        w.addMatrizCost();
-        const fb = await awaitMatrixSave(w);
+        const fb = await saveMatrixCost(w, f, ui.matrixMonth || data.months.at(-1) || "", ui.editingCost);
         ui.editingCost = ""; ui.costForm = null;
         return fb || "salvo na nuvem";
       });
@@ -1798,13 +2128,7 @@
       const p = ui.payForm;
       if (!p.target || !String(p.name || "").trim() || !(Number(p.amount) > 0)) { log("Pagamento: informe carregador, nome e valor.", "bad"); draw(target, w); return; }
       run(target, w, `Pagamento ${p.name}`, async () => {
-        await resyncMatrix(w);
-        w.renderScheduledPayments(w.getGeneralUnitData());
-        const set = (id, v) => { const el = w.document.getElementById(id); if (el) el.value = v ?? ""; };
-        set("scheduledPaymentTarget", p.target); set("scheduledPaymentName", p.name); set("scheduledPaymentSupplier", p.supplier); set("scheduledPaymentCategory", p.category);
-        set("scheduledPaymentAmount", p.amount); set("scheduledPaymentDueDay", p.dueDay || 11); set("scheduledPaymentStartMonth", p.startMonth || ui.payMonth); set("scheduledPaymentEndMonth", p.endMonth);
-        w.addScheduledPayment();
-        const fb = await awaitMatrixSave(w);
+        const fb = await addScheduled(w, p, ui.payMonth);
         ui.payForm = null;
         return fb || "pagamento programado salvo";
       });
@@ -1815,6 +2139,11 @@
     if ($("#pmPayEditCancel")) $("#pmPayEditCancel").onclick = () => { ui.payEditing = ""; ui.payForm = null; draw(target, w); };
     if ($("#pmPayEditSave")) $("#pmPayEditSave").onclick = () => {
       const p = ui.payForm, id = ui.payEditing;
+      const cc = ui.tab === "carregador" ? data.chargers.find(x => x.key === ui.charger) : null;
+      const before = w.loadMatrizCosts().find(c => c.id === id);
+      const pairIdx = cc && before && data.form ? (() => { const live = r => r.basis === "fixed" && Number(r.value) > 0 && r.enabled !== false; const k = costKindOf(`${before.name} ${before.category}`);
+        const byVal = data.form.cost.findIndex(r => live(r) && Math.abs(Number(r.value) - Number(before.amount)) < 0.01);
+        return byVal >= 0 ? byVal : k >= 0 ? data.form.cost.findIndex(r => live(r) && costKindOf(`${r.id} ${r.label}`) === k) : -1; })() : -1;
       if (!p.target || !String(p.name || "").trim() || !(Number(p.amount) > 0) || !/^\d{4}-\d{2}$/.test(p.startMonth || "") || (p.endMonth && !/^\d{4}-\d{2}$/.test(p.endMonth))) { log("Pagamento: informe carregador, nome, valor e mês de início.", "bad"); draw(target, w); return; }
       run(target, w, `Pagamento ${p.name}`, async () => {
         await resyncMatrix(w);
@@ -1830,6 +2159,10 @@
         w.saveMatrizCosts(list);
         const fb = await awaitMatrixSave(w);
         ui.payEditing = ""; ui.payForm = null;
+        if (pairIdx >= 0 && Math.abs(Number(p.amount) - Number(before.amount)) >= 0.01) {
+          await saveChargerRules(w, cc, ui.month, r => { if (r.cost[pairIdx]) r.cost[pairIdx].value = Number(p.amount); });
+          return `${fb || "pagamento atualizado"} · resultado atualizado para ${fmt.brl(Number(p.amount))} a partir de ${ui.month}`;
+        }
         return fb || "pagamento atualizado";
       });
     };
@@ -1937,8 +2270,10 @@
     if ($("#pmDocToEnergy")) $("#pmDocToEnergy").onclick = () => {
       const { res, file } = ui.docCopel;
       ui.docCopel = null; ui.docFile = null; ui.docForm = null;
-      ui.tab = "energia";
+      ui.tab = "carregador";
       applyCopelRead(res, file, data.chargers);
+      followEnCharger();
+      ui.focus = "sec:energia";
       draw(target, w);
     };
     if ($("#pmDocSave")) $("#pmDocSave").onclick = () => {

@@ -79,6 +79,7 @@ main{min-width:0}
 .imp-field .select{width:100%;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:900px){.imp-fields{grid-template-columns:minmax(0,1fr)}}
 html,body{overflow-x:hidden}
+@supports (overflow:clip){html,body{overflow-x:clip}}
 .top-actions{display:flex;align-items:center;gap:10px;margin-left:auto}
 .menu-button{display:none}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--uby-line-strong);border-radius:999px;background:var(--uby-surface);color:var(--uby-forest);font-size:10.5px;font-weight:800;white-space:nowrap}
@@ -570,3 +571,12 @@ html[data-theme="night"] .install-btn{color:var(--uby-forest);border-color:rgba(
 .hub-tabs a:hover{color:var(--uby-ink)}
 .hub-tabs a.on{color:var(--uby-ink);background:var(--uby-surface);border-color:var(--uby-line-strong);box-shadow:inset 0 2px 0 var(--uby-forest)}
 @media(max-width:760px){.hub-tabs{padding:6px 12px 0;overflow-x:auto;flex-wrap:nowrap}.hub-tabs a{white-space:nowrap}}
+/* Centro de custos do carregador: barra fixa com carregador/competência, atalhos e blocos. */
+.cc-bar{position:sticky;top:64px;z-index:6;box-shadow:var(--uby-shadow)}
+.cc-jump{display:flex;flex-wrap:wrap;gap:6px;margin:-6px 0 14px}
+.cc-jump button{height:28px;padding:0 11px;border:1px solid var(--uby-line-strong);border-radius:999px;background:var(--uby-surface);color:var(--uby-forest);font-size:11.5px;font-weight:780;cursor:pointer}
+.cc-jump button:hover{background:var(--uby-green-soft)}
+.cc-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:30px 0 12px;padding-top:16px;border-top:2px solid var(--uby-line);scroll-margin-top:140px}
+.cc-head h2{margin:2px 0 0;font-size:18px}
+.cc-head p{margin:4px 0 0;color:var(--uby-muted);font-size:12.5px;max-width:90ch}
+@media(max-width:860px){.cc-bar{position:static}.cc-head{scroll-margin-top:70px}}
