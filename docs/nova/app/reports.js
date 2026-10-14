@@ -35,6 +35,7 @@
     .kpi{border:1px solid #dfe6e0;border-radius:10px;padding:11px 12px;background:#f8faf7}.kpi b{display:block;font-size:16.5px;color:#0a1628;margin-bottom:3px}.kpi span{font-size:10.5px;color:#5f6b62;text-transform:uppercase;letter-spacing:.03em}
     .kpi small{display:block;color:#5f6b62;font-size:10.5px;margin-top:2px}
     .kpi.hl{background:#eafaf1;border-color:#9fe0bd}.kpi.hl b{color:#007a44}
+    .kpis.k5{grid-template-columns:1.45fr repeat(4,1fr)}.kpi.big{background:#0a1628;border-color:#0a1628}.kpi.big b{font-size:25px;color:#fff;margin-bottom:5px}.kpi.big span,.kpi.big small{color:#b9c6d6}
     table{width:100%;border-collapse:collapse;margin:4px 0 6px} th{background:#f0f4f1;text-align:left;font-size:10px;padding:8px 8px;color:#3d4a41;text-transform:uppercase;letter-spacing:.03em}
     td{padding:7px 8px;border-bottom:1px solid #e6ebe7;vertical-align:top} td.n,th.n{text-align:right;white-space:nowrap} tr.t td{font-weight:800;background:#f4faf6} tr.s td{color:#5f6b62}
     tr.g td{font-weight:800;padding-top:12px;border-bottom:0;color:#0a1628}
@@ -86,8 +87,9 @@
     const changed = !acc && m?.snapshot && (Math.abs(n(m.snapshot.investorPool) - n(m.investorPool)) > 0.009 || Math.abs(n(m.snapshot.result) - n(m.result)) > 0.009);
     return `${header(`Relatório unificado da operação · ${capped ? `consolidado do início até o fechamento de ${monthName(until)}` : monthName(mk)}`,`${d.ownedCount} ativo(s) UBY e ${d.partnerCount} parceiro(s) com royalty · ${inv.investors.length} cotista(s) · ${esc(p.roundLabel || "")}${acc ? ` · ${inv.months.length} competência(s) de distribuição` : ""}${approval}`, status)}
       ${changed ? `<div class="note" style="border-color:#e0a4a0;background:#fdf0ef;color:#8a2f2a"><strong>Os números mudaram depois da aprovação.</strong> Aprovado: resultado ${signed(m.snapshot.result)} · pool ${fmt.brl(m.snapshot.investorPool)} (${fmt.brl(m.snapshot.perQuota)} por cota). Agora: resultado ${signed(m.result)} · pool ${fmt.brl(m.investorPool)}. Revise em Parâmetros e custos → Fechamentos.</div>` : ""}
-      <div class="kpis">
-        ${kpi("Recebido pela UBY", fmt.brl(d.networkRevenue - d.platform - d.management + d.royalties), `faturamento bruto ${fmt.brl(d.networkRevenue)} · ${fmt.int(sessions)} recargas`)}
+      <div class="kpis k5">
+        <div class="kpi big"><b>${fmt.brl(d.networkRevenue)}</b><span>Faturamento bruto</span><small>${fmt.int(sessions)} recargas · ${fmt.kwh0(energy)}</small></div>
+        ${kpi("Recebido pela UBY", fmt.brl(d.networkRevenue - d.platform - d.management + d.royalties), "após Spott e P3, mais royalties")}
         ${kpi("Resultado após impostos", signed(d.networkResult), d.taxesTotal ? `impostos do período ${fmt.brl(d.taxesTotal)}` : "sem imposto lançado")}
         ${kpi("Reservas", fmt.brl(d.reserve), `legal ${fmt.pct1(p.legalReservePct)} · expansão ${fmt.pct1(p.expansionReservePct)}`)}
         ${kpi("Pool dos cotistas", fmt.brl(d.investorPool), acc ? "soma das competências" : `${fmt.brl(m?.perQuota || 0)} por cota`, true)}
@@ -107,6 +109,7 @@
         ${row("Repasse dos ativos UBY (cai na conta)", d.networkRevenue - d.platform - d.management, "t")}
         ${d.royalties ? row("Royalties de parceiros", d.royalties) : ""}
         ${row("Recebido pela UBY", d.networkRevenue - d.platform - d.management + d.royalties, "t")}
+        ${d.management || d.partnerManagement ? row("Recebido pela P3 (gestão)", d.management + (d.partnerManagement || 0), "", d.partnerManagement ? `${fmt.brl(d.management)} dos ativos UBY + ${fmt.brl(d.partnerManagement)} da gestão de parceiros` : "split pago direto à P3") : ""}
         <tr class="g"><td colspan="2">Custos da UBY</td></tr>
         ${row("Energia", -d.energyCost)}${d.directOperation ? row("Operação direta dos carregadores", -d.directOperation) : ""}${d.matrizDedicated ? row("Custos exclusivos de carregadores", -d.matrizDedicated) : ""}${d.otherMatriz ? row("Custos centrais da matriz (rateio)", -d.otherMatriz) : ""}${d.matrizTaxCost ? row("Tributos centralizados da matriz", -d.matrizTaxCost) : ""}
         ${d.areaParticipation ? row("Participação da área", -d.areaParticipation) : ""}${d.taxes ? row("Tributos por carregador", -d.taxes) : ""}

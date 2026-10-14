@@ -1505,7 +1505,8 @@
     powerPerCharger: "Peso por potência dividido no local",
     lossCarry: "Prejuízo compensado antes de distribuir",
     partnerNetBase: "Parceria: gestão e royalty sobre o líquido da plataforma",
-    centralTax: "Imposto central no resultado de cada carregador próprio"
+    centralTax: "Imposto central no resultado de cada carregador próprio",
+    spottSplit: "Gestão P3 pelo líquido, como o split da Spott, e ajuste de fechamento Spott como recarga"
   };
   const MONTH_SPECIFIC = ["energyCopelAmount", "energyCopelKWh", "energyLeaseCreditedKWh"];
 
@@ -1565,8 +1566,9 @@
       }
       let inherited = !res.exact;
       const src = res.exact ? settings.periodMeta?.inheritedFrom : "";
+      let prior = null;
       if (src && src !== mk && n0(settings.energyCopelAmount) > 0) {
-        const prior = E.resolveMonthlySettings(defaultFinanceSettings(), root, scoped, src).settings;
+        prior = E.resolveMonthlySettings(defaultFinanceSettings(), root, scoped, src).settings;
         if (MONTH_SPECIFIC.every(f => n0(settings[f]) === n0(prior[f]))) { inherited = true; flags.push("fatura-copiada"); }
       }
       if (inherited) {
@@ -1575,7 +1577,10 @@
         MONTH_SPECIFIC.forEach(f => { settings[f] = 0; });
         ["costRules", "revenueRules"].forEach(k => {
           if (Array.isArray(settings[k]) && settings[k].some(r => r?.basis === "one_off" && r.enabled !== false)) {
-            settings[k] = settings[k].map(r => (r?.basis === "one_off" ? { ...r, enabled: false } : r));
+            // Mês salvo como cópia de outro (fatura-copiada): só desliga o avulso que já vinha do mês de
+            // origem; avulso lançado no próprio mês (ex.: ajuste de fechamento Spott de set/2026) vale.
+            const fromSrc = r => !res.exact || !prior || (prior[k] || []).some(o => o?.basis === "one_off" && o.enabled !== false && (o.id === r.id || o.label === r.label));
+            settings[k] = settings[k].map(r => (r?.basis === "one_off" && fromSrc(r) ? { ...r, enabled: false } : r));
             flags.push("avulso-herdado");
           }
         });
@@ -1930,6 +1935,7 @@
       taxes: n0(owned.taxes), matrizTaxCost: n0(owned.matrizTaxCost), matrizDedicated: n0(owned.matrizDedicatedCost),
       otherMatriz: Math.max(0, n0(owned.matrizCost) - n0(owned.matrizTaxCost) - n0(owned.matrizDedicatedCost)), matrizCost: n0(owned.matrizCost),
       management: n0(owned.management), platform: n0(owned.platform), areaParticipation: n0(owned.areaParticipation),
+      partnerManagement: sumF(partnerRows, "management"),
       networkTaxes, networkTaxBase: pick("taxBase"), taxRatePct: isMonthView ? taxRateFor(mk) : n0(policy.taxRatePct), taxesTotal: n0(owned.taxes) + networkTaxes,
       operationalResult, networkResult, margin: networkRevenue ? networkResult / networkRevenue * 100 : 0,
       distributable: pick("distributable"), lossCarried: isMonthView ? n0(nm.carryIn) : n0(net.totals.carryOut),

@@ -20,6 +20,9 @@
                     nos carregadores UBY continuam sobre o bruto (02/10/2026)
     centralTax      imposto central (Parâmetros · Cotas, impostos) sai do resultado
                     de cada carregador próprio; a rede tributa só o restante (05/10/2026)
+    spottSplit      bate com o repasse da Spott: gestão P3 dos carregadores UBY = % do
+                    líquido (5% do bruto ÷ 0,92 = 5,43%, em 2 casas, como o split da Spott);
+                    receita "ajuste de fechamento Spott" entra como recarga (taxa e split)
 
   Com todas as chaves desligadas (FIXES_OFF) o resultado é idêntico ao da
   plataforma original — é o que a auditoria compara centavo a centavo.
@@ -27,7 +30,7 @@
 (function (global) {
   "use strict";
 
-  const FIXES = Object.freeze(["aggregation", "zeroSaleMonths", "hybridMarketing", "courtesyInvoice", "monthScope", "matrixCents", "powerPerCharger", "lossCarry", "partnerNetBase", "centralTax"]);
+  const FIXES = Object.freeze(["aggregation", "zeroSaleMonths", "hybridMarketing", "courtesyInvoice", "monthScope", "matrixCents", "powerPerCharger", "lossCarry", "partnerNetBase", "centralTax", "spottSplit"]);
   const FIXES_ON = Object.freeze(Object.fromEntries(FIXES.map(k => [k, true])));
   const FIXES_OFF = Object.freeze(Object.fromEntries(FIXES.map(k => [k, false])));
 
@@ -157,7 +160,11 @@
   function computeMonth(input, fixes = FIXES_OFF) {
     const cfg = input.cfg || {};
     const model = input.model || "uby";
-    const revenue = num(input.revenue);
+    // Diferença do fechamento da Spott que não está nas planilhas: receita extra com "Spott" no nome
+    // (ex.: "Ajuste de fechamento Spott") entra como recarga: sofre a taxa da plataforma e o split.
+    const isSpottAdjust = d => d.scope !== "non_operational" && /spott/i.test(d.label || "") && /(fechamento|repasse)/i.test(d.label || "");
+    const spottAdjust = fixes.spottSplit ? evaluateRules(cfg.revenueRules, input.planning || {}).details.filter(isSpottAdjust).reduce((s, d) => s + num(d.actual), 0) : 0;
+    const revenue = num(input.revenue) + spottAdjust;
     const energy = num(input.energy);
     const acRevenue = num(input.acRevenue), dcRevenue = num(input.dcRevenue);
     const unknownRevenue = Math.max(revenue - acRevenue - dcRevenue, 0);
@@ -189,7 +196,7 @@
     const costEval = evaluateRules(cfg.costRules, planning);
     const revEval = evaluateRules(cfg.revenueRules, planning);
     const marketingRevenue = revEval.details.filter(d => d.scope === "non_operational").reduce((s, d) => s + num(d.actual), 0);
-    const extraRevenue = revEval.details.filter(d => d.scope !== "non_operational").reduce((s, d) => s + num(d.actual), 0);
+    const extraRevenue = revEval.details.filter(d => d.scope !== "non_operational" && !(fixes.spottSplit && isSpottAdjust(d))).reduce((s, d) => s + num(d.actual), 0);
     const matrixItems = (input.matrixItems || []).filter(i => num(i.amount) > 0);
     const matrizCost = matrixItems.reduce((s, i) => s + num(i.amount), 0);
     const matrizTaxCost = matrixItems.filter(i => /tribut|impost|taxa/i.test(`${i.category || ""} ${i.label || ""}`)).reduce((s, i) => s + num(i.amount), 0);
@@ -200,7 +207,11 @@
     const extraCosts = localExtraCosts + matrizCost;
 
     const totalRevenue = revenue + extraRevenue + marketingRevenue;
-    const management = (feesOnNet ? totalRevenue - platform : totalRevenue) * num(cfg.managementPct) / 100;
+    // Carregador UBY: a Spott divide o líquido (ex.: 94,57% UBY / 5,43% P3), não o bruto.
+    const spottNetSplit = !!fixes.spottSplit && (model === "uby" || model === "hybrid") && num(cfg.platformPct) > 0 && num(cfg.platformPct) < 100 && num(cfg.managementPct) > 0;
+    const management = spottNetSplit
+      ? ((revenue - platform) * Math.round(num(cfg.managementPct) / (1 - num(cfg.platformPct) / 100) * 100) / 100 + (totalRevenue - revenue) * num(cfg.managementPct)) / 100
+      : (feesOnNet ? totalRevenue - platform : totalRevenue) * num(cfg.managementPct) / 100;
     const costs = energyCost + extraCosts + taxes;
     const preAreaNet = totalRevenue - management - platform - ubyRoyalty - costs;
     const areaEligible = model === "uby" || model === "hybrid";
@@ -252,7 +263,7 @@
     return {
       monthKey: input.monthKey || "", operationModel: model,
       revenue, chargingRevenue: revenue, energy, commercialEnergy, acRevenue, dcRevenue,
-      extraRevenue, marketingRevenue, totalRevenue,
+      extraRevenue, marketingRevenue, totalRevenue, spottAdjust,
       management, platform, ubyRoyalty, feesOnNet, taxes, energyCost, energyComposition: comp, courtesyInvoiceExcluded,
       localExtraCosts, matrizCost, matrizTaxCost, matrizDedicatedCost, matrizCash, extraCosts, areaSharePct, areaParticipation, areaParticipationCalc,
       preAreaNet, operationNet, acNet, dcNet, unknownNet,
@@ -273,7 +284,7 @@
   }
 
   // Campos que somam entre meses/carregadores.
-  const ADDITIVE = ["revenue", "chargingRevenue", "energy", "commercialEnergy", "acRevenue", "dcRevenue", "extraRevenue", "marketingRevenue", "totalRevenue",
+  const ADDITIVE = ["revenue", "chargingRevenue", "energy", "commercialEnergy", "acRevenue", "dcRevenue", "extraRevenue", "marketingRevenue", "totalRevenue", "spottAdjust",
     "management", "platform", "ubyRoyalty", "taxes", "energyCost", "courtesyInvoiceExcluded", "localExtraCosts", "matrizCost", "matrizTaxCost", "matrizDedicatedCost", "matrizCash", "extraCosts",
     "areaParticipation", "preAreaNet", "operationNet", "ubyNet", "p3SocietyProfit", "partnerShare", "p3Gross", "p3OperationalResult", "ownResult", "paybackBase",
     "saRetention", "ubyDistributable", "investorDistribution", "partnerInvestorDistribution", "finalDistribution", "ubyRetained", "totalOperatingCost",
