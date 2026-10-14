@@ -240,7 +240,10 @@
       const allPaid = keys.length && keys.every(k => byKey.get(k)?.paid);
       const state = ignored.has(t.id) ? "ignorado" : !keys.length ? "sem-conta" : how === "manual" || allPaid ? "conciliado" : "confirmar";
       const expected = r2(keys.reduce((s, k) => s + (byKey.get(k)?.amount || 0), 0));
-      return { ...t, bills: keys, how, state, expected, diff: keys.length ? r2(t.value - expected) : 0, ignored: ignored.has(t.id), note: ignored.get(t.id) || "",
+      // Conta paga em partes (vários lançamentos para a mesma conta): compara a soma das partes.
+      const group = keys.length === 1 ? (billTx.get(keys[0]) || [t.id]) : [t.id];
+      const groupTotal = r2(group.reduce((s, id) => s + (txById.get(id)?.value || 0), 0));
+      return { ...t, bills: keys, how, state, expected, parts: group.length, groupTotal, diff: keys.length ? r2(groupTotal - expected) : 0, ignored: ignored.has(t.id), note: ignored.get(t.id) || "",
         hint: state === "sem-conta" ? hintFor(t) : null };
     });
     return { bills: billRows, outflows: txRows, unmatched: txRows.filter(t => !t.bills.length && !t.ignored) };

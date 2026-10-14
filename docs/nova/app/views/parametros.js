@@ -611,7 +611,14 @@
       const rest = all ? open.filter(b => !fit.includes(b)).sort((a, b) => String(a.due).localeCompare(String(b.due))) : [];
       const where = b => String(b.station || b.workName || "").replace(/^UBY RECHARGE\s*-\s*/i, "");
       const opt = b => `<option value="${esc(b.key)}">${esc(fmtDay(b.due))} · ${esc(fmt.brl(b.amount))} · ${esc(b.name)}${where(b) ? ` · ${esc(where(b))}` : ""}${Math.abs(b.amount - t.value) > 0.009 ? ` (dif. ${esc(fmt.brl(t.value - b.amount))})` : ""}</option>`;
+      // Conta já paga em parte (ex.: repasse da área num Pix e reembolso de energia em outro): o que falta.
+      const missing = b => Math.round((Number(b.dueAmount) - Number(b.amount)) * 100) / 100;
+      const parts = bs.bills.filter(b => b.paid && (b.kind === "area" || b.kind === "matriz") && b.dueAmount !== undefined && b.dueAmount !== null && missing(b) > 0.009
+        && !t.bills.includes(b.key) && Math.abs(missing(b) - t.value) <= Math.max(missing(b) * 0.3, 10) && ddays(b) >= -45 && ddays(b) <= 60)
+        .sort((a, b) => Math.abs(missing(a) - t.value) - Math.abs(missing(b) - t.value));
+      const partOpt = b => `<option value="${esc(b.key)}">${esc(b.name)}${where(b) ? ` · ${esc(where(b))}` : ""} · pago ${esc(fmt.brl(b.amount))} de ${esc(fmt.brl(b.dueAmount))} · falta ${esc(fmt.brl(missing(b)))}${Math.abs(missing(b) - t.value) > 0.009 ? ` (dif. ${esc(fmt.brl(t.value - missing(b)))})` : ""}</option>`;
       return `<option value="">Vincular a uma conta…</option>
+        ${parts.length ? `<optgroup label="Completar conta paga em partes">${parts.slice(0, 6).map(partOpt).join("")}</optgroup>` : ""}
         ${fit.length ? `<optgroup label="Mais prováveis (valor e data parecidos)">${fit.slice(0, 12).map(opt).join("")}</optgroup>` : `<option value="" disabled>Nenhuma conta em aberto com valor parecido</option>`}
         ${rest.length ? `<optgroup label="Outras contas em aberto">${rest.map(opt).join("")}</optgroup>` : ""}
         ${all ? "" : `<option value="__all">Ver todas as contas em aberto…</option>`}
@@ -684,7 +691,7 @@
               return `${names}<small><span class="badge warn">é esta?</span> ${esc(why)}</small>`;
             };
             const hint = t => t.hint ? `<small style="display:block;margin-bottom:4px">Parece: <strong>${esc(t.hint.name)}</strong>${t.hint.supplier ? ` · ${esc(t.hint.supplier)}` : ""} (${esc(t.hint.station || "—")}, ${fmt.brl(t.hint.amount)}) — valor não bate. Se for de outro carregador, lance como conta nova.</small>` : "";
-            const cell = t => t.state === "conciliado" ? `${t.bills.map(k => `<small>${esc(billName(k))}</small>`).join("")}<span class="badge ok">conciliado</span>${Math.abs(t.diff) > 0.009 ? `<small>pago ${fmt.brl(t.value)} · previsto ${fmt.brl(t.expected)}</small>` : ""}`
+            const cell = t => t.state === "conciliado" ? `${t.bills.map(k => `<small>${esc(billName(k))}</small>`).join("")}<span class="badge ok">conciliado</span>${t.parts > 1 ? `<small>paga em ${t.parts} pagamentos · total ${fmt.brl(t.groupTotal)}${Math.abs(t.diff) > 0.009 ? ` · previsto ${fmt.brl(t.expected)}` : ""}</small>` : Math.abs(t.diff) > 0.009 ? `<small>pago ${fmt.brl(t.value)} · previsto ${fmt.brl(t.expected)}</small>` : ""}`
               : t.state === "confirmar" ? sugg(t)
               : t.state === "ignorado" ? `<span class="badge neutral">não é conta</span>${t.note ? `<small>${esc(t.note)}</small>` : ""}`
               : `${hint(t)}<select class="select" data-bank-link="${esc(t.id)}" style="max-width:360px" ${can}>${linkOptions(t)}</select>`;
@@ -1513,8 +1520,14 @@
       const list = keys.map(k => cBill(k)).filter(Boolean);
       if (!list.length) throw new Error("Conta não encontrada. Nada foi gravado.");
       for (const bill of list) {
-        if (bill.paid) continue;
-        const opts = list.length === 1 && (bill.kind === "area" || bill.kind === "matriz") ? { amount: t.value, due: Number(bill.dueAmount ?? bill.amount), diffMode: "next" } : {};
+        const partial = (bill.kind === "area" || bill.kind === "matriz") && list.length === 1;
+        if (bill.paid) {
+          // Complemento de conta paga em partes: o pago passa a ser a soma dos pagamentos.
+          if (partial && bill.dueAmount !== undefined && Number(bill.dueAmount) - Number(bill.amount) > 0.009)
+            await setBillPaid(w, bill, t.date > String(bill.paidAt || "").slice(0, 10) ? t.date : String(bill.paidAt).slice(0, 10), { amount: Math.round((Number(bill.amount) + t.value) * 100) / 100, due: Number(bill.dueAmount), diffMode: "next" });
+          continue;
+        }
+        const opts = partial ? { amount: t.value, due: Number(bill.dueAmount ?? bill.amount), diffMode: "next" } : {};
         await setBillPaid(w, bill, t.date, opts);
       }
       await w.UBY_SUPABASE.saveBankData(p => {
