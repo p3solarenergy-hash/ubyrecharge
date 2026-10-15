@@ -154,8 +154,10 @@
     const icon = 230, lx = W / 2 - 400, ly = 150;
     roundRect(g, lx, ly, icon, icon, 58, grad(lx, ly, lx + icon, ly + icon));
     drawBolt(g, lx + icon / 2 - 46, ly + 40, 150, BRAND.navy);
-    g.font = font(270, 800); g.fillStyle = "#fff"; g.textAlign = "left"; g.textBaseline = "alphabetic"; g.letterSpacing = "-4px"; g.fillText("uby", lx + icon + 50, ly + 205); g.letterSpacing = "0px";
+    // linha verde antes do texto: a perna do "y" passa por cima dela, como no logo oficial
     g.fillStyle = BRAND.green; g.fillRect(lx + icon + 58, ly + 240, 455, 9);
+    g.font = font(270, 800); g.fillStyle = "#fff"; g.textAlign = "left"; g.textBaseline = "alphabetic"; g.letterSpacing = "-4px"; g.fillText("uby", lx + icon + 50, ly + 205); g.letterSpacing = "0px";
+    g.fillStyle = BRAND.green;
     g.font = font(50, 600); g.letterSpacing = "21px"; g.fillText("RECHARGE", lx + icon + 58, ly + 318); g.letterSpacing = "0px";
 
     // chamada
