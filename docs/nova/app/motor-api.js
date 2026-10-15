@@ -1222,6 +1222,7 @@
       ...base,
       cloud: { exists: !!clubCloud.payload, updatedAt: clubCloud.updatedAt, error: clubCloud.error, legacyImportedAt: payload.legacyImportedAt || "" },
       partners: Array.isArray(payload.partners) ? payload.partners : [],
+      partnerProgram: payload.partnerProgram && typeof payload.partnerProgram === "object" ? payload.partnerProgram : {},
       coupons: clubCouponSummary(Array.isArray(payload.coupons?.rows) ? payload.coupons.rows : [], base.monthKey, clubClientRows(monthCharges), participants),
       couponsMeta: { updatedAt: payload.coupons?.updatedAt || "", source: payload.coupons?.source || "" },
       participantsList: participants.map(p => ({ key: clubParticipantKey(p), name: p.name, phone: p.phone, email: p.email, createdAt: p.createdAtMs ? new Date(p.createdAtMs).toISOString() : "",

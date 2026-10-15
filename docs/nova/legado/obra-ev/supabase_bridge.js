@@ -79,9 +79,10 @@
   // parceiros, usos de cupons e participantes importados ficam na linha
   // própria "club-uby" de uby_financial_matrix (a plataforma atual só lê/grava
   // "shared-costs"). Gravação só pela página mínima clube-gravacao.html.
+  // Usos pelo QR dos parceiros (club_partner_uses): a equipe só cancela um uso errado.
   const CLUB_SCOPE = {
     name: "clube",
-    tables: { uby_financial_matrix: ["upsert"], app_audit_log: ["insert"] },
+    tables: { uby_financial_matrix: ["upsert"], app_audit_log: ["insert"], club_partner_uses: ["update"] },
     rpcs: []
   };
   // NOVA PLATAFORMA (usuário: "15. arrume" — backups sem depender da antiga):
@@ -829,6 +830,35 @@
     return { payload: next, updatedAt: data?.updated_at || next.updatedAt };
   }
 
+  // Usos dos benefícios pelo QR do balcão (gravados pela função clube-beneficio).
+  async function loadClubPartnerUses(fromIso, toIso) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    if (!(await currentUser())) throw new Error("Entre na plataforma para ler os usos do Clube UBY.");
+    const rows = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await sb.from("club_partner_uses")
+        .select("id,created_at,partner_id,benefit_id,description,client_key,client_name,code,status")
+        .gte("created_at", fromIso).lt("created_at", toIso)
+        .order("created_at", { ascending: false }).range(offset, offset + 999);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    return rows;
+  }
+  async function cancelClubPartnerUse(id) {
+    const sb = client();
+    if (!sb) throw new Error("Supabase ainda nao configurado.");
+    const user = await currentUser();
+    if (!user) throw new Error("Entre na plataforma antes de cancelar um uso.");
+    const { error } = await sb.from("club_partner_uses")
+      .update({ status: "CANCELADO", cancelled_at: new Date().toISOString(), cancelled_by: user.id })
+      .eq("id", id).eq("status", "CONFIRMADO");
+    if (error) throw error;
+    await insertAuditLog(sb, user, { modulo: "clube", entidadeTipo: "club_partner_uses", entidadeId: id, acao: "cancel_partner_use", resumo: {} });
+  }
+
   // Extratos bancários e conferência (linha própria "bank-uby"; gravada só pela tela
   // Parâmetros · Pagamentos, dentro do PARAMS_SCOPE). Mesmo padrão do Clube: relê antes de gravar.
   const BANK_DOC_ID = "bank-uby";
@@ -1532,6 +1562,8 @@
     uploadDocumentFile,
     loadClubData,
     saveClubData,
+    loadClubPartnerUses,
+    cancelClubPartnerUse,
     loadBankData,
     saveBankData,
     saveRechargeBase,

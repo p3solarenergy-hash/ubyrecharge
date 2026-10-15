@@ -15,6 +15,19 @@
   const STATUS = { active: ["Ativo", "ok"], prospect: ["Em negociação", "warn"], paused: ["Pausado", "neutral"] };
   const PRIORITY = { high: "Alta", medium: "Média", low: "Baixa" };
 
+  // Benefícios pelo QR fixo no balcão (página pública nova/beneficio.html + função clube-beneficio).
+  const BENEFIT_URL = "https://p3solarenergy-hash.github.io/ubyrecharge/nova/beneficio.html";
+  const AUDIENCE = [["TODOS", "Todos que recarregaram na UBY"], ["TOP_MES_ANTERIOR", "Top N do ranking do mês anterior"], ["PRIMEIRAS_COMPRAS", "N primeiras vezes de cada cliente"], ["LOTE", "Lote de N usos (ação)"]];
+  const PERIOD = [["DIA", "por dia"], ["SEMANA", "por semana"], ["MES", "por mês"], ["TOTAL", "no total"], ["ILIMITADO", "sem limite"]];
+  const newQrCode = () => [...crypto.getRandomValues(new Uint8Array(5))].map(b => b.toString(16).padStart(2, "0")).join("");
+  const qrLink = p => `${BENEFIT_URL}?p=${encodeURIComponent(p.qrCode)}`;
+  // Sem regras gravadas, a função usa o benefício geral para todos, 1 vez por dia (mesmo padrão aqui).
+  const rulesOf = p => Array.isArray(p.rules) && p.rules.length ? p.rules
+    : (p.benefit ? [{ id: "geral", description: p.benefit, audience: "TODOS", n: "", period: "DIA", limit: 1, priority: 1, active: true }] : []);
+  const spMonth = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+  const nextMonth = mk => { const [y, m] = mk.split("-").map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`; };
+  const uses = { month: "", rows: null, error: "", loading: false };
+
   // ---------- gravação (quadro oculto) ----------
   let frame = null, ready = null;
   function writer() {
@@ -80,9 +93,62 @@
     { id: "partner-lava-cars", name: "Lava Cars", category: "Lavagem / estética", status: "prospect", benefit: "Benefício a definir para lavagem, higienização ou estética automotiva.", rule: "Definir regra comercial, unidades participantes e comprovação.", coupon: "", contact: "", validity: "A definir", priority: "medium", usageCount: 0, notes: "" }
   ];
 
+  // Usos pelo QR no mês (lidos pela página de gravação do Clube, que já tem a sessão).
+  async function loadUses(mk, force) {
+    if (!mk || (!force && uses.month === mk)) return;   // já lido (ou com erro) neste mês: só recarrega no botão
+    Object.assign(uses, { month: mk, rows: null, error: "", loading: true });
+    try {
+      const w = await writer();
+      uses.rows = await w.UBY_SUPABASE.loadClubPartnerUses(`${mk}-01T00:00:00-03:00`, `${nextMonth(mk)}-01T00:00:00-03:00`);
+    } catch (err) {
+      uses.error = /club_partner_uses|does not exist|relation/i.test(String(err.message || err))
+        ? "A tabela de usos ainda não existe no Supabase (aplique supabase/clube_beneficios.sql)." : String(err.message || err);
+    } finally { uses.loading = false; if (ui.tab === "parceiros") paint(); }
+  }
+
+  // Display de balcão (A5, 300 dpi) com o QR fixo do parceiro, gerado no navegador.
+  let qrLib = null;
+  function ensureQrLib() {
+    if (window.qrcode) return Promise.resolve(window.qrcode);
+    return qrLib || (qrLib = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js";
+      s.onload = () => resolve(window.qrcode); s.onerror = () => { qrLib = null; reject(new Error("Não carreguei o gerador de QR. Confira a internet.")); };
+      document.head.appendChild(s);
+    }));
+  }
+  async function downloadDisplay(p) {
+    const qrcode = await ensureQrLib();
+    const qr = qrcode(0, "M"); qr.addData(qrLink(p)); qr.make();
+    const W = 1748, H = 2480, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const g = cv.getContext("2d"), font = (px, b) => `${b ? "bold " : ""}${px}px Arial, Helvetica, sans-serif`;
+    const center = (t, y, px, b, color) => { g.font = font(px, b); g.fillStyle = color; g.textAlign = "center"; g.textBaseline = "top"; g.fillText(t, W / 2, y); };
+    const fit = (t, px, max) => { const out = []; let line = ""; g.font = font(px, true); t.split(/\s+/).forEach(w => { const s2 = (line + " " + w).trim(); if (g.measureText(s2).width <= max) line = s2; else { out.push(line); line = w; } }); out.push(line); return out; };
+    g.fillStyle = "#fff"; g.fillRect(0, 0, W, H);
+    g.fillStyle = "#0b3a55"; g.fillRect(0, 0, W, 300); center("UBY RECHARGE", 95, 110, true, "#fff");
+    center("Cliente da rede UBY?", 380, 90, true, "#087d99");
+    const chamada = String(p.headline || rulesOf(p).find(r => r.audience === "TODOS")?.description || "Benefício exclusivo").trim();
+    let px = 150, lines = fit(chamada, px, W - 200);
+    while (lines.length > 2 && px > 70) { px -= 8; lines = fit(chamada, px, W - 200); }
+    let y = 520; lines.forEach(l => { center(l, y, px, true, "#0b3a55"); y += px + 20; });
+    const n = qr.getModuleCount(), side = 900, cell = side / (n + 4), top = Math.max(y + 40, 900), left = (W - side) / 2;
+    g.fillStyle = "#0b3a55";
+    for (let r = 0; r < n; r++) for (let c2 = 0; c2 < n; c2++) if (qr.isDark(r, c2)) g.fillRect(Math.floor(left + (c2 + 2) * cell), Math.floor(top + (r + 2) * cell), Math.ceil(cell), Math.ceil(cell));
+    y = top + side + 70;
+    ["1. Aponte a câmera do celular", "2. Toque em USAR AGORA no caixa", "3. Mostre a tela verde ao atendente"].forEach(t => { center(t, y, 64, false, "#0b3a55"); y += 95; });
+    g.fillStyle = "#087d99"; g.fillRect(0, H - 190, W, 190); center(`${p.name} · Parceiro UBY`, H - 140, 66, true, "#fff");
+    const a = document.createElement("a");
+    a.download = `display-${String(p.name).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()}.png`;
+    a.href = cv.toDataURL("image/png"); a.click();
+  }
+
   // ---------- telas ----------
   function rankingTab(c) {
     const s = c.summary, f = c.form, top = c.rows.slice(0, 3), medal = ["#c6a13a", "#9aa39c", "#a0663f"];
+    const pub = c.partnerProgram?.topByMonth?.[c.monthKey], closed = c.monthKey && c.monthKey < spMonth();
+    const validLabel = c.monthKey ? (c.months.find(m => m.key === nextMonth(c.monthKey))?.label || nextMonth(c.monthKey).split("-").reverse().join("/")) : "";
+    const publishLine = !closed ? `<p style="margin:6px 0 0"><small>Mês em andamento: o Top 3 vale nos parceiros a partir do mês seguinte, depois de publicado.</small></p>`
+      : `<p style="margin:6px 0 0"><small>${pub ? `Publicado para os parceiros em ${fmt.dt(pub.publishedAt)} — vale durante ${esc(validLabel)}.` : `<strong style="color:var(--uby-red)">Ainda não publicado</strong> — publique para o benefício do Top 3 valer em ${esc(validLabel)}.`}</small></p>`;
     return `
       <section class="section"><div class="grid g5">
         ${kpi("Participantes no mês", fmt.int(s.participants), `consumo pago em ${esc(c.label)}`, "", "lead")}
@@ -92,7 +158,8 @@
         ${kpi("Cadastro no formulário", fmt.int(s.registered), s.participants ? `${fmt.pct1(s.registered / s.participants * 100)} do ranking` : "")}
       </div></section>
       <div class="split" style="margin-bottom:18px">
-        <section class="section"><div class="section-head"><div><p class="kicker">Pódio · ${esc(c.label)}</p><h2>Top 3</h2></div><button class="btn" id="copyNotice" type="button">Copiar aviso dos vencedores</button></div>
+        <section class="section"><div class="section-head"><div><p class="kicker">Pódio · ${esc(c.label)}</p><h2>Top 3</h2>${publishLine}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${closed && top.length ? `<button class="btn ${pub ? "" : "primary"}" id="clubPublishTop" type="button" ${ui.busy ? "disabled" : ""}>${pub ? "Publicar de novo" : "Publicar Top 3 para os parceiros"}</button>` : ""}<button class="btn" id="copyNotice" type="button">Copiar aviso dos vencedores</button></div></div>
           <div class="grid g3">${top.map((r, i) => `<div class="panel" style="border-top:3px solid ${medal[i]}"><p class="kicker" style="color:${medal[i]}">${i + 1}º lugar</p><h3 style="font-size:15px">${who(r.name)}</h3>
             <p style="margin:6px 0 0;font-size:22px;font-weight:850;color:var(--uby-forest)">${fmt.int(r.points)} pts</p><small>${fmt.brl(r.revenue)} · ${r.sessions} recarga(s)</small><br>
             <span class="badge ${r.registered ? "ok" : "warn"}" style="margin-top:6px">${r.registered ? "cadastro ok" : "sem cadastro"}</span></div>`).join("") || `<div class="note">Ainda sem pontuação no mês.</div>`}</div>
@@ -128,32 +195,59 @@
 
   function partnersTab(c) {
     const partners = c.partners.slice().sort((a, b) => ({ active: 0, prospect: 1, paused: 2 }[a.status] ?? 3) - ({ active: 0, prospect: 1, paused: 2 }[b.status] ?? 3) || String(a.name).localeCompare(String(b.name), "pt-BR"));
-    const f = ui.partnerForm || (ui.partnerForm = { id: "", name: "", category: "", status: "active", benefit: "", rule: "", coupon: "", contact: "", validity: "", priority: "medium", usageCount: 0, notes: "" });
+    const f = ui.partnerForm || (ui.partnerForm = { id: "", name: "", category: "", status: "active", benefit: "", headline: "", rule: "", coupon: "", contact: "", validity: "", priority: "medium", notes: "", rules: [] });
+    if (!Array.isArray(f.rules) || !f.rules.length) f.rules = rulesOf(f).map(r => ({ ...r }));
     const inp = (k, label, type = "text", extra = "") => `<label class="imp-field" style="min-width:0"><span style="font-size:10.5px;color:var(--uby-muted);font-weight:760">${esc(label)}</span><input class="select" data-pf="${k}" type="${type}" value="${esc(f[k] ?? "")}" ${extra} style="width:100%"></label>`;
     const sel = (k, label, opts) => `<label class="imp-field" style="min-width:0"><span style="font-size:10.5px;color:var(--uby-muted);font-weight:760">${esc(label)}</span><select class="select" data-pf="${k}">${opts.map(([v, l]) => `<option value="${v}" ${String(f[k]) === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
+    const rsel = (i, k, opts, v) => `<select class="select" data-rf="${i}:${k}">${opts.map(([o, l]) => `<option value="${o}" ${String(v) === o ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+    const confirmed = (uses.rows || []).filter(u => u.status === "CONFIRMADO");
+    const usesOf = id => confirmed.filter(u => u.partner_id === id).length;
+    const ruleText = r => `${esc(r.description)} <em>· ${esc((AUDIENCE.find(a => a[0] === r.audience) || AUDIENCE[0])[1].replace(" N ", ` ${r.n || "N"} `))}${r.period === "ILIMITADO" ? "" : ` · ${r.limit || 0} ${esc((PERIOD.find(x => x[0] === r.period) || PERIOD[0])[1])}`}</em>`;
+    const names = new Map(partners.map(p => [p.id, p.name]));
+    const mk = data.monthKey;
     return `
       <section class="section"><div class="grid g4">
         ${kpi("Parceiros", fmt.int(partners.length), "base de parcerias do clube", "", "lead")}${kpi("Ativos", fmt.int(partners.filter(p => p.status === "active").length), `${partners.filter(p => p.status === "prospect").length} em negociação`)}
-        ${kpi("Usos registrados", fmt.int(partners.reduce((s, p) => s + Number(p.usageCount || 0), 0)), "controle manual de benefícios")}${kpi("Prioridade alta", fmt.int(partners.filter(p => p.priority === "high").length), "acompanhar de perto")}
+        ${kpi("Usos pelo QR", uses.rows ? fmt.int(confirmed.length) : "—", `em ${esc(data.label)} · registrados sozinhos`)}${kpi("Clientes atendidos", uses.rows ? fmt.int(new Set(confirmed.map(u => u.client_key)).size) : "—", "pessoas diferentes no mês")}
       </div></section>
       <div class="split" style="margin-bottom:14px">
-        <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Parcerias</p><h2>Benefícios do Clube</h2></div>${!partners.length ? `<button class="btn" id="clubDefaults" type="button">Criar parceiros iniciais</button>` : ""}</div>
-          <div class="table-wrap"><table><thead><tr><th>Parceiro</th><th>Situação</th><th>Benefício</th><th>Cupom</th><th class="num">Usos</th><th>Validade</th><th></th></tr></thead>
-            <tbody>${partners.map(p => { const st = STATUS[p.status] || STATUS.prospect; return `<tr><td><strong>${esc(p.name)}</strong><small>${esc(p.category || "—")} · prioridade ${esc(PRIORITY[p.priority] || "—")}</small></td>
-              <td><span class="badge ${st[1]}">${st[0]}</span></td><td style="white-space:normal;min-width:220px"><small>${esc(p.benefit || "—")}${p.rule ? `<br><em>${esc(p.rule)}</em>` : ""}</small></td><td>${esc(p.coupon || "—")}</td><td class="num">${fmt.int(p.usageCount || 0)}</td><td><small>${esc(p.validity || "—")}</small></td>
-              <td style="white-space:nowrap"><button class="btn ghost" data-p-edit="${esc(p.id)}" type="button">Editar</button><button class="btn ghost" data-p-del="${esc(p.id)}" type="button" style="color:var(--uby-red)">Excluir</button></td></tr>`; }).join("") || `<tr><td colspan="7" class="empty">Nenhuma parceria na nuvem ainda.</td></tr>`}</tbody></table></div>
+        <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Parcerias</p><h2>Benefícios do Clube</h2><p>Parceiro ativo ganha um QR fixo para o balcão. O cliente escaneia, toca USAR AGORA e mostra a tela verde; o uso entra aqui sozinho.</p></div>${!partners.length ? `<button class="btn" id="clubDefaults" type="button">Criar parceiros iniciais</button>` : ""}</div>
+          <div class="table-wrap"><table><thead><tr><th>Parceiro · QR do balcão</th><th>Situação</th><th>Benefícios (regras)</th><th class="num">Usos no mês</th><th></th></tr></thead>
+            <tbody>${partners.map(p => { const st = STATUS[p.status] || STATUS.prospect; return `<tr><td><strong>${esc(p.name)}</strong><small>${esc(p.category || "—")} · prioridade ${esc(PRIORITY[p.priority] || "—")}</small>
+              <div style="margin-top:4px;white-space:nowrap">${p.status === "active" && p.qrCode ? `<button class="btn ghost" data-p-display="${esc(p.id)}" type="button">⇩ Display</button><button class="btn ghost" data-p-link="${esc(p.id)}" type="button">Link</button>` : `<small>${p.status === "active" ? "QR: salve o parceiro para gerar" : "QR só para parceiro ativo"}</small>`}</div></td>
+              <td><span class="badge ${st[1]}">${st[0]}</span></td><td style="white-space:normal;min-width:240px"><small>${rulesOf(p).filter(r => r.active !== false).map(ruleText).join("<br>") || "—"}</small></td>
+              <td class="num">${uses.rows ? fmt.int(usesOf(p.id)) : "—"}</td>
+              <td style="white-space:nowrap"><button class="btn ghost" data-p-edit="${esc(p.id)}" type="button">Editar</button><button class="btn ghost" data-p-del="${esc(p.id)}" type="button" style="color:var(--uby-red)">Excluir</button></td></tr>`; }).join("") || `<tr><td colspan="5" class="empty">Nenhuma parceria na nuvem ainda.</td></tr>`}</tbody></table></div>
         </section>
         <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">${f.id ? "Editando" : "Nova parceria"}</p><h2>${f.id ? esc(f.name) : "Cadastrar parceiro"}</h2></div></div>
           <div class="grid g2" style="gap:8px">
             ${inp("name", "Nome do parceiro")}${inp("category", "Categoria")}
             ${sel("status", "Situação", [["active", "Ativo"], ["prospect", "Em negociação"], ["paused", "Pausado"]])}${sel("priority", "Prioridade", [["high", "Alta"], ["medium", "Média"], ["low", "Baixa"]])}
-            ${inp("coupon", "Cupom")}${inp("validity", "Validade")}
-            ${inp("contact", "Contato")}${inp("usageCount", "Usos registrados", "number", 'min="0" step="1"')}
+            ${inp("contact", "Contato")}${inp("validity", "Validade (texto)")}
           </div>
-          ${inp("benefit", "Benefício")}${inp("rule", "Regra / comprovação")}${inp("notes", "Observações")}
+          ${inp("headline", "Frase grande do display (ex.: 10% no almoço)")}${inp("benefit", "Descrição do benefício")}${inp("notes", "Observações")}
+          <p class="kicker" style="margin:14px 0 6px">Regras do QR · o cliente vê a de maior prioridade a que tem direito</p>
+          ${f.rules.map((r, i) => `<div class="panel" style="padding:10px;margin-bottom:8px">
+            <div class="grid g2" style="gap:6px"><input class="select" data-rf="${i}:description" value="${esc(r.description || "")}" placeholder="O que aparece na tela verde (ex.: 10% em todos os serviços)" style="grid-column:1/-1">
+              ${rsel(i, "audience", AUDIENCE, r.audience || "TODOS")}<input class="select" data-rf="${i}:n" type="number" min="0" step="1" value="${esc(r.n ?? "")}" placeholder="N (Top N, primeiras N, lote N)">
+              <span style="display:flex;gap:6px"><input class="select" data-rf="${i}:limit" type="number" min="0" step="1" value="${esc(r.limit ?? "")}" placeholder="Limite" style="width:90px">${rsel(i, "period", PERIOD, r.period || "DIA")}</span>
+              <span style="display:flex;gap:6px;align-items:center"><input class="select" data-rf="${i}:priority" type="number" step="1" value="${esc(r.priority ?? "")}" placeholder="Prioridade" style="width:100px">
+                <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" data-rf="${i}:active" ${r.active !== false ? "checked" : ""}> ativa</label>
+                <button class="btn ghost" data-r-del="${i}" type="button" style="color:var(--uby-red)">✕</button></span></div></div>`).join("")}
+          <button class="btn" id="clubRuleAdd" type="button">+ Regra</button>
+          <p style="margin:8px 0 0"><small>Limite vale por cliente neste parceiro, somando todas as regras (ex.: 1 por dia = um desconto por dia).</small></p>
           <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="clubPartnerSave" type="button" ${ui.busy ? "disabled" : ""}>${f.id ? "Salvar alterações" : "Cadastrar parceiro"}</button>${f.id ? `<button class="btn" id="clubPartnerNew" type="button">Novo</button>` : ""}</div>
         </section>
-      </div>`;
+      </div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Usos pelo QR · ${esc(data.label)}</p><h2>Registros automáticos</h2><p>Gravados no momento em que o cliente toca USAR AGORA no caixa. Cancele um uso feito por engano (o cliente volta a poder usar).</p></div>
+          <button class="btn" id="clubUsesReload" type="button">↻ Atualizar</button></div>
+        ${uses.error ? `<div class="note" style="border-color:var(--uby-amber)">${esc(uses.error)}</div>` : ""}
+        <div class="table-wrap" style="max-height:480px"><table><thead><tr><th>Data</th><th>Parceiro</th><th>Benefício</th><th>Cliente</th><th>Código</th><th>Situação</th><th></th></tr></thead>
+          <tbody>${uses.loading || (!uses.rows && !uses.error && mk) ? `<tr><td colspan="7" class="empty">Carregando…</td></tr>` : (uses.rows || []).map(u => `<tr><td>${fmt.dt(u.created_at)}</td><td>${esc(names.get(u.partner_id) || u.partner_id)}</td><td><small>${esc(u.description)}</small></td>
+            <td>${who(u.client_name || "—")}<small>${priv(String(u.client_key).replace(/^(tel|mail):/, ""))}</small></td><td>${esc(u.code)}</td>
+            <td><span class="badge ${u.status === "CONFIRMADO" ? "ok" : "neutral"}">${u.status === "CONFIRMADO" ? "confirmado" : "cancelado"}</span></td>
+            <td>${u.status === "CONFIRMADO" ? `<button class="btn ghost" data-u-cancel="${esc(u.id)}" type="button" style="color:var(--uby-red)">Cancelar</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">Nenhum uso pelo QR neste mês.</td></tr>`}</tbody></table></div>
+      </section>`;
   }
 
   function couponsTab(c) {
@@ -191,10 +285,11 @@
       <div class="toolbar">
         <div class="seg" id="clubTabs">${[["ranking", "Ranking"], ["participantes", "Participantes"], ["parceiros", "Parceiros"], ["cupons", "Cupons"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
         <span class="spacer"></span>
-        ${ui.tab === "ranking" || ui.tab === "cupons" ? `<label>Competição <select class="select" id="clubMonth">${c.months.slice().reverse().map(m => `<option value="${m.key}" ${m.key === c.monthKey ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></label>` : ""}
+        ${ui.tab === "ranking" || ui.tab === "cupons" || ui.tab === "parceiros" ? `<label>Competição <select class="select" id="clubMonth">${c.months.slice().reverse().map(m => `<option value="${m.key}" ${m.key === c.monthKey ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></label>` : ""}
       </div>
       ${ui.tab === "participantes" ? participantsTab(c) : ui.tab === "parceiros" ? partnersTab(c) : ui.tab === "cupons" ? couponsTab(c) : rankingTab(c)}`;
     bind();
+    if (ui.tab === "parceiros") loadUses(c.monthKey);
   }
 
   function bind() {
@@ -222,18 +317,66 @@
         await save(`Importação de ${rows.length} participante(s)`, p => { p.participants = { rows: mergeBy(p.participants?.rows, rows, participantKey), updatedAt: new Date().toISOString(), source: files.map(f => f.name).join(", ") }; return p; }, "import_participants");
       } catch (err) { ui.msg = { ok: false, text: `Importação: ${err.message || err}` }; paint(); }
     };
+    // ranking: Top 3 do mês fechado vale nos parceiros durante o mês seguinte
+    if ($("#clubPublishTop")) $("#clubPublishTop").onclick = () => {
+      const mk = data.monthKey, top = data.rows.slice(0, 3).map(r => ({ position: r.position, name: r.name, phone: r.phone || "", email: r.email || "" }));
+      const semContato = top.filter(t => !t.phone && !t.email).map(t => t.name);
+      if (semContato.length && !confirm(`Sem celular nem e-mail: ${semContato.join(", ")}. Essa pessoa não vai conseguir usar o benefício do Top 3. Publicar mesmo assim?`)) return;
+      if (!confirm(`Publicar o Top 3 de ${data.label} (${top.map(t => t.name).join(", ")})? Vale nos parceiros durante o mês seguinte.`)) return;
+      save(`Top 3 de ${data.label} publicado`, d => {
+        d.partnerProgram = d.partnerProgram || {};
+        d.partnerProgram.topByMonth = { ...(d.partnerProgram.topByMonth || {}), [mk]: { entries: top, publishedAt: new Date().toISOString() } };
+        return d;
+      }, "publish_top3");
+    };
     // parceiros
-    target.querySelectorAll("[data-pf]").forEach(el => el.onchange = () => { ui.partnerForm[el.dataset.pf] = el.dataset.pf === "usageCount" ? Number(el.value || 0) : el.value; });
-    target.querySelectorAll("[data-p-edit]").forEach(b => b.onclick = () => { const p = data.partners.find(x => x.id === b.dataset.pEdit); if (p) { ui.partnerForm = { ...p }; paint(); } });
+    const readForm = () => {
+      target.querySelectorAll("[data-pf]").forEach(el => { ui.partnerForm[el.dataset.pf] = el.value; });
+      target.querySelectorAll("[data-rf]").forEach(el => {
+        const [i, k] = el.dataset.rf.split(":"), r = ui.partnerForm.rules[Number(i)];
+        if (r) r[k] = el.type === "checkbox" ? el.checked : el.value;
+      });
+    };
+    target.querySelectorAll("[data-pf],[data-rf]").forEach(el => el.onchange = readForm);
+    if ($("#clubRuleAdd")) $("#clubRuleAdd").onclick = () => { readForm(); ui.partnerForm.rules.push({ id: "", description: "", audience: "TODOS", n: "", period: "DIA", limit: 1, priority: 1, active: true }); paint(); };
+    target.querySelectorAll("[data-r-del]").forEach(b => b.onclick = () => { readForm(); ui.partnerForm.rules.splice(Number(b.dataset.rDel), 1); paint(); });
+    target.querySelectorAll("[data-p-edit]").forEach(b => b.onclick = () => { const p = data.partners.find(x => x.id === b.dataset.pEdit); if (p) { ui.partnerForm = { ...p, rules: rulesOf(p).map(r => ({ ...r })) }; paint(); } });
+    target.querySelectorAll("[data-p-display]").forEach(b => b.onclick = async () => {
+      const p = data.partners.find(x => x.id === b.dataset.pDisplay);
+      try { await downloadDisplay(p); } catch (err) { ui.msg = { ok: false, text: `Display: ${err.message || err}` }; paint(); }
+    });
+    target.querySelectorAll("[data-p-link]").forEach(b => b.onclick = async () => {
+      const link = qrLink(data.partners.find(x => x.id === b.dataset.pLink));
+      try { await navigator.clipboard.writeText(link); alert(`Link copiado:\n${link}`); } catch (_) { window.prompt("Link do QR:", link); }
+    });
     if ($("#clubPartnerNew")) $("#clubPartnerNew").onclick = () => { ui.partnerForm = null; paint(); };
     if ($("#clubPartnerSave")) $("#clubPartnerSave").onclick = () => {
-      target.querySelectorAll("[data-pf]").forEach(el => { ui.partnerForm[el.dataset.pf] = el.dataset.pf === "usageCount" ? Number(el.value || 0) : el.value; });
+      readForm();
       const f = { ...ui.partnerForm, name: String(ui.partnerForm.name || "").trim() };
       if (!f.name) { ui.msg = { ok: false, text: "Informe o nome do parceiro." }; paint(); return; }
+      const ids = new Set();
+      f.rules = (f.rules || []).filter(r => String(r.description || "").trim()).map((r, i) => {
+        let id = String(r.id || "").trim() || `regra-${Date.now().toString(36)}-${i}`;
+        while (ids.has(id)) id += "x";
+        ids.add(id);
+        const num = v => v === "" || v == null ? "" : Number(v);
+        return { id, description: String(r.description).trim(), audience: r.audience || "TODOS", n: num(r.n), period: r.period || "DIA", limit: num(r.limit), priority: num(r.priority), active: r.active !== false };
+      });
+      const semN = f.rules.find(r => r.audience !== "TODOS" && !(r.n > 0));
+      if (semN) { ui.msg = { ok: false, text: `Regra "${semN.description}": informe o N (quantos do Top, quantas vezes ou o tamanho do lote).` }; paint(); return; }
+      const semLimite = f.rules.find(r => r.period !== "ILIMITADO" && !(r.limit > 0));
+      if (semLimite) { ui.msg = { ok: false, text: `Regra "${semLimite.description}": informe o limite (ex.: 1 por dia) ou escolha "sem limite".` }; paint(); return; }
       f.id = f.id || `partner-${Date.now().toString(36)}`; f.updatedAt = new Date().toISOString();
+      if (f.status === "active" && !f.qrCode) f.qrCode = newQrCode();
       ui.partnerForm = null;
       save(`Parceiro ${f.name}`, p => { p.partners = (p.partners || []).filter(x => x.id !== f.id).concat(f); return p; }, "save_partner");
     };
+    if ($("#clubUsesReload")) $("#clubUsesReload").onclick = () => loadUses(data.monthKey, true);
+    target.querySelectorAll("[data-u-cancel]").forEach(b => b.onclick = async () => {
+      if (!confirm("Cancelar este uso? O cliente volta a poder usar o benefício no período.")) return;
+      try { const w = await writer(); await w.UBY_SUPABASE.cancelClubPartnerUse(b.dataset.uCancel); ui.msg = { ok: true, text: "Uso cancelado." }; await loadUses(data.monthKey, true); }
+      catch (err) { ui.msg = { ok: false, text: `Cancelar uso: ${err.message || err}` }; paint(); }
+    });
     target.querySelectorAll("[data-p-del]").forEach(b => b.onclick = () => {
       const p = data.partners.find(x => x.id === b.dataset.pDel);
       if (!p || !confirm(`Excluir a parceria ${p.name}?`)) return;
