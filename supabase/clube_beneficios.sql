@@ -54,24 +54,30 @@ create policy "club uses admin cancel" on public.club_partner_uses
   for update to authenticated using (private.can_access_obra_app()) with check (private.can_access_obra_app());
 
 -- Encontra o cliente nas sessões de recarga das estações UBY (qualquer cliente que recarregou).
--- p_phone: só dígitos com DDD (10 ou 11). p_email: minúsculo. Devolve o registro mais recente.
+-- p_phone: chave do celular = DDD + 8 últimos dígitos (mesma regra de normPhone na função):
+-- ignora +55, zeros à esquerda e o 9 extra; número com dígitos a menos/a mais não casa.
+-- p_email: minúsculo. Devolve o registro mais recente; client_phone volta como chave.
 create or replace function public.club_find_client(p_phone text, p_email text, p_work_ids text[])
 returns table (client_name text, client_phone text, client_email text, sessions bigint)
 language sql stable security definer set search_path = public, pg_temp as $$
   with s as (
     select user_name,
-           regexp_replace(coalesce(user_phone, ''), '\D', '', 'g') as digits,
+           ltrim(regexp_replace(coalesce(user_phone, ''), '\D', '', 'g'), '0') as d1,
            lower(trim(coalesce(user_email, ''))) as mail,
            started_at
     from public.recharge_sessions
     where obra_id = any(p_work_ids) and coalesce(revenue, 0) > 0
+  ), n as (
+    select *, case when length(d1) >= 12 and left(d1, 2) = '55' then ltrim(substr(d1, 3), '0') else d1 end as d2 from s
+  ), k as (
+    select *, case when length(d2) between 10 and 11 then left(d2, 2) || right(d2, 8) end as phone_key from n
   ), m as (
-    select * from s
-    where (length(coalesce(p_phone, '')) >= 10 and length(digits) >= 10 and right(digits, length(p_phone)) = p_phone)
+    select * from k
+    where (length(coalesce(p_phone, '')) = 10 and phone_key = p_phone)
        or (coalesce(p_email, '') <> '' and mail = p_email)
   )
   select (array_agg(nullif(trim(user_name), '') order by started_at desc nulls last) filter (where coalesce(trim(user_name), '') <> ''))[1],
-         (array_agg(right(digits, 11) order by started_at desc nulls last) filter (where length(digits) >= 10))[1],
+         (array_agg(phone_key order by started_at desc nulls last) filter (where phone_key is not null))[1],
          (array_agg(mail order by started_at desc nulls last) filter (where mail <> ''))[1],
          count(*)
   from m

@@ -82,6 +82,21 @@ await caso("datas em São Paulo e mês anterior", async () => {
   assert.strictEqual(previousMonth(QUA_MEIO_DIA), "2026-09");
 });
 
+await caso("telefone padronizado: DDD + 8 últimos dígitos, com ou sem 9, +55 ou 0", async () => {
+  const mesmo = ["43 99658-0549", "43996580549", "043 99658-0549", "+55 (43) 99658-0549", "5543996580549", "43 9658-0549", "(043) 9658-0549"];
+  mesmo.forEach(v => assert.strictEqual(normPhone(v), "4396580549", v));
+  ["043 9456415", "4395413541561", "123", ""].forEach(v => assert.strictEqual(normPhone(v), "", v));
+});
+
+await caso("cliente cadastrado sem o 9 extra entra digitando com o 9 (e vice-versa)", async () => {
+  const { chamar, entrar } = cenario();
+  SESSOES.push({ client_name: "Edu Teste", client_phone: "43 9886-7800", client_email: "" });
+  try {
+    await entrar("(43) 99886-7800");
+    assert.strictEqual((await chamar({ acao: "identificar", identificador: "4398867800" })).ok, true);
+  } finally { SESSOES.pop(); }
+});
+
 await caso("vitrine: só parceiros ativos com QR e benefício", async () => {
   const { chamar } = cenario();
   const r = await chamar({ acao: "inicio" });

@@ -4,51 +4,86 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#0a1628">
 <title>Clube UBY · Benefício</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{--azul:#0b3a55;--teal:#087d99;--verde:#11a36a;--verde2:#0d7f53;--cinza:#5b6f7b;--fundo:#f2f6f8;--erro:#b13d2c}
+  /* Identidade UBY Recharge: azul-marinho, verde e raio em degradê verde → turquesa. */
+  :root{--navy:#0a1628;--navy2:#111f38;--linha:#22324f;--verde:#00ff85;--turquesa:#00e5c8;--texto:#ffffff;--suave:#9fb0c8;--erro:#ff6b6b}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--fundo);color:var(--azul);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
-  .wrap{max-width:460px;margin:0 auto;padding:20px 16px 40px}
-  .marca{font-weight:800;letter-spacing:.14em;color:var(--teal);font-size:13px}
-  h1{font-size:26px;margin:4px 0 2px}
-  .sub{color:var(--cinza);margin:0 0 6px}
-  .card{background:#fff;border-radius:18px;padding:22px;margin:18px 0;box-shadow:0 4px 18px #0b223314}
-  .destaque{font-size:28px;font-weight:800;line-height:1.15;margin:6px 0 4px}
-  label{display:block;font-weight:650;margin:14px 0 6px}
-  input{width:100%;font:inherit;font-size:18px;border:1px solid #aebbc4;border-radius:12px;padding:14px}
-  button{width:100%;font:inherit;font-weight:800;font-size:18px;border:0;border-radius:14px;padding:16px;margin-top:18px;cursor:pointer;background:var(--teal);color:#fff}
-  button:disabled{opacity:.55}
-  .usar{background:var(--verde);font-size:22px;padding:22px;letter-spacing:.04em}
-  .link{background:none;color:var(--cinza);font-weight:500;font-size:14px;text-decoration:underline;padding:8px;margin-top:6px}
-  .msg{font-weight:700;margin-top:12px}
+  html,body{background:var(--navy)}
+  body{margin:0;color:var(--texto);font:16px/1.45 Poppins,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+  .wrap{max-width:460px;margin:0 auto;padding:18px 16px 40px}
+  .topo{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .logo{height:40px;width:auto;display:block}
+  .selo{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--verde);border:1px solid #00ff8555;border-radius:999px;padding:5px 10px}
+  h1{font-size:24px;font-weight:700;margin:0 0 2px;line-height:1.2}
+  .sub{color:var(--suave);margin:0 0 6px;font-size:14px}
+  .card{background:var(--navy2);border:1px solid var(--linha);border-radius:20px;padding:22px;margin:16px 0}
+  .destaque{font-size:28px;font-weight:800;line-height:1.15;margin:6px 0 4px;background:linear-gradient(100deg,var(--verde),var(--turquesa));-webkit-background-clip:text;background-clip:text;color:transparent}
+  label{display:block;font-weight:600;margin:16px 0 6px;font-size:14px}
+  input{width:100%;font:inherit;font-size:18px;color:var(--texto);background:#0c1a30;border:1px solid var(--linha);border-radius:14px;padding:14px}
+  input:focus{outline:2px solid var(--verde);border-color:transparent}
+  button{width:100%;font:inherit;font-weight:700;font-size:17px;border:0;border-radius:14px;padding:16px;margin-top:18px;cursor:pointer;background:var(--verde);color:var(--navy)}
+  button:disabled{opacity:.5}
+  .usar{font-size:21px;font-weight:800;padding:22px;letter-spacing:.06em;box-shadow:0 0 0 0 #00ff8566;animation:chama 2.2s ease-in-out infinite}
+  @keyframes chama{0%,100%{box-shadow:0 0 0 0 #00ff8555}50%{box-shadow:0 0 0 10px #00ff8500}}
+  .secundario{background:transparent;color:var(--texto);border:1px solid var(--linha)}
+  .link{background:none;color:var(--suave);font-weight:500;font-size:13px;text-decoration:underline;padding:8px;margin-top:4px}
+  .msg{font-weight:600;margin-top:12px}
   .erro{color:var(--erro)}
   .hide{display:none!important}
-  .lista div{border-top:1px solid #e1e8ec;padding:12px 0}
-  .lista strong{display:block}
-  .passos{margin:10px 0 0;padding-left:20px;color:var(--cinza)}
+  .lista div{border-top:1px solid var(--linha);padding:12px 0;font-size:14px;color:var(--suave)}
+  .lista strong{display:block;color:var(--texto);font-size:16px}
+  .passos{margin:12px 0 0;padding:0;list-style:none;counter-reset:p}
+  .passos li{counter-increment:p;display:flex;gap:10px;align-items:center;color:var(--suave);font-size:14px;margin:6px 0}
+  .passos li::before{content:counter(p);flex:0 0 24px;height:24px;border-radius:50%;background:#00ff851f;color:var(--verde);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .passos b{color:var(--texto)}
+
+  /* Confirmação dentro da página (no lugar da janela do navegador). */
+  #folha{position:fixed;inset:0;background:#050b16cc;display:flex;align-items:flex-end;justify-content:center;z-index:5}
+  #folha .caixa{width:100%;max-width:460px;background:var(--navy2);border:1px solid var(--linha);border-radius:22px 22px 0 0;padding:24px 20px 28px;animation:sobe .2s ease-out}
+  @keyframes sobe{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+  #folha h2{margin:0 0 6px;font-size:20px}
+  #folha p{margin:0;color:var(--suave);font-size:15px}
 
   /* Tela de confirmação: feita para o atendente olhar de longe. */
-  #ok{position:fixed;inset:0;background:linear-gradient(160deg,var(--verde),var(--verde2));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;overflow:hidden}
-  #ok.expirado{background:#6d7c85}
-  .pulso{width:120px;height:120px;border-radius:50%;background:#ffffff33;display:flex;align-items:center;justify-content:center;font-size:64px;animation:pulso 1.4s ease-in-out infinite}
-  #ok.expirado .pulso{animation:none}
-  @keyframes pulso{0%,100%{transform:scale(1);box-shadow:0 0 0 0 #ffffff66}50%{transform:scale(1.08);box-shadow:0 0 0 22px #ffffff00}}
-  .faixa{position:absolute;left:0;right:0;height:10px;background:repeating-linear-gradient(90deg,#fff6 0 20px,transparent 20px 40px);animation:anda 1s linear infinite}
+  #ok{position:fixed;inset:0;background:linear-gradient(160deg,var(--verde),var(--turquesa));color:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;overflow:hidden;z-index:4}
+  #ok.expirado{background:#5d6b7d;color:#fff}
+  .raio-ok{width:120px;height:120px;border-radius:30px;background:var(--navy);display:flex;align-items:center;justify-content:center;animation:pulso 1.4s ease-in-out infinite}
+  .raio-ok svg{width:56px;height:auto}
+  #ok.expirado .raio-ok{animation:none;opacity:.5}
+  @keyframes pulso{0%,100%{transform:scale(1);box-shadow:0 0 0 0 #0a162855}50%{transform:scale(1.07);box-shadow:0 0 0 22px #0a162800}}
+  .faixa{position:absolute;left:0;right:0;height:12px;background:repeating-linear-gradient(90deg,#0a162833 0 20px,transparent 20px 40px);animation:anda 1s linear infinite}
   .faixa.topo{top:0}.faixa.base{bottom:0}
   #ok.expirado .faixa{animation:none;opacity:.3}
   @keyframes anda{from{background-position:0 0}to{background-position:40px 0}}
-  .ok-parceiro{font-size:18px;opacity:.9;margin-top:18px}
-  .ok-desc{font-size:34px;font-weight:900;line-height:1.1;margin:8px 0}
-  .ok-nome{font-size:20px}
-  .relogio{font-size:56px;font-weight:900;font-variant-numeric:tabular-nums;margin:14px 0 0;letter-spacing:.03em}
-  .codigo{font-size:22px;font-weight:800;background:#ffffff26;border-radius:10px;padding:6px 16px;margin-top:8px}
-  .validade{margin-top:14px;font-size:15px;opacity:.95}
+  .ok-marca{position:absolute;top:26px;left:0;right:0;font-size:12px;font-weight:700;letter-spacing:.18em}
+  .ok-parceiro{font-size:17px;font-weight:600;margin-top:20px}
+  .ok-desc{font-size:32px;font-weight:800;line-height:1.1;margin:8px 0}
+  .ok-nome{font-size:18px;font-weight:500}
+  .relogio{font-size:58px;font-weight:800;font-variant-numeric:tabular-nums;margin:14px 0 0;letter-spacing:.02em}
+  .codigo{font-size:20px;font-weight:700;background:var(--navy);color:var(--verde);border-radius:12px;padding:6px 18px;margin-top:8px}
+  #ok.expirado .codigo{background:#00000033;color:#fff}
+  .validade{margin-top:14px;font-size:14px;font-weight:500}
 </style>
 </head>
 <body>
 <main class="wrap">
-  <div class="marca">CLUBE UBY</div>
+  <div class="topo">
+    <!-- Logo UBY Recharge (vetor): ícone com raio + "uby" + RECHARGE -->
+    <svg class="logo" viewBox="0 0 250 80" role="img" aria-label="UBY Recharge">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00ff85"/><stop offset="1" stop-color="#00e5c8"/></linearGradient></defs>
+      <rect x="0" y="4" width="72" height="72" rx="18" fill="url(#g)"/>
+      <svg x="18" y="15" width="36" height="50" viewBox="142 99 95 181"><path d="M215 99L142 203L186 203L165 280L237 177L197 177Z" fill="#0a1628"/></svg>
+      <text x="88" y="52" font-family="Poppins,sans-serif" font-weight="800" font-size="52" fill="#fff" letter-spacing="-1">uby</text>
+      <rect x="90" y="60" width="96" height="2.5" fill="#00ff85"/>
+      <text x="90" y="76" font-family="Poppins,sans-serif" font-weight="600" font-size="10.5" fill="#00ff85" letter-spacing="4.2">RECHARGE</text>
+    </svg>
+    <span class="selo">CLUBE UBY</span>
+  </div>
   <h1 id="titulo">Benefícios UBY</h1>
   <p class="sub" id="subtitulo">Carregando…</p>
 
@@ -56,16 +91,16 @@
   <section id="vitrine" class="card hide">
     <strong>Onde usar seus benefícios</strong>
     <div id="vitrineLista" class="lista"></div>
-    <p class="sub">No estabelecimento, escaneie o QR Code UBY do balcão com a câmera do celular.</p>
+    <p class="sub" style="margin-top:10px">No estabelecimento, aponte a câmera para o QR UBY do balcão.</p>
   </section>
 
   <!-- Identificação: só na primeira vez neste aparelho -->
   <section id="ident" class="card hide">
     <div class="sub">Benefício para clientes da rede UBY</div>
     <div class="destaque" id="destaqueIdent"></div>
-    <p class="sub">Primeira vez neste celular? Informe o mesmo celular ou e-mail que você usa no app de recarga. Só pedimos uma vez.</p>
+    <p class="sub" style="margin-top:10px">Primeira vez neste celular? Informe o mesmo celular ou e-mail que você usa no app de recarga. Só pedimos uma vez.</p>
     <label for="ident-campo">Celular com DDD ou e-mail</label>
-    <input id="ident-campo" autocomplete="tel" placeholder="(65) 99999-9999">
+    <input id="ident-campo" autocomplete="tel" placeholder="(43) 99999-9999">
     <button id="btnIdent" onclick="identificar()">Continuar</button>
     <div id="msgIdent" class="msg erro"></div>
   </section>
@@ -76,10 +111,10 @@
     <div class="destaque" id="desc"></div>
     <ol class="passos">
       <li>Vá até o caixa.</li>
-      <li>Toque em <b>USAR AGORA</b> na frente do atendente.</li>
+      <li><span>Toque em <b>USAR AGORA</b> na frente do atendente.</span></li>
       <li>Mostre a tela verde.</li>
     </ol>
-    <button id="btnUsar" class="usar" onclick="usar()">USAR AGORA</button>
+    <button id="btnUsar" class="usar" onclick="pedirUso()">USAR AGORA</button>
     <div id="msgUsar" class="msg erro"></div>
   </section>
 
@@ -91,13 +126,24 @@
 
   <section id="erro" class="card hide"><div class="msg erro" id="msgErro"></div></section>
 
-  <button id="btnTrocar" class="link hide" onclick="trocar()">Não é você? Trocar cadastro neste celular</button>
+  <button id="btnTrocar" class="link hide" onclick="pedirTroca()">Não é você? Trocar cadastro neste celular</button>
 </main>
+
+<!-- Confirmação da página -->
+<section id="folha" class="hide" role="dialog" aria-modal="true" aria-labelledby="folhaTitulo">
+  <div class="caixa">
+    <h2 id="folhaTitulo"></h2>
+    <p id="folhaTexto"></p>
+    <button id="folhaSim" type="button"></button>
+    <button id="folhaNao" class="secundario" type="button" style="margin-top:10px">Ainda não</button>
+  </div>
+</section>
 
 <!-- Tela verde de confirmação -->
 <section id="ok" class="hide" aria-live="polite">
   <div class="faixa topo"></div>
-  <div class="pulso" id="icone">✓</div>
+  <div class="ok-marca">CLUBE UBY · BENEFÍCIO CONFIRMADO</div>
+  <div class="raio-ok"><svg viewBox="142 99 95 181"><path d="M215 99L142 203L186 203L165 280L237 177L197 177Z" fill="#00ff85"/></svg></div>
   <div class="ok-parceiro" id="okParceiro"></div>
   <div class="ok-desc" id="okDesc"></div>
   <div class="ok-nome" id="okNome"></div>
@@ -123,6 +169,13 @@
       const r = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo)});
       return await r.json();
     } catch (e) { return {ok:false, mensagem:'Sem conexão. Confira a internet e tente de novo.'}; }
+  }
+  // Pergunta dentro da página (a janela do navegador mostraria "github.io diz").
+  function perguntar(titulo, texto, sim, acao){
+    $('folhaTitulo').textContent = titulo; $('folhaTexto').textContent = texto; $('folhaSim').textContent = sim;
+    $('folha').classList.remove('hide');
+    $('folhaSim').onclick = () => { $('folha').classList.add('hide'); acao(); };
+    $('folhaNao').onclick = () => $('folha').classList.add('hide');
   }
 
   async function carregar(){
@@ -154,8 +207,10 @@
     gravar('uby_clube_aparelho', r.aparelho); carregar();
   }
 
+  function pedirUso(){
+    perguntar('Você está no caixa?', 'Toque em confirmar na frente do atendente. A tela verde vale por 10 minutos.', 'Confirmar agora', usar);
+  }
   async function usar(){
-    if (!confirm('Use somente no caixa, na frente do atendente. Confirmar agora?')) return;
     $('btnUsar').disabled = true; $('msgUsar').textContent = '';
     const r = await chamar({acao:'usar', p:codigo, aparelho:ler('uby_clube_aparelho')});
     $('btnUsar').disabled = false;
@@ -171,13 +226,12 @@
     $('okNome').textContent = 'Cliente UBY · ' + c.nome;
     $('okCodigo').textContent = 'Código ' + c.codigo;
     $('ok').classList.remove('hide','expirado');
-    $('icone').textContent = '✓';
     clearInterval(timer);
     const tick = () => {
       const agora = Date.now() + offset, resta = c.expiraEm - agora;
       $('relogio').textContent = new Date(agora).toLocaleTimeString('pt-BR', {timeZone:'America/Sao_Paulo'});
       if (resta <= 0){
-        clearInterval(timer); $('ok').classList.add('expirado'); $('icone').textContent = '⌛';
+        clearInterval(timer); $('ok').classList.add('expirado');
         $('okValidade').textContent = 'Confirmação expirada (' + c.horario + '). Não vale mais no caixa.';
         return;
       }
@@ -187,10 +241,11 @@
     tick(); timer = setInterval(tick, 250);
   }
 
-  async function trocar(){
-    if (!confirm('Remover seu cadastro deste celular?')) return;
-    const a = ler('uby_clube_aparelho'); gravar('uby_clube_aparelho','');
-    await chamar({acao:'esquecer', aparelho:a}); carregar();
+  function pedirTroca(){
+    perguntar('Trocar cadastro?', 'Seu cadastro sai deste celular. Para usar de novo, informe o celular ou e-mail do app de recarga.', 'Sim, trocar', async () => {
+      const a = ler('uby_clube_aparelho'); gravar('uby_clube_aparelho','');
+      await chamar({acao:'esquecer', aparelho:a}); carregar();
+    });
   }
 
   carregar();

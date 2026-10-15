@@ -117,26 +117,79 @@
       document.head.appendChild(s);
     }));
   }
+  // Identidade UBY Recharge: azul-marinho, verde e raio em degradê verde → turquesa (Poppins).
+  const BRAND = { navy: "#0a1628", navy2: "#111f38", green: "#00ff85", teal: "#00e5c8", soft: "#9fb0c8" };
+  async function ensurePoppins() {
+    if (!document.querySelector("link[data-poppins]")) {
+      const l = document.createElement("link"); l.rel = "stylesheet"; l.dataset.poppins = "1";
+      l.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&display=swap";
+      document.head.appendChild(l);
+      await new Promise(r => { l.onload = r; l.onerror = r; setTimeout(r, 4000); });
+    }
+    try { await Promise.all(["500", "600", "700", "800"].map(w => document.fonts.load(`${w} 80px Poppins`))); } catch (_) {}
+  }
+  // Raio do logo (contorno medido do arquivo oficial), desenhado com altura h a partir de (x, y).
+  function drawBolt(g, x, y, h, fill) {
+    const s = h / 181, P = [[215, 99], [142, 203], [186, 203], [165, 280], [237, 177], [197, 177]];
+    g.beginPath(); P.forEach(([px, py], i) => g[i ? "lineTo" : "moveTo"](x + (px - 142) * s, y + (py - 99) * s)); g.closePath();
+    g.fillStyle = fill; g.fill();
+  }
+  function roundRect(g, x, y, w, h, r, fill) { g.beginPath(); g.roundRect(x, y, w, h, r); g.fillStyle = fill; g.fill(); }
   async function downloadDisplay(p) {
-    const qrcode = await ensureQrLib();
+    const [qrcode] = await Promise.all([ensureQrLib(), ensurePoppins()]);
     const qr = qrcode(0, "M"); qr.addData(qrLink(p)); qr.make();
     const W = 1748, H = 2480, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
-    const g = cv.getContext("2d"), font = (px, b) => `${b ? "bold " : ""}${px}px Arial, Helvetica, sans-serif`;
-    const center = (t, y, px, b, color) => { g.font = font(px, b); g.fillStyle = color; g.textAlign = "center"; g.textBaseline = "top"; g.fillText(t, W / 2, y); };
-    const fit = (t, px, max) => { const out = []; let line = ""; g.font = font(px, true); t.split(/\s+/).forEach(w => { const s2 = (line + " " + w).trim(); if (g.measureText(s2).width <= max) line = s2; else { out.push(line); line = w; } }); out.push(line); return out; };
-    g.fillStyle = "#fff"; g.fillRect(0, 0, W, H);
-    g.fillStyle = "#0b3a55"; g.fillRect(0, 0, W, 300); center("UBY RECHARGE", 95, 110, true, "#fff");
-    center("Cliente da rede UBY?", 380, 90, true, "#087d99");
+    const g = cv.getContext("2d");
+    const font = (px, w = 700) => `${w} ${px}px Poppins, Arial, sans-serif`;
+    const grad = (x0, y0, x1, y1) => { const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, BRAND.green); gr.addColorStop(1, BRAND.teal); return gr; };
+    const center = (t, y, px, w, color, spacing = "0px") => { g.font = font(px, w); g.letterSpacing = spacing; g.fillStyle = color; g.textAlign = "center"; g.textBaseline = "top"; g.fillText(t, W / 2, y); g.letterSpacing = "0px"; };
+    const fit = (t, px, max) => { const out = []; let line = ""; g.font = font(px, 800); t.split(/\s+/).forEach(w => { const s2 = (line + " " + w).trim(); if (g.measureText(s2).width <= max) line = s2; else { out.push(line); line = w; } }); out.push(line); return out; };
+
+    // fundo azul-marinho com brilho verde discreto no topo
+    g.fillStyle = BRAND.navy; g.fillRect(0, 0, W, H);
+    const glow = g.createRadialGradient(W / 2, 260, 40, W / 2, 260, 900); glow.addColorStop(0, "#00ff8522"); glow.addColorStop(1, "#00ff8500");
+    g.fillStyle = glow; g.fillRect(0, 0, W, 1100);
+
+    // logo: ícone (degradê + raio azul) + "uby" + RECHARGE
+    const icon = 230, lx = W / 2 - 400, ly = 150;
+    roundRect(g, lx, ly, icon, icon, 58, grad(lx, ly, lx + icon, ly + icon));
+    drawBolt(g, lx + icon / 2 - 46, ly + 40, 150, BRAND.navy);
+    g.font = font(270, 800); g.fillStyle = "#fff"; g.textAlign = "left"; g.textBaseline = "alphabetic"; g.letterSpacing = "-4px"; g.fillText("uby", lx + icon + 50, ly + 205); g.letterSpacing = "0px";
+    g.fillStyle = BRAND.green; g.fillRect(lx + icon + 58, ly + 240, 455, 9);
+    g.font = font(50, 600); g.letterSpacing = "21px"; g.fillText("RECHARGE", lx + icon + 58, ly + 318); g.letterSpacing = "0px";
+
+    // chamada
+    center("CLIENTE DA REDE UBY?", 560, 60, 700, BRAND.green, "8px");
     const chamada = String(p.headline || rulesOf(p).find(r => r.audience === "TODOS")?.description || "Benefício exclusivo").trim();
-    let px = 150, lines = fit(chamada, px, W - 200);
-    while (lines.length > 2 && px > 70) { px -= 8; lines = fit(chamada, px, W - 200); }
-    let y = 520; lines.forEach(l => { center(l, y, px, true, "#0b3a55"); y += px + 20; });
-    const n = qr.getModuleCount(), side = 900, cell = side / (n + 4), top = Math.max(y + 40, 900), left = (W - side) / 2;
-    g.fillStyle = "#0b3a55";
-    for (let r = 0; r < n; r++) for (let c2 = 0; c2 < n; c2++) if (qr.isDark(r, c2)) g.fillRect(Math.floor(left + (c2 + 2) * cell), Math.floor(top + (r + 2) * cell), Math.ceil(cell), Math.ceil(cell));
-    y = top + side + 70;
-    ["1. Aponte a câmera do celular", "2. Toque em USAR AGORA no caixa", "3. Mostre a tela verde ao atendente"].forEach(t => { center(t, y, 64, false, "#0b3a55"); y += 95; });
-    g.fillStyle = "#087d99"; g.fillRect(0, H - 190, W, 190); center(`${p.name} · Parceiro UBY`, H - 140, 66, true, "#fff");
+    let px = 140, lines = fit(chamada, px, W - 220);
+    while (lines.length > 2 && px > 70) { px -= 8; lines = fit(chamada, px, W - 220); }
+    let y = 650; lines.forEach(l => { center(l, y, px, 800, "#fff"); y += px + 18; });
+
+    // QR num cartão branco com moldura verde
+    const card = 860, cx = (W - card) / 2, top = Math.max(y + 40, 990);
+    roundRect(g, cx - 14, top - 14, card + 28, card + 28, 70, grad(cx, top, cx + card, top + card));
+    roundRect(g, cx, top, card, card, 58, "#fff");
+    const n = qr.getModuleCount(), side = 740, cell = side / n, qx = cx + (card - side) / 2, qy = top + (card - side) / 2;
+    g.fillStyle = BRAND.navy;
+    for (let r = 0; r < n; r++) for (let c2 = 0; c2 < n; c2++) if (qr.isDark(r, c2)) g.fillRect(Math.floor(qx + c2 * cell), Math.floor(qy + r * cell), Math.ceil(cell), Math.ceil(cell));
+    // selo do raio no centro do QR (correção M aguenta)
+    roundRect(g, W / 2 - 66, top + card / 2 - 66, 132, 132, 32, BRAND.navy);
+    drawBolt(g, W / 2 - 26, top + card / 2 - 46, 92, BRAND.green);
+
+    // passos
+    y = top + card + 64;
+    ["Aponte a câmera do celular", "No caixa, toque em USAR AGORA", "Mostre a tela verde ao atendente"].forEach((t, i) => {
+      g.font = font(58, 500); const w = g.measureText(t).width, bx = (W - (w + 110)) / 2;
+      g.beginPath(); g.arc(bx + 34, y + 34, 34, 0, Math.PI * 2); g.fillStyle = BRAND.green; g.fill();
+      g.font = font(44, 800); g.fillStyle = BRAND.navy; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(String(i + 1), bx + 34, y + 36);
+      g.font = font(58, 500); g.fillStyle = "#fff"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(t, bx + 100, y + 36);
+      y += 92;
+    });
+
+    // rodapé com o parceiro
+    g.fillStyle = grad(0, H - 210, W, H); g.fillRect(0, H - 210, W, 210);
+    center(String(p.name || "").toUpperCase(), H - 170, 64, 800, BRAND.navy, "2px");
+    center("PARCEIRO DO CLUBE UBY", H - 82, 38, 600, BRAND.navy, "10px");
     const a = document.createElement("a");
     a.download = `display-${String(p.name).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()}.png`;
     a.href = cv.toDataURL("image/png"); a.click();

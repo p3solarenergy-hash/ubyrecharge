@@ -22,11 +22,18 @@ export type Use = { id?: string; created_at: string; partner_id: string; benefit
 
 // ───────────── utilidades puras (testadas em scripts/test_clube_beneficio.mjs) ─────────────
 
+/**
+ * Chave do celular: DDD + 8 últimos dígitos. Cada cadastro vem num formato
+ * ("043 9965-8054", "+55 43 99965-8054", "43999658054"): ignora +55, zeros à
+ * esquerda e o 9 extra, que às vezes falta. Número com dígitos a menos ou a
+ * mais não tem como ser adivinhado e fica vazio (o cliente usa o e-mail).
+ * A mesma regra está em club_find_client (SQL).
+ */
 export function normPhone(v: unknown): string {
-  let d = String(v ?? "").replace(/\D/g, "");
-  if (d.length >= 12 && d.startsWith("55")) d = d.slice(2);
-  if (d.startsWith("0")) d = d.slice(1);
-  return d.length >= 10 ? d.slice(-11) : "";
+  let d = String(v ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  if (d.length >= 12 && d.startsWith("55")) d = d.slice(2).replace(/^0+/, "");
+  if (d.length < 10 || d.length > 11) return "";
+  return d.slice(0, 2) + d.slice(-8);
 }
 export function normEmail(v: unknown): string {
   const e = String(v ?? "").trim().toLowerCase();
