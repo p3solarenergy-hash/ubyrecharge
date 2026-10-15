@@ -52,6 +52,58 @@
     window.UBY_ENGINE_SKIPPED_RENDERS = skip.length;
   })();
 
+  // ---------------------------------------------------------------------
+  // Identidade do cliente (15/10/2026). A chave original usa o nome primeiro;
+  // quando a Spott traz o nome escrito diferente com o mesmo e-mail ou telefone
+  // ("Edilson Lima" × "Edilson pereira de lima"), virava outro cliente e gerava
+  // alerta falso de "parado". Aqui as recargas que dividem nome, e-mail ou
+  // telefone formam um só cliente; a chave do grupo é a chave original mais
+  // usada nele. Vale para todo o motor (clientKeyFromCharge é global).
+  // ---------------------------------------------------------------------
+  let lookupClientId = () => null;
+  (function unifyClientIdentity() {
+    const baseKey = window.clientKeyFromCharge;
+    if (typeof baseKey !== "function") return;
+    let cache = null, building = false;
+    const idsOf = c => {
+      const e = safeText(c.userEmail).trim().toLowerCase(), p = normalizePhone(c.userPhone);
+      return [baseKey(c), e && `email:${e}`, p && `phone:${p}`].filter(Boolean);
+    };
+    function index() {
+      // Caminho rápido (chamado a cada recarga): getGeneralUnitData() relê o
+      // localStorage, então só é chamado quando a versão das recargas muda.
+      const version = typeof rechargeRecordsVersion !== "undefined" ? rechargeRecordsVersion : 0;
+      const current = typeof generalUnitDataCache !== "undefined" ? generalUnitDataCache?.data : undefined;
+      if (cache && cache.version === version && (current === undefined || current === cache.unitData)) return cache.map;
+      building = true;
+      try {
+        const unitData = getGeneralUnitData();
+        if (cache && cache.version === rechargeRecordsVersion && cache.unitData === unitData) return cache.map;
+        const parent = new Map(), count = new Map();
+        const find = x => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+        getUbyChargerRows(unitData).forEach(r => (r.charges || []).forEach(c => {
+          const ids = idsOf(c);
+          if (!ids.length) return;
+          ids.forEach(i => { if (!parent.has(i)) parent.set(i, i); });
+          count.set(ids[0], (count.get(ids[0]) || 0) + 1);
+          ids.slice(1).forEach(i => { const a = find(ids[0]), b = find(i); if (a !== b) parent.set(b, a); });
+        }));
+        const best = new Map();
+        count.forEach((n, k) => { const root = find(k), cur = best.get(root); if (!cur || n > cur.n || (n === cur.n && k < cur.k)) best.set(root, { k, n }); });
+        const map = new Map();
+        parent.forEach((_, x) => { const b = best.get(find(x)); map.set(x, b ? b.k : x); });
+        cache = { version: rechargeRecordsVersion, unitData, map };
+        return map;
+      } finally { building = false; }
+    }
+    window.clientKeyFromCharge = function (charge = {}) {
+      const k = baseKey(charge);
+      if (!k || building) return k;
+      try { return index().get(k) || k; } catch (_) { return k; }
+    };
+    lookupClientId = id => { if (!id || building) return null; try { return index().get(id) || null; } catch (_) { return null; } };
+  })();
+
   const iso = date => (date instanceof Date && !Number.isNaN(date.getTime())) ? date.toISOString() : null;
   const sumBy = (list, fn) => list.reduce((sum, item) => sum + Number(fn(item) || 0), 0);
   const clientsOf = charges => new Set(charges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
@@ -820,7 +872,49 @@
     // cópia local de volta para a nuvem.
     const official = await readCustomerRegistryCloud();
     if (!official) return { rows: [], total: 0 };
-    return JSON.parse(JSON.stringify({ rows: customerRegistryRowsFromCloud(official.rows), total: official.total,
+    // A tabela tem duas linhas para a mesma pessoa (importação manual por e-mail e
+    // outra gerada das recargas, com chave hash) e os acumulados são retratos
+    // antigos. Aqui: 1 linha por pessoa e os números vêm das recargas importadas
+    // (operação UBY, sem parceiros): R$ e kWh = soma das linhas; recargas = válidas.
+    const raw = customerRegistryRowsFromCloud(official.rows);
+    const stats = {};
+    getUbyChargerRows(getGeneralUnitData()).filter(r => r.included && !isPartnerRow(r)).forEach(r => (r.charges || []).forEach(c => {
+      const k = clientKeyFromCharge(c); if (!k) return;
+      const s = stats[k] || (stats[k] = { name: c.userName || c.userEmail || "", email: c.userEmail || "", phone: c.userPhone || "", transactions: 0, energy: 0, spent: 0, hours: 0, stations: new Set(), last: null });
+      s.energy += Number(c.energyKWh || 0); s.spent += Number(c.revenue || 0);
+      if (isExecutedCharge(c)) { s.transactions += 1; s.hours += durToHours(c.duration) || 0; }
+      if (c.station) s.stations.add(abbreviatedStationLabel(r.station));
+      if (c.startDate instanceof Date && !Number.isNaN(c.startDate.getTime()) && (!s.last || c.startDate > s.last)) s.last = c.startDate;
+      if (!s.email && c.userEmail) s.email = c.userEmail;
+      if (!s.phone && c.userPhone) s.phone = c.userPhone;
+    }));
+    const keyOfRow = r => {
+      const e = String(r.email || "").trim().toLowerCase(), p = normalizePhone(r.phone);
+      const ids = [clientIdentityKey(r.name, r.email, r.phone), e && `email:${e}`, p && `phone:${p}`].filter(Boolean);
+      for (const id of ids) { const k = lookupClientId(id); if (k) return k; }
+      return null;
+    };
+    // Agrupa por cliente das recargas; quem não aparece nelas é unido por CPF/e-mail/telefone.
+    const groups = new Map(), loose = [];
+    raw.forEach(r => { const k = keyOfRow(r); if (k) (groups.get(k) || groups.set(k, []).get(k)).push(r); else loose.push(r); });
+    const pickContact = list => {
+      const first = f => (list.find(x => x[f]) || {})[f] || "";
+      return { name: first("name"), email: first("email"), phone: first("phone"), phoneDisplay: first("phoneDisplay") || first("phone"), complement: first("complement") };
+    };
+    const out = [];
+    groups.forEach((list, k) => {
+      const s = stats[k];
+      delete stats[k];
+      // só carregou em parceiro (fora das métricas): fica com o retrato do cadastro
+      if (!s || !(s.transactions || s.spent)) { loose.push(...list); return; }
+      out.push({ ...pickContact(list), chargers: s.stations.size, stations: [...s.stations], transactions: s.transactions, energy: s.energy, spent: s.spent,
+        chargeTime: formatRechargeDuration(s.hours), last: iso(s.last), status: "ok", merged: list.length });
+    });
+    consolidateCustomerRegistryRows(loose).forEach(r => out.push({ ...r, phoneDisplay: r.phoneDisplay || r.phone, stations: r.locations || [], last: null, status: "cadastro", merged: 1 }));
+    Object.values(stats).filter(s => s.transactions || s.spent).forEach(s => out.push({ name: s.name, email: s.email, phone: normalizePhone(s.phone), phoneDisplay: s.phone, complement: "",
+      chargers: s.stations.size, stations: [...s.stations], transactions: s.transactions, energy: s.energy, spent: s.spent, chargeTime: formatRechargeDuration(s.hours),
+      last: iso(s.last), status: "sem-cadastro", merged: 0 }));
+    return JSON.parse(JSON.stringify({ rows: out, total: official.total, rawRows: raw.length,
       updatedAt: official.rows.reduce((max, r) => (r.updated_at || "") > max ? r.updated_at : max, "") }));
   }
 

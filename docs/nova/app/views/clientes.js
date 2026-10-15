@@ -214,21 +214,25 @@
     const q = ui.search.trim().toLowerCase();
     const rows = registry.rows.filter(r => !q || `${r.name} ${r.email} ${r.phone}`.toLowerCase().includes(q)).sort((a, b) =>
       ui.sort === "name" ? String(a.name).localeCompare(String(b.name), "pt-BR") : Number(b[ui.sort] || 0) - Number(a[ui.sort] || 0));
-    const tot = registry.rows.reduce((a, r) => ({ transactions: a.transactions + r.transactions, energy: a.energy + r.energy, spent: a.spent + r.spent }), { transactions: 0, energy: 0, spent: 0 });
+    const live = registry.rows.filter(r => r.status !== "cadastro");
+    const tot = live.reduce((a, r) => ({ transactions: a.transactions + r.transactions, energy: a.energy + r.energy, spent: a.spent + r.spent }), { transactions: 0, energy: 0, spent: 0 });
+    const onlyReg = registry.rows.length - live.length, noReg = registry.rows.filter(r => r.status === "sem-cadastro").length;
+    const united = (registry.rawRows || 0) - (registry.rows.length - noReg);
+    const tag = r => r.status === "cadastro" ? ' <span class="badge neutral">só no cadastro</span>' : r.status === "sem-cadastro" ? ' <span class="badge warn">sem cadastro</span>' : "";
     return `
-      <section class="section"><div class="section-head"><div><p class="kicker">Base oficial · recharge_customers</p><h2>Cadastro geral de clientes</h2><p>Base consolidada importada das plataformas de recarga. Importações novas: <a href="#/importar">Importar planilhas</a>.</p></div><div class="meta">atualizada ${fmt.dt(registry.updatedAt)}</div></div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Base oficial · recharge_customers</p><h2>Cadastro geral de clientes</h2><p>Uma linha por pessoa (cadastros repetidos por e-mail, telefone ou nome são unidos). Recargas, energia, tempo e gasto vêm das planilhas importadas da operação UBY, sem parceiros. Quem não tem recarga nelas mostra o retrato antigo do cadastro. Importações novas: <a href="#/importar">Importar planilhas</a>.</p></div><div class="meta">cadastro atualizado ${fmt.dt(registry.updatedAt)}</div></div>
         <div class="grid g4" style="margin-bottom:14px">
-          ${kpi("Clientes", fmt.int(registry.rows.length), "cadastros únicos", "", "lead")}
-          ${kpi("Transações", fmt.int(tot.transactions), "acumulado informado")}
-          ${kpi("Energia", fmt.kwh0(tot.energy), "consumo acumulado", "", "warn")}
-          ${kpi("Total gasto", fmt.brl(tot.spent), "faturamento informado")}
+          ${kpi("Clientes", fmt.int(registry.rows.length), `${fmt.int(united)} linha(s) repetida(s) unida(s) · ${fmt.int(noReg)} sem cadastro`, "", "lead")}
+          ${kpi("Recargas válidas", fmt.int(tot.transactions), `soma das planilhas · ${fmt.int(live.length)} clientes`)}
+          ${kpi("Energia", fmt.kwh0(tot.energy), "soma das planilhas", "", "warn")}
+          ${kpi("Total gasto", fmt.brl(tot.spent), `${fmt.int(onlyReg)} só no cadastro fora da soma`)}
         </div>
         <div class="toolbar" style="box-shadow:none"><input class="search" id="regSearch" placeholder="Buscar nome, e-mail ou telefone" value="${esc(ui.search)}">
           <select class="select" id="regSort">${[["spent", "Maior gasto"], ["transactions", "Mais transações"], ["energy", "Mais energia"], ["name", "Nome"]].map(([v, l]) => `<option value="${v}" ${ui.sort === v ? "selected" : ""}>${l}</option>`).join("")}</select>
           <span class="spacer"></span><small>${rows.length} de ${registry.rows.length}</small></div>
-        <div class="table-wrap" style="max-height:620px"><table><thead><tr><th>Cliente</th><th>Telefone</th><th>E-mail</th><th class="num">Carregadores</th><th class="num">Transações</th><th class="num">Energia</th><th>Tempo</th><th class="num">Total gasto</th></tr></thead>
-          <tbody>${rows.slice(0, 800).map(r => `<tr><td><strong>${who(r.name || "—")}</strong>${r.complement ? `<small>${esc(r.complement)}</small>` : ""}</td><td>${contact(r.phoneDisplay || r.phone)}</td><td>${contact(r.email)}</td>
-            <td class="num">${r.chargers}</td><td class="num">${r.transactions}</td><td class="num">${fmt.kwh(r.energy)}</td><td>${esc(r.chargeTime || "—")}</td><td class="num"><strong>${fmt.brl(r.spent)}</strong></td></tr>`).join("") || `<tr><td colspan="8" class="empty">Nenhum cliente encontrado.</td></tr>`}</tbody></table></div>
+        <div class="table-wrap" style="max-height:620px"><table><thead><tr><th>Cliente</th><th>Telefone</th><th>E-mail</th><th>Carregadores</th><th class="num">Recargas</th><th class="num">Energia</th><th>Tempo</th><th class="num">Total gasto</th></tr></thead>
+          <tbody>${rows.slice(0, 800).map(r => `<tr class="${r.status === "cadastro" ? "muted" : ""}"><td><strong>${who(r.name || "—")}</strong>${tag(r)}${r.complement ? `<small>${esc(r.complement)}</small>` : ""}</td><td>${contact(r.phoneDisplay || r.phone)}</td><td>${contact(r.email)}</td>
+            <td>${esc((r.stations || []).join(" · ") || String(r.chargers || "—"))}${r.last ? `<small>última ${fmt.dt(r.last)}</small>` : ""}</td><td class="num">${r.transactions}</td><td class="num">${fmt.kwh(r.energy)}</td><td>${esc(r.chargeTime || "—")}</td><td class="num"><strong>${fmt.brl(r.spent)}</strong></td></tr>`).join("") || `<tr><td colspan="8" class="empty">Nenhum cliente encontrado.</td></tr>`}</tbody></table></div>
       </section>`;
   }
 
