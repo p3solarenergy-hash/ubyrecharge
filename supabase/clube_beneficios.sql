@@ -44,14 +44,14 @@ alter table public.club_partner_uses enable row level security;
 alter table public.club_devices enable row level security;
 alter table public.club_identify_attempts enable row level security;
 
--- A equipe (admin da plataforma) lê os usos e pode cancelar um uso errado.
+-- A equipe (mesmo acesso da plataforma: private.can_access_obra_app) lê os usos e pode cancelar um uso errado.
 -- Aparelhos e tentativas não têm política: só a função (service role) acessa.
 drop policy if exists "club uses admin select" on public.club_partner_uses;
 create policy "club uses admin select" on public.club_partner_uses
-  for select to authenticated using (public.is_admin());
+  for select to authenticated using (private.can_access_obra_app());
 drop policy if exists "club uses admin cancel" on public.club_partner_uses;
 create policy "club uses admin cancel" on public.club_partner_uses
-  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+  for update to authenticated using (private.can_access_obra_app()) with check (private.can_access_obra_app());
 
 -- Encontra o cliente nas sessões de recarga das estações UBY (qualquer cliente que recarregou).
 -- p_phone: só dígitos com DDD (10 ou 11). p_email: minúsculo. Devolve o registro mais recente.
