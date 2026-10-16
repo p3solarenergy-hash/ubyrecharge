@@ -8,11 +8,12 @@
   const catOf = p => /energia/i.test(p.category) ? "Energia" : /área/i.test(p.category) ? "Repasse à área" : /cotista/i.test(p.category) ? "Cotistas" : "Custos e pagamentos";
   const BUCKETS = [
     ["vencida", "Vencidas", "bad"], ["hoje", "Vencem hoje", "bad"], ["3dias", "Próximos 3 dias", "warn"],
-    ["7dias", "Próximos 7 dias", "warn"], ["mes", "Resto do mês", ""], ["proximo", "Próximo mês", ""]
+    ["7dias", "Próximos 7 dias", "warn"], ["mes", "Resto do mês", ""], ["proximo", "Próximo mês", ""],
+    ["debitar", "Agendadas · confirmar", "warn"], ["agendada", "Agendadas no banco", ""]
   ];
   const LEVEL = { critico: ["bad", "Urgente"], atencao: ["warn", "Atenção"], info: ["neutral", "Informativo"] };
   const when = d => d < 0 ? `venceu há ${Math.abs(d)} dia${Math.abs(d) > 1 ? "s" : ""}` : d === 0 ? "vence hoje" : d === 1 ? "vence amanhã" : `em ${d} dias`;
-  const payLink = () => "#/parametros/pagamentos";
+  const payLink = () => "#/parametros/contas";
   const fmtDay = s => { const [y, m, d] = String(s).split("-"); return `${d}/${m}/${y}`; };
 
   // Contas pagas: lista geral para controle (data, conta, origem, valor), filtrável por mês do pagamento e tipo.
@@ -55,7 +56,7 @@
       <section class="section"><div class="section-head"><div><p class="kicker">Contas a pagar</p><h2>Por prazo</h2>
         <p>Custos da matriz, pagamentos programados, faturas de energia (Copel e arrendamento) e repasses às áreas que ainda não foram marcados como pagos. Clique num prazo para filtrar.</p></div></div>
         <div class="grid g6" id="avBuckets">
-          ${BUCKETS.map(([id, label, cls]) => `<button type="button" class="kpi ${t[id].count ? cls : ""} ${ui.bucket === id ? "lead" : ""}" data-b="${id}" style="text-align:left;cursor:pointer;font:inherit">
+          ${BUCKETS.filter(([id]) => !["debitar", "agendada"].includes(id) || t[id]?.count).map(([id, label, cls]) => `<button type="button" class="kpi ${t[id].count ? cls : ""} ${ui.bucket === id ? "lead" : ""}" data-b="${id}" style="text-align:left;cursor:pointer;font:inherit">
             <span class="k">${esc(label)}</span><strong class="v">${fmt.brl(t[id].amount)}</strong><span class="s">${fmt.int(t[id].count)} conta(s)</span></button>`).join("")}
         </div>
         <div class="grid g3" style="margin-top:10px">
@@ -67,14 +68,14 @@
         ${groups.length ? groups.map(g => `
           <h3 style="margin:18px 0 8px;font-size:13px"><span class="badge ${g.cls || "neutral"}">${esc(g.label)}</span> <small style="color:var(--uby-muted)">${fmt.int(g.list.length)} · ${fmt.brl(g.list.reduce((s, b) => s + b.amount, 0))}</small></h3>
           <div class="table-wrap"><table><thead><tr><th>Vencimento</th><th>Conta</th><th>Fornecedor</th><th>Carregador / origem</th><th class="num">Valor</th><th></th></tr></thead><tbody>
-            ${g.list.map(b => `<tr><td><strong>${esc(fmtDay(b.dueDate))}</strong><br><small>${esc(when(b.days))}</small></td>
+            ${g.list.map(b => `<tr><td><strong>${esc(fmtDay(b.dueDate))}</strong><br><small>${esc(b.scheduledDate ? `agendada p/ ${fmtDay(b.scheduledDate)}` : when(b.days))}</small></td>
               <td>${esc(b.name)}<br><small>${esc(b.category || "")}</small></td><td>${esc(b.supplier || "—")}</td>
               <td>${esc(b.station || "")}${b.workName ? `<br><small>${esc(b.workName)}</small>` : ""}</td>
               <td class="num"><strong>${fmt.brl(b.amount)}</strong></td>
-              <td><a class="btn" href="${payLink(b)}">Marcar pago →</a></td></tr>`).join("")}
+              <td><a class="btn" href="${payLink(b)}">${b.scheduledDate ? "Confirmar →" : "Pagar ou agendar →"}</a></td></tr>`).join("")}
           </tbody></table></div>`).join("")
         : `<div class="note" style="margin-top:12px">Nenhuma conta ${ui.bucket ? "neste prazo" : "em aberto"}.</div>`}
-        <p class="source-line">Para marcar como paga: Parâmetros e custos → Pagamentos e extrato (todas as contas numa lista só, com a conferência do extrato do banco). Contas de até 3 meses atrás não pagas continuam aparecendo como vencidas.</p>
+        <p class="source-line">Para pagar, agendar no banco ou anexar o boleto: Contas a pagar (botão 📎 em cada conta). Conta agendada não conta como vencida. Contas de até 3 meses atrás não pagas continuam aparecendo como vencidas.</p>
       </section>
 
       ${paidSection()}

@@ -727,10 +727,14 @@
     const f = ui.cf || (ui.cf = { view: "abertas", month: today.slice(0, 7), cat: "", cc: "", sup: "", q: "" });
     const dueOf = b => String(b.due || "").slice(0, 10);
     const paidOf = b => String(b.paidAt || "").slice(0, 10);
-    const sit = b => b.paid ? "paga" : dueOf(b) < today ? "vencida" : dueOf(b) === today ? "hoje" : dueOf(b) <= in7 ? "7dias" : "aberta";
-    const SIT = { paga: ["ok", "Paga"], vencida: ["bad", "Vencida"], hoje: ["warn", "Vence hoje"], "7dias": ["warn", "Próximos 7 dias"], aberta: ["neutral", "Em aberto"] };
+    // Agendada no banco: não conta como vencida; passada a data, pede a confirmação pelo extrato (ou a baixa).
+    const schedOf = b => (bs.p.scheduled || {})[b.key] || null;
+    const sit = b => b.paid ? "paga" : schedOf(b) ? (schedOf(b).date <= today ? "debitar" : "agendada") : dueOf(b) < today ? "vencida" : dueOf(b) === today ? "hoje" : dueOf(b) <= in7 ? "7dias" : "aberta";
+    const SIT = { paga: ["ok", "Paga"], vencida: ["bad", "Vencida"], hoje: ["warn", "Vence hoje"], "7dias": ["warn", "Próximos 7 dias"], aberta: ["neutral", "Em aberto"], agendada: ["dc", "Agendada no banco"], debitar: ["warn", "Agendada · confirme no extrato"] };
+    // Documentos (boleto, NF) ligados à conta: pela marca "conta:<chave>" ou pelo custo da matriz + competência.
+    const docsOf = b => (data.billDocs || []).filter(d => String(d.notes || "").includes(`conta:${b.key}`) || (b.kind === "matriz" && d.matrix_cost_id === b.billId && d.competence_key === b.monthKey));
     const all = bs.bills.filter(b => b.amount > 0);
-    const VIEWS = [["vencidas", "Vencidas", b => sit(b) === "vencida"], ["hoje", "Vencem hoje", b => sit(b) === "hoje"], ["7dias", "Próximos 7 dias", b => !b.paid && dueOf(b) >= today && dueOf(b) <= in7],
+    const VIEWS = [["vencidas", "Vencidas", b => sit(b) === "vencida" || sit(b) === "debitar"], ["hoje", "Vencem hoje", b => sit(b) === "hoje"], ["7dias", "Próximos 7 dias", b => !b.paid && dueOf(b) >= today && dueOf(b) <= in7],
       ["abertas", "Todas em aberto", b => !b.paid], ["mes", "Vencem no mês", b => dueOf(b).slice(0, 7) === f.month], ["pagas", "Pagas no mês", b => b.paid && paidOf(b).slice(0, 7) === f.month]];
     const view = VIEWS.find(v => v[0] === f.view) || VIEWS[3];
     const q = String(f.q || "").toLowerCase();
@@ -758,6 +762,23 @@
         <button class="btn ghost" data-c-cancel type="button">Cancelar</button></div></td></tr>`;
     };
     const selTotal = sum(rows.filter(b => sel.has(b.key)));
+    const docPanel = b => {
+      const sc = schedOf(b);
+      return `<tr><td colspan="9"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+        ${b.paid ? "" : `<div class="note" style="margin:0"><strong>🏦 Pagamento agendado no banco</strong><br><small>Marque quando já deixou o pagamento autorizado para a data. A conta sai de "vencida"; quando o débito aparecer no extrato, confirme na conciliação.</small>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px">${field("Débito agendado para", `<input class="select" type="date" data-c-sched-date value="${esc(sc?.date || dueOf(b) || today)}" style="width:160px">`)}
+            <button class="btn primary" data-c-sched="${esc(b.key)}" type="button" ${can}>${sc ? "Atualizar agendamento" : "Marcar como agendado"}</button>
+            ${sc ? `<button class="btn ghost" data-c-unsched="${esc(b.key)}" type="button" ${can}>Tirar agendamento</button>` : ""}</div>
+          ${sc ? `<small>agendado em ${fmtDay(sc.at)}${sc.by ? ` por ${esc(sc.by)}` : ""}</small>` : ""}</div>`}
+        <div class="note" style="margin:0"><strong>📎 Anexar boleto, NF ou comprovante</strong><br><small>Fica privado, ligado a esta conta (${esc(b.name)} · ${fmtDay(dueOf(b))}). PDF ou imagem até 15 MB.</small>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px">
+            ${field("Tipo", `<select class="select" data-c-doc-type style="width:140px">${[["boleto", "Boleto"], ["nota_fiscal", "Nota fiscal"], ["fatura", "Fatura"], ["recibo", "Comprovante"], ["contrato", "Contrato"], ["outro", "Outro"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>`)}
+            ${field("Número (opcional)", `<input class="select" data-c-doc-num style="width:150px">`)}
+            ${field("Arquivo", `<input class="select" type="file" data-c-doc-file accept="application/pdf,image/jpeg,image/png,image/webp" style="width:230px;padding-top:6px">`)}
+            <button class="btn primary" data-c-doc-save="${esc(b.key)}" type="button" ${can}>Anexar</button></div>
+          ${docsOf(b).length ? `<small>Já anexado: ${docsOf(b).map(d => esc(d.file_name || d.document_type)).join(", ")}</small>` : ""}</div>
+        </div><div style="margin-top:8px"><button class="btn ghost" data-c-doc-close type="button">Fechar</button></div></td></tr>`;
+    };
     return `
       <div class="grid g5" style="margin-bottom:14px">
         ${kpi("Vencido", fmt.brl(sum(k.late)), `${fmt.int(k.late.length)} conta(s)`, "", k.late.length ? "bad" : "")}
@@ -783,14 +804,14 @@
           <tbody>${rows.map(b => `<tr${sit(b) === "vencida" ? ' style="background:rgba(183,84,80,.06)"' : ""}>
             <td>${b.paid ? "" : `<input type="checkbox" data-cf-sel="${esc(b.key)}" ${sel.has(b.key) ? "checked" : ""}>`}</td>
             <td><strong>${fmtDay(dueOf(b))}</strong>${sit(b) === "vencida" ? `<small style="color:var(--uby-red)">há ${Math.round((new Date(`${today}T12:00:00`) - new Date(`${dueOf(b)}T12:00:00`)) / 86400000)} dia(s)</small>` : ""}</td>
-            <td style="white-space:normal"><a class="edit-link" href="${billEditHref(b)}" title="Abrir onde esta conta é editada"><strong>${esc(b.name)}</strong><span aria-hidden="true"> ✎</span></a><small>${esc(billKindLabel(b))}${b.supplier ? ` · ${esc(b.supplier)}` : ""}</small></td>
+            <td style="white-space:normal"><a class="edit-link" href="${billEditHref(b)}" title="Abrir onde esta conta é editada"><strong>${esc(b.name)}</strong><span aria-hidden="true"> ✎</span></a><small>${esc(billKindLabel(b))}${b.supplier ? ` · ${esc(b.supplier)}` : ""}</small>${docsOf(b).map(d => `<button class="btn ghost" data-doc-open="${esc(d.id)}" type="button" title="${esc(d.file_name || "documento")}" style="height:22px;padding:0 7px;font-size:11px;margin-top:3px">📄 ${esc({ boleto: "Boleto", nota_fiscal: "NF", fatura: "Fatura", recibo: "Comprovante", contrato: "Contrato" }[d.document_type] || "Documento")}</button>`).join(" ")}</td>
             <td>${b.workId ? UBY.stationLink(b.workId, billCenter(b)) : esc(billCenter(b))}</td>
             <td><small>${esc(billCategory(b))}</small></td>
             <td class="num"><strong>${fmt.brl(b.amount)}</strong>${b.paidAmount !== null && b.paidAmount !== undefined && Math.abs(b.paidAmount - b.dueAmount) > 0.009 ? `<small>${b.kind === "area" ? "devido" : "previsto"} ${fmt.brl(b.dueAmount)}</small>` : ""}</td>
-            <td><span class="badge ${SIT[sit(b)][0]}">${SIT[sit(b)][1]}</span>${b.paid && paidOf(b) ? `<small>em ${fmtDay(paidOf(b))}</small>` : ""}</td>
+            <td><span class="badge ${SIT[sit(b)][0]}">${SIT[sit(b)][1]}</span>${b.paid && paidOf(b) ? `<small>em ${fmtDay(paidOf(b))}</small>` : !b.paid && schedOf(b) ? `<small>débito em ${fmtDay(schedOf(b).date)}</small>` : ""}</td>
             <td>${recTxt(b)}</td>
-            <td style="white-space:nowrap">${b.paid ? `<button class="btn ghost" data-c-unpay="${esc(b.key)}" type="button" ${can}>Desfazer</button>` : `<button class="btn primary" data-c-pay="${esc(b.key)}" type="button" ${can}>Pagar</button>`}</td></tr>
-            ${ui.cPay === b.key && !b.paid ? panel(b) : ""}`).join("") || `<tr><td colspan="9" class="empty">Nenhuma conta nesta visão.</td></tr>`}</tbody>
+            <td style="white-space:nowrap"><button class="btn ghost" data-c-doc="${esc(b.key)}" type="button" title="Anexar boleto/NF${b.paid ? "" : " e agendar no banco"}">📎${b.paid ? "" : " Agendar"}</button> ${b.paid ? `<button class="btn ghost" data-c-unpay="${esc(b.key)}" type="button" ${can}>Desfazer</button>` : `<button class="btn primary" data-c-pay="${esc(b.key)}" type="button" ${can}>Pagar</button>`}</td></tr>
+            ${ui.cPay === b.key && !b.paid ? panel(b) : ""}${ui.cDoc === b.key ? docPanel(b) : ""}`).join("") || `<tr><td colspan="9" class="empty">Nenhuma conta nesta visão.</td></tr>`}</tbody>
           <tfoot><tr><td colspan="5">Total da visão</td><td class="num">${fmt.brl(sum(rows))}</td><td colspan="3"></td></tr></tfoot></table></div>
       </section>`;
   }
@@ -1757,6 +1778,10 @@
         try { data.bank = (await w.UBY_SUPABASE.loadBankData()).payload || null; data.bankError = ""; }
         catch (err) { data.bank = null; data.bankError = err.message; }
       }
+      if (ui.tab === "contas") {
+        try { const [m, c] = await Promise.all([w.UBY_SUPABASE.loadFinanceDocuments({ limit: 200 }), w.UBY_SUPABASE.loadFinanceDocuments({ scope: "charger", limit: 200 })]); data.billDocs = [...(m || []), ...(c || [])]; }
+        catch (_) { data.billDocs = []; }
+      }
       if (ui.tab === "pagamentos" || ui.tab === "contas") {
         try { data.bills = UBY.state.api.allBills(); } catch (err) { data.bills = []; }
         try { data.bank = (await w.UBY_SUPABASE.loadBankData()).payload || null; data.bankError = ""; }
@@ -1841,6 +1866,34 @@
     if ($("#pmCentralMonth")) $("#pmCentralMonth").onchange = e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { ui.payMonth = e.target.value; ui.cPay = ""; draw(target, w); } };
     target.querySelectorAll("[data-c-pay]").forEach(b => b.onclick = () => { ui.cPay = ui.cPay === b.dataset.cPay ? "" : b.dataset.cPay; draw(target, w); });
     target.querySelectorAll("[data-c-cancel]").forEach(b => b.onclick = () => { ui.cPay = ""; draw(target, w); });
+    target.querySelectorAll("[data-c-doc]").forEach(b => b.onclick = () => { ui.cDoc = ui.cDoc === b.dataset.cDoc ? "" : b.dataset.cDoc; ui.cPay = ""; draw(target, w); });
+    target.querySelectorAll("[data-c-doc-close]").forEach(b => b.onclick = () => { ui.cDoc = ""; draw(target, w); });
+    const saveSched = (bill, value) => run(target, w, `${value ? "Agendada no banco" : "Agendamento retirado"} · ${bill.name}`, async () => {
+      await w.UBY_SUPABASE.saveBankData(p => { const scheduled = { ...(p.scheduled || {}) }; if (value) scheduled[bill.key] = value; else delete scheduled[bill.key]; return { statements: [], transactions: [], ...p, scheduled }; },
+        { acao: value ? "bill_scheduled" : "bill_unscheduled", conta: bill.key, data: value?.date || "" });
+      ui.cDoc = "";
+      return value ? `débito em ${fmtDay(value.date)}` : "retirado";
+    });
+    target.querySelectorAll("[data-c-sched]").forEach(btn => btn.onclick = () => {
+      const bill = cBill(btn.dataset.cSched); const date = target.querySelector("[data-c-sched-date]")?.value;
+      if (!bill || !/^\d{4}-\d{2}-\d{2}$/.test(date || "")) { alert("Informe a data do débito."); return; }
+      saveSched(bill, { date, at: new Date().toISOString().slice(0, 10), by: UBY.state.status?.user?.email || "" });
+    });
+    target.querySelectorAll("[data-c-unsched]").forEach(btn => btn.onclick = () => { const bill = cBill(btn.dataset.cUnsched); if (bill) saveSched(bill, null); });
+    target.querySelectorAll("[data-c-doc-save]").forEach(btn => btn.onclick = () => {
+      const bill = cBill(btn.dataset.cDocSave); const file = target.querySelector("[data-c-doc-file]")?.files?.[0];
+      if (!bill) return;
+      if (!file) { alert("Escolha o arquivo (PDF ou imagem)."); return; }
+      const type = target.querySelector("[data-c-doc-type]")?.value || "boleto", num = target.querySelector("[data-c-doc-num]")?.value || "";
+      run(target, w, `Documento · ${bill.name}`, async () => {
+        await w.UBY_SUPABASE.createFinanceDocument({
+          scope: bill.workId ? "charger" : "matrix", workId: bill.workId || null, matrixCostId: bill.kind === "matriz" ? bill.billId : null, competenceKey: bill.monthKey,
+          supplier: bill.supplier || bill.name, category: billCategory(bill), documentNumber: num, documentType: type, amount: Number(bill.amount) || 0, dueDate: bill.due || null,
+          status: bill.paid ? "paid" : "pending", notes: `${bill.name} · conta:${bill.key}`
+        }, file);
+        return `${file.name} anexado`;
+      });
+    });
     target.querySelectorAll("[data-c-confirm]").forEach(btn => btn.onclick = () => {
       const bill = cBill(btn.dataset.cConfirm); if (!bill) return;
       const date = target.querySelector("[data-c-date]")?.value || new Date().toISOString().slice(0, 10);

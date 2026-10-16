@@ -297,6 +297,7 @@
       rerender();
       mark("tela2");
       updateBell();
+      loadBankScheduled();
     } catch (err) {
       console.error(err);
       setStatus("Falha ao ler dados", "err");
@@ -306,6 +307,18 @@
 
   // Sino do topo: número de avisos urgentes + atenção (contas vencidas, que vencem
   // em até 7 dias, carregadores parados, fechamentos). Clique abre #/avisos.
+  // Contas já agendadas no banco (Contas a pagar · 📎 Agendar): o motor tira das vencidas nos avisos e no sino.
+  async function loadBankScheduled() {
+    try {
+      const mw = document.getElementById("motorFrame")?.contentWindow;
+      const r = await mw?.UBY_SUPABASE?.loadBankData?.();
+      if (!mw) return;
+      mw.__UBY_BANK_SCHEDULED = r?.payload?.scheduled || {};
+      state.cache.clear();
+      updateBell();
+      if (state.route?.id === "avisos") rerender();
+    } catch (err) { console.warn("[agendamentos]", err.message); }
+  }
   function updateBell() {
     const bell = document.getElementById("alertBell");
     if (!bell || !state.api?.alerts) return;

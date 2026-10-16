@@ -2349,13 +2349,16 @@
         const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
         const days = Math.round((dueDay - today) / DAY);
         if (days > 45) return;
-        const bucket = days < 0 ? "vencida" : days === 0 ? "hoje" : days <= 3 ? "3dias" : days <= 7 ? "7dias" : mkOf(dueDay) === cur ? "mes" : "proximo";
-        bills.push({ id: p.id, name: p.name, category: p.category, supplier: p.supplier, station: p.station, workName: p.workName, source: p.source,
+        // Pagamento já agendado no banco (Contas a pagar): não é vencida; passada a data, pede confirmação no extrato.
+        const sc = (window.__UBY_BANK_SCHEDULED || {})[key];
+        const bucket = sc ? (sc.date <= ymd(today) ? "debitar" : "agendada")
+          : days < 0 ? "vencida" : days === 0 ? "hoje" : days <= 3 ? "3dias" : days <= 7 ? "7dias" : mkOf(dueDay) === cur ? "mes" : "proximo";
+        bills.push({ id: p.id, key, scheduledDate: sc?.date || "", name: p.name, category: p.category, supplier: p.supplier, station: p.station, workName: p.workName, source: p.source,
           amount: Number(p.amount) || 0, dueDate: ymd(dueDay), days, bucket, monthKey: mk });
       });
     });
     bills.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || b.amount - a.amount);
-    const BUCKETS = ["vencida", "hoje", "3dias", "7dias", "mes", "proximo"];
+    const BUCKETS = ["vencida", "hoje", "3dias", "7dias", "mes", "proximo", "debitar", "agendada"];
     const totals = Object.fromEntries(BUCKETS.map(b => [b, { count: 0, amount: 0 }]));
     bills.forEach(b => { totals[b.bucket].count += 1; totals[b.bucket].amount += b.amount; });
     const nextBill = bills.find(b => b.days >= 0) || null;
@@ -2422,7 +2425,7 @@
       });
     } catch (err) { console.warn("[alertas de clientes]", err.message); }
 
-    const billLevel = b => (b.bucket === "vencida" || b.bucket === "hoje") ? "critico" : (b.bucket === "3dias" || b.bucket === "7dias") ? "atencao" : "info";
+    const billLevel = b => (b.bucket === "vencida" || b.bucket === "hoje") ? "critico" : (b.bucket === "3dias" || b.bucket === "7dias" || b.bucket === "debitar") ? "atencao" : "info";
     const counts = { critico: 0, atencao: 0, info: 0 };
     bills.forEach(b => { counts[billLevel(b)] += 1; });
     items.forEach(i => { counts[i.level] += 1; });
