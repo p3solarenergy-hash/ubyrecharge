@@ -70,7 +70,7 @@
     Cada fatura cobre [start, end): o dia da leitura final pertence à próxima.
     O custo da fatura entra inteiro na competência dela (ref) e o pagamento
     fica no vencimento. Mês com entrega sem fatura lançada entra como
-    estimativa, pela tarifa por kWh entregue da fatura mais recente, e fica
+    estimativa, pelo custo médio por kWh vendido no mês da fatura anterior, e fica
     marcado até a fatura chegar.
     invoices: [{id, ref, start, end, kwh, copelAmount, leaseKWh, leaseRate}]
     dailyKWh: { "AAAA-MM-DD": kWh entregue }
@@ -104,29 +104,37 @@
       m.parts.push(part);
       m.kwh += part.kwh; m.leaseKWh += part.leaseKWh; m.copel += part.copel; m.lease += part.lease; m.total += part.total; m.deliveredKWh += part.deliveredKWh;
     });
-    // Dias com entrega que nenhuma fatura cobre vão para o mês em que a próxima fatura vai entrar — o
-    // próprio mês, ou o seguinte se o mês já tem fatura (ex.: 24 a 30/09 vão para a fatura de outubro).
-    // Estimativa desse mês = kWh entregues × custo médio por kWh entregue da fatura do mês anterior,
-    // separado em Copel e arrendamento (usuário, 09/10/2026), até a fatura do mês ser lançada.
-    // Antes da primeira fatura, vale o custo médio da primeira.
+    // Mês com vendas e sem fatura lançada = estimativa: kWh vendidos NO PRÓPRIO MÊS × custo médio por kWh
+    // vendido no mês da fatura anterior, separado em Copel e arrendamento (usuário, 09 e 16/10/2026), até a
+    // fatura do mês ser lançada. Como cada mês recebe uma fatura inteira, dias fora da leitura num mês que
+    // já tem fatura (ex.: 24 a 30/09) não são levados ao mês seguinte — isso comparava 16 dias de faturamento
+    // com 23 de energia na projeção. Antes da primeira fatura, vale o custo médio da primeira.
     if (list.length) {
       const covered = d => list.some(i => i.start <= d && d < i.end);
-      const nextMonth = mk => { const [y, m] = mk.split("-").map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`; };
-      const target = d => { let mk = d.slice(0, 7); while (months[mk]?.parts.length) mk = nextMonth(mk); return mk; };
       const byMonth = {};
-      Object.keys(dailyKWh).sort().forEach(d => { const kwh = pos(dailyKWh[d]); if (!(kwh > 0) || covered(d)) return; const mk = target(d); (byMonth[mk] = byMonth[mk] || []).push([d, kwh]); });
+      Object.keys(dailyKWh).sort().forEach(d => { const kwh = pos(dailyKWh[d]); const mk = d.slice(0, 7); if (!(kwh > 0) || covered(d) || months[mk]?.parts.length) return; (byMonth[mk] = byMonth[mk] || []).push([d, kwh]); });
       Object.keys(byMonth).sort().forEach(mk => {
         const kwh = byMonth[mk].reduce((s, [, k]) => s + k, 0);
         const usable = list.filter(i => i.ratePerDelivered > 0).sort((a, b) => a.ref.localeCompare(b.ref) || a.start.localeCompare(b.start));
         const ref = usable.filter(i => i.ref < mk).pop() || usable[0];
         if (!ref) return;
+        // Custo médio do MÊS da fatura de referência (usuário, 16/10/2026): fatura(s) da competência ÷ kWh
+        // vendidos no mês inteiro — não ÷ kWh do período de leitura, que é menor e inflava a estimativa
+        // (JK out/2026: R$ 1,06/kWh pela leitura × R$ 0,70/kWh pelo mês de setembro).
+        const rm = months[ref.ref];
+        const monthKWh = Object.keys(dailyKWh).filter(d => d.startsWith(ref.ref)).reduce((s, d) => s + pos(dailyKWh[d]), 0);
+        const byMonthBase = rm && monthKWh > 0;
+        const copelRate = byMonthBase ? rm.copel / monthKWh : ref.copel / ref.deliveredKWh;
+        const leaseRate = byMonthBase ? rm.lease / monthKWh : ref.lease / ref.deliveredKWh;
+        const meterRate = byMonthBase ? rm.kwh / monthKWh : ref.kwh / ref.deliveredKWh;
         const m = month(mk);
         m.estimatedDeliveredKWh = kwh;
-        m.estimatedCopel = Math.round(kwh * ref.copel / ref.deliveredKWh * 100) / 100;
-        m.estimatedLease = Math.round(kwh * ref.lease / ref.deliveredKWh * 100) / 100;
+        m.estimatedCopel = Math.round(kwh * copelRate * 100) / 100;
+        m.estimatedLease = Math.round(kwh * leaseRate * 100) / 100;
         m.estimatedCost = m.estimatedCopel + m.estimatedLease;
-        m.estimatedCopelRate = ref.copel / ref.deliveredKWh; m.estimatedLeaseRate = ref.lease / ref.deliveredKWh;
-        m.estimatedKWh = kwh * ref.kwh / ref.deliveredKWh;
+        m.estimatedCopelRate = copelRate; m.estimatedLeaseRate = leaseRate;
+        m.estimatedBaseKWh = byMonthBase ? monthKWh : ref.deliveredKWh;
+        m.estimatedKWh = kwh * meterRate;
         m.estimatedRef = ref.ref || ref.id;
         m.estimatedFrom = byMonth[mk][0][0]; m.estimatedTo = byMonth[mk].at(-1)[0];
       });
