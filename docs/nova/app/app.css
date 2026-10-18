@@ -245,7 +245,7 @@ tfoot td{font-weight:850;color:var(--uby-forest);background:var(--uby-surface-so
 /* Login */
 .login-page{display:grid;place-items:center;min-height:100vh;padding:20px}
 .login-card{width:min(420px,100%);padding:28px;border:1px solid var(--uby-line);border-radius:18px;background:var(--uby-surface);box-shadow:var(--uby-shadow)}
-.login-card img{height:30px;margin-bottom:18px}
+.login-card>img{height:30px;margin-bottom:18px}
 .login-card h1{font-size:26px;margin-bottom:6px}
 .login-card form{display:grid;gap:12px;margin-top:18px}
 .login-card label{display:grid;gap:5px;color:var(--uby-muted);font-size:11px;font-weight:800}
@@ -580,37 +580,68 @@ html[data-theme="night"] .install-btn{color:var(--uby-forest);border-color:rgba(
 .cc-head h2{margin:2px 0 0;font-size:18px}
 .cc-head p{margin:4px 0 0;color:var(--uby-muted);font-size:12.5px;max-width:90ch}
 @media(max-width:860px){.cc-bar{position:static}.cc-head{scroll-margin-top:70px}}
-/* ---------- Efeitos (app/fx.js): luz no clique, onda no fundo, brilho do cursor, entrada de tela, textura ---------- */
-:root{--fx-rgb:24,116,87;--fx-rgb2:198,212,73;--fx-grain:.035}
-html[data-theme="night"]{--fx-rgb:0,229,255;--fx-rgb2:0,255,133;--fx-grain:.05}
-/* textura: grão fino sobre o fundo (não pega clique) */
+/* ---------- Efeitos (app/fx.js) — visual high-tech: cartão inteiro acende, pulso neon no clique, ping no ponto ---------- */
+:root{--fx-rgb:24,116,87;--fx-rgb2:61,111,142;--fx-grain:.03;--fx-sheen:rgba(24,116,87,.10)}
+html[data-theme="night"]{--fx-rgb:0,229,255;--fx-rgb2:0,255,133;--fx-grain:.045;--fx-sheen:rgba(255,255,255,.10)}
+/* textura: grão fino + grade técnica bem leve */
 body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:var(--fx-grain);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+html[data-theme="night"] body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.35;
+  background-image:linear-gradient(rgba(0,229,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.035) 1px,transparent 1px);background-size:44px 44px;
+  -webkit-mask-image:radial-gradient(ellipse at 70% 0%,#000 0%,transparent 70%);mask-image:radial-gradient(ellipse at 70% 0%,#000 0%,transparent 70%)}
 .app-shell{position:relative;z-index:1}
-/* onda de luz no fundo, a partir do clique */
-.fx-wave{position:fixed;z-index:2;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,rgba(var(--fx-rgb),.16) 0%,rgba(var(--fx-rgb),.07) 38%,rgba(var(--fx-rgb2),.05) 55%,transparent 70%);
-  box-shadow:0 0 0 1px rgba(var(--fx-rgb),.18);animation:fx-wave 1.1s cubic-bezier(.16,.84,.3,1) forwards}
-@keyframes fx-wave{0%{transform:scale(1);opacity:.9}70%{opacity:.35}100%{transform:scale(46);opacity:0}}
-/* brilho dentro do elemento clicado */
-.fx-host{position:relative}
-.fx-clip{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:0}
-.fx-glow{position:absolute;border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,rgba(var(--fx-rgb),.28) 0%,rgba(var(--fx-rgb),.12) 30%,transparent 62%);
-  transform:scale(.15);opacity:1;animation:fx-glow .75s cubic-bezier(.2,.8,.25,1) forwards}
-html[data-theme="night"] .fx-glow{background:radial-gradient(circle,rgba(var(--fx-rgb),.34) 0%,rgba(var(--fx-rgb),.14) 30%,transparent 62%)}
-@keyframes fx-glow{to{transform:scale(1);opacity:0}}
-.btn,.kpi,.nav-item,.mini,.seg button,.hub-tabs a,.cc-jump button{transition:box-shadow .25s ease,border-color .25s ease,background-color .25s ease,transform .18s ease}
+/* elementos interativos: transições suaves */
+.btn,.kpi,.nav-item,.mini,.seg button,.hub-tabs a,.cc-jump button{position:relative;transition:box-shadow .3s ease,border-color .3s ease,background-color .3s ease,transform .25s cubic-bezier(.2,.8,.25,1),color .3s ease}
+.kpi{overflow:hidden}
+/* hover: o cartão INTEIRO acende (borda neon + halo + leve elevação) e um reflexo atravessa */
+.kpi:hover,.mini:hover{border-color:rgba(var(--fx-rgb),.55);box-shadow:0 0 0 1px rgba(var(--fx-rgb),.28),0 12px 32px -10px rgba(var(--fx-rgb),.45);transform:translateY(-2px)}
+.btn:hover,.cc-jump button:hover{border-color:rgba(var(--fx-rgb),.6);box-shadow:0 0 0 1px rgba(var(--fx-rgb),.25),0 0 16px -2px rgba(var(--fx-rgb),.45)}
+.nav-item:hover,.hub-tabs a:hover,.seg button:hover{box-shadow:inset 0 0 0 1px rgba(var(--fx-rgb),.35),0 0 14px -4px rgba(var(--fx-rgb),.5)}
+.kpi::after,.btn::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;
+  background:linear-gradient(115deg,transparent 35%,var(--fx-sheen) 48%,rgba(var(--fx-rgb),.12) 52%,transparent 65%);background-size:260% 100%;background-position:130% 0}
+.kpi:hover::after,.btn:hover::after{opacity:1;animation:fx-sheen .9s cubic-bezier(.3,.7,.3,1) forwards}
+@keyframes fx-sheen{from{background-position:130% 0}to{background-position:-30% 0}}
+html[data-theme="night"] .kpi:hover .v,html[data-theme="night"] .kpi:hover strong{text-shadow:0 0 14px rgba(var(--fx-rgb),.45)}
+/* clique: pulso neon na borda do elemento */
+.fx-press{animation:fx-press .55s cubic-bezier(.2,.8,.25,1)}
+@keyframes fx-press{0%{box-shadow:0 0 0 0 rgba(var(--fx-rgb),.65),0 0 18px rgba(var(--fx-rgb),.55)}100%{box-shadow:0 0 0 9px rgba(var(--fx-rgb),0),0 0 0 rgba(var(--fx-rgb),0)}}
 .btn:active,.seg button:active,.cc-jump button:active,.nav-item:active{transform:scale(.97)}
-/* luz que acompanha o cursor */
-.btn::after,.kpi::after,.nav-item::after,.mini::after,.seg button::after,.hub-tabs a::after,.cc-jump button::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s ease;
-  background:radial-gradient(160px circle at var(--mx,50%) var(--my,50%),rgba(var(--fx-rgb),.10),transparent 70%)}
-.fx-lit::after{opacity:1}
-.btn,.nav-item,.mini,.seg button,.hub-tabs a,.cc-jump button{position:relative}
-.kpi.fx-lit{border-color:rgba(var(--fx-rgb),.35);box-shadow:0 6px 22px rgba(var(--fx-rgb),.10)}
-html[data-theme="night"] .kpi.fx-lit{box-shadow:0 0 0 1px rgba(var(--fx-rgb),.18),0 8px 28px rgba(var(--fx-rgb),.12)}
+/* clique: ping fino no ponto (radar) */
+.fx-ping{position:fixed;z-index:40;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;pointer-events:none;
+  border:1.5px solid rgba(var(--fx-rgb),.85);box-shadow:0 0 10px rgba(var(--fx-rgb),.6),inset 0 0 6px rgba(var(--fx-rgb),.4);animation:fx-ping .5s cubic-bezier(.15,.8,.3,1) forwards}
+.fx-ping::after{content:"";position:absolute;inset:3px;border-radius:50%;background:rgba(var(--fx-rgb),.9);animation:fx-dot .5s ease-out forwards}
+@keyframes fx-ping{from{transform:scale(.6);opacity:1}to{transform:scale(5.5);opacity:0;border-width:.5px}}
+@keyframes fx-dot{from{opacity:1}to{opacity:0}}
 /* entrada de tela */
 .fx-enter>*{animation:fx-in .42s cubic-bezier(.2,.8,.25,1) both}
 .fx-enter>*:nth-child(2){animation-delay:.04s}.fx-enter>*:nth-child(3){animation-delay:.08s}.fx-enter>*:nth-child(4){animation-delay:.12s}.fx-enter>*:nth-child(n+5){animation-delay:.16s}
 @keyframes fx-in{from{opacity:0;transform:translateY(10px);filter:blur(2px)}to{opacity:1;transform:none;filter:none}}
-.hub-tabs a.on{transition:background-color .3s ease,box-shadow .3s ease}
-@media (prefers-reduced-motion:reduce){.fx-wave,.fx-glow{display:none}.fx-enter>*{animation:none}.btn:active,.seg button:active,.nav-item:active{transform:none}}
+@media (prefers-reduced-motion:reduce){.fx-ping{display:none}.fx-press,.fx-enter>*,.kpi:hover::after,.btn:hover::after{animation:none}.kpi:hover,.mini:hover{transform:none}.btn:active,.seg button:active,.nav-item:active{transform:none}}
+/* ---------- Logo UBY oficial (assets/brand.png = 01_principal_fundo_claro, brand-night.png = 02_versao_dark, da pasta v2) ---------- */
+.uby-logo{display:inline-flex;align-items:center;line-height:0}
+.uby-logo img{display:block;height:34px;width:auto}
+.uby-logo .uby-logo-dark{display:none}
+html[data-theme="night"] .uby-logo .uby-logo-light{display:none}
+html[data-theme="night"] .uby-logo .uby-logo-dark{display:block}
+.brand .uby-logo img{height:32px}
+.login-card .uby-logo{margin-bottom:18px}.login-card .uby-logo img{height:40px}
+.portal-top .uby-logo img{height:36px}
+/* ---------- Fundo vivo (app/fx.js): aurora de luz + linhas de energia passando, bem devagar ---------- */
+.fx-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.fx-bg i{position:absolute;width:60vmax;height:60vmax;border-radius:50%;filter:blur(70px);opacity:var(--fx-aura,.14);will-change:transform}
+.fx-bg i:nth-child(1){top:-25vmax;left:-15vmax;background:radial-gradient(circle,rgba(var(--fx-rgb),.75),transparent 62%);animation:fx-drift1 46s ease-in-out infinite alternate}
+.fx-bg i:nth-child(2){bottom:-30vmax;right:-20vmax;background:radial-gradient(circle,rgba(var(--fx-rgb2),.7),transparent 62%);animation:fx-drift2 58s ease-in-out infinite alternate}
+.fx-bg i:nth-child(3){top:30%;left:35%;width:42vmax;height:42vmax;background:radial-gradient(circle,rgba(0,229,200,.55),transparent 65%);animation:fx-drift3 72s ease-in-out infinite alternate}
+@keyframes fx-drift1{0%{transform:translate(0,0) scale(1)}50%{transform:translate(18vw,10vh) scale(1.15)}100%{transform:translate(8vw,24vh) scale(.95)}}
+@keyframes fx-drift2{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-22vw,-12vh) scale(1.1)}100%{transform:translate(-10vw,-26vh) scale(1.2)}}
+@keyframes fx-drift3{0%{transform:translate(0,0) scale(.9)}50%{transform:translate(-14vw,8vh) scale(1.2)}100%{transform:translate(12vw,-10vh) scale(1)}}
+/* névoa (duas camadas de ruído suave, desfocadas, derivando devagar) e areia fina flutuando */
+.fx-mist{position:absolute;top:0;left:0;width:calc(100% + 900px);height:calc(100% + 900px);background:rgba(var(--fx-rgb),var(--fx-mist,.08));
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.0045' numOctaves='4' stitchTiles='stitch' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.5 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.0045' numOctaves='4' stitchTiles='stitch' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.5 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");-webkit-mask-size:900px 900px;mask-size:900px 900px;will-change:transform;animation:fx-mist 120s linear infinite}
+.fx-mist.m2{background:rgba(var(--fx-rgb2),var(--fx-mist,.08));-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.0032' numOctaves='4' stitchTiles='stitch' seed='23'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.5 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.0032' numOctaves='4' stitchTiles='stitch' seed='23'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.5 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");opacity:.8;animation:fx-mist2 170s linear infinite}
+@keyframes fx-mist{from{transform:translate3d(0,0,0)}to{transform:translate3d(-900px,-900px,0)}}
+@keyframes fx-mist2{from{transform:translate3d(-900px,0,0)}to{transform:translate3d(0,-900px,0)}}
+.fx-sand{position:absolute;top:0;left:0;width:calc(100% + 320px);height:calc(100% + 320px);background:rgba(var(--fx-rgb),var(--fx-sand,.22));
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' stitchTiles='stitch' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 3.2 0 0 0 -2.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' stitchTiles='stitch' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 3.2 0 0 0 -2.05'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");-webkit-mask-size:320px 320px;mask-size:320px 320px;will-change:transform;animation:fx-sand 60s linear infinite}
+@keyframes fx-sand{from{transform:translate3d(0,0,0)}to{transform:translate3d(-320px,-320px,0)}}
+html[data-theme="night"]{--fx-aura:.2;--fx-mist:.10;--fx-sand:.22}
+@media (prefers-reduced-motion:reduce){.fx-bg i,.fx-mist,.fx-sand{animation:none}}

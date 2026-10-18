@@ -184,8 +184,7 @@
   function applyTheme(theme, persist = true) {
     const night = theme === "night";
     if (night) document.documentElement.dataset.theme = "night"; else delete document.documentElement.dataset.theme;
-    const brand = document.querySelector(".brand img");
-    if (brand) brand.src = night ? "assets/brand-night.svg" : "assets/brand.svg";
+    // Logo: as duas versões oficiais estão na página; o CSS mostra a do tema (app.css · .uby-logo).
     const btn = document.getElementById("themeButton");
     if (btn) { btn.textContent = night ? "☀" : "☾"; btn.title = night ? "Voltar ao tema claro" : "Ver a versão night (azul escuro)"; }
     if (window.Chart) { Chart.defaults.color = night ? "#AEB8C6" : "#666"; Chart.defaults.borderColor = night ? "rgba(138,149,165,.16)" : "rgba(0,0,0,.1)"; }
