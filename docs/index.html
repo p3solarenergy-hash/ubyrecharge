@@ -10,7 +10,7 @@
 <meta property="og:description" content="3 locais ativos em Londrina: Posto Robert Koch, Posto Central JK e Shopping Aurora. Recarga DC rápida e AC 22 kW.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://p3solarenergy-hash.github.io/ubyrecharge/obra-ev/assets/brand/v2/02_versao_dark.png">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2300FF85'/%3E%3Cpath d='M38 8 18 36h12l-4 20 20-28H34z' fill='%230A1628'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 72'%3E%3Crect width='72' height='72' rx='18' fill='%2300FF85'/%3E%3Csvg x='18' y='11' width='36' height='50' viewBox='142 99 95 181'%3E%3Cpath d='M215 99L142 203L186 203L165 280L237 177L197 177Z' fill='%230A1628'/%3E%3C/svg%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
@@ -55,11 +55,8 @@
 
   /* logo */
   .logo{display:inline-flex;align-items:center;gap:10px}
-  .logo-mark{width:38px;height:38px;border-radius:11px;background:var(--volt);display:grid;place-items:center;flex-shrink:0}
-  .logo-mark svg{width:20px;height:20px}
-  .logo-type{display:flex;flex-direction:column;line-height:1}
-  .logo-type b{font-family:var(--display);font-weight:800;font-size:25px;letter-spacing:-.03em;color:var(--white)}
-  .logo-type small{font-size:7.5px;font-weight:700;letter-spacing:.42em;color:var(--volt);border-top:1.5px solid var(--volt);padding-top:3px;margin-top:2px}
+  .logo-svg{display:block;height:52px;width:127px}
+  .logo-svg.logo-lg{height:56px;width:137px}
 
   /* nav */
   .nav{position:fixed;inset:0 0 auto;z-index:50;transition:background .3s,border-color .3s,backdrop-filter .3s;border-bottom:1px solid transparent}
@@ -234,6 +231,46 @@
   .brand{padding:14px 26px;border-radius:14px;background:var(--bg2);border:1px solid var(--line);font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:.02em;color:var(--muted2);transition:color .2s,border-color .2s}
   .brand:hover{color:#fff;border-color:var(--line2)}
 
+  /* clube */
+  .club{border-radius:32px;border:1px solid var(--line2);background:
+    radial-gradient(60% 80% at 100% 0%,rgba(0,229,255,.12),transparent 60%),
+    radial-gradient(60% 80% at 0% 100%,rgba(0,255,133,.12),transparent 60%),var(--bg2);overflow:hidden;position:relative}
+  .club::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:linear-gradient(90deg,var(--volt),var(--cyan))}
+  .club-top{display:grid;grid-template-columns:1.05fr 1fr;gap:48px;padding:56px}
+  .club-badge{display:inline-flex;align-items:center;gap:10px;margin-bottom:20px}
+  .club-badge span{font-family:var(--display);font-weight:800;font-size:13px;letter-spacing:.16em;color:var(--volt);border-left:2px solid var(--volt);padding-left:10px}
+  .club h2{font-size:clamp(30px,4vw,46px);margin-bottom:16px}
+  .club h2 em{font-style:normal;color:var(--volt)}
+  .club-lead{color:var(--muted2);font-size:17px;margin-bottom:28px;max-width:520px}
+  .perks{display:grid;gap:14px;margin-bottom:32px}
+  .perk{display:flex;gap:14px;align-items:flex-start}
+  .perk-ic{width:44px;height:44px;border-radius:12px;background:var(--volt-a);color:var(--volt);display:grid;place-items:center;flex-shrink:0}
+  .perk-ic svg{width:22px;height:22px}
+  .perk b{display:block;color:#fff;font-size:16px;margin-bottom:2px}
+  .perk span{color:var(--muted2);font-size:14px}
+  .club-cta{display:flex;gap:12px;flex-wrap:wrap}
+  .vitrine{background:rgba(6,16,31,.6);border:1px solid var(--line2);border-radius:24px;padding:24px;display:flex;flex-direction:column;align-self:start}
+  .vitrine-h .pill{white-space:nowrap;flex-shrink:0}
+  .vitrine-h{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px}
+  .vitrine-h h3{font-size:20px}
+  .vitrine>p{font-size:13px;color:var(--muted);margin-bottom:16px}
+  .vlist{display:grid;gap:10px}
+  .vitem{display:flex;gap:14px;align-items:flex-start;padding:14px;border-radius:16px;background:var(--bg3);border:1px solid var(--line)}
+  .vitem .av{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex-shrink:0;font-family:var(--display);font-weight:800;font-size:17px;color:var(--bg2);background:linear-gradient(135deg,var(--volt),var(--cyan))}
+  .vitem b{display:block;color:#fff;font-size:15px;margin-bottom:6px}
+  .vitem .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .vitem .tag{font-size:12px;font-weight:600;color:var(--volt);background:var(--volt-a);border-radius:8px;padding:4px 9px}
+  .skel{height:70px;border-radius:16px;background:linear-gradient(90deg,var(--bg3) 0%,#16294a 50%,var(--bg3) 100%);background-size:200% 100%;animation:sk 1.4s linear infinite}
+  @keyframes sk{to{background-position:-200% 0}}
+  .vempty{padding:22px;border-radius:16px;border:1px dashed var(--line2);text-align:center;color:var(--muted2);font-size:14px}
+  .vempty a{color:var(--volt);font-weight:600}
+  .club-steps{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+  .club-step{padding:28px 32px;display:flex;gap:14px;align-items:flex-start;border-left:1px solid var(--line)}
+  .club-step:first-child{border-left:0}
+  .club-step i{font-style:normal;font-family:var(--display);font-weight:800;font-size:15px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--volt);color:var(--bg2);flex-shrink:0}
+  .club-step b{display:block;color:#fff;font-size:15px}
+  .club-step span{font-size:13px;color:var(--muted2)}
+
   /* business */
   .biz{display:grid;grid-template-columns:1.2fr 1fr;gap:48px;align-items:center;border-radius:32px;padding:64px;background:var(--volt);color:var(--bg2);position:relative;overflow:hidden}
   .biz::after{content:"";position:absolute;right:-60px;bottom:-120px;width:420px;height:420px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 1 4 14h7l-2 9 11-14h-7z' fill='%230A1628' fill-opacity='.08'/%3E%3C/svg%3E") no-repeat center/contain;pointer-events:none}
@@ -314,6 +351,7 @@
     .stations{grid-template-columns:1fr 1fr}
     .steps{grid-template-columns:1fr 1fr}
     .spott,.biz{padding:48px;gap:40px}
+    .club-top{padding:44px;gap:36px}
     .ft{grid-template-columns:1fr 1fr}
   }
   @media (max-width:860px){
@@ -330,7 +368,10 @@
     .map-tabs{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}
     .map-tab{flex:0 0 auto}
     .map-frame{min-height:320px}
-    .spott,.biz,.calc,.rev{grid-template-columns:1fr}
+    .spott,.biz,.calc,.rev,.club-top{grid-template-columns:1fr}
+    .club-steps{grid-template-columns:1fr}
+    .club-step{border-left:0;border-top:1px solid var(--line)}
+    .club-step:first-child{border-top:0}
     .sec{padding:84px 0}
   }
   @media (max-width:600px){
@@ -338,6 +379,10 @@
     .nav-cta .btn-volt{display:none}
     .stations,.steps{grid-template-columns:1fr}
     .spott,.biz{padding:32px 22px;border-radius:24px}
+    .club{border-radius:24px}
+    .club-top{padding:32px 20px}
+    .club-step{padding:22px 20px}
+    .logo-svg{height:40px;width:98px}
     .calc-card,.rev-card{padding:24px}
     .row2{grid-template-columns:1fr}
     .ft{grid-template-columns:1fr}
@@ -353,6 +398,13 @@
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00E5FF"/><stop offset="1" stop-color="#00FF85"/></linearGradient>
+    <symbol id="logo" viewBox="0 0 196 80">
+      <rect x="0" y="4" width="72" height="72" rx="18" fill="#00FF85"/>
+      <svg x="18" y="15" width="36" height="50" viewBox="142 99 95 181"><path d="M215 99L142 203L186 203L165 280L237 177L197 177Z" fill="#0A1628"/></svg>
+      <rect x="90" y="60" width="96" height="2.5" fill="#00FF85"/>
+      <text x="88" y="52" font-family="Poppins,sans-serif" font-weight="800" font-size="52" fill="#fff" letter-spacing="-1">uby</text>
+      <text x="90" y="76" font-family="Poppins,sans-serif" font-weight="600" font-size="10.5" fill="#00FF85" letter-spacing="4.2">RECHARGE</text>
+    </symbol>
     <symbol id="bolt" viewBox="0 0 24 24"><path d="M14 1 4 14h7l-2 9 11-14h-7z" fill="currentColor"/></symbol>
     <symbol id="pin" viewBox="0 0 24 24"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
     <symbol id="check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor" opacity=".15"/><path d="m7.5 12.5 3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -365,13 +417,11 @@
 
 <header class="nav" id="nav">
   <div class="wrap nav-in">
-    <a href="#" class="logo" aria-label="UBY Recharge — início">
-      <span class="logo-mark"><svg viewBox="0 0 24 24" style="color:#0A1628"><use href="#bolt"/></svg></span>
-      <span class="logo-type"><b>uby</b><small>RECHARGE</small></span>
-    </a>
+    <a href="#" class="logo" aria-label="UBY Recharge — início"><svg class="logo-svg" role="img" aria-label="UBY Recharge"><use href="#logo"/></svg></a>
     <ul class="nav-links">
       <li><a href="#pontos">Pontos</a></li>
       <li><a href="#como-funciona">Como funciona</a></li>
+      <li><a href="#clube">Clube UBY</a></li>
       <li><a href="#tempo">Tempo de recarga</a></li>
       <li><a href="#empresas">Para empresas</a></li>
       <li><a href="#faq">Dúvidas</a></li>
@@ -386,6 +436,7 @@
 <nav class="mnav" id="mnav" aria-label="Menu">
   <a href="#pontos">Pontos de recarga</a>
   <a href="#como-funciona">Como funciona</a>
+  <a href="#clube">Clube UBY</a>
   <a href="#tempo">Tempo de recarga</a>
   <a href="#empresas">Para empresas</a>
   <a href="#avaliar">Avaliar</a>
@@ -653,6 +704,42 @@
   </div>
 </section>
 
+<!-- CLUBE UBY -->
+<section class="sec" id="clube" style="padding-top:0">
+  <div class="wrap">
+    <div class="club rv">
+      <div class="club-top">
+        <div>
+          <div class="club-badge"><svg class="logo-svg" role="img" aria-label="UBY Recharge" style="height:36px;width:88px"><use href="#logo"/></svg><span>CLUBE UBY</span></div>
+          <h2>Carregou na UBY, <em>ganhou vantagens.</em></h2>
+          <p class="club-lead">O Clube UBY é o programa de benefícios de quem carrega na nossa rede: pontos a cada recarga, ranking do mês e descontos em estabelecimentos parceiros.</p>
+          <div class="perks">
+            <div class="perk"><span class="perk-ic"><svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.4 8.6 8 10 4.6-1.4 8-5 8-10V6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>Pontos em toda recarga</b><span>Cada R$ 1 em recarga vale 1 ponto no ranking do mês.</span></span></div>
+            <div class="perk"><span class="perk-ic"><svg viewBox="0 0 24 24"><path d="M3 9h18v11H3zM3 9l2-5h14l2 5M9 20v-6h6v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span><span><b>Descontos em parceiros</b><span>Benefícios exclusivos em lojas, cafés e serviços parceiros da UBY.</span></span></div>
+            <div class="perk"><span class="perk-ic"><svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>Ranking do mês</b><span>Quem mais carrega pode desbloquear benefícios especiais no mês seguinte.</span></span></div>
+          </div>
+          <div class="club-cta">
+            <a class="btn btn-volt" href="https://docs.google.com/forms/d/1OqvX0LKcrdKe8VPvkrSX6fxGhM0T1JZNExfuCHRddvM/viewform" target="_blank" rel="noopener">Entrar no Clube UBY<svg><use href="#arrow"/></svg></a>
+            <a class="btn btn-ghost" href="nova/beneficio.html" target="_blank" rel="noopener">Ver benefícios</a>
+          </div>
+        </div>
+        <div class="vitrine" aria-live="polite">
+          <div class="vitrine-h"><h3>Parceiros e promoções</h3><span class="pill pill-on" id="vlive"><span class="dot" style="width:6px;height:6px"></span>Ao vivo</span></div>
+          <p>Benefícios em vigor agora para clientes da rede UBY.</p>
+          <div class="vlist" id="vlist">
+            <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+          </div>
+        </div>
+      </div>
+      <div class="club-steps">
+        <div class="club-step"><i>1</i><span><b>Aponte a câmera</b><span>Leia o QR UBY no balcão do parceiro.</span></span></div>
+        <div class="club-step"><i>2</i><span><b>Identifique-se uma vez</b><span>Use o mesmo celular ou e-mail do app de recarga.</span></span></div>
+        <div class="club-step"><i>3</i><span><b>Mostre a tela verde</b><span>Toque em "Usar agora" no caixa. Vale por 10 minutos.</span></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- EMPRESAS -->
 <section class="sec" id="empresas" style="padding-top:0">
   <div class="wrap">
@@ -667,6 +754,7 @@
         <li><svg><use href="#check"/></svg>Projeto elétrico e instalação completos</li>
         <li><svg><use href="#check"/></svg>Operação, manutenção e suporte 24h</li>
         <li><svg><use href="#check"/></svg>Seu ponto visível no app SPOTT</li>
+        <li><svg><use href="#check"/></svg>Vire parceiro do Clube UBY e receba os motoristas da rede</li>
       </ul>
     </div>
   </div>
@@ -736,6 +824,7 @@
       <details class="qa rv"><summary>Meu carro é compatível?<i>+</i></summary><p>Quase certamente. A recarga rápida DC usa CCS2 e a recarga AC usa Tipo 2, os padrões da maioria dos elétricos e híbridos plug-in vendidos no Brasil, como BYD, Geely, GAC, GWM, Volvo, BMW, Audi e Mercedes-Benz.</p></details>
       <details class="qa rv"><summary>Como pago a recarga?<i>+</i></summary><p>Pelo app SPOTT, com Pix ou cartão de crédito. Você lê o QR Code da estação, inicia a recarga e paga pela energia carregada.</p></details>
       <details class="qa rv"><summary>Os pontos funcionam de madrugada?<i>+</i></summary><p>Robert Koch e Posto Central JK funcionam 24 horas, 7 dias por semana. No Shopping Aurora a recarga acompanha o horário de funcionamento do shopping.</p></details>
+      <details class="qa rv"><summary>O que é o Clube UBY?<i>+</i></summary><p>É o programa de benefícios de quem carrega na rede UBY. Cada R$ 1 em recarga vale 1 ponto no ranking do mês, e você ganha descontos em estabelecimentos parceiros: é só ler o QR UBY no balcão e se identificar com o mesmo celular ou e-mail do app de recarga.</p></details>
       <details class="qa rv"><summary>Tive um problema na recarga. O que faço?<i>+</i></summary><p>Fale com a gente pelo WhatsApp (43) 98828-1585. Nossa equipe acompanha os carregadores e responde rápido.</p></details>
       <details class="qa rv"><summary>Quero um eletroposto no meu estabelecimento. Como funciona?<i>+</i></summary><p>Fale com a UBY pelo WhatsApp. Fazemos o estudo de viabilidade gratuito e cuidamos do projeto, da instalação e da operação.</p></details>
     </div>
@@ -759,7 +848,7 @@
   <div class="wrap">
     <div class="ft">
       <div>
-        <a href="#" class="logo"><span class="logo-mark"><svg viewBox="0 0 24 24" style="color:#0A1628"><use href="#bolt"/></svg></span><span class="logo-type"><b>uby</b><small>RECHARGE</small></span></a>
+        <a href="#" class="logo" aria-label="UBY Recharge"><svg class="logo-svg logo-lg" role="img" aria-label="UBY Recharge"><use href="#logo"/></svg></a>
         <p>Rede de eletropostos de recarga rápida. Começamos em Londrina (PR) e vamos para 50 pontos no Sul e Sudeste.</p>
         <div class="socials">
           <a href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener" aria-label="Instagram"><svg><use href="#ig"/></svg></a>
@@ -768,7 +857,7 @@
         </div>
       </div>
       <div><h4>Pontos</h4><ul><li><a href="#pontos">Posto Robert Koch</a></li><li><a href="#pontos">Posto Central · JK</a></li><li><a href="#pontos">Shopping Aurora</a></li></ul></div>
-      <div><h4>Recarga</h4><ul><li><a href="#como-funciona">Como funciona</a></li><li><a href="#tempo">Tempo de recarga</a></li><li><a href="#app">App SPOTT</a></li><li><a href="#faq">Dúvidas</a></li></ul></div>
+      <div><h4>Recarga</h4><ul><li><a href="#como-funciona">Como funciona</a></li><li><a href="#tempo">Tempo de recarga</a></li><li><a href="#app">App SPOTT</a></li><li><a href="#clube">Clube UBY</a></li><li><a href="#faq">Dúvidas</a></li></ul></div>
       <div><h4>Contato</h4><ul><li><a href="https://wa.me/5543988281585" target="_blank" rel="noopener">WhatsApp</a></li><li><a href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener">Instagram</a></li><li><a href="#empresas">Para empresas</a></li></ul></div>
     </div>
     <div class="fb"><span>© <span id="yr">2026</span> UBY Recharge · Londrina, PR</span><span>Energia que move.</span></div>
@@ -843,6 +932,36 @@
   $$('#bats .chip').forEach(c => c.addEventListener('click', () => { bat.value = c.dataset.b; calc(bat); }));
   $$('#chg .chip').forEach(c => c.addEventListener('click', () => { chg = +c.dataset.c; calc(); }));
   calc();
+
+  // Clube UBY: vitrine pública de parceiros (mesma função da página de benefícios)
+  (async () => {
+    const box = $('#vlist');
+    const empty = html => { box.innerHTML = `<div class="vempty">${html}</div>`; };
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 9000);
+      const r = await fetch('https://csxafzuaqbbsbdatuhrd.supabase.co/functions/v1/clube-beneficio', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'inicio' }), signal: ctl.signal
+      });
+      clearTimeout(t);
+      const d = await r.json();
+      const list = d && d.ok && Array.isArray(d.vitrine) ? d.vitrine : null;
+      if (!list) throw new Error('sem vitrine');
+      if (!list.length) return empty('Novos parceiros chegando. <a href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener">Acompanhe no Instagram</a>.');
+      box.replaceChildren(...list.map(v => {
+        const el = document.createElement('div'); el.className = 'vitem';
+        const av = document.createElement('span'); av.className = 'av'; av.textContent = String(v.parceiro || '?').trim().charAt(0).toUpperCase();
+        const body = document.createElement('div');
+        const b = document.createElement('b'); b.textContent = v.parceiro;
+        const tags = document.createElement('div'); tags.className = 'tags';
+        (v.beneficios || []).forEach(x => { const t = document.createElement('span'); t.className = 'tag'; t.textContent = x; tags.append(t); });
+        body.append(b, tags); el.append(av, body); return el;
+      }));
+    } catch (_) {
+      $('#vlive').remove();
+      empty('Veja os parceiros e benefícios em vigor na <a href="nova/beneficio.html" target="_blank" rel="noopener">página do Clube UBY</a>.');
+    }
+  })();
 
   // reviews
   let nota = 0;
