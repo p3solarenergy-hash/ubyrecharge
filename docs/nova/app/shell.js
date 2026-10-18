@@ -201,7 +201,8 @@
   }
   function baseChartOptions(extra = {}) {
     return {
-      responsive: true, maintainAspectRatio: false, animation: false,
+      // Gráficos crescem e desenham ao abrir (sem animação com "reduzir movimento").
+      responsive: true, maintainAspectRatio: false, animation: window.UBY_FX?.reduced?.() ? false : { duration: 750, easing: "easeOutQuart" },
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: { boxWidth: 10, font: { size: 11, family: "Inter" }, color: "#465249" } }, tooltip: { titleFont: { family: "Inter" }, bodyFont: { family: "Inter" } } },
       scales: {
@@ -541,6 +542,9 @@
       if (ticket !== state.renderTicket) return;
       try {
         view.render(target, state.params);
+        // Tela nova (outra rota ou outros parâmetros) entra com fade e leve deslize; recálculo da mesma tela não.
+        const routeKey = `${def.id}|${(state.params || []).join("/")}`;
+        if (routeKey !== state.fxRoute) { state.fxRoute = routeKey; window.UBY_FX?.enter?.(target); }
       } catch (err) {
         console.error(err);
         renderError(err);
