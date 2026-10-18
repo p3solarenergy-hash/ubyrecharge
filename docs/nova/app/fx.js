@@ -47,32 +47,28 @@
     return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
   }
 
-  // Ruído de valor periódico (várias oitavas), remapeado para 0..1 e cortado em nuvens: alfa = k·n − c.
-  function mistTile(size, cells, seed, k, c) {
+  // Névoa: manchas radiais suaves espalhadas no ladrilho, cada uma desenhada também nas bordas opostas
+  // para repetir sem emenda. Nada de grade: as formas ficam redondas e o contorno some aos poucos.
+  const FALLOFF = [[0, 1], [0.2, 0.86], [0.4, 0.58], [0.6, 0.29], [0.8, 0.09], [1, 0]]; // ~gaussiana
+  function mistTile(size, count, rMin, rMax, seed) {
     const rand = rng(seed);
-    const grids = cells.map(n => ({ n, v: Array.from({ length: n * n }, rand) }));
-    const field = new Float32Array(size * size);
-    let min = Infinity, max = -Infinity;
-    const smooth = t => t * t * (3 - 2 * t);
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        let sum = 0, amp = 1;
-        for (const { n, v } of grids) {
-          const gx = x / size * n, gy = y / size * n;
-          const x0 = Math.floor(gx), y0 = Math.floor(gy);
-          const tx = smooth(gx - x0), ty = smooth(gy - y0);
-          const x1 = (x0 + 1) % n, y1 = (y0 + 1) % n;
-          const a = v[y0 * n + x0] + (v[y0 * n + x1] - v[y0 * n + x0]) * tx;
-          const b = v[y1 * n + x0] + (v[y1 * n + x1] - v[y1 * n + x0]) * tx;
-          sum += (a + (b - a) * ty) * amp;
-          amp *= 0.5;
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = size;
+    const ctx = cv.getContext("2d");
+    for (let i = 0; i < count; i++) {
+      const x = rand() * size, y = rand() * size, r = rMin + (rMax - rMin) * rand(), a = 0.35 + 0.45 * rand();
+      for (const ox of [-size, 0, size]) {
+        for (const oy of [-size, 0, size]) {
+          const cx = x + ox, cy = y + oy;
+          if (cx + r < 0 || cx - r > size || cy + r < 0 || cy - r > size) continue;
+          const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+          for (const [t, k] of FALLOFF) g.addColorStop(t, `rgba(255,255,255,${a * k})`);
+          ctx.fillStyle = g;
+          ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
         }
-        field[y * size + x] = sum;
-        if (sum < min) min = sum;
-        if (sum > max) max = sum;
       }
     }
-    return paint(size, i => Math.min(1, Math.max(0, k * (field[i] - min) / (max - min) - c)));
+    return `url(${cv.toDataURL("image/png")})`;
   }
 
   // Areia: grãos esparsos, cada um com brilho próprio.
@@ -101,8 +97,8 @@
     bg.setAttribute("aria-hidden", "true");
     bg.innerHTML = `<i></i><i></i><i></i><b class="fx-mist"></b><b class="fx-mist m2"></b><b class="fx-sand"></b>`;
     try {
-      bg.style.setProperty("--fx-mist-a", mistTile(256, [4, 8, 16, 32], 7, 1.5, 0.62));
-      bg.style.setProperty("--fx-mist-b", mistTile(256, [3, 6, 12, 24], 23, 1.5, 0.62));
+      bg.style.setProperty("--fx-mist-a", mistTile(300, 13, 40, 110, 7));
+      bg.style.setProperty("--fx-mist-b", mistTile(300, 8, 60, 140, 23));
       bg.style.setProperty("--fx-sand-m", sandTile(320, 3));
     } catch (e) { /* sem canvas: fica só a aura de luz */ }
     document.body.prepend(bg);
