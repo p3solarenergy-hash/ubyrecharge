@@ -150,15 +150,8 @@
     const glow = g.createRadialGradient(W / 2, 260, 40, W / 2, 260, 900); glow.addColorStop(0, "#00ff8522"); glow.addColorStop(1, "#00ff8500");
     g.fillStyle = glow; g.fillRect(0, 0, W, 1100);
 
-    // logo: ícone (degradê + raio azul) + "uby" + RECHARGE
-    const icon = 230, lx = W / 2 - 400, ly = 150;
-    roundRect(g, lx, ly, icon, icon, 58, grad(lx, ly, lx + icon, ly + icon));
-    drawBolt(g, lx + icon / 2 - 46, ly + 40, 150, BRAND.navy);
-    // linha verde antes do texto: a perna do "y" passa por cima dela, como no logo oficial
-    g.fillStyle = BRAND.green; g.fillRect(lx + icon + 58, ly + 240, 455, 9);
-    g.font = font(270, 800); g.fillStyle = "#fff"; g.textAlign = "left"; g.textBaseline = "alphabetic"; g.letterSpacing = "-4px"; g.fillText("uby", lx + icon + 50, ly + 205); g.letterSpacing = "0px";
-    g.fillStyle = BRAND.green;
-    g.font = font(50, 600); g.letterSpacing = "21px"; g.fillText("RECHARGE", lx + icon + 58, ly + 318); g.letterSpacing = "0px";
+    // logo oficial (mesmo desenho da página do cliente: app/uby-logo.js)
+    const S = 260; window.UBYLogo.draw(g, (W - window.UBYLogo.WIDTH * S) / 2, 130, S);
 
     // chamada
     center("CLIENTE DA REDE UBY?", 560, 60, 700, BRAND.green, "8px");

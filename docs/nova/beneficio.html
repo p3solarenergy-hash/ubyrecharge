@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="app/uby-logo.js?v=1"></script>
 <style>
   /* Identidade UBY Recharge: azul-marinho, verde e raio em degradê verde → turquesa. */
   :root{--navy:#0a1628;--navy2:#111f38;--linha:#22324f;--verde:#00ff85;--turquesa:#00e5c8;--texto:#ffffff;--suave:#9fb0c8;--erro:#ff6b6b}
@@ -17,7 +18,7 @@
   body{margin:0;color:var(--texto);font:16px/1.45 Poppins,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
   .wrap{max-width:460px;margin:0 auto;padding:18px 16px 40px}
   .topo{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-  .logo{height:40px;width:auto;display:block}
+  .logo{height:42px;display:block}
   .selo{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--verde);border:1px solid #00ff8555;border-radius:999px;padding:5px 10px}
   h1{font-size:24px;font-weight:700;margin:0 0 2px;line-height:1.2}
   .sub{color:var(--suave);margin:0 0 6px;font-size:14px}
@@ -73,15 +74,8 @@
 <body>
 <main class="wrap">
   <div class="topo">
-    <!-- Logo UBY Recharge (vetor): ícone com raio + "uby" + RECHARGE -->
-    <svg class="logo" viewBox="0 0 250 80" role="img" aria-label="UBY Recharge">
-      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00ff85"/><stop offset="1" stop-color="#00e5c8"/></linearGradient></defs>
-      <rect x="0" y="4" width="72" height="72" rx="18" fill="url(#g)"/>
-      <svg x="18" y="15" width="36" height="50" viewBox="142 99 95 181"><path d="M215 99L142 203L186 203L165 280L237 177L197 177Z" fill="#0a1628"/></svg>
-      <rect x="90" y="60" width="96" height="2.5" fill="#00ff85"/>
-      <text x="88" y="52" font-family="Poppins,sans-serif" font-weight="800" font-size="52" fill="#fff" letter-spacing="-1">uby</text>
-      <text x="90" y="76" font-family="Poppins,sans-serif" font-weight="600" font-size="10.5" fill="#00ff85" letter-spacing="4.2">RECHARGE</text>
-    </svg>
+    <!-- Logo oficial UBY Recharge (mesmo desenho do display: app/uby-logo.js) -->
+    <canvas id="logo" class="logo" role="img" aria-label="UBY Recharge"></canvas>
     <span class="selo">CLUBE UBY</span>
   </div>
   <h1 id="titulo">Benefícios UBY</h1>
@@ -248,6 +242,17 @@
     });
   }
 
+  // Logo nítido em qualquer tela (desenhado na densidade de pixels do aparelho).
+  async function desenharLogo(){
+    try { await Promise.all([document.fonts.load('800 40px Poppins'), document.fonts.load('500 10px Poppins')]); } catch(e){}
+    // desenha em pixels reais (pelo menos 3x): em tamanho pequeno o navegador arredonda as medidas da fonte
+    const c = $('logo'), alto = 42, k = Math.max(3, window.devicePixelRatio || 1), S = alto * k / UBYLogo.HEIGHT;
+    c.style.height = alto + 'px'; c.style.width = (UBYLogo.WIDTH * alto / UBYLogo.HEIGHT) + 'px';
+    c.width = Math.ceil(UBYLogo.WIDTH * S) + 2; c.height = Math.ceil(alto * k) + 2;
+    UBYLogo.draw(c.getContext('2d'), 0, 0, S);
+  }
+
+  desenharLogo();
   carregar();
 </script>
 </body>
