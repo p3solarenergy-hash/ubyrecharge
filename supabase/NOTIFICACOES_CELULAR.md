@@ -12,7 +12,7 @@ O app da Nova plataforma (instalado no celular ou aberto no Chrome) recebe aviso
   - `subscribe` / `unsubscribe`: liga ou desliga o aparelho;
   - `test`: manda um teste para os aparelhos da própria conta.
 - `docs/nova/sw.js`: mostra a notificação e, no toque, abre a tela do aviso.
-- `docs/nova/app/push.js`: seção **Notificações neste aparelho** na Central de avisos.
+- `docs/nova/app/push.js` e `docs/nova/app/views/ajustes.js`: seção **Notificações neste aparelho** na tela **Ajustes** (último item do menu).
 
 ## Publicar (uma vez)
 
@@ -34,10 +34,10 @@ Não precisa gerar chave nenhuma: a função cria as chaves sozinha.
 ## Testar no Android
 
 1. No Chrome do celular, abra a plataforma e entre com o seu login. Se o app já estiver instalado, use o app.
-2. Vá em **Avisos**. No topo aparece **Notificações neste aparelho**.
+2. Abra o menu e vá em **Ajustes**, no fim da lista. Ali aparece **Notificações neste aparelho**.
 3. Toque em **Ativar notificações** e depois em **Permitir**.
 4. Toque em **Enviar notificação de teste**. Em alguns segundos aparece "UBY Recharge — Teste…" na tela. Tocando nela, o app abre em Avisos.
-5. Feche o app e mande outro teste pelo computador: logado na mesma conta, abra **Avisos** e clique em **Enviar teste aos meus aparelhos**. O teste vai para todos os aparelhos ativados nessa conta.
+5. Feche o app e mande outro teste pelo computador: logado na mesma conta, abra **Ajustes** e clique em **Enviar teste aos meus aparelhos**. O teste vai para todos os aparelhos ativados nessa conta.
 
 ## Se não chegar
 

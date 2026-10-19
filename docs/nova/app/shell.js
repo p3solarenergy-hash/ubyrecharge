@@ -59,6 +59,9 @@
     // A P3 é prestadora de serviço da UBY: sempre depois da UBY.
     { label: "P3 · PRESTADORA", items: [
       { id: "p3", icon: "◈", label: "P3 Solar · gestão", type: "view" }
+    ] },
+    { label: "AJUSTES", items: [
+      { id: "ajustes", icon: "⚙", label: "Ajustes", type: "view" }
     ] }
   ];
   const ROUTES = Object.fromEntries(GROUPS.flatMap(g => g.items.map(item => [item.id, { ...item, group: g.label }])));
@@ -87,6 +90,10 @@
     // A P3 é prestadora de serviço da UBY: sempre depois da UBY.
     { label: "P3 · PRESTADORA", items: [
       { icon: "◈", label: "P3 Solar · gestão", tabs: [["p3", "P3 Solar · gestão"]] }
+    ] },
+    // Preferências do aparelho (notificações): no fim do menu, fora do caminho do dia a dia.
+    { label: "AJUSTES", items: [
+      { icon: "⚙", label: "Ajustes", tabs: [["ajustes", "Ajustes · notificações no celular"]] }
     ] }
   ];
   const tabHref = t => (t[0].startsWith("#/") ? t[0] : `#/${t[0]}`);

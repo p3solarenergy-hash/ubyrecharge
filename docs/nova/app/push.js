@@ -1,6 +1,6 @@
 /* NOVA PLATAFORMA UBY — notificações no celular (Web Push).
    O aparelho se inscreve pelo service worker (sw.js) e a função uby-push do
-   Supabase guarda a inscrição e envia os avisos. A seção aparece na Central de avisos. */
+   Supabase guarda a inscrição e envia os avisos. A seção aparece na tela Ajustes. */
 (function () {
   "use strict";
   const FN = "uby-push";
