@@ -665,12 +665,21 @@
   const isUbyModel = model => UBY_MODELS.includes(model || "uby");
   // Centro de custos de um carregador (Financeiro › Por estação). O nome da estação pode vir da obra
   // ("POSTO CENTRAL JK") ou das recargas ("UBY RECHARGE - CENTRAL JK"): a tela acha pelo workId.
+  // Nome curto do carregador para cartões pequenos (usuário, 19/10/2026: "abrevia, coloca JK, RK ou Aurora").
+  const shortStation = name => {
+    const s = String(name || "").replace(/^UBY RECHARGE\s*-\s*/i, "").trim();
+    const n = s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    if (/robert\s*koch|malassise/.test(n)) return "RK";
+    if (/central\s*jk/.test(n)) return /\bac\b/.test(n) ? "JK AC" : "JK";
+    if (/aurora/.test(n)) return /\bac\b/.test(n) ? "Aurora AC" : /\bdc\b/.test(n) ? "Aurora DC" : "Aurora";
+    return s.replace(/^(posto|shopping|mercado)\s+/i, "") || s;
+  };
   const stationHref = (workId, station) => workId || station ? `#/financeiro/estacao/${encodeURIComponent(`${workId || ""}|${station || ""}`)}` : "";
   const stationLink = (workId, station, label = station) => {
     const href = stationHref(workId, station);
     return href ? `<a class="edit-link" href="${href}" title="Abrir o centro de custos deste carregador">${esc(label)}<span aria-hidden="true"> ↗</span></a>` : esc(label);
   };
 
-  window.UBY = { nav: NAV, routes: ROUTES, start, checkCloudSession, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, obrasEdit, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel, stationHref, stationLink,
+  window.UBY = { nav: NAV, routes: ROUTES, shortStation, start, checkCloudSession, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, obrasEdit, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel, stationHref, stationLink,
     register: (id, view) => { VIEWS[id] = view; }, go: hash => { location.hash = hash; }, ROUTES };
 })();

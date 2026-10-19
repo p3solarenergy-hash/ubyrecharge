@@ -28,7 +28,7 @@
           ${mini("Média por dia", fmt.n1(b.perDay), isDc ? esc(b.perDayByStation.slice(0, 3).map(r => `${r.station}: ${fmt.n1(r.perDay)}/dia`).join(" · ")) : "recargas por dia", d(c.current.perDay, c.previous.perDay))}
           ${mini("Disponibilidade real", fmt.pct(b.availability), `${fmt.int(b.validSessions)} de ${fmt.int(b.sessions)} tentativas viraram recarga`)}
           ${mini(`Falhas ${kindLabel(kind)}`, fmt.int(b.failures), `${fmt.pct(b.failureRate)} das tentativas`, d(c.current.failedCount, c.previous.failedCount, { inverse: true }))}
-          ${mini("Melhor unidade", esc(b.best?.station || "—"), b.best ? fmt.brl(b.best.revenue) : "sem dados no período")}
+          ${mini("Melhor unidade", `<span title="${esc(b.best?.station || "")}">${esc(b.best ? UBY.shortStation(b.best.station) : "—")}</span>`, b.best ? fmt.brl(b.best.revenue) : "sem dados no período")}
           ${mini("Participação na rede", fmt.pct(b.revenueShare), `do faturamento · ${fmt.pct(b.networkShare)} das recargas do consolidado`)}
         </div>` : `<div class="note">Sem base ${kindLabel(kind)} própria neste período. O bloco continua visível para não misturar médias com outras origens.</div>`}
       </article>`;
