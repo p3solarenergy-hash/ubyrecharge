@@ -252,6 +252,25 @@
     UBYLogo.draw(c.getContext('2d'), 0, 0, S);
   }
 
+  // Celular em qualquer formato (43-99955-6210, 4399955-6210, (43)999556210, +55 43 ...):
+  // o campo já mostra como (43) 99955-6210. E-mail (com @) fica como foi digitado.
+  function formatarTelefone(v){
+    if (/[@a-z]/i.test(v)) return v;
+    let d = v.replace(/\D/g, '').replace(/^0+/, '');
+    if (d.length > 11 && d.startsWith('55')) d = d.slice(2).replace(/^0+/, '');
+    d = d.slice(0, 11);
+    if (d.length <= 2) return d.length ? '(' + d : '';
+    const resto = d.slice(2), corte = d.length === 11 ? 5 : 4;
+    return '(' + d.slice(0, 2) + ') ' + (resto.length > corte ? resto.slice(0, corte) + '-' + resto.slice(corte) : resto);
+  }
+  $('ident-campo').addEventListener('input', e => {
+    // apagando: deixa a pessoa apagar o traço/parêntese sem que ele volte sozinho
+    if (String(e.inputType || '').startsWith('delete')) return;
+    const el = e.target, antes = el.value, depois = formatarTelefone(antes);
+    if (depois !== antes) { el.value = depois; el.setSelectionRange(depois.length, depois.length); }
+  });
+  $('ident-campo').addEventListener('keydown', e => { if (e.key === 'Enter') identificar(); });
+
   desenharLogo();
   carregar();
 </script>
