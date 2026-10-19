@@ -49,3 +49,30 @@ self.addEventListener("fetch", event => {
     })
   );
 });
+
+// Notificações no celular (ver app/push.js e supabase/functions/uby-push).
+const HOME = "./index.html#/avisos";
+self.addEventListener("push", event => {
+  let msg = {};
+  try { msg = event.data ? event.data.json() : {}; } catch (_) { msg = { body: event.data ? event.data.text() : "" }; }
+  event.waitUntil(self.registration.showNotification(msg.title || "UBY Recharge", {
+    body: msg.body || "",
+    icon: "assets/pwa/icon-192.png",
+    tag: msg.tag || undefined,
+    lang: "pt-BR",
+    data: { url: msg.url || HOME }
+  }));
+});
+
+// Toque na notificação: abre a tela do aviso no app já aberto, ou abre o app.
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const scope = self.registration.scope;
+  let url = new URL((event.notification.data && event.notification.data.url) || HOME, scope).href;
+  if (!url.startsWith(scope)) url = new URL(HOME, scope).href;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+    const open = list.find(c => c.url.startsWith(scope) && "focus" in c);
+    if (!open) return self.clients.openWindow(url);
+    return open.focus().then(c => c.navigate(url)).catch(() => self.clients.openWindow(url));
+  }));
+});
