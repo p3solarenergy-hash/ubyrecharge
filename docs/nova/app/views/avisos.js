@@ -53,8 +53,6 @@
         <p class="lead">Tudo o que precisa de ação: contas vencidas e a vencer, repasses, faturas de energia, pagamento aos cotistas, fechamentos e carregadores sem recarga.</p></div>
         <div class="callout"><strong>${a.nextBill ? `Próxima conta: ${esc(fmtDay(a.nextBill.dueDate))}` : "Nenhuma conta a vencer"}</strong><small>${a.nextBill ? `${esc(a.nextBill.name)} · ${fmt.brl(a.nextBill.amount)}` : "Contas marcadas como pagas saem desta lista."}</small></div></div>
 
-      <div id="avPush"></div>
-
       <section class="section"><div class="section-head"><div><p class="kicker">Contas a pagar</p><h2>Por prazo</h2>
         <p>Custos da matriz, pagamentos programados, faturas de energia (Copel e arrendamento) e repasses às áreas que ainda não foram marcados como pagos. Clique num prazo para filtrar.</p></div></div>
         <div class="grid g6" id="avBuckets">
@@ -95,7 +93,6 @@
     target.querySelectorAll("#avBuckets [data-b]").forEach(btn => { btn.onclick = () => { ui.bucket = ui.bucket === btn.dataset.b ? "" : btn.dataset.b; render(target); }; });
     const all = target.querySelector("#avAll");
     if (all) all.onclick = () => { ui.bucket = ""; render(target); };
-    if (UBY.push) UBY.push.mount(target.querySelector("#avPush"));
   }
 
   UBY.register("avisos", { render });
