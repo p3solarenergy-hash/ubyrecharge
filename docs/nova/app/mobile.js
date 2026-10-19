@@ -22,7 +22,8 @@
   const backdrop = document.createElement("div");
   backdrop.className = "menu-backdrop";
   backdrop.onclick = () => document.body.classList.remove("menu-open");
-  document.body.appendChild(backdrop);
+  // Dentro da .app-shell, que tem camada própria (z-index): fora dela o fundo ficava por cima do menu e engolia os toques.
+  (document.querySelector(".app-shell") || document.body).appendChild(backdrop);
   document.addEventListener("keydown", e => { if (e.key === "Escape") document.body.classList.remove("menu-open"); });
 
   // ---------- barra de abas (só aparece no celular, via CSS) ----------
