@@ -27,6 +27,10 @@
   const spMonth = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
   const nextMonth = mk => { const [y, m] = mk.split("-").map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`; };
   const uses = { month: "", rows: null, error: "", loading: false };
+  // Relatório de usos (usuário, 19/10/2026: "relatório, filtro por data, por parceiro, exportar planilha e relatório").
+  const spDay = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d);
+  const addDay = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const rep = { from: `${spMonth()}-01`, to: spDay(), partner: "", status: "CONFIRMADO", q: "", rows: null, key: "", error: "", loading: false };
 
   // ---------- gravação (quadro oculto) ----------
   let frame = null, ready = null;
@@ -104,6 +108,117 @@
       uses.error = /club_partner_uses|does not exist|relation/i.test(String(err.message || err))
         ? "A tabela de usos ainda não existe no Supabase (aplique supabase/clube_beneficios.sql)." : String(err.message || err);
     } finally { uses.loading = false; if (ui.tab === "parceiros") paint(); }
+  }
+
+  async function loadRep(force) {
+    const key = `${rep.from}|${rep.to}`;
+    if (!rep.from || !rep.to || (!force && rep.key === key)) return;
+    Object.assign(rep, { key, rows: null, error: "", loading: true });
+    try {
+      const w = await writer();
+      rep.rows = await w.UBY_SUPABASE.loadClubPartnerUses(`${rep.from}T00:00:00-03:00`, `${addDay(rep.to, 1)}T00:00:00-03:00`);
+    } catch (err) {
+      rep.error = /club_partner_uses|does not exist|relation/i.test(String(err.message || err))
+        ? "A tabela de usos ainda não existe no Supabase (aplique supabase/clube_beneficios.sql)." : String(err.message || err);
+    } finally { rep.loading = false; if (ui.tab === "relatorio") paint(); }
+  }
+  // Linhas do relatório com os filtros da tela (parceiro, situação, cliente).
+  const fold = v => String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  function repRows(c, anyStatus = false) {
+    const names = new Map(c.partners.map(p => [p.id, p.name]));
+    const q = fold(rep.q).trim();
+    return (rep.rows || []).map(u => ({ ...u, partner: names.get(u.partner_id) || u.partner_id, contact: String(u.client_key || "").replace(/^(tel|mail):/, "") }))
+      .filter(u => (!rep.partner || u.partner_id === rep.partner) && (anyStatus || rep.status === "TODOS" || u.status === rep.status)
+        && (!q || fold(`${u.client_name} ${u.contact} ${u.code}`).includes(q)));
+  }
+  // Cancelados contam no período/parceiro/cliente, independente do filtro de situação.
+  function repSummary(list, all = list) {
+    const conf = list.filter(u => u.status === "CONFIRMADO");
+    const group = (arr, keyOf) => {
+      const m = new Map();
+      arr.forEach(u => {
+        const k = keyOf(u);
+        const g = m.get(k) || { key: k, n: 0, clients: new Set(), partners: new Set(), first: u.created_at, last: u.created_at, sample: u };
+        g.n++; g.clients.add(u.client_key); g.partners.add(u.partner);
+        if (u.created_at < g.first) g.first = u.created_at;
+        if (u.created_at > g.last) g.last = u.created_at;
+        m.set(k, g);
+      });
+      return [...m.values()].sort((a, b) => b.n - a.n);
+    };
+    return { conf, cancelled: all.filter(u => u.status !== "CONFIRMADO"), byPartner: group(conf, u => u.partner), byClient: group(conf, u => u.client_key) };
+  }
+  const periodLabel = () => `${rep.from.split("-").reverse().join("/")} a ${rep.to.split("-").reverse().join("/")}`;
+  function reportTab(c) {
+    const list = repRows(c), s = repSummary(list, repRows(c, true));
+    const partners = c.partners.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), "pt-BR"));
+    const shown = list.slice(0, 500);
+    return `
+      <section class="section"><div class="section-head"><div><p class="kicker">Clube UBY · usos pelo QR</p><h2>Relatório de usos</h2><p>Filtre por período, parceiro, situação ou cliente. A planilha e o PDF saem exatamente com os filtros da tela.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" id="clubRepXlsx" type="button" ${rep.rows ? "" : "disabled"}>⇩ Planilha (Excel)</button><button class="btn primary" id="clubRepPdf" type="button" ${rep.rows ? "" : "disabled"}>⇩ Relatório (PDF)</button></div></div>
+        <div class="toolbar" style="box-shadow:none">
+          <label>De <input class="select" type="date" id="clubRepFrom" value="${esc(rep.from)}"></label>
+          <label>Até <input class="select" type="date" id="clubRepTo" value="${esc(rep.to)}"></label>
+          <span class="seg" id="clubRepQuick">${[["mes", "Este mês"], ["ant", "Mês passado"], ["30", "30 dias"], ["ano", "Ano"]].map(([v, l]) => `<button type="button" data-q="${v}">${l}</button>`).join("")}</span>
+          <select class="select" id="clubRepPartner"><option value="">Todos os parceiros</option>${partners.map(p => `<option value="${esc(p.id)}" ${rep.partner === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>
+          <select class="select" id="clubRepStatus">${[["CONFIRMADO", "Confirmados"], ["CANCELADO", "Cancelados"], ["TODOS", "Todos"]].map(([v, l]) => `<option value="${v}" ${rep.status === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+          <input class="search" id="clubRepQ" placeholder="Cliente, contato ou código" value="${esc(rep.q)}">
+          <button class="btn ghost" id="clubRepReload" type="button" title="Ler de novo">↻</button>
+        </div>
+        ${rep.error ? `<div class="note" style="border-color:var(--uby-amber)">${esc(rep.error)}</div>` : ""}
+        ${rep.loading || !rep.rows ? (rep.error ? "" : `<div class="note">Lendo os usos de ${esc(periodLabel())}…</div>`) : `
+        <div class="grid g4" style="margin:6px 0 14px">
+          ${kpi("Usos confirmados", fmt.int(s.conf.length), esc(periodLabel()), "", "lead")}
+          ${kpi("Clientes atendidos", fmt.int(s.byClient.length), "pessoas diferentes")}
+          ${kpi("Parceiros com uso", fmt.int(s.byPartner.length), `${fmt.int(partners.filter(p => p.status === "active").length)} ativos no Clube`)}
+          ${kpi("Cancelados", fmt.int(s.cancelled.length), "usos desfeitos no caixa")}
+        </div>
+        <div class="split" style="margin-bottom:14px">
+          <div><h3 style="margin:0 0 6px">Por parceiro</h3><div class="table-wrap"><table><thead><tr><th>Parceiro</th><th class="num">Usos</th><th class="num">Clientes</th><th>Primeiro</th><th>Último</th></tr></thead>
+            <tbody>${s.byPartner.map(g => `<tr><td><strong>${esc(g.key)}</strong></td><td class="num">${fmt.int(g.n)}</td><td class="num">${fmt.int(g.clients.size)}</td><td><small>${fmt.dt(g.first)}</small></td><td><small>${fmt.dt(g.last)}</small></td></tr>`).join("") || `<tr><td colspan="5" class="empty">Nenhum uso confirmado no filtro.</td></tr>`}</tbody></table></div></div>
+          <div><h3 style="margin:0 0 6px">Clientes que mais usaram</h3><div class="table-wrap"><table><thead><tr><th>Cliente</th><th class="num">Usos</th><th>Parceiros</th><th>Último</th></tr></thead>
+            <tbody>${s.byClient.slice(0, 15).map(g => `<tr><td>${who(g.sample.client_name || "—")}<small>${priv(g.sample.contact)}</small></td><td class="num">${fmt.int(g.n)}</td><td><small>${esc([...g.partners].join(", "))}</small></td><td><small>${fmt.dt(g.last)}</small></td></tr>`).join("") || `<tr><td colspan="4" class="empty">—</td></tr>`}</tbody></table></div></div>
+        </div>
+        <h3 style="margin:0 0 6px">Usos (${fmt.int(list.length)})</h3>
+        <div class="table-wrap" style="max-height:520px"><table><thead><tr><th>Data</th><th>Parceiro</th><th>Benefício</th><th>Cliente</th><th>Código</th><th>Situação</th></tr></thead>
+          <tbody>${shown.map(u => `<tr><td>${fmt.dt(u.created_at)}</td><td>${esc(u.partner)}</td><td><small>${esc(u.description)}</small></td><td>${who(u.client_name || "—")}<small>${priv(u.contact)}</small></td><td>${esc(u.code)}</td>
+            <td><span class="badge ${u.status === "CONFIRMADO" ? "ok" : "neutral"}">${u.status === "CONFIRMADO" ? "confirmado" : "cancelado"}</span></td></tr>`).join("") || `<tr><td colspan="6" class="empty">Nenhum uso neste filtro.</td></tr>`}</tbody></table></div>
+        ${list.length > shown.length ? `<p class="source-line">Mostrando os ${fmt.int(shown.length)} mais recentes; a planilha e o PDF trazem todos os ${fmt.int(list.length)}.</p>` : ""}`}
+      </section>`;
+  }
+  const repTitle = c => `Clube UBY - usos ${rep.from.split("-").reverse().join("-")} a ${rep.to.split("-").reverse().join("-")}${rep.partner ? ` - ${String((c.partners.find(p => p.id === rep.partner) || {}).name || "").replace(/[\\/:*?"<>|]+/g, "-")}` : ""}`;
+  // Planilha (.xlsx) com três abas: usos, por parceiro e por cliente.
+  async function exportXlsx(c) {
+    const XLSX = await document.getElementById("motorFrame").contentWindow.ensureSpreadsheetLibrary();
+    const list = repRows(c), s = repSummary(list);
+    const dt = iso => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(list.map(u => ({ "Data": dt(u.created_at), "Parceiro": u.partner, "Benefício": u.description, "Cliente": u.client_name || "", "Contato": u.contact, "Código": u.code, "Situação": u.status === "CONFIRMADO" ? "confirmado" : "cancelado" }))), "Usos");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s.byPartner.map(g => ({ "Parceiro": g.key, "Usos confirmados": g.n, "Clientes": g.clients.size, "Primeiro uso": dt(g.first), "Último uso": dt(g.last) }))), "Por parceiro");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s.byClient.map(g => ({ "Cliente": g.sample.client_name || "", "Contato": g.sample.contact, "Usos confirmados": g.n, "Parceiros": [...g.partners].join(", "), "Último uso": dt(g.last) }))), "Por cliente");
+    const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    a.download = `${repTitle(c)}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  }
+  // Relatório para imprimir / salvar em PDF (mesmo modelo dos relatórios da plataforma).
+  function exportPdf(c) {
+    const list = repRows(c), s = repSummary(list, repRows(c, true));
+    const partnerName = rep.partner ? (c.partners.find(p => p.id === rep.partner) || {}).name || "" : "Todos os parceiros";
+    const st = { CONFIRMADO: "confirmados", CANCELADO: "cancelados", TODOS: "todos" }[rep.status];
+    const dt = iso => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const k = (l, v) => `<div class="kpi"><b>${v}</b><span>${esc(l)}</span></div>`;
+    const html = `<div class="top"><div><div class="brand">UBY <b>Recharge</b> · Clube UBY</div><h1>Relatório de usos dos benefícios</h1>
+        <div class="sub">${esc(periodLabel())} · ${esc(partnerName)} · usos ${esc(st)}${rep.q ? ` · cliente: ${esc(rep.q)}` : ""}</div></div><span class="badge">QR do balcão</span></div>
+      <div class="kpis">${k("Usos confirmados", fmt.int(s.conf.length))}${k("Clientes atendidos", fmt.int(s.byClient.length))}${k("Parceiros com uso", fmt.int(s.byPartner.length))}${k("Cancelados", fmt.int(s.cancelled.length))}</div>
+      <h2>Por parceiro</h2><table><thead><tr><th>Parceiro</th><th class="n">Usos</th><th class="n">Clientes</th><th>Primeiro uso</th><th>Último uso</th></tr></thead>
+        <tbody>${s.byPartner.map(g => `<tr><td>${esc(g.key)}</td><td class="n">${g.n}</td><td class="n">${g.clients.size}</td><td>${dt(g.first)}</td><td>${dt(g.last)}</td></tr>`).join("") || `<tr><td colspan="5">Nenhum uso confirmado.</td></tr>`}</tbody></table>
+      <h2>Usos</h2><table><thead><tr><th>Data</th><th>Parceiro</th><th>Cliente</th><th>Benefício</th><th>Código</th><th>Situação</th></tr></thead>
+        <tbody>${list.map(u => `<tr><td>${dt(u.created_at)}</td><td>${esc(u.partner)}</td><td>${esc(u.client_name || "—")}</td><td>${esc(u.description)}</td><td>${esc(u.code)}</td><td>${u.status === "CONFIRMADO" ? "confirmado" : "cancelado"}</td></tr>`).join("") || `<tr><td colspan="6">Nenhum uso no filtro.</td></tr>`}</tbody></table>
+      <div class="foot">Gerado em ${new Date().toLocaleString("pt-BR")} pela Nova Plataforma UBY · usos registrados quando o cliente toca USAR AGORA no balcão do parceiro.</div>`;
+    UBY.reports.page(`UBY Recharge — ${repTitle(c)}`, html);
   }
 
   // Display de balcão (A5, 300 dpi) com o QR fixo do parceiro, gerado no navegador.
@@ -331,13 +446,14 @@
       ${legacy.any && !c.cloud.legacyImportedAt ? `<div class="note" style="margin-bottom:12px;border-color:var(--uby-amber)"><strong>Dados do Clube encontrados neste navegador (plataforma atual)</strong><br>${legacy.partners.length} parceiro(s), ${legacy.coupons.length} uso(s) de cupom e ${legacy.participants.length} participante(s) guardados só neste computador. Importe para a nuvem para não perder e usar em qualquer lugar (junta com o que já existe, sem apagar nada). <button class="btn primary" id="clubLegacyImport" type="button" style="margin-left:6px" ${ui.busy ? "disabled" : ""}>Importar para a nuvem</button></div>` : ""}
       ${ui.msg ? `<div class="note" style="margin-bottom:12px;border-color:${ui.msg.ok ? "var(--uby-green, #1f9d55)" : "var(--uby-red)"}">${esc(ui.msg.text)}</div>` : ""}
       <div class="toolbar">
-        <div class="seg" id="clubTabs">${[["ranking", "Ranking"], ["participantes", "Participantes"], ["parceiros", "Parceiros"], ["cupons", "Cupons"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
+        <div class="seg" id="clubTabs">${[["ranking", "Ranking"], ["participantes", "Participantes"], ["parceiros", "Parceiros"], ["relatorio", "Relatório de usos"], ["cupons", "Cupons"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${ui.tab === v ? "on" : ""}">${l}</button>`).join("")}</div>
         <span class="spacer"></span>
         ${ui.tab === "ranking" || ui.tab === "cupons" || ui.tab === "parceiros" ? `<label>Competição <select class="select" id="clubMonth">${c.months.slice().reverse().map(m => `<option value="${m.key}" ${m.key === c.monthKey ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></label>` : ""}
       </div>
-      ${ui.tab === "participantes" ? participantsTab(c) : ui.tab === "parceiros" ? partnersTab(c) : ui.tab === "cupons" ? couponsTab(c) : rankingTab(c)}`;
+      ${ui.tab === "participantes" ? participantsTab(c) : ui.tab === "parceiros" ? partnersTab(c) : ui.tab === "relatorio" ? reportTab(c) : ui.tab === "cupons" ? couponsTab(c) : rankingTab(c)}`;
     bind();
     if (ui.tab === "parceiros") loadUses(c.monthKey);
+    if (ui.tab === "relatorio") loadRep(false);
   }
 
   function bind() {
@@ -420,6 +536,21 @@
       save(`Parceiro ${f.name}`, p => { p.partners = (p.partners || []).filter(x => x.id !== f.id).concat(f); return p; }, "save_partner");
     };
     if ($("#clubUsesReload")) $("#clubUsesReload").onclick = () => loadUses(data.monthKey, true);
+    // --- relatório de usos ---
+    const repDates = (from, to) => { rep.from = from; rep.to = to; loadRep(false); paint(); };
+    if ($("#clubRepFrom")) $("#clubRepFrom").onchange = e => { if (e.target.value) repDates(e.target.value, rep.to < e.target.value ? e.target.value : rep.to); };
+    if ($("#clubRepTo")) $("#clubRepTo").onchange = e => { if (e.target.value) repDates(rep.from > e.target.value ? e.target.value : rep.from, e.target.value); };
+    target.querySelectorAll("#clubRepQuick [data-q]").forEach(b => b.onclick = () => {
+      const today = spDay(), mk = spMonth();
+      const [y, m] = mk.split("-").map(Number); const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+      ({ mes: () => repDates(`${mk}-01`, today), ant: () => repDates(`${prev}-01`, addDay(`${mk}-01`, -1)), "30": () => repDates(addDay(today, -29), today), ano: () => repDates(`${y}-01-01`, today) })[b.dataset.q]();
+    });
+    if ($("#clubRepPartner")) $("#clubRepPartner").onchange = e => { rep.partner = e.target.value; paint(); };
+    if ($("#clubRepStatus")) $("#clubRepStatus").onchange = e => { rep.status = e.target.value; paint(); };
+    if ($("#clubRepQ")) $("#clubRepQ").oninput = e => { clearTimeout(e.target._t); e.target._t = setTimeout(() => { rep.q = e.target.value; paint(); const n = target.querySelector("#clubRepQ"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 300); };
+    if ($("#clubRepReload")) $("#clubRepReload").onclick = () => { loadRep(true); paint(); };
+    if ($("#clubRepXlsx")) $("#clubRepXlsx").onclick = () => exportXlsx(data).catch(err => alert(`Não consegui gerar a planilha: ${err.message || err}`));
+    if ($("#clubRepPdf")) $("#clubRepPdf").onclick = () => exportPdf(data);
     target.querySelectorAll("[data-u-cancel]").forEach(b => b.onclick = async () => {
       if (!confirm("Cancelar este uso? O cliente volta a poder usar o benefício no período.")) return;
       try { const w = await writer(); await w.UBY_SUPABASE.cancelClubPartnerUse(b.dataset.uCancel); ui.msg = { ok: true, text: "Uso cancelado." }; await loadUses(data.monthKey, true); }

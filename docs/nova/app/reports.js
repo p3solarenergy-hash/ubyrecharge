@@ -289,6 +289,8 @@
 
   UBY.reports = {
     build, open,
+    // Página avulsa no mesmo modelo (ex.: relatório de usos do Clube): o título vira o nome do PDF.
+    page: (title, html) => open(doc(title, [html])),
     unificado: mk => open(build("unificado", { month: mk })),
     competencia: mk => open(build("unificado", { month: mk })),
     carregador: (workId, station, mk) => open(build("carregador", { workId, station, month: mk })),
