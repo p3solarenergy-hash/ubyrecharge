@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
 // Notificações no celular (Web Push). Chamada pela plataforma com a sessão do
@@ -6,6 +6,7 @@ import webpush from "npm:web-push@3.6.7";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, authorization, apikey, x-client-info", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const DEFAULT_SUBJECT = "https://p3solarenergy-hash.github.io/ubyrecharge/nova/";
 const TABLE = "uby_push_subscriptions";
+const VAPID_TABLE = "uby_push_vapid";
 
 type Subscription = { endpoint: string; p256dh: string; auth: string };
 type Vapid = { subject: string; publicKey: string; privateKey: string };
@@ -13,11 +14,28 @@ type Vapid = { subject: string; publicKey: string; privateKey: string };
 const text = (value: unknown) => value == null ? "" : String(value);
 const reply = (body: Record<string, unknown>, status = 200) => Response.json(body, { status, headers: CORS });
 
-function vapid(): Vapid | null {
-  const publicKey = text(Deno.env.get("VAPID_PUBLIC_KEY")).trim();
-  const privateKey = text(Deno.env.get("VAPID_PRIVATE_KEY")).trim();
+// Chaves dos segredos da função, se existirem; senão, as do banco. Na primeira
+// chamada o par é gerado e gravado (se duas chamadas gerarem juntas, vale o que
+// gravou primeiro), então a chave privada nunca sai do Supabase.
+async function vapid(supabase: SupabaseClient): Promise<Vapid> {
   const subject = text(Deno.env.get("VAPID_SUBJECT")).trim() || DEFAULT_SUBJECT;
-  return publicKey && privateKey ? { subject, publicKey, privateKey } : null;
+  const envPublic = text(Deno.env.get("VAPID_PUBLIC_KEY")).trim();
+  const envPrivate = text(Deno.env.get("VAPID_PRIVATE_KEY")).trim();
+  if (envPublic && envPrivate) return { subject, publicKey: envPublic, privateKey: envPrivate };
+
+  const load = async () => {
+    const { data, error } = await supabase.from(VAPID_TABLE).select("public_key,private_key").eq("id", 1).maybeSingle();
+    if (error) throw error;
+    return data ? { subject, publicKey: text(data.public_key), privateKey: text(data.private_key) } : null;
+  };
+  const saved = await load();
+  if (saved) return saved;
+  const keys = webpush.generateVAPIDKeys();
+  const { error } = await supabase.from(VAPID_TABLE).upsert({ id: 1, public_key: keys.publicKey, private_key: keys.privateKey }, { onConflict: "id", ignoreDuplicates: true });
+  if (error) throw error;
+  const created = await load();
+  if (!created) throw new Error("Não foi possível gravar as chaves das notificações.");
+  return created;
 }
 
 // O web-push só monta o pedido criptografado; o envio vai pelo fetch do Deno
@@ -56,8 +74,7 @@ Deno.serve(async (request) => {
     const user = auth?.user;
     if (!user) return reply({ ok: false, error: "Entre na plataforma para usar as notificações." }, 401);
 
-    const keys = vapid();
-    if (!keys) return reply({ ok: false, error: "Chaves VAPID não configuradas no Supabase (VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY)." }, 409);
+    const keys = await vapid(supabase);
 
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     const action = text(body.action);

@@ -4,7 +4,9 @@ O app da Nova plataforma (instalado no celular ou aberto no Chrome) recebe aviso
 
 ## Peças
 
-- `supabase/push_notificacoes.sql`: cria a tabela `uby_push_subscriptions` (um registro por aparelho ativado). Só a função lê e grava.
+- `supabase/push_notificacoes.sql`: cria duas tabelas que só a função lê e grava:
+  - `uby_push_subscriptions`: um registro por aparelho ativado;
+  - `uby_push_vapid`: o par de chaves de envio, gerado pela própria função na primeira chamada. A chave privada nunca sai do Supabase.
 - `supabase/functions/uby-push/index.ts`: função chamada pela plataforma com o login do usuário. Ações:
   - `config`: devolve a chave pública;
   - `subscribe` / `unsubscribe`: liga ou desliga o aparelho;
@@ -14,16 +16,10 @@ O app da Nova plataforma (instalado no celular ou aberto no Chrome) recebe aviso
 
 ## Publicar (uma vez)
 
-1. **Chaves:** num computador com Node instalado, rode:
-   ```bash
-   npx web-push generate-vapid-keys
-   ```
-   Saem duas chaves: **Public Key** e **Private Key**. A privada é secreta: não coloque no código nem mande por mensagem.
-2. **Segredos:** no Supabase, abra **Edge Functions → Secrets** e crie:
-   - `VAPID_PUBLIC_KEY`: a Public Key;
-   - `VAPID_PRIVATE_KEY`: a Private Key.
-3. **Banco:** no Supabase, abra **SQL Editor**, cole todo o `supabase/push_notificacoes.sql` e clique em **Run**.
-4. **Função:** no Supabase, abra **Edge Functions → Deploy a new function → Via Editor**.
+Não precisa gerar chave nenhuma: a função cria as chaves sozinha.
+
+1. **Banco:** no Supabase, abra **SQL Editor**, cole todo o `supabase/push_notificacoes.sql` e clique em **Run**.
+2. **Função:** no Supabase, abra **Edge Functions → Deploy a new function → Via Editor**.
    - Nome: `uby-push`.
    - Cole o `supabase/functions/uby-push/index.ts` e clique em **Deploy**.
    - Deixe **Enforce JWT verification** ligado: só quem está logado na plataforma usa.
@@ -31,7 +27,9 @@ O app da Nova plataforma (instalado no celular ou aberto no Chrome) recebe aviso
      ```bash
      npx supabase functions deploy uby-push --project-ref csxafzuaqbbsbdatuhrd
      ```
-5. **Site:** publique os arquivos de `docs/nova` (commit + push na `master`). O GitHub Pages atualiza em 1 a 2 minutos.
+3. **Site:** publique os arquivos de `docs/nova` (commit + push na `master`). O GitHub Pages atualiza em 1 a 2 minutos.
+
+**Opcional:** para usar chaves próprias, crie os segredos `VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` em **Edge Functions → Secrets** (gere com `npx web-push generate-vapid-keys`). Eles passam a valer no lugar das chaves do banco, e cada aparelho precisa tocar em **Ativar** de novo.
 
 ## Testar no Android
 
@@ -43,7 +41,8 @@ O app da Nova plataforma (instalado no celular ou aberto no Chrome) recebe aviso
 
 ## Se não chegar
 
-- **"Chaves VAPID não configuradas":** falta o passo 2.
+- **Erro ao ativar ("relation uby_push_vapid does not exist" ou parecido):** falta o passo 1.
+- **"Failed to send a request to the Edge Function":** falta o passo 2.
 - **"Bloqueadas":** abra Configurações do Android → Apps → Chrome (ou UBY) → Notificações e libere. Depois recarregue a página.
 - **Celular em economia de bateria:** o Android pode atrasar o aviso alguns minutos.
 - **Trocou as chaves:** cada aparelho precisa tocar em **Ativar** de novo.
