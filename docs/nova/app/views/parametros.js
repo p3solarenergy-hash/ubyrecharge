@@ -66,6 +66,21 @@
     if (/pendente|erro|falha|bloquead|somente leitura/i.test(fb)) throw new Error(fb);
     return fb;
   }
+  // Impostos sobre o recebido: relê extrato e matriz na nuvem, recalcula as linhas automáticas (PIS/COFINS
+  // mensal, IRPJ/CSLL trimestral) e só grava se algo mudou. force = linhas que voltam à projeção.
+  async function syncTaxLines(w, force = []) {
+    const B = window.UBY_BANK;
+    if (!B?.taxPlan) throw new Error("Cálculo de impostos indisponível.");
+    const bank = (await w.UBY_SUPABASE.loadBankData()).payload || {};
+    const plan = B.taxPlan(bank.transactions || [], bank.links || {});
+    await resyncMatrix(w);
+    const res = B.applyTaxPlan(w.loadMatrizCosts(), plan.lines, w.matrizNormalizeCost, new Date().toISOString(), force);
+    if (!res.changed) return "impostos já estavam em dia";
+    w.saveMatrizCosts(res.costs);
+    await awaitMatrixSave(w);
+    const r = res.report;
+    return `impostos atualizados (${r.added.length} nova(s), ${r.updated.length} ajustada(s), ${r.removed.length} removida(s))`;
+  }
 
   // ---------- leitura dos dados do motor ----------
   function chargers(w) {
@@ -762,6 +777,27 @@
         <button class="btn ghost" data-c-cancel type="button">Cancelar</button></div></td></tr>`;
     };
     const selTotal = sum(rows.filter(b => sel.has(b.key)));
+    // Impostos projetados sobre o recebido no extrato: uma linha por guia (PIS/COFINS no mês, IRPJ/CSLL no trimestre).
+    const taxPanel = (() => {
+      const B = window.UBY_BANK;
+      if (!B?.taxPlan || !bs.tx.length) return "";
+      let plan, res;
+      try { plan = B.taxPlan(bs.tx, bs.p.links || {}); res = B.applyTaxPlan(w.loadMatrizCosts(), plan.lines, w.matrizNormalizeCost); } catch (_) { return ""; }
+      if (!plan.lines.length && !res.report.removed.length) return "";
+      const rp = res.report, pending = rp.added.length + rp.updated.length + rp.removed.length;
+      const st = id => rp.added.includes(id) ? ["warn", "ainda não lançada"] : rp.updated.includes(id) ? ["warn", "desatualizada"] : rp.locked.includes(id) ? ["neutral", "guia real (valor travado)"] : rp.paid.includes(id) ? ["ok", "paga"] : ["ok", "em dia"];
+      return `<section class="section"><div class="section-head"><div><p class="kicker">Impostos</p><h2>Guias projetadas sobre o recebido</h2>
+          <p>Uma linha por guia, calculada sobre o que entrou na conta (Spott, Move e cartão): PIS/COFINS no mês (3,65%) e IRPJ/CSLL no trimestre (7,68%). Atualiza sozinha quando você anexa o extrato ou corrige a origem de uma entrada. Quando a guia real sair, edite o valor da linha: ele fica travado.</p></div>
+          <div style="flex:none"><button class="btn primary" id="pmTaxSync" type="button" style="white-space:nowrap" ${can} ${pending ? "" : "disabled"}>Atualizar linhas de imposto${pending ? ` (${pending})` : ""}</button></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Guia</th><th class="num">Recebido (base)</th><th class="num">Valor projetado</th><th>Vencimento</th><th>Situação</th></tr></thead><tbody>
+          ${plan.lines.map(L => { const [cls, label] = st(L.id); return `<tr><td style="white-space:normal"><strong>${esc(L.name)}</strong></td><td class="num">${fmt.brl(L.base)}</td><td class="num"><strong>${fmt.brl(L.amount)}</strong></td><td>${fmtDay(L.dueDate)}</td>
+            <td><span class="badge ${cls}">${esc(label)}</span>${rp.locked.includes(L.id) ? ` <button class="btn ghost" data-tax-force="${esc(L.id)}" type="button" ${can}>Voltar à projeção</button>` : ""}</td></tr>`; }).join("")}
+          ${rp.removed.map(id => `<tr><td colspan="4"><small>${esc(id)}: sem recebido na base</small></td><td><span class="badge warn">será removida</span></td></tr>`).join("")}
+        </tbody></table></div>
+        ${plan.warnings.map(m => `<div class="note" style="border-color:var(--uby-amber,#c9962b);margin-top:8px">${esc(m)}</div>`).join("")}
+        <p class="source-line">Base: entradas de Spott, Move e cartão, no mês do recebimento. "Rendimentos", "Outras entradas" e "Não é da UBY" ficam de fora. Antes de out/2026 valem as guias reais já emitidas. Vencimento que cai em fim de semana vai para o dia útil anterior (feriados não são considerados).</p>
+      </section>`;
+    })();
     const docPanel = b => {
       const sc = schedOf(b);
       return `<tr><td colspan="9"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
@@ -787,6 +823,7 @@
         ${kpi("Total em aberto", fmt.brl(sum(k.open)), `${fmt.int(k.open.length)} conta(s)`, "", "lead")}
         ${kpi(`Pago em ${esc(UBY.state.api?.monthName?.(f.month) || f.month)}`, fmt.brl(sum(k.paid)), `${fmt.int(k.paid.length)} conta(s)`)}
       </div>
+      ${taxPanel}
       <section class="section"><div class="section-head"><div><p class="kicker">Financeiro</p><h2>Contas a pagar</h2><p>Todas as contas numa lista só: internet, aluguel, seguro, energia (Copel e arrendamento), repasses às áreas e impostos. Pague aqui (com o valor real, se teve desconto ou juros), em lote, ou concilie com o extrato.</p></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn primary" href="#/parametros/pagamentos">＋ Nova conta</a><a class="btn" href="#/parametros/pagamentos">🏦 Conciliar extrato</a></div></div>
         <div class="seg" id="cfView" style="margin-bottom:10px">${VIEWS.map(([v, l, fn]) => `<button type="button" data-v="${v}" class="${f.view === v ? "on" : ""}">${esc(l)}${["vencidas", "hoje", "7dias"].includes(v) ? ` <b>${all.filter(fn).length}</b>` : ""}</button>`).join("")}</div>
@@ -1947,12 +1984,13 @@
       let res = null;
       run(target, w, `Extrato ${file.name}`, async () => {
         await w.UBY_SUPABASE.saveBankData(p => { res = B.merge(p, parsed, file.name); return res.payload; }, { acao: "import_statement", arquivo: file.name, de: parsed.meta.from, ate: parsed.meta.to });
-        return `${res.total} lançamento(s) de ${fmtDay(parsed.meta.from)} a ${fmtDay(parsed.meta.to)}, ${res.added} novo(s)`;
+        let tax = ""; try { tax = ` · ${await syncTaxLines(w)}`; } catch (err) { tax = ` · impostos não atualizados: ${err.message}`; }
+        return `${res.total} lançamento(s) de ${fmtDay(parsed.meta.from)} a ${fmtDay(parsed.meta.to)}, ${res.added} novo(s)${tax}`;
       });
     };
     target.querySelectorAll("[data-bank-src]").forEach(sel => sel.onchange = () => {
       const id = sel.dataset.bankSrc, v = sel.value;
-      saveLinks(`Entrada classificada como ${v}`, l => { l[id] = { ...(l[id] || {}), source: v }; });
+      saveLinks(`Entrada classificada como ${v}`, l => { l[id] = { ...(l[id] || {}), source: v }; }, () => syncTaxLines(w));
     });
     target.querySelectorAll("[data-bank-del-st]").forEach(btn => btn.onclick = () => {
       const st = (data.bank?.statements || []).find(s => s.id === btn.dataset.bankDelSt); if (!st) return;
@@ -1964,7 +2002,14 @@
         return `${removed} lançamento(s) removido(s)`;
       });
     });
-    const saveLinks = (label, mutate) => run(target, w, label, async () => { await w.UBY_SUPABASE.saveBankData(p => { const links = { ...(p.links || {}) }; mutate(links); return { statements: [], transactions: [], ...p, links }; }, { acao: "bank_link" }); return "salvo"; });
+    // after (opcional): roda depois de gravar o vínculo, ex. recalcular os impostos quando a origem de uma entrada muda.
+    const saveLinks = (label, mutate, after) => run(target, w, label, async () => {
+      await w.UBY_SUPABASE.saveBankData(p => { const links = { ...(p.links || {}) }; mutate(links); return { statements: [], transactions: [], ...p, links }; }, { acao: "bank_link" });
+      if (!after) return "salvo";
+      try { return `salvo · ${await after()}`; } catch (err) { return `salvo · impostos não atualizados: ${err.message}`; }
+    });
+    if ($("#pmTaxSync")) $("#pmTaxSync").onclick = () => run(target, w, "Impostos sobre o recebido", () => syncTaxLines(w));
+    target.querySelectorAll("[data-tax-force]").forEach(b => b.onclick = () => run(target, w, "Imposto de volta à projeção", () => syncTaxLines(w, [b.dataset.taxForce])));
     // Conciliar: marca a(s) conta(s) como paga(s) na data e no valor do banco, guarda o vínculo e
     // aprende a regra (esta descrição do banco paga esta conta) para sugerir sozinho na próxima vez.
     const outRow = id => bankState(data).rec.outflows.find(t => t.id === id);

@@ -269,5 +269,96 @@
     return { payload: { ...p, statements: p.statements.filter(s => s.id !== statementId), transactions: p.transactions.filter(t => !gone.has(t.id)), links }, removed: gone.size };
   }
 
-  global.UBY_BANK = Object.freeze({ parseRows, parseCSV, parseOFX, merge, removeStatement, reconcile, inflows, inflowSource, isoDate, num, norm, billBase });
+  // ---------- Impostos projetados sobre o recebido (Lucro Presumido, serviços) ----------
+  // Uma linha de conta por guia, calculada sobre o que entrou na conta (Spott, Move, cartão):
+  //   PIS/COFINS: mensal, 0,65% + 3% do recebido no mês, vence dia 25 do mês seguinte;
+  //   IRPJ/CSLL: trimestral, base presumida de 32% (15% + 9%; + adicional de 10% do que passar de R$ 60 mil
+  //   por trimestre), vence no último dia útil do mês seguinte ao trimestre.
+  // Só a partir de TAX.from: antes disso valem as guias reais já emitidas. Feriados não são considerados.
+  const TAX = Object.freeze({ from: "2026-10", pis: 0.0065, cofins: 0.03, presumption: 0.32, irpj: 0.15, csll: 0.09,
+    adicionalAbove: 60000, adicional: 0.10, sources: Object.freeze(["Spott", "Move", "Cartão (vendas)"]) });
+  const MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const brl = v => Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function backToBusinessDay(y, m, d) {
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    while (dt.getUTCDay() === 0 || dt.getUTCDay() === 6) dt.setUTCDate(dt.getUTCDate() - 1);
+    return dt.toISOString().slice(0, 10);
+  }
+  const nextMonth = (y, m) => m === 12 ? [y + 1, 1] : [y, m + 1];
+
+  function taxPlan(transactions, links = {}, cfg = {}) {
+    const t = { ...TAX, ...cfg };
+    const byMonth = {};
+    (transactions || []).filter(x => x.amount > 0).forEach(x => {
+      const mk = String(x.date).slice(0, 7);
+      if (mk < t.from) return;
+      const src = links[x.id]?.source || inflowSource(x);
+      if (!t.sources.includes(src)) return;
+      byMonth[mk] = r2((byMonth[mk] || 0) + x.amount);
+    });
+    const lines = [];
+    const quarters = {};
+    Object.keys(byMonth).sort().forEach(mk => {
+      const [y, m] = mk.split("-").map(Number), base = byMonth[mk];
+      const [ny, nm] = nextMonth(y, m);
+      lines.push({ id: `ptaxauto-pc-${mk}`, kind: "pc", period: mk, base, amount: r2(r2(base * t.pis) + r2(base * t.cofins)),
+        name: `PIS/COFINS · ${MES[m - 1]}/${y} (${brl((t.pis + t.cofins) * 100)}% do recebido)`,
+        supplier: `Receita Federal · sobre R$ ${brl(base)} recebidos em ${MES[m - 1]}/${y}`, dueDate: backToBusinessDay(ny, nm, 25) });
+      const q = Math.ceil(m / 3), qk = `${y}-Q${q}`;
+      quarters[qk] = quarters[qk] || { y, q, base: 0 };
+      quarters[qk].base = r2(quarters[qk].base + base);
+    });
+    const warnings = [];
+    Object.entries(quarters).sort().forEach(([qk, { y, q, base }]) => {
+      const presumed = base * t.presumption;
+      const adicional = presumed > t.adicionalAbove ? r2((presumed - t.adicionalAbove) * t.adicional) : 0;
+      if (adicional) warnings.push(`${q}º tri/${y}: base presumida acima de R$ 60 mil, com adicional de IRPJ de R$ ${brl(adicional)}.`);
+      const [ny, nm] = nextMonth(y, q * 3);
+      const lastDay = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+      lines.push({ id: `ptaxauto-ic-${qk}`, kind: "ic", period: qk, base, amount: r2(r2(presumed * t.irpj) + adicional + r2(presumed * t.csll)),
+        name: `IRPJ/CSLL · ${q}º tri/${y} (${brl(t.presumption * (t.irpj + t.csll) * 100)}% do recebido)`,
+        supplier: `Receita Federal · sobre R$ ${brl(base)} recebidos no trimestre${adicional ? ` · inclui adicional de IRPJ R$ ${brl(adicional)}` : ""}`,
+        dueDate: backToBusinessDay(ny, nm, lastDay) });
+    });
+    return { lines, warnings, byMonth };
+  }
+
+  // Aplica a projeção sobre a lista de custos da matriz (sem gravar). Regras:
+  //  - conta já paga no mês do vencimento não muda;
+  //  - valor editado à mão (guia real) fica travado até pedir "voltar à projeção" (force);
+  //  - conta automática sem base (recebido sumiu) e sem pagamento nem edição é removida.
+  // normalize = matrizNormalizeCost da plataforma.
+  const TAX_MARK = /^auto-imposto\|(-?[\d.]+)/;
+  const TAX_LEGACY = Object.freeze({ ptaxspott2609: "ptaxauto-pc-2026-10", ptaxirpj2701: "ptaxauto-ic-2026-Q4" });
+  const taxMarkOf = c => { const m = TAX_MARK.exec(c.notes || ""); return m ? Number(m[1]) : null; };
+  const taxEdited = c => { const k = taxMarkOf(c); return k !== null && Math.abs(Number(c.amount) - k) > 0.004; };
+  function applyTaxPlan(costs, lines, normalize, now = new Date().toISOString(), force = []) {
+    let list = (costs || []).slice();
+    const report = { added: [], updated: [], locked: [], paid: [], removed: [], same: [] };
+    const idx = id => list.findIndex(c => c.id === id);
+    lines.forEach(L => {
+      const mk = L.dueDate.slice(0, 7), day = Number(L.dueDate.slice(8, 10));
+      let i = idx(L.id);
+      if (i < 0) { const old = Object.keys(TAX_LEGACY).find(k => TAX_LEGACY[k] === L.id && idx(k) >= 0); if (old) i = idx(old); }
+      const body = { name: L.name, supplier: L.supplier, category: "Impostos", costKind: "recurring", amount: L.amount, installments: 1, coverageMonths: 1,
+        startMonth: mk, endMonth: mk, dueDay: day, allocation: "equal", targets: [], notes: `auto-imposto|${L.amount}`, scheduledPayment: true, enabled: true };
+      if (i < 0) { list.push(normalize({ id: L.id, ...body, createdAt: now, updatedAt: now })); report.added.push(L.id); return; }
+      const cur = list[i];
+      if (cur.paymentLedger?.[mk]?.status === "paid") { report.paid.push(L.id); return; }
+      if (taxEdited(cur) && !force.includes(L.id)) { report.locked.push(L.id); return; }
+      const same = cur.id === L.id && taxMarkOf(cur) !== null && Math.abs(Number(cur.amount) - L.amount) < 0.005 && cur.dueDay === day && cur.startMonth === mk && cur.name === L.name && cur.supplier === L.supplier;
+      if (same) { report.same.push(L.id); return; }
+      list[i] = normalize({ ...cur, id: L.id, ...body, createdAt: cur.createdAt, paymentLedger: cur.paymentLedger, updatedAt: now });
+      report.updated.push(L.id);
+    });
+    const wanted = new Set(lines.map(l => l.id));
+    list = list.filter(c => {
+      if (!String(c.id).startsWith("ptaxauto-") || wanted.has(c.id)) return true;
+      if (taxEdited(c) || Object.values(c.paymentLedger || {}).some(e => e?.status === "paid")) return true;
+      report.removed.push(c.id); return false;
+    });
+    return { costs: list, report, changed: report.added.length + report.updated.length + report.removed.length > 0 };
+  }
+
+  global.UBY_BANK = Object.freeze({ parseRows, parseCSV, parseOFX, merge, removeStatement, reconcile, inflows, inflowSource, isoDate, num, norm, billBase, taxPlan, applyTaxPlan, TAX });
 })(typeof window !== "undefined" ? window : globalThis);
