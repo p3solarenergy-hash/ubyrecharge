@@ -238,6 +238,8 @@
 
   function render(target, params) {
     const tab = TABS.some(([id]) => id === params[0]) ? params[0] : "visao";
+    // Busca geral (Ctrl+K): #/clientes/cadastro/<nome> abre o cadastro já filtrado.
+    if (tab === "cadastro" && params[1] && params[1] !== ui.searchFrom) { ui.search = params[1]; ui.searchFrom = params[1]; }
     const r = UBY.data("clientIntelligence", monthArg());
     let body = "";
     let wd = null;
