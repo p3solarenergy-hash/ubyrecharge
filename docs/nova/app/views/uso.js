@@ -83,33 +83,15 @@
       </article>`).join("")}</div>`;
   }
 
-  function render(target) {
-    const month = monthArg();
-    const stationList = UBY.data("stations", "").filter(s => s.sessions > 0);
-    if (ui.kind === "station" && !stationList.some(s => `${s.workId}|${s.station}` === ui.station)) ui.station = stationList[0] ? `${stationList[0].workId}|${stationList[0].station}` : "";
-    const [workId, station] = ui.station.split("|");
-    const u = UBY.data("usage", { kind: ui.kind, workId, station, monthKey: month });
+  // Blocos da análise (volume, calendário, semana, horários, pagamentos, cupons, ociosidade, avaliações,
+  // diagnóstico). Também usados na página de cada carregador (views/unidades.js), com single = true.
+  function details(u, scopeLabel, single) {
     const t = u.totals;
-    const scopeLabel = ui.kind === "uby" ? "Operação UBY (sem parceiros)" : ui.kind === "partner" ? "Parceiros" : ui.kind === "all" ? "Rede toda (inclui fora da operação UBY)" : station;
     const maxHour = Math.max(...u.hours.values, 1);
     const payTotal = u.payments.reduce((s, p) => s + p.count, 0) || 1;
     const couponTotal = u.coupons.reduce((s, c) => s + c.count, 0) || 1;
-
-    target.innerHTML = `
-      <div class="hero"><div><p class="eyebrow">Rede de recargas · ${esc(u.scope.label)}</p><h1>Análise de uso</h1>
-        <p class="lead">Quando e como a rede é usada: dia da semana, horários, tempo de permanência, formas de pagamento, cupons, ociosidade, avaliações e desempenho técnico.</p></div>
-        <div class="callout"><strong>${esc(scopeLabel)}</strong><small>${fmt.int(u.scope.stations)} estação(ões) · potência considerada ${fmt.int(u.scope.power)} kW${u.scope.bounds ? ` · ${fmt.dt(u.scope.bounds.start)} a ${fmt.dt(u.scope.bounds.end)}` : ""}</small></div></div>
-
-      <div class="toolbar">
-        <div class="seg" id="usoKind">${[["uby", "Operação UBY"], ["partner", "Parceiros"], ["all", "Rede toda"], ["station", "Uma estação"]].map(([v, l]) => `<button data-v="${v}" class="${ui.kind === v ? "on" : ""}">${l}</button>`).join("")}</div>
-        ${ui.kind === "station" ? `<select class="select" id="usoStation">${stationList.map(s => `<option value="${esc(`${s.workId}|${s.station}`)}" ${`${s.workId}|${s.station}` === ui.station ? "selected" : ""}>${esc(s.station)}</option>`).join("")}</select>` : ""}
-        <span class="spacer"></span>
-        ${ui.kind === "station" ? `<a class="btn" href="#/unidades/${encodeURIComponent(workId)}/${encodeURIComponent(station)}" style="display:inline-flex;align-items:center;text-decoration:none">Sessões da estação →</a>` : ""}
-      </div>
-
-      ${u.kpis ? kpiBlock(u.kpis, station) : ""}
-
-      ${ui.kind === "station" && u.kpis ? "" : `
+    return `
+      ${single && u.kpis ? "" : `
       <section class="section"><div class="section-head"><div><p class="kicker">Volume do período</p><h2>${esc(scopeLabel)}</h2></div>
           <div class="meta">${t.acdc.acChargers} AC · ${t.acdc.dcChargers} DC carregador(es)<br>AC ${fmt.int(t.acdc.acCharges)} · DC ${fmt.int(t.acdc.dcCharges)} recargas${t.idleValue > 0 ? `<br>ociosidade ${fmt.brl(t.idleValue)}` : ""}</div></div>
         <div class="grid g4">
@@ -120,11 +102,11 @@
         </div>
       </section>`}
 
-      <section class="section"><div class="section-head"><div><p class="kicker">Calendário</p><h2>Faturamento e ocupação por dia</h2><p>Cada dia mostra faturamento, recargas, energia e a ocupação do dia (energia ÷ potência × horas disponíveis do dia). Passe o mouse para ver o detalhe.</p></div>
+      <section class="section" id="secCal"><div class="section-head"><div><p class="kicker">Calendário</p><h2>Faturamento e ocupação por dia</h2><p>Cada dia mostra faturamento, recargas, energia e a ocupação do dia (energia ÷ potência × horas disponíveis do dia). Passe o mouse para ver o detalhe.</p></div>
           <div class="seg" id="calMode">${[["rev", "Cor por faturamento"], ["occ", "Cor por ocupação"]].map(([v, l]) => `<button data-v="${v}" class="${ui.calMode === v ? "on" : ""}">${l}</button>`).join("")}</div></div>
         ${calendar(u.days)}${calendarSummary(u.days)}</section>
 
-      <section class="section"><div class="section-head"><div><p class="kicker">Dinâmica semanal</p><h2>Ocupação por dia da semana</h2><p>Horas disponíveis de cada dia, recortadas ao período; hoje conta só as horas já passadas.</p></div></div>
+      <section class="section" id="secSemana"><div class="section-head"><div><p class="kicker">Dinâmica semanal</p><h2>Ocupação por dia da semana</h2><p>Horas disponíveis de cada dia, recortadas ao período; hoje conta só as horas já passadas.</p></div></div>
         ${weekdayCards(u.weekday)}
         <div class="table-wrap"><table><thead><tr><th>Dia</th><th class="num">Dias</th><th class="num">Recargas</th><th class="num">Recargas/dia</th><th class="num">Falhas</th><th class="num">Faturamento</th><th class="num">Média/dia</th><th class="num">Energia</th><th class="num">Ticket</th><th style="min-width:120px">Ocupação</th></tr></thead>
           <tbody>${u.weekday.map(w => `<tr><td><strong>${esc(w.label)}</strong></td><td class="num">${w.days}</td><td class="num">${w.valid}</td><td class="num"><strong>${fmt.n1(w.days ? w.valid / w.days : 0)}</strong></td><td class="num">${w.failed || ""}</td><td class="num">${fmt.brl(w.revenue)}</td>
@@ -132,7 +114,7 @@
             <td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="flex:1"><span style="width:${Math.min(w.occ * 3, 100)}%"></span></div><strong>${fmt.pct1(w.occ)}</strong></div></td></tr>`).join("")}</tbody></table></div>
       </section>
 
-      <div class="grid g2" style="gap:18px;margin-bottom:18px">
+      <div class="grid g2" id="secHorarios" style="gap:18px;margin-bottom:18px">
         <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Últimos 7 dias do período</p><h2>Horários mais procurados</h2></div></div>
           <div style="display:grid;grid-template-columns:repeat(24,1fr);gap:3px;align-items:end;height:150px">${u.hours.values.map((v, h) => `<div title="${h}h: ${v} recarga(s)" style="height:${Math.max(v / maxHour * 100, 2)}%;background:${v === maxHour ? "var(--uby-forest)" : "var(--uby-green)"};border-radius:3px 3px 0 0;opacity:${v ? 1 : .25}"></div>`).join("")}</div>
           <div style="display:grid;grid-template-columns:repeat(24,1fr);gap:3px;font-size:9px;color:var(--uby-muted);text-align:center;margin-top:4px">${u.hours.labels.map(h => `<span>${Number(h) % 3 === 0 ? h : ""}</span>`).join("")}</div>
@@ -146,7 +128,7 @@
             <tbody>${u.coupons.map(c => `<tr><td><strong>${esc(c.coupon)}</strong></td><td class="num">${c.count}</td><td class="num">${fmt.pct1(c.count / couponTotal * 100)}</td><td class="num">${fmt.brl(c.revenue)}</td><td class="num">${fmt.brl(c.count ? c.revenue / c.count : 0)}</td><td class="num">${c.discount ? fmt.brl(c.discount) : "—"}</td></tr>`).join("")}</tbody></table></div></section>
       </div>
 
-      <div class="split" style="margin-bottom:18px">
+      <div class="split" id="secOcio" style="margin-bottom:18px">
         <section class="section"><div class="section-head"><div><p class="kicker">Ociosidade</p><h2>Carros parados após a recarga (${u.idleCount})</h2><p>Sessões com 1 minuto ou mais de ociosidade, da maior para a menor.</p></div></div>
           <div class="table-wrap" style="max-height:360px"><table><thead><tr><th>Início</th><th>Cliente</th><th>Estação</th><th class="num">Energia</th><th class="num">Valor</th><th class="num">Parado</th><th class="num">Ociosidade (R$)</th></tr></thead>
             <tbody>${u.idle.map(i => `<tr><td>${fmt.dt(i.start)}</td><td>${esc(i.client)}</td><td>${esc(i.station)}</td><td class="num">${fmt.kwh(i.energy)}</td><td class="num">${fmt.brl(i.revenue)}</td><td class="num"><span class="badge ${i.idleMin >= 30 ? "bad" : "warn"}">${fmt.hours(i.idleMin / 60)}</span></td><td class="num">${fmt.brl(i.idleValue)}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">Nenhum alerta relevante.</td></tr>`}</tbody></table></div>
@@ -158,7 +140,7 @@
         </section>
       </div>
 
-      <section class="section"><div class="section-head"><div><p class="kicker">Diagnóstico técnico</p><h2>Potência entregue e produtividade</h2><p>Potência média = kWh ÷ horas conectadas. Horas equivalentes = kWh ÷ potência instalada.</p></div></div>
+      <section class="section" id="secTecnico"><div class="section-head"><div><p class="kicker">Diagnóstico técnico</p><h2>Potência entregue e produtividade</h2><p>Potência média = kWh ÷ horas conectadas. Horas equivalentes = kWh ÷ potência instalada.</p></div></div>
         <div class="grid g6">
           ${kpi("Potência média", `${fmt.n1(u.tech.avgPower)} kW`, "todas as sessões")}
           ${kpi("Potência mediana", `${fmt.n1(u.tech.medPower)} kW`, "sessão típica")}
@@ -168,13 +150,42 @@
           ${kpi("Receita por hora conectada", fmt.brl(u.tech.revPerHour), "")}
         </div>
       </section>`;
-
-    target.querySelectorAll("#usoKind button").forEach(b => b.onclick = () => { ui.kind = b.dataset.v; render(target); });
-    target.querySelectorAll("#calMode button").forEach(b => b.onclick = () => { ui.calMode = b.dataset.v; render(target); });
-    const sel = target.querySelector("#usoStation"); if (sel) sel.onchange = e => { ui.station = e.target.value; render(target); };
+  }
+  function bind(target, u, rerender) {
+    target.querySelectorAll("#calMode button").forEach(b => b.onclick = () => { ui.calMode = b.dataset.v; rerender(); });
     UBY.chart("chStay", { type: "bar", data: { labels: u.stay.labels, datasets: [{ label: "Sessões", data: u.stay.values, backgroundColor: "#3d6f8e", borderRadius: 4 }] },
       options: UBY.baseChartOptions({ plugins: { legend: { display: false } } }) });
   }
 
+  function render(target) {
+    const month = monthArg();
+    const stationList = UBY.data("stations", "").filter(s => s.sessions > 0);
+    if (ui.kind === "station" && !stationList.some(s => `${s.workId}|${s.station}` === ui.station)) ui.station = stationList[0] ? `${stationList[0].workId}|${stationList[0].station}` : "";
+    const [workId, station] = ui.station.split("|");
+    const u = UBY.data("usage", { kind: ui.kind, workId, station, monthKey: month });
+    const scopeLabel = ui.kind === "uby" ? "Operação UBY (sem parceiros)" : ui.kind === "partner" ? "Parceiros" : ui.kind === "all" ? "Rede toda (inclui fora da operação UBY)" : station;
+
+    target.innerHTML = `
+      <div class="hero"><div><p class="eyebrow">Rede de recargas · ${esc(u.scope.label)}</p><h1>Análise de uso</h1>
+        <p class="lead">Quando e como a rede é usada: dia da semana, horários, tempo de permanência, formas de pagamento, cupons, ociosidade, avaliações e desempenho técnico.</p></div>
+        <div class="callout"><strong>${esc(scopeLabel)}</strong><small>${fmt.int(u.scope.stations)} estação(ões) · potência considerada ${fmt.int(u.scope.power)} kW${u.scope.bounds ? ` · ${fmt.dt(u.scope.bounds.start)} a ${fmt.dt(u.scope.bounds.end)}` : ""}</small></div></div>
+
+      <div class="toolbar">
+        <div class="seg" id="usoKind">${[["uby", "Operação UBY"], ["partner", "Parceiros"], ["all", "Rede toda"], ["station", "Uma estação"]].map(([v, l]) => `<button data-v="${v}" class="${ui.kind === v ? "on" : ""}">${l}</button>`).join("")}</div>
+        ${ui.kind === "station" ? `<select class="select" id="usoStation">${stationList.map(s => `<option value="${esc(`${s.workId}|${s.station}`)}" ${`${s.workId}|${s.station}` === ui.station ? "selected" : ""}>${esc(s.station)}</option>`).join("")}</select>` : ""}
+        <span class="spacer"></span>
+        ${ui.kind === "station" ? `<a class="btn" href="#/unidades/${encodeURIComponent(workId)}/${encodeURIComponent(station)}" style="display:inline-flex;align-items:center;text-decoration:none">Abrir o carregador →</a>` : ""}
+      </div>
+
+      ${u.kpis ? kpiBlock(u.kpis, station) : ""}
+
+      ${details(u, scopeLabel, ui.kind === "station")}`;
+
+    target.querySelectorAll("#usoKind button").forEach(b => b.onclick = () => { ui.kind = b.dataset.v; render(target); });
+    const sel = target.querySelector("#usoStation"); if (sel) sel.onchange = e => { ui.station = e.target.value; render(target); };
+    bind(target, u, () => render(target));
+  }
+
+  UBY.usageParts = { kpiBlock, details, bind };
   UBY.register("uso", { render });
 })();

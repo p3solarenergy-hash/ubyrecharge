@@ -19,6 +19,14 @@
     const b = okDay(fb) && okDay(tb) ? { scope: sb || a.scope, from: fb, to: tb } : { scope: sb || a.scope, ...monthRange(last) };
     return { a, b, same: same === undefined ? null : same === "1" };
   }
+  // Link vindo da página do carregador: o nome da estação pode vir com outra grafia (acento, caixa, "UBY RECHARGE - ").
+  const norm = v => String(v || "").replace(/^UBY RECHARGE\s*-\s*/i, "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  function resolveScope(scope, opts) {
+    if (!scope.startsWith("ref:") || opts.stations.some(x => x.ref === scope.slice(4))) return scope;
+    const [workId, ...rest] = scope.slice(4).split("|"), name = norm(rest.join("|"));
+    const hit = opts.stations.find(x => x.workId === workId && norm(x.station) === name) || opts.stations.find(x => norm(x.station) === name);
+    return hit ? `ref:${hit.ref}` : scope;
+  }
   const go = (a, b, same) => UBY.go(`#/comparar/${[a.scope, a.from, a.to, b.scope, b.from, b.to, same ? "1" : "0"].map(encodeURIComponent).join("/")}`);
 
   function scopeLabel(scope, opts) {
@@ -70,6 +78,7 @@
   function render(target, params) {
     const opts = UBY.data("compareOptions");
     const { a, b, same } = readParams(params);
+    a.scope = resolveScope(a.scope, opts); b.scope = resolveScope(b.scope, opts);
     // Mês em andamento contra mês fechado: por padrão compara os mesmos dias (1 a N de cada lado).
     const probe = UBY.data("compare", a, b, { sameDays: false });
     const sameDays = same === null ? probe.a.partial || probe.b.partial : same;

@@ -719,3 +719,10 @@ html[data-theme="night"] .sx-panel{background:#0F1F38}
 #cmpSwap{align-self:center;font-size:15px}
 .cmp-controls .toolbar{border:0;padding:0;background:none}
 @media(max-width:860px){.cmp-sides{grid-template-columns:minmax(0,1fr)}#cmpSwap{justify-self:start}}
+/* Página do carregador (views/unidades.js): índice das partes, fixo no topo ao rolar */
+.unit-jump{position:sticky;top:64px;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 16px;padding:8px 10px;border:1px solid var(--uby-line);border-radius:12px;background:var(--uby-surface);box-shadow:0 6px 18px rgba(0,0,0,.06)}
+.unit-jump a[data-jump]{padding:5px 10px;border-radius:999px;color:var(--uby-forest);font-size:11.5px;font-weight:760;text-decoration:none}
+.unit-jump a[data-jump]:hover{background:var(--uby-surface-soft)}
+.unit-jump .spacer{flex:1}
+[id^="sec"]{scroll-margin-top:120px}
+@media(max-width:860px){.unit-jump{position:static}.unit-jump .spacer{display:none}}

@@ -62,6 +62,16 @@
     target.querySelectorAll("tr[data-unit]").forEach(tr => tr.onclick = () => UBY.go(`#/unidades/${encodeURIComponent(tr.dataset.unit)}/${encodeURIComponent(tr.dataset.station)}`));
   }
 
+  // Comparar períodos já com este carregador: mês anterior × mês escolhido (ou os dois últimos meses no acumulado).
+  function compareHref(workId, station, month) {
+    const months = UBY.state.months, b = month || months.at(-1) || "";
+    const a = months[months.indexOf(b) - 1] || b;
+    if (!b) return "#/comparar";
+    const range = mk => { const [y, m] = mk.split("-").map(Number); return [`${mk}-01`, `${mk}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`]; };
+    const scope = `ref:${workId}|${station}`;
+    return `#/comparar/${[scope, ...range(a), scope, ...range(b)].map(encodeURIComponent).join("/")}`;
+  }
+
   function renderDetail(target, workId, station) {
     const month = monthArg();
     const d = UBY.data("stationDetail", workId, station, month);
@@ -74,6 +84,14 @@
     const sessions = d.sessions.filter(s => ui.sessionFilter === "all" || (ui.sessionFilter === "valid" ? s.valid : !s.valid));
     const classicHref = `legado/obra-ev/recargas.html?obra=${encodeURIComponent(d.workId)}&openReport=mensal&station=${encodeURIComponent(d.station)}`;
 
+    // Página única do carregador (usuário, 20/10/2026: "a análise de uso pode aparecer já dentro do carregador"):
+    // painel do mês, ritmo, calendário, semana, horários, pagamentos, ociosidade, diagnóstico e sessões.
+    const parts = UBY.usageParts;
+    const u = parts ? UBY.data("usage", { kind: "station", workId: d.workId, station: d.station, monthKey: month }) : null;
+    const hasUse = !!(u && u.kpis);
+    const cmpHref = compareHref(d.workId, d.station, month);
+    const jump = [["secResumo", "Resumo"], ["secRitmo", "Ritmo e histórico"], ...(u ? [["secCal", "Calendário"], ["secSemana", "Dia da semana"], ["secHorarios", "Horários e pagamentos"], ["secOcio", "Ociosidade e avaliações"], ["secTecnico", "Diagnóstico"]] : []), ["secSessoes", "Sessões"]];
+
     target.innerHTML = `
       <p style="margin:0 0 12px"><a href="#/unidades" style="font-weight:800;font-size:12px">← Unidades e carregadores</a></p>
       <div class="hero"><div><p class="eyebrow">Unidade operacional · ${esc(d.workName)}</p><h1>${esc(d.station)}</h1>
@@ -81,6 +99,9 @@
         <div class="callout"><strong>${esc(periodLabel)} · ocupação ${fmt.pct(d.occupancy)} (${esc(d.band)})</strong><small>${fmt.n1(d.hours)} h disponíveis no período. <a href="#/financeiro/estacao">Financeiro da estação</a> · <a href="#/parametros/carregador/${encodeURIComponent(`${d.workId}|${d.station}`)}">Editar valores</a> · <a href="#/parametros/operacao/${encodeURIComponent(`${d.workId}|${d.station}`)}">Horários e potência</a></small>
           <p style="margin:10px 0 0"><a class="btn primary link-btn" href="#/importar/${encodeURIComponent(d.workId)}/${month || new Date().toISOString().slice(0, 7)}/${encodeURIComponent(location.hash)}/${encodeURIComponent(d.station)}">⇪ Importar planilha desta estação</a></p></div></div>
 
+      <nav class="unit-jump" aria-label="Partes desta página">${jump.map(([id, l]) => `<a href="#${id}" data-jump="${id}">${l}</a>`).join("")}<span class="spacer"></span><a class="btn primary link-btn" href="${cmpHref}">⇄ Comparar períodos</a></nav>
+
+      <div id="secResumo">${hasUse ? parts.kpiBlock(u.kpis, `${d.station}`) : `
       <div class="grid g6" style="margin-bottom:18px">
         ${kpi("Ocupação", fmt.pct(d.occupancy), `${esc(d.band)} · ${fmt.n1(d.hours)} h disponíveis`, "", "lead big")}
         ${kpi("Faturamento", fmt.brl(m.revenue), `R$/kWh ${fmt.brl(m.revenuePerKwh)}`, "", "lead big")}
@@ -89,8 +110,10 @@
         ${kpi("Clientes", fmt.int(m.clients), `ticket ${fmt.brl(m.avgTicket)} · ociosidade ${fmt.brl(m.idleValue)}`)}
         ${kpi("Falhas", fmt.int(m.failed), `${fmt.int(m.shortOrZero)} curtas/zeradas`, "", m.failed ? "bad" : "")}
       </div>
+      `}</div>
+      ${hasUse ? `<p class="source-line" style="margin:-6px 0 16px">${fmt.int(m.valid)} recargas válidas de ${fmt.int(m.sessions)} · ${fmt.int(m.clients)} clientes · ${fmt.int(m.shortOrZero)} curtas/zeradas · tempo médio ${esc(m.avgDuration)}</p>` : ""}
 
-      <div class="split" style="margin-bottom:18px">
+      <div class="split" id="secRitmo" style="margin-bottom:18px">
         <section class="section"><div class="section-head"><div><p class="kicker">Ritmo</p><h2>Série diária</h2></div></div><div class="chart-box"><canvas id="chUnitDaily"></canvas></div></section>
         <section class="section"><div class="section-head"><div><p class="kicker">Histórico</p><h2>Mês a mês</h2></div></div>
           <div class="table-wrap" style="max-height:260px"><table><thead><tr><th>Mês</th><th class="num">Faturamento</th><th class="num">Recargas</th><th class="num">Energia</th></tr></thead>
@@ -99,7 +122,9 @@
         </section>
       </div>
 
-      <section class="section">
+      ${u ? parts.details(u, d.station, true) : ""}
+
+      <section class="section" id="secSessoes">
         <div class="section-head"><div><p class="kicker">Auditoria</p><h2>Sessões brutas (${d.sessions.length})</h2><p>Todas as linhas importadas, inclusive falhas e sessões curtas, com o motivo de exclusão das médias.</p></div>
           <div class="seg" id="sessFilter">${[["all", "Todas"], ["valid", "Válidas"], ["invalid", "Fora da regra"]].map(([v, l]) => `<button data-v="${v}" class="${ui.sessionFilter === v ? "on" : ""}">${l}</button>`).join("")}</div></div>
         <div class="table-wrap" style="max-height:520px"><table>
@@ -112,6 +137,9 @@
       </section>`;
 
     target.querySelectorAll("#sessFilter button").forEach(b => b.onclick = () => { ui.sessionFilter = b.dataset.v; renderDetail(target, workId, station); });
+    // Âncoras da página: rolam sem trocar a rota (o # da tela continua o mesmo).
+    target.querySelectorAll("[data-jump]").forEach(a => a.onclick = e => { e.preventDefault(); document.getElementById(a.dataset.jump)?.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    if (u) parts.bind(target, u, () => renderDetail(target, workId, station));
     const opts = UBY.baseChartOptions;
     // Degradê vertical do faturamento: azul embaixo, verde no topo (cores do tema night quando ativo).
     const revGradient = (alphaLow, alphaHigh) => ({ chart }) => {
