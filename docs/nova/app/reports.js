@@ -76,7 +76,7 @@
     const later = list.filter(i => i.newQuota && !i.founder);
     return [
       { head: true, title: "Rodada 1", note: "valor cheio por cota" }, { rows: round1 },
-      ...(later.length ? [{ head: true, sep: true, title: "Cotas 11 em diante", note: `cada cota recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota; ${fmt.pct1(inv.founderPct)} vão para o bloco fundador` }, { rows: later }] : [])
+      ...(later.length ? [{ head: true, sep: true, title: "Cotas 11 em diante", note: inv.investors.some(i => i.founder) ? `cada cota recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota; ${fmt.pct1(inv.founderPct)} vão para o bloco fundador` : "valor cheio por cota (sem bloco fundador marcado)" }, { rows: later }] : [])
     ];
   }
 
@@ -223,7 +223,7 @@
     const i = inv.investors.find(x => x.name === name);
     if (!i) return `${header("Extrato do cotista", "Cotista não encontrado.", "pendente")}${foot()}`;
     const rows = inv.months.map((m, k) => ({ m, value: i.allocations[k] || 0 })).filter(r => r.m.key >= i.eligibleFrom || r.value > 0);
-    const kindNote = i.founder ? ` · bloco fundador (desenvolvedora)` : i.newQuota ? ` · cota 11+: ${fmt.pct1(100 - inv.founderPct)} do valor por cota` : "";
+    const kindNote = i.founder ? ` · bloco fundador (desenvolvedora)` : i.newQuota && inv.investors.some(x => x.founder) ? ` · cota 11+: ${fmt.pct1(100 - inv.founderPct)} do valor por cota` : "";
     return `${header(`Extrato do cotista · ${i.name}`, `${i.quotas} cota(s) a ${fmt.brl(i.quotaValue)} · investido ${fmt.brl(i.investment)} · ${i.waitingOperation ? "aguardando início da operação de "+esc(i.linkedStation) : "habilitado desde "+esc(monthName(i.eligibleFrom))}${kindNote}`, i.status)}
       <div class="kpis">
         ${kpi("Investido", fmt.brl(i.investment))}${kpi("Total a receber", fmt.brl(i.due), "", true)}
@@ -234,7 +234,7 @@
         ${rows.map(r => `<tr><td>${esc(r.m.label)}</td><td class="n">${signed(r.m.result)}</td><td class="n">${fmt.brl(r.m.investorPool)}</td><td class="n">${r.m.eligibleQuotas}</td><td class="n">${fmt.brl(i.newQuota && !i.founder && r.m.newQuotas ? r.m.perNewQuota : r.m.perQuota)}</td><td class="n"><strong>${fmt.brl(r.value)}</strong></td><td>${esc(r.m.status)}</td></tr>`).join("") || `<tr><td colspan="7">Sem competências desde a habilitação.</td></tr>`}
         <tr class="t"><td>Total</td><td></td><td></td><td></td><td></td><td class="n">${fmt.brl(i.due)}</td><td></td></tr>
       </tbody></table>
-      <div class="note">O resultado da rede já considera energia, custos dos carregadores, custos centrais, gestão, impostos sobre o faturamento e a compensação de prejuízos anteriores. Reserva legal e fundo de expansão são descontados antes do pool dos cotistas.${i.founder ? ` Seu repasse soma as cotas do bloco (rodada 1) e ${fmt.pct1(inv.founderPct)} do que recebem as cotas 11 em diante (taxa da desenvolvedora).` : i.newQuota ? ` Como cota 11+, você recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota; ${fmt.pct1(inv.founderPct)} vão para a desenvolvedora.` : ""}${i.paybackYears ? ` Payback indicativo no ritmo atual: ${fmt.n1(i.paybackYears)} anos.` : ""}</div>${foot()}`;
+      <div class="note">O resultado da rede já considera energia, custos dos carregadores, custos centrais, gestão, impostos sobre o faturamento e a compensação de prejuízos anteriores. Reserva legal e fundo de expansão são descontados antes do pool dos cotistas.${i.founder ? ` Seu repasse soma as cotas do bloco (rodada 1) e ${fmt.pct1(inv.founderPct)} do que recebem as cotas 11 em diante (taxa da desenvolvedora).` : i.newQuota && inv.investors.some(x => x.founder) ? ` Como cota 11+, você recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota; ${fmt.pct1(inv.founderPct)} vão para a desenvolvedora.` : ""}${i.paybackYears ? ` Payback indicativo no ritmo atual: ${fmt.n1(i.paybackYears)} anos.` : ""}</div>${foot()}`;
   }
 
   // ---------------------------------------------------------------- área (dono do local)

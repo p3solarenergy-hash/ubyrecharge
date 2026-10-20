@@ -439,7 +439,7 @@
     const quotas = rows => rows.reduce((s, i) => s + Number(i.quotas || 0), 0);
     return [
       { head: true, title: "Rodada 1", note: `${fmt.n1(quotas(round1))} cota(s), todas com o valor cheio por cota` }, { rows: round1 },
-      ...(later.length ? [{ head: true, sep: true, title: "Cotas 11 em diante", note: `${fmt.n1(quotas(later))} cota(s); cada uma recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota e ${fmt.pct1(inv.founderPct)} vão para o bloco fundador` }, { rows: later }] : [])
+      ...(later.length ? [{ head: true, sep: true, title: "Cotas 11 em diante", note: list.some(i => i.founder) ? `${fmt.n1(quotas(later))} cota(s); cada uma recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota e ${fmt.pct1(inv.founderPct)} vão para o bloco fundador` : `${fmt.n1(quotas(later))} cota(s); taxa da desenvolvedora não cobrada: falta marcar o bloco fundador em Parâmetros → Cotistas` }, { rows: later }] : [])
     ];
   }
   const groupHead = (g, cols) => `<tr><td colspan="${cols}" style="${g.sep ? "border-top:2px dashed var(--uby-muted);" : ""}padding-top:${g.sep ? 14 : 6}px"><strong style="font-size:12px;letter-spacing:.04em;text-transform:uppercase">${esc(g.title)}</strong> <small style="display:inline;margin-left:6px">${esc(g.note)}</small></td></tr>`;
