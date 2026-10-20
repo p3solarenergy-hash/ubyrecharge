@@ -2109,7 +2109,7 @@
     });
     const investors = net.investors.map(inv => ({ name: inv.name, quotas: inv.quotas, eligibleFrom: inv.eligibleFrom, status: inv.status, founder: !!inv.founder, newQuota: !!inv.newQuota,
       linkedStation: inv.linkedStation || "", baseEligibleFrom: inv.baseEligibleFrom || inv.eligibleFrom, operationFrom: inv.operationFrom || "", waitingOperation: !!inv.waitingOperation,
-      allocations: idx.map(i => inv.allocations[i]), due: inv.due, quotaValue: n0(inv.quotaValue) || net.quotaValue,
+      allocations: idx.map(i => inv.allocations[i]), due: inv.due, ownAllocations: idx.map(i => inv.ownAllocations[i]), feeAllocations: idx.map(i => inv.feeAllocations[i]), ownDue: idx.reduce((s, i) => s + inv.ownAllocations[i], 0), feeDue: idx.reduce((s, i) => s + inv.feeAllocations[i], 0), quotaValue: n0(inv.quotaValue) || net.quotaValue,
       investment: inv.investment, returnRate: inv.returnRate, annualized: inv.annualized, paybackYears: inv.paybackYears }));
     const totalAllocated = investors.reduce((s, i) => s + i.due, 0);
     const totalPool = months.filter(m => m.eligibleQuotas > 0).reduce((s, m) => s + m.investorPool, 0);

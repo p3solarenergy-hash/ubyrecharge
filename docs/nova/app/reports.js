@@ -69,14 +69,18 @@
   const kpi = (label, value, small = "", hl = false) => `<div class="kpi ${hl ? "hl" : ""}"><b>${value}</b><span>${esc(label)}</span>${small ? `<small>${small}</small>` : ""}</div>`;
   const row = (label, value, cls = "", note = "") => `<tr class="${cls}"><td>${label}${note ? `<div class="sub">${esc(note)}</div>` : ""}</td><td class="n">${signed(value)}</td></tr>`;
 
-  // Rodada 1 (bloco fundador por último) e, separadas por tracejado, as cotas 11 em diante.
+  // Mesmos grupos do Financeiro: rodada 1 (investidores), rodada 1 (REBP), cotas 11+ e a taxa da desenvolvedora.
   function repasseGroups(list, inv) {
     if (!list.some(i => i.founder || i.newQuota)) return [{ rows: list }];
-    const round1 = [...list.filter(i => !i.founder && !i.newQuota), ...list.filter(i => i.founder)];
+    const round1 = list.filter(i => !i.founder && !i.newQuota), founders = list.filter(i => i.founder);
     const later = list.filter(i => i.newQuota && !i.founder);
+    const charged = inv.investors.some(i => i.founder);
+    const fee = founders.reduce((s, i) => s + n(i.feeValue), 0);
     return [
-      { head: true, title: "Rodada 1", note: "valor cheio por cota" }, { rows: round1 },
-      ...(later.length ? [{ head: true, sep: true, title: "Cotas 11 em diante", note: inv.investors.some(i => i.founder) ? `cada cota recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota; ${fmt.pct1(inv.founderPct)} vão para o bloco fundador` : "valor cheio por cota (sem bloco fundador marcado)" }, { rows: later }] : [])
+      { head: true, title: "Rodada 1 · investidores", note: "valor cheio por cota" }, { rows: round1 },
+      ...(founders.some(i => n(i.ownValue) > 0 || i.eligibleFrom) ? [{ head: true, sep: true, title: "Rodada 1 · REBP", note: "cotas da REBP na rodada 1, valor cheio por cota" }, { rows: founders }] : []),
+      ...(later.length ? [{ head: true, sep: true, title: "Cotas 11 em diante", note: charged ? `cada cota recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota; ${fmt.pct1(inv.founderPct)} vão para a taxa da desenvolvedora` : "valor cheio por cota (cotas da REBP na rodada 1 não marcadas)" }, { rows: later }] : []),
+      ...(founders.length && later.length ? [{ head: true, sep: true, title: "Taxa da desenvolvedora", note: `${fmt.pct1(inv.founderPct)} do que recebem as cotas 11 em diante, pagos à REBP` }, { fee: { name: founders[0].name, value: fee } }] : [])
     ];
   }
 
@@ -91,7 +95,8 @@
     const m = idx >= 0 ? inv.months[idx] : null;
     const units = cmd.units || [];
     const sessions = units.reduce((s, u) => s + n(u.sessions), 0), energy = units.reduce((s, u) => s + n(u.energy), 0);
-    const cotistas = acc ? inv.investors.map(i => ({ ...i, value: i.due })) : inv.investors.map(i => ({ ...i, value: idx >= 0 ? i.allocations[idx] || 0 : 0 })).filter(i => i.eligibleFrom <= mk || i.value > 0);
+    const cotistas = acc ? inv.investors.map(i => ({ ...i, value: i.due, ownValue: i.ownDue ?? i.due, feeValue: i.feeDue || 0 }))
+      : inv.investors.map(i => ({ ...i, value: idx >= 0 ? i.allocations[idx] || 0 : 0, ownValue: idx >= 0 ? (i.ownAllocations || i.allocations)[idx] || 0 : 0, feeValue: idx >= 0 ? i.feeAllocations?.[idx] || 0 : 0 })).filter(i => i.eligibleFrom <= mk || i.value > 0);
     const monthsRows = inv.months.filter(x => acc || x.key === mk);
     const status = acc ? "pendente" : (m?.status || "pendente");
     const approval = !acc && m?.approvedAt ? ` · aprovado em ${fmt.dt(m.approvedAt)}${m.approvedBy ? ` por ${esc(m.approvedBy)}` : ""}${m.paidAt ? ` · pago em ${fmt.date(m.paidAt + "T12:00:00")}` : ""}` : "";
@@ -144,10 +149,10 @@
       </tbody></table>
       <h2>Repasse por cotista</h2>
       <table><thead><tr><th>Cotista</th><th class="n">Cotas</th><th class="n">Valor da cota</th><th class="n">Investido</th>${acc ? `<th class="n">Retorno acum.</th>` : `<th class="n">Por cota</th>`}<th class="n">${acc ? "Total a receber" : "Repasse do mês"}</th></tr></thead><tbody>
-        ${repasseGroups(cotistas, inv).map(g => g.head ? `<tr class="g"><td colspan="6" style="${g.sep ? "border-top:2px dashed #68746b;" : ""}">${esc(g.title)}<div class="sub">${esc(g.note)}</div></td></tr>` : g.rows.map(i => `<tr><td>${esc(initials(i.name))}${i.founder ? `<div class="sub">bloco fundador (desenvolvedora)</div>` : ""}</td><td class="n">${i.quotas}</td><td class="n">${fmt.brl(i.quotaValue)}</td><td class="n">${fmt.brl(i.investment)}</td><td class="n">${acc ? fmt.pct(i.returnRate * 100) : fmt.brl(i.newQuota && !i.founder && m?.newQuotas ? m.perNewQuota : m?.perQuota || 0)}</td><td class="n"><strong>${fmt.brl(i.value)}</strong></td></tr>`).join("")).join("") || `<tr><td colspan="6">Nenhum cotista habilitado.</td></tr>`}
+        ${repasseGroups(cotistas, inv).map(g => g.head ? `<tr class="g"><td colspan="6" style="${g.sep ? "border-top:2px dashed #68746b;" : ""}">${esc(g.title)}<div class="sub">${esc(g.note)}</div></td></tr>` : g.fee ? `<tr><td>${esc(initials(g.fee.name))}<div class="sub">taxa da desenvolvedora</div></td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">${fmt.pct1(inv.founderPct)} das cotas 11+</td><td class="n"><strong>${fmt.brl(g.fee.value)}</strong></td></tr>` : g.rows.map(i => `<tr><td>${esc(initials(i.name))}</td><td class="n">${i.quotas}</td><td class="n">${fmt.brl(i.quotaValue)}</td><td class="n">${fmt.brl(i.investment)}</td><td class="n">${acc ? fmt.pct(i.returnRate * 100) : fmt.brl(i.newQuota && !i.founder && m?.newQuotas ? m.perNewQuota : m?.perQuota || 0)}</td><td class="n"><strong>${fmt.brl(i.ownValue ?? i.value)}</strong></td></tr>`).join("")).join("") || `<tr><td colspan="6">Nenhum cotista habilitado.</td></tr>`}
         <tr class="t"><td>Total</td><td class="n">${cotistas.reduce((s, i) => s + n(i.quotas), 0)}</td><td></td><td class="n">${fmt.brl(cotistas.reduce((s, i) => s + n(i.investment), 0))}</td><td></td><td class="n">${fmt.brl(cotistas.reduce((s, i) => s + n(i.value), 0))}</td></tr>
       </tbody></table>
-      <div class="note">Cada competência é dividida somente entre as cotas habilitadas no primeiro dia do mês.${inv.investors.some(i => i.founder) ? ` Da cota 11 em diante, ${fmt.pct1(inv.founderPct)} do que cada cota recebe vão para o bloco fundador (taxa da desenvolvedora); as 10 cotas da rodada 1 recebem o valor cheio.` : ""} O lucro só é distribuído depois de cobrir prejuízos de meses anteriores. Carregadores só de gestão P3 ficam fora do resultado da UBY; parceiros entram apenas pelo royalty. ${d.taxesTotal ? "" : "<strong>Atenção: não há imposto lançado no período.</strong> "}Confira documentos e aprove antes de pagar.</div>
+      <div class="note">Cada competência é dividida somente entre as cotas habilitadas no primeiro dia do mês.${inv.investors.some(i => i.founder) ? ` Da cota 11 em diante, ${fmt.pct1(inv.founderPct)} do que cada cota recebe vão para a REBP como taxa da desenvolvedora (linha à parte); as 10 cotas da rodada 1 recebem o valor cheio.` : ""} O lucro só é distribuído depois de cobrir prejuízos de meses anteriores. Carregadores só de gestão P3 ficam fora do resultado da UBY; parceiros entram apenas pelo royalty. ${d.taxesTotal ? "" : "<strong>Atenção: não há imposto lançado no período.</strong> "}Confira documentos e aprove antes de pagar.</div>
       <div class="sign"><div>Responsável financeiro · UBY Recharge</div><div>Aprovação</div></div>${foot()}`;
   }
 
@@ -223,7 +228,18 @@
     const i = inv.investors.find(x => x.name === name);
     if (!i) return `${header("Extrato do cotista", "Cotista não encontrado.", "pendente")}${foot()}`;
     const rows = inv.months.map((m, k) => ({ m, value: i.allocations[k] || 0 })).filter(r => r.m.key >= i.eligibleFrom || r.value > 0);
-    const kindNote = i.founder ? ` · bloco fundador (desenvolvedora)` : i.newQuota && inv.investors.some(x => x.founder) ? ` · cota 11+: ${fmt.pct1(100 - inv.founderPct)} do valor por cota` : "";
+    if (i.founder) return `${header(`Extrato da REBP · ${i.name}`, `${i.quotas} cota(s) da rodada 1 a ${fmt.brl(i.quotaValue)} · ${i.waitingOperation ? "aguardando início da operação de "+esc(i.linkedStation) : "cotas habilitadas desde "+esc(monthName(i.eligibleFrom))} · taxa da desenvolvedora de ${fmt.pct1(inv.founderPct)} sobre as cotas 11+`, i.status)}
+      <div class="kpis">
+        ${kpi("Cotas da rodada 1", fmt.brl(i.ownDue ?? i.due), `retorno ${fmt.pct(i.returnRate * 100)} sobre ${fmt.brl(i.investment)}`)}${kpi("Taxa da desenvolvedora", fmt.brl(i.feeDue || 0), `${fmt.pct1(inv.founderPct)} das cotas 11+`)}
+        ${kpi("Total a receber", fmt.brl(i.due), "", true)}
+      </div>
+      <h2>Mês a mês</h2>
+      <table><thead><tr><th>Competência</th><th class="n">Pool dos cotistas</th><th class="n">Valor por cota</th><th class="n">Cotas da rodada 1</th><th class="n">Taxa da desenvolvedora</th><th class="n">Total</th><th>Situação</th></tr></thead><tbody>
+        ${rows.map(r => { const k = inv.months.indexOf(r.m); return `<tr><td>${esc(r.m.label)}</td><td class="n">${fmt.brl(r.m.investorPool)}</td><td class="n">${fmt.brl(r.m.perQuota)}</td><td class="n">${fmt.brl((i.ownAllocations || [])[k] || 0)}</td><td class="n">${fmt.brl((i.feeAllocations || [])[k] || 0)}</td><td class="n"><strong>${fmt.brl(r.value)}</strong></td><td>${esc(r.m.status)}</td></tr>`; }).join("") || `<tr><td colspan="7">Sem competências.</td></tr>`}
+        <tr class="t"><td>Total</td><td></td><td></td><td class="n">${fmt.brl(i.ownDue ?? i.due)}</td><td class="n">${fmt.brl(i.feeDue || 0)}</td><td class="n">${fmt.brl(i.due)}</td><td></td></tr>
+      </tbody></table>
+      <div class="note">As cotas da REBP na rodada 1 recebem o valor cheio por cota a partir da entrada delas. A taxa da desenvolvedora (${fmt.pct1(inv.founderPct)} do que recebem as cotas 11 em diante) é separada e vale desde o início de cada cota nova.</div>${foot()}`;
+    const kindNote = i.newQuota && inv.investors.some(x => x.founder) ? ` · cota 11+: ${fmt.pct1(100 - inv.founderPct)} do valor por cota` : "";
     return `${header(`Extrato do cotista · ${i.name}`, `${i.quotas} cota(s) a ${fmt.brl(i.quotaValue)} · investido ${fmt.brl(i.investment)} · ${i.waitingOperation ? "aguardando início da operação de "+esc(i.linkedStation) : "habilitado desde "+esc(monthName(i.eligibleFrom))}${kindNote}`, i.status)}
       <div class="kpis">
         ${kpi("Investido", fmt.brl(i.investment))}${kpi("Total a receber", fmt.brl(i.due), "", true)}

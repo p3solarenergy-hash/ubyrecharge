@@ -1565,15 +1565,15 @@
     return { ...i, quotaValue, investedAt, investment, quotas, eligibleFrom };
   }
 
-  // Lista de cotistas por modo de recebimento: rodada 1 (bloco fundador por último) e, após o tracejado, as cotas 11+.
+  // Lista de cotistas por modo de recebimento: rodada 1 (investidores), rodada 1 (REBP) e cotas 11+, separados por tracejado.
   function quotaGroups(order, investors, feePct) {
     if (!investors.some(i => i.founder || i.newQuota)) return [{ keys: order }];
-    const round1 = [...order.filter(k => !investors[k].founder && !investors[k].newQuota), ...order.filter(k => investors[k].founder)];
+    const round1 = order.filter(k => !investors[k].founder && !investors[k].newQuota), founders = order.filter(k => investors[k].founder);
     const later = order.filter(k => investors[k].newQuota && !investors[k].founder);
-    const charged = investors.some(i => i.founder);
     return [
-      { head: true, title: "Rodada 1", note: "10 cotas: 8 de investidores + 2 da REBP (bloco fundador), todas com o valor cheio por cota" }, { keys: round1 },
-      ...(later.length ? [{ head: true, sep: true, title: "Cotas 11 em diante", note: charged ? `cada cota recebe ${fmt.pct1(100 - feePct)} do valor por cota; ${fmt.pct1(feePct)} vão para o bloco fundador` : "taxa da desenvolvedora não cobrada: falta marcar o bloco fundador" }, { keys: later }] : [])
+      { head: true, title: "Rodada 1 · investidores", note: "valor cheio por cota" }, { keys: round1 },
+      ...(founders.length ? [{ head: true, sep: true, title: "Rodada 1 · REBP", note: `cotas da REBP na rodada 1, valor cheio por cota; recebem também a taxa de ${fmt.pct1(feePct)} das cotas 11+, mostrada à parte em Financeiro → Investidores` }, { keys: founders }] : []),
+      ...(later.length ? [{ head: true, sep: true, title: "Cotas 11 em diante", note: founders.length ? `cada cota recebe ${fmt.pct1(100 - feePct)} do valor por cota; ${fmt.pct1(feePct)} vão para a taxa da desenvolvedora` : "taxa da desenvolvedora não cobrada: falta marcar as cotas da REBP na rodada 1" }, { keys: later }] : [])
     ];
   }
 
@@ -1612,7 +1612,7 @@
           ${inp("soldQuotas", "Cotas vendidas", "number", 'min="0" step="1"')}${inp("roundLabel", "Nome da rodada atual", "text")}
           ${inp("founderPct", "Taxa da desenvolvedora nas cotas 11+ (%)", "number", 'min="0" max="100" step="0.1"')}
         </div>
-        <p class="meta" style="margin:10px 0 0">Rodada 1: 10 cotas (8 de investidores + 2 da REBP, o bloco fundador), todas recebendo o mesmo valor por cota. Da cota 11 em diante, cada cota fica com ${esc(fmt.pct1(100 - feePct))} do que recebe e ${esc(fmt.pct1(feePct))} vão para o bloco fundador, como taxa da desenvolvedora. Assim o bloco segue com 20% do pool quando habilitado. Indique o tipo de cada cotista na coluna "Tipo da cota".</p>
+        <p class="meta" style="margin:10px 0 0">Rodada 1: 10 cotas (8 de investidores + 2 da REBP), todas recebendo o mesmo valor por cota. Da cota 11 em diante, cada cota fica com ${esc(fmt.pct1(100 - feePct))} do que recebe e ${esc(fmt.pct1(feePct))} vão para a REBP como taxa da desenvolvedora, mostrada à parte. Indique o tipo de cada cotista na coluna "Tipo da cota".</p>
       </section>
       ${startWarn}
       <section class="section"><div class="section-head"><div><p class="kicker">Impostos da UBY</p><h2>Impostos sobre o faturamento</h2><p>Incidem sobre tudo o que a UBY faturou no mês (recargas e receitas dos ativos próprios + royalties) e saem do resultado antes das reservas e dos cotistas. Use o percentual e, quando a guia sair, lance o valor exato do mês — ele substitui o percentual naquela competência.</p></div></div>
@@ -1627,7 +1627,7 @@
       </section>
       <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Cotistas: data do aporte e valor investido</h2><p>Informe só a data do aporte e o valor investido. A plataforma calcula as cotas (valor ÷ valor da cota da rodada, fixado na entrada do cotista) e o mês em que ele passa a participar: aporte no dia 1º entra no próprio mês; em qualquer outro dia, entra no mês seguinte. Se a cota for vinculada a um carregador, o dividendo só começa depois do início da operação dele (vale o mês mais tardio entre o aporte e o mês em que o carregador entrou em operação); o vínculo não rateia faturamento, só define a data. ${fmt.n1(quotasSum)} cota(s) · ${fmt.brl(investedSum)} investidos${derived.some(i => i.founder) ? ` · ${fmt.n1(derived.filter(i => i.newQuota && !i.founder).reduce((s, i) => s + Number(i.quotas || 0), 0))} cota(s) 11+ com taxa de ${esc(fmt.pct1(feePct))}` : ""}.</p></div>
           <button class="btn" id="pmInvAdd" type="button">＋ Cotista</button></div>
-        ${e.investors.some(i => i.newQuota && !i.founder) && !e.investors.some(i => i.founder) ? `<div class="note" style="margin:0 0 10px;border-color:#e0a4a0"><strong>Atenção:</strong> há cota(s) 11+, mas nenhum cotista está como "Bloco fundador (REBP)". Sem o bloco, a taxa de ${esc(fmt.pct1(feePct))} não é cobrada e as cotas 11+ recebem o valor cheio. Marque as 2 cotas da REBP na rodada 1 como "Bloco fundador (REBP)".</div>` : ""}
+        ${e.investors.some(i => i.newQuota && !i.founder) && !e.investors.some(i => i.founder) ? `<div class="note" style="margin:0 0 10px;border-color:#e0a4a0"><strong>Atenção:</strong> há cota(s) 11+, mas nenhum cotista está como "Rodada 1 · REBP (fundadora)". Sem ele, a taxa de ${esc(fmt.pct1(feePct))} não é cobrada e as cotas 11+ recebem o valor cheio. Marque as 2 cotas da REBP na rodada 1 como "Rodada 1 · REBP (fundadora)".</div>` : ""}
         <datalist id="pmStationList">${stationNames.map(n => `<option value="${esc(n)}"></option>`).join("")}</datalist>
         <div class="table-wrap"><table><thead><tr><th>Cotista</th><th>E-mail (acesso aos extratos)</th><th>Data do aporte</th><th class="num">Valor investido (R$)</th><th class="num">Valor da cota</th><th class="num">Cotas</th><th>Tipo da cota</th><th>Carregador vinculado</th><th>Participa a partir de</th><th>Situação</th><th></th></tr></thead>
           <tbody>${quotaGroups(ui.rowOrder, e.investors, feePct).map(g => g.head ? `<tr><td colspan="11" style="${g.sep ? "border-top:2px dashed var(--uby-muted);" : ""}padding-top:${g.sep ? 14 : 6}px"><strong style="font-size:12px;letter-spacing:.04em;text-transform:uppercase">${esc(g.title)}</strong> <small style="display:inline;margin-left:6px">${esc(g.note)}</small></td></tr>` : g.keys.map(k => { const i = e.investors[k], d = derived[k]; return `<tr>
@@ -1637,7 +1637,7 @@
             <td class="num"><input class="select" type="number" min="0" step="0.01" data-inv="${k}|investment" value="${esc(i.investment || "")}" style="width:140px"></td>
             <td class="num"><input class="select" type="number" min="0" step="1000" data-inv="${k}|quotaValue" value="${esc(d.quotaValue)}" style="width:120px"><small>${Number(i.quotaValue) > 0 ? "desta cota" : "padrão da rodada"}</small></td>
             <td class="num"><strong>${fmt.n1(d.quotas)}</strong></td>
-            <td><select class="select" data-inv="${k}|kind">${[["round1", "Rodada 1"], ["founder", "Bloco fundador (REBP)"], ["new", `Cota 11+ (${fmt.pct1(feePct)} p/ desenvolvedora)`]].map(([v, l]) => `<option value="${v}" ${kindOf(i) === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></td>
+            <td><select class="select" data-inv="${k}|kind">${[["round1", "Rodada 1 · investidor"], ["founder", "Rodada 1 · REBP (fundadora)"], ["new", `Cota 11+ (${fmt.pct1(feePct)} p/ desenvolvedora)`]].map(([v, l]) => `<option value="${v}" ${kindOf(i) === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></td>
             <td><input class="select" list="pmStationList" data-inv="${k}|linkedStation" value="${esc(i.linkedStation || "")}" placeholder="sem vínculo" style="width:190px"></td>
             <td>${d.waitingOperation ? `<strong>aguardando operação</strong><small>${esc(d.linkedStation)} ainda não iniciou</small>` : `<strong>${esc(d.eligibleFrom ? (UBY.state.api?.monthName?.(d.eligibleFrom) || d.eligibleFrom) : "—")}</strong>${d.operationFrom && d.operationFrom > d.baseEligibleFrom ? `<small>aguarda o início da operação (aporte: ${esc(UBY.state.api?.monthName?.(d.baseEligibleFrom) || d.baseEligibleFrom)})</small>` : (d.investedAt && d.investedAt.slice(8) !== "01" ? "<small>aporte após o dia 1º</small>" : "")}`}</td>
             <td><select class="select" data-inv="${k}|status">${["pendente", "aprovado", "pago"].map(s => `<option ${i.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></td>
