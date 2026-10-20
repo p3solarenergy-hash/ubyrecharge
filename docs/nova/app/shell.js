@@ -24,6 +24,7 @@
       { id: "unidades", icon: "▤", label: "Unidades e carregadores", type: "view", period: true },
       { id: "locais", icon: "⧉", label: "Shopping Aurora (AC + DC)", type: "view", period: true },
       { id: "uso", icon: "◔", label: "Análise de uso", type: "view", period: true },
+      { id: "comparar", icon: "⇄", label: "Comparar períodos", type: "view" },
       { id: "clientes", icon: "◎", label: "Clientes", type: "view", period: true },
       { id: "precos", icon: "⇅", label: "Estudos de preço", type: "view" },
       { id: "clube", icon: "✦", label: "Clube UBY", type: "view" },
@@ -73,7 +74,7 @@
       { icon: "▦", label: "Comando da rede", tabs: [["comando", "Comando da rede"], ["resumo", "Resumo executivo"], ["modelo", "Modelo operacional"], ["avisos", "Avisos e contas a vencer"]] }
     ] },
     { label: "REDE DE RECARGAS", items: [
-      { icon: "▤", label: "Carregadores e uso", tabs: [["unidades", "Unidades e carregadores"], ["uso", "Análise de uso"], ["locais", "Shopping Aurora (AC + DC)"], ["precos", "Estudos de preço"], ["sessoes", "Sessões importadas"], ["recargas", "Tela original"]] },
+      { icon: "▤", label: "Carregadores e uso", tabs: [["unidades", "Unidades e carregadores"], ["uso", "Análise de uso"], ["comparar", "Comparar períodos"], ["locais", "Shopping Aurora (AC + DC)"], ["precos", "Estudos de preço"], ["sessoes", "Sessões importadas"], ["recargas", "Tela original"]] },
       { icon: "◎", label: "Clientes e Clube", tabs: [["clientes", "Clientes"], ["clube", "Clube UBY"]] }
     ] },
     { label: "FINANCEIRO", items: [

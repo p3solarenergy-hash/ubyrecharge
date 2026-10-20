@@ -708,3 +708,14 @@ html[data-theme="night"] .sx-panel{background:#0F1F38}
 @keyframes sx-in{from{opacity:0}to{opacity:1}}
 @keyframes sx-pop{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:none}}
 @media(max-width:760px){.sx{padding-top:8vh}.sx-item .sx-x{display:none}.sx-foot{display:none}}
+/* Comparar períodos (views/comparar.js) */
+.cmp-sides{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:14px;align-items:start}
+.cmp-side{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.cmp-side .kicker{flex-basis:100%;margin:0}
+.cmp-side .select{max-width:100%}
+.cmp-dates{display:inline-flex;align-items:center;gap:6px;color:var(--uby-muted);font-size:11px}
+.cmp-dates[hidden]{display:none}
+.cmp-dates input[type=date].select{cursor:text}
+#cmpSwap{align-self:center;font-size:15px}
+.cmp-controls .toolbar{border:0;padding:0;background:none}
+@media(max-width:860px){.cmp-sides{grid-template-columns:minmax(0,1fr)}#cmpSwap{justify-self:start}}
