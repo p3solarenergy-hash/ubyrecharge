@@ -5824,8 +5824,10 @@ function normalizeNetworkInvestors(raw) {
     email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(item?.email || '').trim()) ? String(item.email).trim().toLowerCase() : '',
     // Carregador cuja entrada em operação libera o dividendo desta cota (não é rateio de faturamento).
     linkedStation: safeText(item?.linkedStation || '').slice(0, 120),
-    // Bloco fundador: recebe o percentual fixo da política (founderPct), sem diluir com novas cotas.
-    founder: item?.founder === true
+    // Bloco fundador: as 2 cotas da REBP na rodada 1; recebe também founderPct% das cotas 11 em diante.
+    founder: item?.founder === true,
+    // Cota 11 em diante: fica com 100% − founderPct do que a cota recebe.
+    newQuota: item?.newQuota === true && item?.founder !== true
   })).filter(item => item.name && item.quotas > 0);
 }
 

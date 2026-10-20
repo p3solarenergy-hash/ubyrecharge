@@ -80,7 +80,7 @@
     const m = idx >= 0 ? inv.months[idx] : null;
     const units = cmd.units || [];
     const sessions = units.reduce((s, u) => s + n(u.sessions), 0), energy = units.reduce((s, u) => s + n(u.energy), 0);
-    const cotistas = acc ? inv.investors.map(i => ({ ...i, value: i.due })) : inv.investors.filter(i => i.eligibleFrom <= mk).map(i => ({ ...i, value: idx >= 0 ? i.allocations[idx] || 0 : 0 }));
+    const cotistas = acc ? inv.investors.map(i => ({ ...i, value: i.due })) : inv.investors.map(i => ({ ...i, value: idx >= 0 ? i.allocations[idx] || 0 : 0 })).filter(i => i.eligibleFrom <= mk || i.value > 0);
     const monthsRows = inv.months.filter(x => acc || x.key === mk);
     const status = acc ? "pendente" : (m?.status || "pendente");
     const approval = !acc && m?.approvedAt ? ` · aprovado em ${fmt.dt(m.approvedAt)}${m.approvedBy ? ` por ${esc(m.approvedBy)}` : ""}${m.paidAt ? ` · pago em ${fmt.date(m.paidAt + "T12:00:00")}` : ""}` : "";
@@ -128,17 +128,15 @@
         ${f.rows.map(s => `<tr><td>${esc(s.station)}</td><td>${esc(s.modelLabel)}</td><td class="n">${fmt.brl(s.revenue)}</td><td class="n">${s.partner ? "—" : fmt.brl(s.totalOperatingCost)}</td><td class="n">${s.partner ? `${fmt.brl(s.ubyRoyalty)}<div class="sub">royalty UBY</div>` : signed(s.operationNet)}</td><td class="n">${s.partner ? "—" : fmt.pct1(s.operationMargin)}</td></tr>`).join("") || `<tr><td colspan="6">Sem carregadores no período.</td></tr>`}
       </tbody></table>
       <h2>${acc ? "Evolução por competência" : "Competência"}</h2>
-      <table><thead><tr><th>Competência</th><th class="n">Antes dos impostos</th><th class="n">Impostos</th><th class="n">Resultado</th><th class="n">Prejuízo compensado</th><th class="n">Pool cotistas</th><th class="n">Bloco fundador</th><th class="n">Cotas</th><th class="n">Por cota</th><th>Situação</th></tr></thead><tbody>
-        ${monthsRows.map(x => `<tr><td>${esc(x.label)}</td><td class="n">${signed(x.preTax ?? x.result)}</td><td class="n">${x.taxes ? fmt.brl(x.taxes) : "—"}</td><td class="n">${signed(x.result)}</td><td class="n">${x.carryIn < 0 ? signed(x.carryIn) : "—"}</td><td class="n">${fmt.brl(x.investorPool)}</td><td class="n">${x.founderQuotas ? `${fmt.brl(x.founderPool)} (${fmt.pct1(x.founderPct)})` : "—"}</td><td class="n">${x.eligibleQuotas}</td><td class="n">${fmt.brl(x.perQuota)}</td><td>${esc(x.status)}</td></tr>`).join("") || `<tr><td colspan="10">Competência fora do período de distribuição (a partir de ${esc(monthName(inv.distributionStartMonth))}).</td></tr>`}
+      <table><thead><tr><th>Competência</th><th class="n">Antes dos impostos</th><th class="n">Impostos</th><th class="n">Resultado</th><th class="n">Prejuízo compensado</th><th class="n">Pool cotistas</th><th class="n">Cotas</th><th class="n">Por cota</th><th class="n">Taxa desenvolvedora</th><th>Situação</th></tr></thead><tbody>
+        ${monthsRows.map(x => `<tr><td>${esc(x.label)}</td><td class="n">${signed(x.preTax ?? x.result)}</td><td class="n">${x.taxes ? fmt.brl(x.taxes) : "—"}</td><td class="n">${signed(x.result)}</td><td class="n">${x.carryIn < 0 ? signed(x.carryIn) : "—"}</td><td class="n">${fmt.brl(x.investorPool)}</td><td class="n">${x.eligibleQuotas}</td><td class="n">${fmt.brl(x.perQuota)}</td><td class="n">${x.newQuotas ? `${fmt.brl(x.developerFee)} (${fmt.pct1(x.founderPct)} de ${x.newQuotas} cota(s) 11+)` : "—"}</td><td>${esc(x.status)}</td></tr>`).join("") || `<tr><td colspan="10">Competência fora do período de distribuição (a partir de ${esc(monthName(inv.distributionStartMonth))}).</td></tr>`}
       </tbody></table>
       <h2>Repasse por cotista</h2>
       <table><thead><tr><th>Cotista</th><th class="n">Cotas</th><th class="n">Valor da cota</th><th class="n">Investido</th>${acc ? `<th class="n">Retorno acum.</th>` : `<th class="n">Por cota</th>`}<th class="n">${acc ? "Total a receber" : "Repasse do mês"}</th></tr></thead><tbody>
-        ${cotistas.map(i => i.founder
-          ? `<tr><td>Bloco Fundador</td><td class="n" colspan="3">Bloco Fundador: ${fmt.pct1(inv.founderPct)} fixos</td><td class="n">—</td><td class="n"><strong>${fmt.brl(i.value)}</strong></td></tr>`
-          : `<tr><td>${esc(initials(i.name))}</td><td class="n">${i.quotas}</td><td class="n">${fmt.brl(i.quotaValue)}</td><td class="n">${fmt.brl(i.investment)}</td><td class="n">${acc ? fmt.pct(i.returnRate * 100) : fmt.brl(m?.perQuota || 0)}</td><td class="n"><strong>${fmt.brl(i.value)}</strong></td></tr>`).join("") || `<tr><td colspan="6">Nenhum cotista habilitado.</td></tr>`}
-        <tr class="t"><td>Total</td><td class="n">${cotistas.filter(i => !i.founder).reduce((s, i) => s + n(i.quotas), 0)}</td><td></td><td class="n">${fmt.brl(cotistas.filter(i => !i.founder).reduce((s, i) => s + n(i.investment), 0))}</td><td></td><td class="n">${fmt.brl(cotistas.reduce((s, i) => s + n(i.value), 0))}</td></tr>
+        ${cotistas.map(i => `<tr><td>${esc(initials(i.name))}${i.founder ? `<div class="sub">bloco fundador · inclui ${fmt.pct1(inv.founderPct)} das cotas 11+</div>` : i.newQuota ? `<div class="sub">cota 11+ · ${fmt.pct1(100 - inv.founderPct)} da cota</div>` : ""}</td><td class="n">${i.quotas}</td><td class="n">${fmt.brl(i.quotaValue)}</td><td class="n">${fmt.brl(i.investment)}</td><td class="n">${acc ? fmt.pct(i.returnRate * 100) : fmt.brl(i.newQuota && !i.founder && m?.newQuotas ? m.perNewQuota : m?.perQuota || 0)}</td><td class="n"><strong>${fmt.brl(i.value)}</strong></td></tr>`).join("") || `<tr><td colspan="6">Nenhum cotista habilitado.</td></tr>`}
+        <tr class="t"><td>Total</td><td class="n">${cotistas.reduce((s, i) => s + n(i.quotas), 0)}</td><td></td><td class="n">${fmt.brl(cotistas.reduce((s, i) => s + n(i.investment), 0))}</td><td></td><td class="n">${fmt.brl(cotistas.reduce((s, i) => s + n(i.value), 0))}</td></tr>
       </tbody></table>
-      <div class="note">Cada competência é dividida somente entre as cotas habilitadas no primeiro dia do mês.${inv.investors.some(i => i.founder) ? ` Desde a entrada do bloco fundador, ele recebe ${fmt.pct1(inv.founderPct)} fixos do pool, sem diluição; o restante é dividido entre as cotas dos investidores.` : ""} O lucro só é distribuído depois de cobrir prejuízos de meses anteriores. Carregadores só de gestão P3 ficam fora do resultado da UBY; parceiros entram apenas pelo royalty. ${d.taxesTotal ? "" : "<strong>Atenção: não há imposto lançado no período.</strong> "}Confira documentos e aprove antes de pagar.</div>
+      <div class="note">Cada competência é dividida somente entre as cotas habilitadas no primeiro dia do mês.${inv.investors.some(i => i.founder) ? ` Da cota 11 em diante, ${fmt.pct1(inv.founderPct)} do que cada cota recebe vão para o bloco fundador (taxa da desenvolvedora); as 10 cotas da rodada 1 recebem o valor cheio.` : ""} O lucro só é distribuído depois de cobrir prejuízos de meses anteriores. Carregadores só de gestão P3 ficam fora do resultado da UBY; parceiros entram apenas pelo royalty. ${d.taxesTotal ? "" : "<strong>Atenção: não há imposto lançado no período.</strong> "}Confira documentos e aprove antes de pagar.</div>
       <div class="sign"><div>Responsável financeiro · UBY Recharge</div><div>Aprovação</div></div>${foot()}`;
   }
 
@@ -213,26 +211,19 @@
     const inv = UBY.data("investorDistribution");
     const i = inv.investors.find(x => x.name === name);
     if (!i) return `${header("Extrato do cotista", "Cotista não encontrado.", "pendente")}${foot()}`;
-    const rows = inv.months.map((m, k) => ({ m, value: i.allocations[k] || 0 })).filter(r => r.m.key >= i.eligibleFrom);
-    if (i.founder) return `${header(`Extrato do bloco fundador · ${i.name}`, `Bloco Fundador: ${fmt.pct1(inv.founderPct)} fixos do pool dos cotistas, sem diluição · habilitado desde ${esc(monthName(i.eligibleFrom))}`, i.status)}
-      <div class="kpis">${kpi("Participação", `${fmt.pct1(inv.founderPct)} do pool`)}${kpi("Total a receber", fmt.brl(i.due), "", true)}</div>
-      <h2>Mês a mês</h2>
-      <table><thead><tr><th>Competência</th><th class="n">Resultado da rede</th><th class="n">Pool dos cotistas</th><th class="n">Participação</th><th class="n">Seu repasse</th><th>Situação</th></tr></thead><tbody>
-        ${rows.map(r => `<tr><td>${esc(r.m.label)}</td><td class="n">${signed(r.m.result)}</td><td class="n">${fmt.brl(r.m.investorPool)}</td><td class="n">${fmt.pct1(r.m.investorPool > 0 ? r.value / r.m.investorPool * 100 : r.m.founderPct)}</td><td class="n"><strong>${fmt.brl(r.value)}</strong></td><td>${esc(r.m.status)}</td></tr>`).join("") || `<tr><td colspan="6">Sem competências desde a habilitação.</td></tr>`}
-        <tr class="t"><td>Total</td><td></td><td></td><td></td><td class="n">${fmt.brl(i.due)}</td><td></td></tr>
-      </tbody></table>
-      <div class="note">O bloco fundador recebe ${fmt.pct1(inv.founderPct)} fixos do pool dos cotistas desde a sua entrada, sem diluição por novas cotas. O restante do pool é dividido entre as cotas dos investidores.</div>${foot()}`;
-    return `${header(`Extrato do cotista · ${i.name}`, `${i.quotas} cota(s) a ${fmt.brl(i.quotaValue)} · investido ${fmt.brl(i.investment)} · ${i.waitingOperation ? "aguardando início da operação de "+esc(i.linkedStation) : "habilitado desde "+esc(monthName(i.eligibleFrom))}`, i.status)}
+    const rows = inv.months.map((m, k) => ({ m, value: i.allocations[k] || 0 })).filter(r => r.m.key >= i.eligibleFrom || r.value > 0);
+    const kindNote = i.founder ? ` · bloco fundador: recebe também ${fmt.pct1(inv.founderPct)} das cotas 11+` : i.newQuota ? ` · cota 11+: ${fmt.pct1(100 - inv.founderPct)} do valor por cota` : "";
+    return `${header(`Extrato do cotista · ${i.name}`, `${i.quotas} cota(s) a ${fmt.brl(i.quotaValue)} · investido ${fmt.brl(i.investment)} · ${i.waitingOperation ? "aguardando início da operação de "+esc(i.linkedStation) : "habilitado desde "+esc(monthName(i.eligibleFrom))}${kindNote}`, i.status)}
       <div class="kpis">
         ${kpi("Investido", fmt.brl(i.investment))}${kpi("Total a receber", fmt.brl(i.due), "", true)}
         ${kpi("Retorno acumulado", fmt.pct(i.returnRate * 100))}${kpi("Retorno anualizado", i.annualized ? fmt.pct(i.annualized * 100) : "—")}
       </div>
       <h2>Mês a mês</h2>
       <table><thead><tr><th>Competência</th><th class="n">Resultado da rede</th><th class="n">Pool dos cotistas</th><th class="n">Cotas habilitadas</th><th class="n">Valor por cota</th><th class="n">Seu repasse</th><th>Situação</th></tr></thead><tbody>
-        ${rows.map(r => `<tr><td>${esc(r.m.label)}</td><td class="n">${signed(r.m.result)}</td><td class="n">${fmt.brl(r.m.investorPool)}</td><td class="n">${r.m.eligibleQuotas}</td><td class="n">${fmt.brl(r.m.perQuota)}</td><td class="n"><strong>${fmt.brl(r.value)}</strong></td><td>${esc(r.m.status)}</td></tr>`).join("") || `<tr><td colspan="7">Sem competências desde a habilitação.</td></tr>`}
+        ${rows.map(r => `<tr><td>${esc(r.m.label)}</td><td class="n">${signed(r.m.result)}</td><td class="n">${fmt.brl(r.m.investorPool)}</td><td class="n">${r.m.eligibleQuotas}</td><td class="n">${fmt.brl(i.newQuota && !i.founder && r.m.newQuotas ? r.m.perNewQuota : r.m.perQuota)}</td><td class="n"><strong>${fmt.brl(r.value)}</strong></td><td>${esc(r.m.status)}</td></tr>`).join("") || `<tr><td colspan="7">Sem competências desde a habilitação.</td></tr>`}
         <tr class="t"><td>Total</td><td></td><td></td><td></td><td></td><td class="n">${fmt.brl(i.due)}</td><td></td></tr>
       </tbody></table>
-      <div class="note">O resultado da rede já considera energia, custos dos carregadores, custos centrais, gestão, impostos sobre o faturamento e a compensação de prejuízos anteriores. Reserva legal e fundo de expansão são descontados antes do pool dos cotistas.${i.paybackYears ? ` Payback indicativo no ritmo atual: ${fmt.n1(i.paybackYears)} anos.` : ""}</div>${foot()}`;
+      <div class="note">O resultado da rede já considera energia, custos dos carregadores, custos centrais, gestão, impostos sobre o faturamento e a compensação de prejuízos anteriores. Reserva legal e fundo de expansão são descontados antes do pool dos cotistas.${i.founder ? ` Seu repasse soma as cotas do bloco (rodada 1) e ${fmt.pct1(inv.founderPct)} do que recebem as cotas 11 em diante (taxa da desenvolvedora).` : i.newQuota ? ` Como cota 11+, você recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota; ${fmt.pct1(inv.founderPct)} vão para a desenvolvedora.` : ""}${i.paybackYears ? ` Payback indicativo no ritmo atual: ${fmt.n1(i.paybackYears)} anos.` : ""}</div>${foot()}`;
   }
 
   // ---------------------------------------------------------------- área (dono do local)

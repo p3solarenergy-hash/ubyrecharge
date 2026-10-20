@@ -2102,17 +2102,17 @@
       return { key: m.monthKey, label: monthLabel(m.monthKey), taxBase: m.taxBase, taxes: n0(m.taxes) + n0(m.taxesApplied), taxSource: m.taxSource, preTax: m.preTax + n0(m.taxesApplied), result: m.result,
         carryIn: m.carryIn, carryOut: m.carryOut, distributable: m.distributable, legalReserve: m.legalReserve, expansionReserve: m.expansionReserve,
         investorPool: m.investorPool, eligibleQuotas: m.eligibleQuotas, perQuota: m.perQuota,
-        founderQuotas: m.founderQuotas, founderPct: m.founderPct, founderPool: m.founderPool, quotaPool: m.quotaPool,
+        founderQuotas: m.founderQuotas, founderPct: m.founderPct, founderPool: m.founderPool, newQuotas: m.newQuotas, developerFee: m.developerFee, perNewQuota: m.perNewQuota,
         status: policy.paymentLedger?.[m.monthKey]?.status || "pendente",
         approvedAt: policy.paymentLedger?.[m.monthKey]?.approvedAt || "", approvedBy: policy.paymentLedger?.[m.monthKey]?.approvedBy || "",
         paidAt: policy.paymentLedger?.[m.monthKey]?.paidAt || "", snapshot: policy.paymentLedger?.[m.monthKey]?.snapshot || null };
     });
-    const investors = net.investors.map(inv => ({ name: inv.name, quotas: inv.quotas, eligibleFrom: inv.eligibleFrom, status: inv.status, founder: !!inv.founder,
+    const investors = net.investors.map(inv => ({ name: inv.name, quotas: inv.quotas, eligibleFrom: inv.eligibleFrom, status: inv.status, founder: !!inv.founder, newQuota: !!inv.newQuota,
       linkedStation: inv.linkedStation || "", baseEligibleFrom: inv.baseEligibleFrom || inv.eligibleFrom, operationFrom: inv.operationFrom || "", waitingOperation: !!inv.waitingOperation,
       allocations: idx.map(i => inv.allocations[i]), due: inv.due, quotaValue: n0(inv.quotaValue) || net.quotaValue,
       investment: inv.investment, returnRate: inv.returnRate, annualized: inv.annualized, paybackYears: inv.paybackYears }));
     const totalAllocated = investors.reduce((s, i) => s + i.due, 0);
-    const totalPool = months.filter(m => m.eligibleQuotas > 0 || m.founderQuotas > 0).reduce((s, m) => s + m.investorPool, 0);
+    const totalPool = months.filter(m => m.eligibleQuotas > 0).reduce((s, m) => s + m.investorPool, 0);
     return { engine: "v2", valid: Math.abs(totalAllocated - totalPool) < 0.02, totalAllocated, totalPool, months, investors, founderPct: net.founderPct,
       quotaValue: net.quotaValue, distributionStartMonth: net.distributionStartMonth, taxRatePct: n0(policy.taxRatePct),
       totals: { taxes: months.reduce((s, m) => s + m.taxes, 0), preTax: months.reduce((s, m) => s + m.preTax, 0), result: months.reduce((s, m) => s + m.result, 0) } };
