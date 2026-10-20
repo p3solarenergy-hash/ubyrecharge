@@ -1072,11 +1072,34 @@
         const revenue = Number(c.revenue || 0);
         // cortesia (receita 0) não é recarga paga: fica de fora das contas de preço e de cliente
         out.push({ key: clientKeyFromCharge(c) || "", name: c.userName || c.userEmail || "", email: c.userEmail || "", phone: c.userPhone || "", site, ref: `${row.workId}|${row.station}`,
-          own: !!row.included, t: d.getTime(), day: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, hour: d.getHours(), dow: d.getDay(),
+          workId: String(row.workId), own: !!row.included, partner: isPartnerRow(row), t: d.getTime(), day: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, hour: d.getHours(), dow: d.getDay(),
           kwh: Number(c.energyKWh || 0), revenue, valid: isExecutedCharge(c) && revenue > 0, voucher: String(c.voucher || "") });
       });
     });
     return out;
+  }
+
+  // Comparação de períodos (tela Comparar). Escopo de cada lado: "uby" (operação UBY sem parceiros,
+  // a mesma regra de Clientes), "all" (todos os carregadores), "ref:<obra|estação>" ou "work:<obra>" (local inteiro).
+  function compareOptions() {
+    const rows = getUbyChargerRows(getGeneralUnitData()).filter(r => (r.charges || []).length);
+    const stations = rows.map(r => ({ ref: `${r.workId}|${r.station}`, workId: String(r.workId), workName: r.workName || "", station: r.station,
+      label: abbreviatedStationLabel(r.station), own: !!r.included, partner: isPartnerRow(r) }))
+      .sort((a, b) => (b.own && !b.partner) - (a.own && !a.partner) || a.label.localeCompare(b.label, "pt-BR"));
+    const byWork = {};
+    stations.forEach(s => { (byWork[s.workId] = byWork[s.workId] || { workId: s.workId, workName: s.workName, stations: [] }).stations.push(s.label); });
+    return { stations, works: Object.values(byWork).filter(w => w.stations.length > 1) };
+  }
+  function compare(a, b, opts = {}) {
+    const matcher = scope => {
+      const sc = String(scope || "uby");
+      if (sc === "all") return () => true;
+      if (sc.startsWith("ref:")) { const ref = sc.slice(4); return s => s.ref === ref; }
+      if (sc.startsWith("work:")) { const id = sc.slice(5); return s => s.workId === id; }
+      return s => s.own && !s.partner;
+    };
+    const side = p => ({ from: p.from, to: p.to, match: matcher(p.scope) });
+    return JSON.parse(JSON.stringify(window.UBY_ANALYTICS_CORE.comparePeriods(analyticsSessions("all"), side(a), side(b), opts)));
   }
 
   function customerWatch() {
@@ -2652,7 +2675,7 @@
   window.UBY_MOTOR_API = { withUntil, alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
-    customerRegistry, clientIntelligence, clientRanking, customerWatch, pricingBase, club, financeV2, financeV2Parity, financeV2Impact,
+    customerRegistry, clientIntelligence, clientRanking, customerWatch, compare, compareOptions, pricingBase, club, financeV2, financeV2Parity, financeV2Impact,
     financeLegacy, investorDistributionLegacy, stationFinanceLegacy, destinationsLegacy };
   document.dispatchEvent(new CustomEvent("uby:motor-api-ready"));
 })();

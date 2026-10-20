@@ -323,6 +323,100 @@
   }
 
   // ------------------------------------------------------------------
+  // Comparação de períodos (ex.: julho da JK × setembro da JK, ou JK × RK no mesmo mês)
+  // ------------------------------------------------------------------
+  // a, b: { from: "AAAA-MM-DD", to: "AAAA-MM-DD", match: s => bool } — match escolhe as recargas
+  // (carregador, local, rede). Só recargas válidas contam; `sessions` é o histórico inteiro, que
+  // serve para separar cliente novo (primeira recarga da vida na UBY) de cliente que voltou.
+  // sameDays: corta os dois períodos no mesmo número de dias (mês em andamento × mês fechado).
+  const addDays = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
+  function comparePeriods(sessions, a, b, o) {
+    const sameDays = !!(o && o.sameDays);
+    const valid = sessions.filter(s => s.valid && s.day);
+    const lastDay = valid.reduce((m, s) => (s.day > m ? s.day : m), "");
+    const firstEver = new Map();
+    valid.forEach(s => { if (s.key && !(firstEver.get(s.key) <= s.day)) firstEver.set(s.key, s.day); });
+    // Dias que já passaram de cada período (um período no futuro ou em andamento para na última recarga importada).
+    const span = p => { const end = p.to < lastDay ? p.to : lastDay; return Math.max(0, dayIndex(end) - dayIndex(p.from) + 1); };
+    const full = p => Math.max(0, dayIndex(p.to) - dayIndex(p.from) + 1);
+    const daysA = span(a), daysB = span(b);
+    const cut = sameDays ? Math.min(daysA, daysB) : null;
+    const cutTo = (p, days) => ({ ...p, days, toUsed: days > 0 ? addDays(p.from, days - 1) : p.from, partial: days < full(p) });
+    const wa = cutTo(a, cut ?? daysA), wb = cutTo(b, cut ?? daysB);
+    const pick = w => valid.filter(s => s.day >= w.from && s.day <= w.toUsed && w.days > 0 && w.match(s));
+
+    function summarize(w, list) {
+      const clients = new Map(), sites = new Map(), daily = Array(w.days).fill(0), activeDays = new Set();
+      let revenue = 0, kwh = 0;
+      list.forEach(s => {
+        revenue += num(s.revenue); kwh += num(s.kwh); activeDays.add(s.day);
+        const i = dayIndex(s.day) - dayIndex(w.from);
+        if (i >= 0 && i < daily.length) daily[i] += num(s.revenue);
+        if (s.key) {
+          let c = clients.get(s.key);
+          if (!c) { c = { key: s.key, name: s.name, phone: s.phone, n: 0, kwh: 0, revenue: 0, sites: {} }; clients.set(s.key, c); }
+          c.n += 1; c.kwh += num(s.kwh); c.revenue += num(s.revenue); c.sites[s.site] = (c.sites[s.site] || 0) + 1;
+        }
+        let st = sites.get(s.ref || s.site);
+        if (!st) { st = { ref: s.ref || s.site, site: s.site, sessions: 0, kwh: 0, revenue: 0, clients: new Set() }; sites.set(st.ref, st); }
+        st.sessions += 1; st.kwh += num(s.kwh); st.revenue += num(s.revenue); if (s.key) st.clients.add(s.key);
+      });
+      const n = list.length, days = Math.max(1, w.days);
+      const newClients = [...clients.keys()].filter(k => firstEver.get(k) >= w.from).length;
+      let acc = 0;
+      return {
+        from: w.from, to: w.to, toUsed: w.toUsed, days: w.days, partial: w.partial,
+        totals: { revenue: r2(revenue), kwh: r2(kwh), sessions: n, clients: clients.size, newClients, activeDays: activeDays.size,
+          ticket: n ? revenue / n : 0, pricePerKwh: kwh ? revenue / kwh : 0, kwhPerSession: n ? kwh / n : 0,
+          revenuePerDay: revenue / days, kwhPerDay: kwh / days, sessionsPerDay: n / days, sessionsPerClient: clients.size ? n / clients.size : 0 },
+        cumulative: daily.map(v => r2(acc += v)),
+        clients, sites: [...sites.values()].map(x => ({ ...x, clients: x.clients.size }))
+      };
+    }
+    const A = summarize(wa, pick(wa)), B = summarize(wb, pick(wb));
+
+    const pct = (x, y) => (x ? (y / x - 1) * 100 : null);
+    const deltas = Object.fromEntries(Object.keys(A.totals).map(k => [k, { a: A.totals[k], b: B.totals[k], diff: B.totals[k] - A.totals[k], pct: pct(A.totals[k], B.totals[k]) }]));
+
+    // Por carregador: soma A e B pela mesma referência.
+    const siteMap = new Map();
+    [["a", A], ["b", B]].forEach(([side, P]) => P.sites.forEach(x => {
+      const row = siteMap.get(x.ref) || { ref: x.ref, site: x.site, a: { sessions: 0, kwh: 0, revenue: 0, clients: 0 }, b: { sessions: 0, kwh: 0, revenue: 0, clients: 0 } };
+      row[side] = { sessions: x.sessions, kwh: r2(x.kwh), revenue: r2(x.revenue), clients: x.clients };
+      siteMap.set(x.ref, row);
+    }));
+    const bySite = [...siteMap.values()].map(r => ({ ...r, revenuePct: pct(r.a.revenue, r.b.revenue), kwhPct: pct(r.a.kwh, r.b.kwh) }))
+      .sort((x, y) => (y.b.revenue + y.a.revenue) - (x.b.revenue + x.a.revenue));
+
+    // Movimento de clientes de A para B.
+    const ca = A.clients, cb = B.clients, moves = { kept: [], lost: [], returned: [], fresh: [] };
+    const row = (k, x, y) => {
+      const ref = y || x;
+      const site = Object.entries(ref.sites).sort((p, q) => q[1] - p[1])[0]?.[0] || "";
+      return { key: k, name: ref.name || "", phone: ref.phone || "", site, aRevenue: r2(x?.revenue || 0), bRevenue: r2(y?.revenue || 0), aKwh: r2(x?.kwh || 0), bKwh: r2(y?.kwh || 0),
+        aSessions: x?.n || 0, bSessions: y?.n || 0, diff: r2((y?.revenue || 0) - (x?.revenue || 0)) };
+    };
+    ca.forEach((x, k) => (cb.has(k) ? moves.kept : moves.lost).push(row(k, x, cb.get(k))));
+    cb.forEach((y, k) => { if (!ca.has(k)) (firstEver.get(k) >= wb.from ? moves.fresh : moves.returned).push(row(k, null, y)); });
+    const sumOf = (list, f) => r2(list.reduce((s, c) => s + c[f], 0));
+    const group = list => ({ count: list.length, aRevenue: sumOf(list, "aRevenue"), bRevenue: sumOf(list, "bRevenue"), diff: sumOf(list, "diff") });
+    const byDiff = list => list.slice().sort((x, y) => y.diff - x.diff);
+
+    const strip = P => { const { clients, sites, ...rest } = P; return rest; };
+    return {
+      lastDay, sameDays, a: strip(A), b: strip(B), deltas, bySite,
+      clients: {
+        kept: group(moves.kept), lost: group(moves.lost), returned: group(moves.returned), fresh: group(moves.fresh),
+        // Ponte do faturamento: B = A + mantidos (diferença) − perdidos + voltaram + novos.
+        bridge: { a: A.totals.revenue, kept: sumOf(moves.kept, "diff"), lost: -sumOf(moves.lost, "aRevenue"), returned: sumOf(moves.returned, "bRevenue"), fresh: sumOf(moves.fresh, "bRevenue"), b: B.totals.revenue },
+        gainers: byDiff(moves.kept.concat(moves.returned, moves.fresh)).filter(c => c.diff > 0).slice(0, 15),
+        losers: byDiff(moves.kept.concat(moves.lost)).reverse().filter(c => c.diff < 0).slice(0, 15),
+        lostList: moves.lost.sort((x, y) => y.aRevenue - x.aRevenue), freshList: moves.fresh.sort((x, y) => y.bRevenue - x.bRevenue)
+      }
+    };
+  }
+
+  // ------------------------------------------------------------------
   // Pacote completo para a tela de Clientes
   // ------------------------------------------------------------------
   function customerWatch(sessions, o) {
@@ -341,5 +435,5 @@
   }
 
   global.UBY_ANALYTICS_CORE = Object.freeze({ DEFAULTS, customerProfiles, customerAlerts, segmentSummary, concentration, keyClients, siteTrend, loadProfile, kwhInHours,
-    priceLadder, listPrice, priceEvents, margin, breakeven, scenario, sweep, segmentScenario, customerWatch });
+    priceLadder, listPrice, priceEvents, margin, breakeven, scenario, sweep, segmentScenario, customerWatch, comparePeriods });
 })(typeof window !== "undefined" ? window : globalThis);
