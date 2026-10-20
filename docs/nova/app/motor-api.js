@@ -1871,7 +1871,7 @@
   }
   function fv2Policy() {
     const p = loadNetworkDistribution();
-    return { legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct, investorPct: p.investorPct,
+    return { legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct, investorPct: p.investorPct, founderPct: p.founderPct,
       quotaValue: p.quotaValue, distributionStartMonth: p.distributionStartMonth, investors: applyInvestorOperationStart(normalizeNetworkInvestors(p.investors)).sort(compareInvestorsByStart),
       taxRatePct: p.taxRatePct || 0, taxRateFrom: p.taxRateFrom || {}, taxByMonth: p.taxByMonth || {}, paymentLedger: p.paymentLedger || {} };
   }
@@ -2098,22 +2098,22 @@
     const idx = net.months.map((m, i) => (m.inDistribution ? i : -1)).filter(i => i >= 0);
     const months = idx.map(i => {
       const m = net.months[i];
-      const eligibleQuotas = policy.investors.filter(inv => inv.eligibleFrom <= m.monthKey).reduce((s, inv) => s + n0(inv.quotas), 0);
       // preTax e taxes mostram o imposto inteiro do mês (o que saiu dos carregadores + o restante da rede).
       return { key: m.monthKey, label: monthLabel(m.monthKey), taxBase: m.taxBase, taxes: n0(m.taxes) + n0(m.taxesApplied), taxSource: m.taxSource, preTax: m.preTax + n0(m.taxesApplied), result: m.result,
         carryIn: m.carryIn, carryOut: m.carryOut, distributable: m.distributable, legalReserve: m.legalReserve, expansionReserve: m.expansionReserve,
-        investorPool: m.investorPool, eligibleQuotas, perQuota: eligibleQuotas && m.investorPool > 0 ? m.investorPool / eligibleQuotas : 0,
+        investorPool: m.investorPool, eligibleQuotas: m.eligibleQuotas, perQuota: m.perQuota,
+        founderQuotas: m.founderQuotas, founderPct: m.founderPct, founderPool: m.founderPool, quotaPool: m.quotaPool,
         status: policy.paymentLedger?.[m.monthKey]?.status || "pendente",
         approvedAt: policy.paymentLedger?.[m.monthKey]?.approvedAt || "", approvedBy: policy.paymentLedger?.[m.monthKey]?.approvedBy || "",
         paidAt: policy.paymentLedger?.[m.monthKey]?.paidAt || "", snapshot: policy.paymentLedger?.[m.monthKey]?.snapshot || null };
     });
-    const investors = net.investors.map(inv => ({ name: inv.name, quotas: inv.quotas, eligibleFrom: inv.eligibleFrom, status: inv.status,
+    const investors = net.investors.map(inv => ({ name: inv.name, quotas: inv.quotas, eligibleFrom: inv.eligibleFrom, status: inv.status, founder: !!inv.founder,
       linkedStation: inv.linkedStation || "", baseEligibleFrom: inv.baseEligibleFrom || inv.eligibleFrom, operationFrom: inv.operationFrom || "", waitingOperation: !!inv.waitingOperation,
       allocations: idx.map(i => inv.allocations[i]), due: inv.due, quotaValue: n0(inv.quotaValue) || net.quotaValue,
       investment: inv.investment, returnRate: inv.returnRate, annualized: inv.annualized, paybackYears: inv.paybackYears }));
     const totalAllocated = investors.reduce((s, i) => s + i.due, 0);
-    const totalPool = months.filter(m => m.eligibleQuotas > 0).reduce((s, m) => s + m.investorPool, 0);
-    return { engine: "v2", valid: Math.abs(totalAllocated - totalPool) < 0.02, totalAllocated, totalPool, months, investors,
+    const totalPool = months.filter(m => m.eligibleQuotas > 0 || m.founderQuotas > 0).reduce((s, m) => s + m.investorPool, 0);
+    return { engine: "v2", valid: Math.abs(totalAllocated - totalPool) < 0.02, totalAllocated, totalPool, months, investors, founderPct: net.founderPct,
       quotaValue: net.quotaValue, distributionStartMonth: net.distributionStartMonth, taxRatePct: n0(policy.taxRatePct),
       totals: { taxes: months.reduce((s, m) => s + m.taxes, 0), preTax: months.reduce((s, m) => s + m.preTax, 0), result: months.reduce((s, m) => s + m.result, 0) } };
   }
