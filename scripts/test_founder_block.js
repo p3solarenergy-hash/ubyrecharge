@@ -34,6 +34,12 @@ assert.strictEqual(by(net, 'Renan Sanchez')[1], 1818.18);
 assert.strictEqual(by(net, 'R.EBP (11ª cota)')[1], 727.27);
 assert.strictEqual(by(net, 'R.EBP')[1], 2000);
 assert.strictEqual(round(nov.developerFee), 181.82);
+// A REBP vê separado o que é das cotas da rodada 1 e o que é taxa da desenvolvedora.
+const rebp = net.investors.find(i => i.name === 'R.EBP');
+assert.deepStrictEqual(rebp.ownAllocations.map(round), [0, 1818.18]);
+assert.deepStrictEqual(rebp.feeAllocations.map(round), [222.22, 181.82]);
+assert.strictEqual(round(rebp.feeDue), 404.04);
+assert.strictEqual(round(rebp.returnRate * 160000), 1818.18, 'retorno só sobre as cotas, sem a taxa');
 closes(net);
 
 // Rodada 2 (+3 cotas de terceiros): o bloco segue com 20%; rodada 1 a 1/14 do pool, cotas novas a 80% disso.

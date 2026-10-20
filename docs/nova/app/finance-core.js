@@ -382,20 +382,19 @@
         perNewQuota: perQuota * (100 - founderPct) / 100, founderQuotas, founderPool: perQuota * founderQuotas + developerFee });
     });
     const investors = all.map(inv => {
-      const allocations = months.map(mo => {
-        if (!mo.inDistribution) return 0;
-        const own = mo.monthKey < inv.eligibleFrom ? 0
-          : (inv.newQuota && !inv.founder && founderTotalQuotas ? mo.perNewQuota : mo.perQuota) * num(inv.quotas);
-        // A taxa das cotas 11+ vale desde a entrada de cada uma, mesmo antes das cotas do bloco começarem a receber.
-        const fee = inv.founder ? mo.developerFee * num(inv.quotas) / founderTotalQuotas : 0;
-        return own + fee;
-      });
+      const ownAllocations = months.map(mo => !mo.inDistribution || mo.monthKey < inv.eligibleFrom ? 0
+        : (inv.newQuota && !inv.founder && founderTotalQuotas ? mo.perNewQuota : mo.perQuota) * num(inv.quotas));
+      // A taxa das cotas 11+ vale desde a entrada de cada uma, mesmo antes das cotas do bloco começarem a receber.
+      const feeAllocations = months.map(mo => mo.inDistribution && inv.founder ? mo.developerFee * num(inv.quotas) / founderTotalQuotas : 0);
+      const allocations = ownAllocations.map((v, k) => v + feeAllocations[k]);
       const due = allocations.reduce((s, x) => s + x, 0);
+      const ownDue = ownAllocations.reduce((s, x) => s + x, 0), feeDue = due - ownDue;
       const investment = num(inv.investment) || num(inv.quotas) * (num(inv.quotaValue) || quotaValue);
       const activeMonths = months.filter(mo => mo.inDistribution && mo.monthKey >= inv.eligibleFrom && mo.investorPool > 0).length;
-      const returnRate = investment ? due / investment : 0;
+      // Retorno sobre o capital: só o que a cota recebe; a taxa da desenvolvedora fica fora.
+      const returnRate = investment ? ownDue / investment : 0;
       const annualized = activeMonths ? returnRate / activeMonths * 12 : 0;
-      return { ...inv, allocations, due, investment, returnRate, annualized, paybackYears: annualized > 0 ? 1 / annualized : null };
+      return { ...inv, allocations, ownAllocations, feeAllocations, due, ownDue, feeDue, investment, returnRate, annualized, paybackYears: annualized > 0 ? 1 / annualized : null };
     });
     const sum = k => months.reduce((s, m) => s + num(m[k]), 0);
     return { months, investors, quotaValue, distributionStartMonth: start,
