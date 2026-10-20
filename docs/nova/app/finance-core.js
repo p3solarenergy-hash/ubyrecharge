@@ -326,8 +326,8 @@
     monthly: [{ monthKey, ownedNet, royalties }] em ordem.
     policy: { legalReservePct, expansionReservePct, investorPct, quotaValue, distributionStartMonth, founderPct, investors[{name, quotas, eligibleFrom, founder, newQuota}] }
     Com lossCarry, o prejuízo acumulado é compensado antes de reserva e distribuição.
-    Bloco fundador (usuário, 20/10/2026): a rodada 1 tem 10 cotas (8 de investidores + 2 da REBP, o bloco).
-    Da cota 11 em diante, founderPct% do que cada cota recebe vai para o bloco, como taxa da desenvolvedora.
+    Rodada 1 (usuário, 20/10/2026): 10 cotas (8 de investidores + 2 da REBP). Da cota 11 em diante,
+    founderPct% do que cada cota recebe é a taxa da desenvolvedora (REBP), em developerFee de cada mês.
   */
   function network(monthly, policy = {}, fixes = FIXES_OFF) {
     const legalPct = num(policy.legalReservePct), expPct = num(policy.expansionReservePct), invPct = num(policy.investorPct);
@@ -366,35 +366,29 @@
     });
     const all = policy.investors || [];
     const founderPct = Math.min(100, Math.max(0, policy.founderPct === undefined || policy.founderPct === null || policy.founderPct === "" ? 20 : num(policy.founderPct)));
-    // Bloco fundador = as 2 cotas da REBP na rodada 1 (recebem como qualquer cota, desde a própria entrada).
-    // Cotas 11 em diante (newQuota) ficam com 100% − founderPct do que a cota recebe; founderPct vai ao bloco.
-    // Assim o bloco fica sempre com 20% do pool quando habilitado, e a rodada 1 não paga a taxa.
-    const founderTotalQuotas = all.filter(x => x.founder).reduce((s, x) => s + num(x.quotas), 0);
+    // Rodada 1 (inclusive as 2 cotas da REBP, founder) recebe o valor cheio por cota. Cotas 11 em diante
+    // (newQuota) ficam com 100% − founderPct; founderPct é a taxa da desenvolvedora (REBP), apurada à parte:
+    // não depende de nenhum cotista marcado e vale desde o início de cada cota nova.
     months.forEach(mo => {
       const eligible = all.filter(x => x.eligibleFrom <= mo.monthKey);
       const eligibleQuotas = eligible.reduce((s, x) => s + num(x.quotas), 0);
       const founderQuotas = eligible.filter(x => x.founder).reduce((s, x) => s + num(x.quotas), 0);
-      const newQuotas = founderTotalQuotas ? eligible.filter(x => x.newQuota && !x.founder).reduce((s, x) => s + num(x.quotas), 0) : 0;
+      const newQuotas = eligible.filter(x => x.newQuota && !x.founder).reduce((s, x) => s + num(x.quotas), 0);
       const pool = mo.inDistribution && mo.investorPool > 0 ? mo.investorPool : 0;
       const perQuota = eligibleQuotas ? pool / eligibleQuotas : 0;
       const developerFee = perQuota * newQuotas * founderPct / 100;
       Object.assign(mo, { eligibleQuotas, perQuota, newQuotas, founderPct: newQuotas ? founderPct : 0, developerFee,
-        perNewQuota: perQuota * (100 - founderPct) / 100, founderQuotas, founderPool: perQuota * founderQuotas + developerFee });
+        perNewQuota: perQuota * (100 - founderPct) / 100, founderQuotas, founderPool: perQuota * founderQuotas });
     });
     const investors = all.map(inv => {
-      const ownAllocations = months.map(mo => !mo.inDistribution || mo.monthKey < inv.eligibleFrom ? 0
-        : (inv.newQuota && !inv.founder && founderTotalQuotas ? mo.perNewQuota : mo.perQuota) * num(inv.quotas));
-      // A taxa das cotas 11+ vale desde a entrada de cada uma, mesmo antes das cotas do bloco começarem a receber.
-      const feeAllocations = months.map(mo => mo.inDistribution && inv.founder ? mo.developerFee * num(inv.quotas) / founderTotalQuotas : 0);
-      const allocations = ownAllocations.map((v, k) => v + feeAllocations[k]);
+      const allocations = months.map(mo => !mo.inDistribution || mo.monthKey < inv.eligibleFrom ? 0
+        : (inv.newQuota && !inv.founder ? mo.perNewQuota : mo.perQuota) * num(inv.quotas));
       const due = allocations.reduce((s, x) => s + x, 0);
-      const ownDue = ownAllocations.reduce((s, x) => s + x, 0), feeDue = due - ownDue;
       const investment = num(inv.investment) || num(inv.quotas) * (num(inv.quotaValue) || quotaValue);
       const activeMonths = months.filter(mo => mo.inDistribution && mo.monthKey >= inv.eligibleFrom && mo.investorPool > 0).length;
-      // Retorno sobre o capital: só o que a cota recebe; a taxa da desenvolvedora fica fora.
-      const returnRate = investment ? ownDue / investment : 0;
+      const returnRate = investment ? due / investment : 0;
       const annualized = activeMonths ? returnRate / activeMonths * 12 : 0;
-      return { ...inv, allocations, ownAllocations, feeAllocations, due, ownDue, feeDue, investment, returnRate, annualized, paybackYears: annualized > 0 ? 1 / annualized : null };
+      return { ...inv, allocations, due, investment, returnRate, annualized, paybackYears: annualized > 0 ? 1 / annualized : null };
     });
     const sum = k => months.reduce((s, m) => s + num(m[k]), 0);
     return { months, investors, quotaValue, distributionStartMonth: start,
