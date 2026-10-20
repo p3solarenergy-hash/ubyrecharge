@@ -1467,8 +1467,8 @@
       engine: "v2", savedAt: new Date().toISOString(),
       taxBase: nz(m.taxBase), taxes: nz(m.taxes), preTax: nz(m.preTax), result: nz(m.result), carryIn: nz(m.carryIn),
       distributable: nz(m.distributable), legalReserve: nz(m.legalReserve), expansionReserve: nz(m.expansionReserve),
-      investorPool: nz(m.investorPool), eligibleQuotas: nz(m.eligibleQuotas), perQuota: nz(m.perQuota), founderPct: nz(m.founderPct), founderPool: nz(m.founderPool),
-      investors: inv.investors.filter(i => i.eligibleFrom <= m.key).map(i => ({ name: i.name, quotas: nz(i.quotas), founder: !!i.founder, value: Math.round(nz(i.allocations[idx]) * 100) / 100 }))
+      investorPool: nz(m.investorPool), eligibleQuotas: nz(m.eligibleQuotas), perQuota: nz(m.perQuota), founderPct: nz(m.founderPct), founderPool: nz(m.founderPool), developerFee: nz(m.developerFee),
+      investors: inv.investors.filter(i => i.eligibleFrom <= m.key || Number(i.allocations[idx]) > 0).map(i => ({ name: i.name, quotas: nz(i.quotas), founder: !!i.founder, newQuota: !!i.newQuota, value: Math.round(nz(i.allocations[idx]) * 100) / 100 }))
     };
   }
   function closingDiff(inv, idx) {
@@ -1587,8 +1587,10 @@
     const startWarn = firstEligible && e.distributionStartMonth && e.distributionStartMonth > firstEligible
       ? `<div class="note" style="margin:10px 0;border-color:#e0a4a0"><strong>Atenção:</strong> "Distribuição a partir de" está em ${esc(UBY.state.api?.monthName?.(e.distributionStartMonth) || e.distributionStartMonth)}, mas há cotas habilitadas desde ${esc(UBY.state.api?.monthName?.(firstEligible) || firstEligible)}. Os meses anteriores ao início da distribuição não aparecem no histórico nem na rentabilidade dos cotistas.</div>` : "";
     const stationNames = (w.getUbyChargerRows(w.getGeneralUnitData()) || []).filter(r => r.included).map(r => r.station || r.stationName || r.workName).filter(Boolean);
-    const quotasSum = derived.filter(i => !i.founder).reduce((s, i) => s + Number(i.quotas || 0), 0);
-    const investedSum = derived.filter(i => !i.founder).reduce((s, i) => s + Number(i.investment || 0), 0);
+    const quotasSum = derived.reduce((s, i) => s + Number(i.quotas || 0), 0);
+    const investedSum = derived.reduce((s, i) => s + Number(i.investment || 0), 0);
+    const feePct = Number(e.founderPct ?? 20);
+    const kindOf = i => i.founder ? "founder" : i.newQuota ? "new" : "round1";
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Política de distribuição</p><h2>Rodadas, valor da cota e reservas</h2><p>O valor padrão da cota vale para cotistas sem valor próprio. Cada cotista pode ter o valor da sua rodada (ex.: rodada 1 a R$ 80 mil, novas a R$ 100 mil). A distribuição por cota é igual para todas; o valor pago muda o investido, o retorno e o payback.</p></div></div>
         <div class="grid g4" style="gap:8px">
@@ -1596,9 +1598,9 @@
           ${inp("legalReservePct", "Reserva legal (%)", "number", 'min="0" max="100" step="0.1"')}${inp("expansionReservePct", "Fundo de expansão (%)", "number", 'min="0" max="100" step="0.1"')}
           ${inp("investorPct", "Parte dos cotistas após reservas (%)", "number", 'min="0" max="100" step="0.1"')}${inp("totalQuotas", "Cotas da rodada atual", "number", 'min="1" step="1"')}
           ${inp("soldQuotas", "Cotas vendidas", "number", 'min="0" step="1"')}${inp("roundLabel", "Nome da rodada atual", "text")}
-          ${inp("founderPct", "Bloco fundador (% fixo do pool)", "number", 'min="0" max="100" step="0.1"')}
+          ${inp("founderPct", "Taxa da desenvolvedora nas cotas 11+ (%)", "number", 'min="0" max="100" step="0.1"')}
         </div>
-        <p class="meta" style="margin:10px 0 0">Bloco fundador: a partir do mês em que entra, fica com ${esc(fmt.pct1(Number(e.founderPct ?? 20)))} fixos do pool dos cotistas, sem diluição por novas cotas; os outros ${esc(fmt.pct1(100 - Number(e.founderPct ?? 20)))} são divididos entre as cotas dos investidores habilitadas no mês. Marque o bloco na coluna "Bloco fundador" da lista de cotistas.</p>
+        <p class="meta" style="margin:10px 0 0">Rodada 1: 10 cotas (8 de investidores + 2 da REBP, o bloco fundador), todas recebendo o mesmo valor por cota. Da cota 11 em diante, cada cota fica com ${esc(fmt.pct1(100 - feePct))} do que recebe e ${esc(fmt.pct1(feePct))} vão para o bloco fundador, como taxa da desenvolvedora. Assim o bloco segue com 20% do pool quando habilitado. Indique o tipo de cada cotista na coluna "Tipo da cota".</p>
       </section>
       ${startWarn}
       <section class="section"><div class="section-head"><div><p class="kicker">Impostos da UBY</p><h2>Impostos sobre o faturamento</h2><p>Incidem sobre tudo o que a UBY faturou no mês (recargas e receitas dos ativos próprios + royalties) e saem do resultado antes das reservas e dos cotistas. Use o percentual e, quando a guia sair, lance o valor exato do mês — ele substitui o percentual naquela competência.</p></div></div>
@@ -1611,18 +1613,18 @@
         <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Competência</th><th class="num">Valor exato do imposto (R$)</th><th>Uso</th></tr></thead>
           <tbody>${(UBY.state.months || []).slice().reverse().map(mk => { const v = e.taxByMonth[mk]; return `<tr><td>${esc(UBY.state.api?.monthName?.(mk) || mk)}</td><td class="num"><input class="select" type="number" min="0" step="0.01" data-tax-month="${esc(mk)}" value="${v === undefined ? "" : esc(v)}" placeholder="usar ${esc(e.taxRatePct || 0)}%" style="width:150px"></td><td><small>${v === undefined ? `alíquota de ${esc(e.taxRatePct || 0)}%` : "valor lançado"}</small></td></tr>`; }).join("")}</tbody></table></div>
       </section>
-      <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Cotistas: data do aporte e valor investido</h2><p>Informe só a data do aporte e o valor investido. A plataforma calcula as cotas (valor ÷ valor da cota da rodada, fixado na entrada do cotista) e o mês em que ele passa a participar: aporte no dia 1º entra no próprio mês; em qualquer outro dia, entra no mês seguinte. Se a cota for vinculada a um carregador, o dividendo só começa depois do início da operação dele (vale o mês mais tardio entre o aporte e o mês em que o carregador entrou em operação); o vínculo não rateia faturamento, só define a data. ${fmt.n1(quotasSum)} cota(s) de investidores · ${fmt.brl(investedSum)} investidos${derived.some(i => i.founder) ? ` · bloco fundador com ${esc(fmt.pct1(Number(e.founderPct ?? 20)))} fixos` : ""}.</p></div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Cotistas: data do aporte e valor investido</h2><p>Informe só a data do aporte e o valor investido. A plataforma calcula as cotas (valor ÷ valor da cota da rodada, fixado na entrada do cotista) e o mês em que ele passa a participar: aporte no dia 1º entra no próprio mês; em qualquer outro dia, entra no mês seguinte. Se a cota for vinculada a um carregador, o dividendo só começa depois do início da operação dele (vale o mês mais tardio entre o aporte e o mês em que o carregador entrou em operação); o vínculo não rateia faturamento, só define a data. ${fmt.n1(quotasSum)} cota(s) · ${fmt.brl(investedSum)} investidos${derived.some(i => i.founder) ? ` · ${fmt.n1(derived.filter(i => i.newQuota && !i.founder).reduce((s, i) => s + Number(i.quotas || 0), 0))} cota(s) 11+ com taxa de ${esc(fmt.pct1(feePct))}` : ""}.</p></div>
           <button class="btn" id="pmInvAdd" type="button">＋ Cotista</button></div>
         <datalist id="pmStationList">${stationNames.map(n => `<option value="${esc(n)}"></option>`).join("")}</datalist>
-        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th>E-mail (acesso aos extratos)</th><th>Data do aporte</th><th class="num">Valor investido (R$)</th><th class="num">Valor da cota</th><th class="num">Cotas</th><th>Bloco fundador</th><th>Carregador vinculado</th><th>Participa a partir de</th><th>Situação</th><th></th></tr></thead>
+        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th>E-mail (acesso aos extratos)</th><th>Data do aporte</th><th class="num">Valor investido (R$)</th><th class="num">Valor da cota</th><th class="num">Cotas</th><th>Tipo da cota</th><th>Carregador vinculado</th><th>Participa a partir de</th><th>Situação</th><th></th></tr></thead>
           <tbody>${ui.rowOrder.map(k => { const i = e.investors[k], d = derived[k]; return `<tr>
             <td><input class="select" data-inv="${k}|name" value="${esc(i.name)}" style="width:100%"></td>
             <td><input class="select" type="email" data-inv="${k}|email" value="${esc(i.email || "")}" placeholder="opcional" style="width:100%"></td>
             <td><input class="select" type="date" data-inv="${k}|investedAt" value="${esc(i.investedAt || "")}"></td>
             <td class="num"><input class="select" type="number" min="0" step="0.01" data-inv="${k}|investment" value="${esc(i.investment || "")}" style="width:140px"></td>
             <td class="num"><input class="select" type="number" min="0" step="1000" data-inv="${k}|quotaValue" value="${esc(d.quotaValue)}" style="width:120px"><small>${Number(i.quotaValue) > 0 ? "desta cota" : "padrão da rodada"}</small></td>
-            <td class="num">${i.founder ? `<strong>${esc(fmt.pct1(Number(e.founderPct ?? 20)))}</strong><small>fixo do pool</small>` : `<strong>${fmt.n1(d.quotas)}</strong>`}</td>
-            <td><label style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input type="checkbox" data-inv="${k}|founder" ${i.founder ? "checked" : ""}> fundador</label></td>
+            <td class="num"><strong>${fmt.n1(d.quotas)}</strong></td>
+            <td><select class="select" data-inv="${k}|kind">${[["round1", "Rodada 1"], ["founder", "Bloco fundador (REBP)"], ["new", `Cota 11+ (${fmt.pct1(feePct)} p/ desenvolvedora)`]].map(([v, l]) => `<option value="${v}" ${kindOf(i) === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></td>
             <td><input class="select" list="pmStationList" data-inv="${k}|linkedStation" value="${esc(i.linkedStation || "")}" placeholder="sem vínculo" style="width:190px"></td>
             <td>${d.waitingOperation ? `<strong>aguardando operação</strong><small>${esc(d.linkedStation)} ainda não iniciou</small>` : `<strong>${esc(d.eligibleFrom ? (UBY.state.api?.monthName?.(d.eligibleFrom) || d.eligibleFrom) : "—")}</strong>${d.operationFrom && d.operationFrom > d.baseEligibleFrom ? `<small>aguarda o início da operação (aporte: ${esc(UBY.state.api?.monthName?.(d.baseEligibleFrom) || d.baseEligibleFrom)})</small>` : (d.investedAt && d.investedAt.slice(8) !== "01" ? "<small>aporte após o dia 1º</small>" : "")}`}</td>
             <td><select class="select" data-inv="${k}|status">${["pendente", "aprovado", "pago"].map(s => `<option ${i.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></td>
@@ -2557,8 +2559,8 @@
     target.querySelectorAll("[data-tax-from-del]").forEach(b => b.onclick = () => { delete ui.policyEdits.taxRateFrom[b.dataset.taxFromDel]; draw(target, w); });
     if ($("#pmTaxFromAdd")) $("#pmTaxFromAdd").onclick = () => { const m = $("#pmTaxFromMonth").value, v = $("#pmTaxFromPct").value; if (!/^\d{4}-\d{2}$/.test(m) || v === "") return alert("Informe o mês e a nova alíquota."); ui.policyEdits.taxRateFrom[m] = Math.max(0, Number(v)); draw(target, w); };
     target.querySelectorAll("[data-tax-month]").forEach(el => el.onchange = () => { const k = el.dataset.taxMonth; if (el.value === "") delete ui.policyEdits.taxByMonth[k]; else ui.policyEdits.taxByMonth[k] = Math.max(0, Number(el.value)); draw(target, w); });
-    target.querySelectorAll("[data-inv]").forEach(el => el.onchange = () => { const [i, k] = el.dataset.inv.split("|"); ui.policyEdits.investors[Number(i)][k] = k === "founder" ? el.checked : ["investment", "quotaValue"].includes(k) ? Number(el.value || 0) : el.value; draw(target, w); });
-    if ($("#pmInvAdd")) $("#pmInvAdd").onclick = () => { const qv = Number(ui.policyEdits.quotaValue) || window.UBY_CONFIG.quotaValueDefault; ui.policyEdits.investors.push({ name: "Novo cotista", investedAt: new Date().toISOString().slice(0, 10), investment: qv, quotaValue: qv, status: "pendente" }); draw(target, w); };
+    target.querySelectorAll("[data-inv]").forEach(el => el.onchange = () => { const [i, k] = el.dataset.inv.split("|"); const inv = ui.policyEdits.investors[Number(i)]; if (k === "kind") { inv.founder = el.value === "founder"; inv.newQuota = el.value === "new"; } else inv[k] = ["investment", "quotaValue"].includes(k) ? Number(el.value || 0) : el.value; draw(target, w); });
+    if ($("#pmInvAdd")) $("#pmInvAdd").onclick = () => { const qv = Number(ui.policyEdits.quotaValue) || window.UBY_CONFIG.quotaValueDefault; ui.policyEdits.investors.push({ name: "Novo cotista", investedAt: new Date().toISOString().slice(0, 10), investment: qv, quotaValue: qv, status: "pendente", newQuota: true }); draw(target, w); };
     target.querySelectorAll("[data-inv-del]").forEach(b => b.onclick = () => { const i = Number(b.dataset.invDel); if (confirm(`Remover ${ui.policyEdits.investors[i].name} da lista de cotistas?`)) { ui.policyEdits.investors.splice(i, 1); draw(target, w); } });
     if ($("#pmPolReset")) $("#pmPolReset").onclick = () => { ui.policyEdits = null; ui.rowOrder = null; draw(target, w); };
     if ($("#pmPolSave")) $("#pmPolSave").onclick = () => run(target, w, "Política de cotas", async () => {
@@ -2568,7 +2570,7 @@
       const next = { ...current, ...ui.policyEdits, investors };
       const saved = w.saveNetworkDistribution(next);
       const fb = await awaitMatrixSave(w);
-      if (Number(saved.founderPct) !== Number(next.founderPct) || saved.investors.filter(i => i.founder).length !== investors.filter(i => i.founder).length) throw new Error("A política não foi aceita pela plataforma original (bloco fundador).");
+      if (Number(saved.founderPct) !== Number(next.founderPct) || saved.investors.filter(i => i.founder).length !== investors.filter(i => i.founder).length || saved.investors.filter(i => i.newQuota).length !== investors.filter(i => i.newQuota).length) throw new Error("A política não foi aceita pela plataforma original (bloco fundador).");
       if (Number(saved.quotaValue) !== Number(next.quotaValue) || Number(saved.taxRatePct || 0) !== Number(next.taxRatePct || 0) || JSON.stringify(saved.taxRateFrom || {}) !== JSON.stringify(next.taxRateFrom || {})) throw new Error("A política não foi aceita pela plataforma original (valor da cota ou impostos).");
       ui.policyEdits = null; ui.rowOrder = null;
       return fb || "política salva na nuvem";
