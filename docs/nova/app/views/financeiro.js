@@ -430,6 +430,20 @@
   }
 
   // ---------- Investidores ----------
+  // Rodada 1 (as 10 primeiras cotas, com o bloco fundador por último) e, depois de um tracejado, as cotas 11 em diante.
+  function investorGroups(inv) {
+    const list = inv.investors || [];
+    if (!list.some(i => i.founder || i.newQuota)) return [{ rows: list }];
+    const round1 = [...list.filter(i => !i.founder && !i.newQuota), ...list.filter(i => i.founder)];
+    const later = list.filter(i => i.newQuota && !i.founder);
+    const quotas = rows => rows.reduce((s, i) => s + Number(i.quotas || 0), 0);
+    return [
+      { head: true, title: "Rodada 1", note: `${fmt.n1(quotas(round1))} cota(s), todas com o valor cheio por cota` }, { rows: round1 },
+      ...(later.length ? [{ head: true, sep: true, title: "Cotas 11 em diante", note: `${fmt.n1(quotas(later))} cota(s); cada uma recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota e ${fmt.pct1(inv.founderPct)} vão para o bloco fundador` }, { rows: later }] : [])
+    ];
+  }
+  const groupHead = (g, cols) => `<tr><td colspan="${cols}" style="${g.sep ? "border-top:2px dashed var(--uby-muted);" : ""}padding-top:${g.sep ? 14 : 6}px"><strong style="font-size:12px;letter-spacing:.04em;text-transform:uppercase">${esc(g.title)}</strong> <small style="display:inline;margin-left:6px">${esc(g.note)}</small></td></tr>`;
+
   function investidores(inv) {
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Rodada 1 · apuração por competência</p><h2>Distribuição por período de aporte</h2><p>Cada mês é dividido só entre as cotas habilitadas no primeiro dia do mês, sem proporcionalidade retroativa.${inv.investors.some(i => i.founder) ? ` Da cota 11 em diante, ${fmt.pct1(inv.founderPct)} do que cada cota recebe vão para o bloco fundador (taxa da desenvolvedora); a rodada 1 recebe o valor cheio por cota.` : ""}</p></div>
@@ -444,8 +458,8 @@
       </section>
       <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Apuração por cotista</h2><p>Cada cotista usa o valor da cota da própria rodada (padrão ${fmt.brl(inv.quotaValue || window.UBY_CONFIG.quotaValueDefault)}); a distribuição por cota é igual para todas${inv.investors.some(i => i.founder) ? `, e as cotas 11+ ficam com ${fmt.pct1(100 - inv.founderPct)} dela` : ""}. Distribuição a partir de ${esc(UBY.state.api.monthName(inv.distributionStartMonth || window.UBY_CONFIG.distributionStartDefault))}. Payback indicativo pelo retorno anualizado.</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Cotista</th><th class="num">Cotas</th><th class="num">Valor da cota</th><th class="num">Investido</th><th>Início</th>${inv.months.map(m => `<th class="num">${esc(m.label)}</th>`).join("")}<th class="num">Total devido</th><th class="num">Retorno acum.</th><th class="num">Payback</th><th>Situação</th><th></th></tr></thead>
-          <tbody>${inv.investors.map(i => `<tr><td><strong>${esc(i.name)}</strong>${i.founder ? `<small>Bloco fundador · rodada 1 + ${fmt.pct1(inv.founderPct)} das cotas 11+</small>` : i.newQuota ? `<small>Cota 11+ · ${fmt.pct1(100 - inv.founderPct)} da cota</small>` : ""}</td><td class="num">${i.quotas}</td><td class="num">${fmt.brl(i.quotaValue || inv.quotaValue || window.UBY_CONFIG.quotaValueDefault)}</td><td class="num">${fmt.brl(i.investment)}</td><td>${i.waitingOperation ? "aguardando operação" : esc(i.eligibleFrom ? UBY.state.api.monthName(i.eligibleFrom) : "—")}</td>${i.allocations.map(a => `<td class="num">${fmt.brl(a)}</td>`).join("")}
-            <td class="num"><strong>${fmt.brl(i.due)}</strong></td><td class="num">${fmt.pct(i.returnRate * 100)}</td><td class="num">${i.paybackYears ? `${fmt.n1(i.paybackYears)} anos` : "—"}</td><td>${esc(i.status)}</td><td><button class="btn ghost" data-extrato="${esc(i.name)}" type="button">Extrato</button></td></tr>`).join("") || `<tr><td colspan="${10 + inv.months.length}" class="empty">Nenhum cotista cadastrado.</td></tr>`}</tbody></table></div>
+          <tbody>${investorGroups(inv).map(g => g.head ? groupHead(g, 10 + inv.months.length) : g.rows.map(i => `<tr><td><strong>${esc(i.name)}</strong>${i.founder ? "<small>Bloco fundador (desenvolvedora)</small>" : ""}</td><td class="num">${i.quotas}</td><td class="num">${fmt.brl(i.quotaValue || inv.quotaValue || window.UBY_CONFIG.quotaValueDefault)}</td><td class="num">${fmt.brl(i.investment)}</td><td>${i.waitingOperation ? "aguardando operação" : esc(i.eligibleFrom ? UBY.state.api.monthName(i.eligibleFrom) : "—")}</td>${i.allocations.map(a => `<td class="num">${fmt.brl(a)}</td>`).join("")}
+            <td class="num"><strong>${fmt.brl(i.due)}</strong></td><td class="num">${fmt.pct(i.returnRate * 100)}</td><td class="num">${i.paybackYears ? `${fmt.n1(i.paybackYears)} anos` : "—"}</td><td>${esc(i.status)}</td><td><button class="btn ghost" data-extrato="${esc(i.name)}" type="button">Extrato</button></td></tr>`).join("")).join("") || `<tr><td colspan="${10 + inv.months.length}" class="empty">Nenhum cotista cadastrado.</td></tr>`}</tbody></table></div>
       </section>`;
   }
 
