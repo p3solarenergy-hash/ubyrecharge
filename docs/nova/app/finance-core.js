@@ -324,8 +324,10 @@
   /*
     Resultado da rede por competência e distribuição aos cotistas.
     monthly: [{ monthKey, ownedNet, royalties }] em ordem.
-    policy: { legalReservePct, expansionReservePct, investorPct, quotaValue, distributionStartMonth, investors[{name, quotas, eligibleFrom}] }
+    policy: { legalReservePct, expansionReservePct, investorPct, quotaValue, distributionStartMonth, founderPct, investors[{name, quotas, eligibleFrom, founder}] }
     Com lossCarry, o prejuízo acumulado é compensado antes de reserva e distribuição.
+    Bloco fundador (usuário, 20/10/2026): a partir do mês em que entra, recebe founderPct% fixos do pool,
+    sem diluição; o restante é dividido entre as cotas dos investidores habilitadas no mês.
   */
   function network(monthly, policy = {}, fixes = FIXES_OFF) {
     const legalPct = num(policy.legalReservePct), expPct = num(policy.expansionReservePct), invPct = num(policy.investorPct);
@@ -363,11 +365,24 @@
       return { monthKey: m.monthKey, ownedNet: num(m.ownedNet), royalties: num(m.royalties), rows: m.rows || [], taxBase, taxes, taxesTotal, taxesApplied, taxSource: manual ? "valor lançado" : (pct ? `${String(pct).replace(".", ",")}% do recebido pela UBY` : "sem imposto lançado"), preTax, result, carryIn, carryOut: carry, distributable, legalReserve, expansionReserve, investorPool, inDistribution: m.monthKey >= start };
     });
     const all = policy.investors || [];
+    const founderPct = Math.min(100, Math.max(0, policy.founderPct === undefined || policy.founderPct === null || policy.founderPct === "" ? 20 : num(policy.founderPct)));
+    // Divisão do pool no mês: bloco fundador (fatia fixa) × cotas dos investidores (rateio por cota).
+    months.forEach(mo => {
+      const eligible = all.filter(x => x.eligibleFrom <= mo.monthKey);
+      const founderQuotas = eligible.filter(x => x.founder).reduce((s, x) => s + num(x.quotas), 0);
+      const eligibleQuotas = eligible.filter(x => !x.founder).reduce((s, x) => s + num(x.quotas), 0);
+      const pool = mo.inDistribution && mo.investorPool > 0 ? mo.investorPool : 0;
+      // Sem cota de investidor habilitada, o bloco fica com o pool inteiro (a conferência continua fechando).
+      const founderPool = founderQuotas ? (eligibleQuotas ? pool * founderPct / 100 : pool) : 0;
+      Object.assign(mo, { founderQuotas, founderPct: founderQuotas ? founderPct : 0, founderPool, eligibleQuotas, quotaPool: pool - founderPool,
+        perQuota: eligibleQuotas ? (pool - founderPool) / eligibleQuotas : 0 });
+    });
     const investors = all.map(inv => {
       const allocations = months.map(mo => {
         if (!mo.inDistribution || mo.monthKey < inv.eligibleFrom) return 0;
-        const eligibleQuotas = all.filter(x => x.eligibleFrom <= mo.monthKey).reduce((s, x) => s + num(x.quotas), 0);
-        return eligibleQuotas && mo.investorPool > 0 ? mo.investorPool / eligibleQuotas * num(inv.quotas) : 0;
+        return inv.founder
+          ? (mo.founderQuotas ? mo.founderPool / mo.founderQuotas * num(inv.quotas) : 0)
+          : mo.perQuota * num(inv.quotas);
       });
       const due = allocations.reduce((s, x) => s + x, 0);
       const investment = num(inv.investment) || num(inv.quotas) * (num(inv.quotaValue) || quotaValue);
@@ -378,7 +393,8 @@
     });
     const sum = k => months.reduce((s, m) => s + num(m[k]), 0);
     return { months, investors, quotaValue, distributionStartMonth: start,
-      totals: { preTax: sum("preTax"), taxes: sum("taxes"), taxesTotal: sum("taxesTotal"), taxesApplied: sum("taxesApplied"), taxBase: sum("taxBase"), result: sum("result"), distributable: sum("distributable"), investorPool: sum("investorPool"), legalReserve: sum("legalReserve"), expansionReserve: sum("expansionReserve"), carryOut: carry } };
+      founderPct,
+      totals: { preTax: sum("preTax"), taxes: sum("taxes"), taxesTotal: sum("taxesTotal"), taxesApplied: sum("taxesApplied"), taxBase: sum("taxBase"), result: sum("result"), distributable: sum("distributable"), investorPool: sum("investorPool"), founderPool: sum("founderPool"), legalReserve: sum("legalReserve"), expansionReserve: sum("expansionReserve"), carryOut: carry } };
   }
 
   global.UBY_FINANCE_CORE = Object.freeze({ FIXES, FIXES_ON, FIXES_OFF, computeMonth, aggregate, network, allocate, evaluateRules, energyComposition, energyInvoiceMonths, ADDITIVE });
