@@ -2109,11 +2109,13 @@
     });
     const investors = net.investors.map(inv => ({ name: inv.name, quotas: inv.quotas, eligibleFrom: inv.eligibleFrom, status: inv.status, founder: !!inv.founder, newQuota: !!inv.newQuota,
       linkedStation: inv.linkedStation || "", baseEligibleFrom: inv.baseEligibleFrom || inv.eligibleFrom, operationFrom: inv.operationFrom || "", waitingOperation: !!inv.waitingOperation,
-      allocations: idx.map(i => inv.allocations[i]), due: inv.due, ownAllocations: idx.map(i => inv.ownAllocations[i]), feeAllocations: idx.map(i => inv.feeAllocations[i]), ownDue: idx.reduce((s, i) => s + inv.ownAllocations[i], 0), feeDue: idx.reduce((s, i) => s + inv.feeAllocations[i], 0), quotaValue: n0(inv.quotaValue) || net.quotaValue,
+      allocations: idx.map(i => inv.allocations[i]), due: inv.due, quotaValue: n0(inv.quotaValue) || net.quotaValue,
       investment: inv.investment, returnRate: inv.returnRate, annualized: inv.annualized, paybackYears: inv.paybackYears }));
-    const totalAllocated = investors.reduce((s, i) => s + i.due, 0);
+    // A taxa da desenvolvedora sai do pool como os repasses: entra na conferência.
+    const developerFee = months.reduce((s, m) => s + n0(m.developerFee), 0);
+    const totalAllocated = investors.reduce((s, i) => s + i.due, 0) + developerFee;
     const totalPool = months.filter(m => m.eligibleQuotas > 0).reduce((s, m) => s + m.investorPool, 0);
-    return { engine: "v2", valid: Math.abs(totalAllocated - totalPool) < 0.02, totalAllocated, totalPool, months, investors, founderPct: net.founderPct,
+    return { engine: "v2", valid: Math.abs(totalAllocated - totalPool) < 0.02, totalAllocated, totalPool, months, investors, founderPct: net.founderPct, developerFee,
       quotaValue: net.quotaValue, distributionStartMonth: net.distributionStartMonth, taxRatePct: n0(policy.taxRatePct),
       totals: { taxes: months.reduce((s, m) => s + m.taxes, 0), preTax: months.reduce((s, m) => s + m.preTax, 0), result: months.reduce((s, m) => s + m.result, 0) } };
   }
