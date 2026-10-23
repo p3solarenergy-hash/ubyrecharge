@@ -1,0 +1,53 @@
+name: Atualizar frota EV por município
+
+# Mercado EV → Frota por cidade (docs/nova/app/data/frota-ev.json).
+# Toda segunda de manhã confere se a Senatran publicou um mês novo; só grava quando há novidade.
+# Também dá para rodar à mão em Actions → "Atualizar frota EV por município" → Run workflow.
+on:
+  schedule:
+    - cron: "17 9 * * 1" # segunda, 06:17 em Brasília
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Regravar mesmo sem mês novo"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atualizar-frota-ev
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar leitor de planilhas (SheetJS)
+        run: npm install --no-save --prefix "$RUNNER_TEMP/deps" https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+
+      - name: Buscar Senatran e IBGE
+        env:
+          NODE_PATH: ${{ runner.temp }}/deps/node_modules
+          FORCE: ${{ inputs.force && '--force' || '' }}
+        run: node scripts/atualizar_frota_ev.js $FORCE
+
+      - name: Gravar se mudou
+        run: |
+          if git diff --quiet -- docs/nova/app/data/frota-ev.json; then
+            echo "Sem novidade na Senatran."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/nova/app/data/frota-ev.json
+          git commit -m "Dados: frota EV por município (Senatran $(node -p "require('./docs/nova/app/data/frota-ev.json').month"))"
+          git push
