@@ -16,6 +16,30 @@
   const payLink = () => "#/parametros/contas";
   const fmtDay = s => { const [y, m, d] = String(s).split("-"); return `${d}/${m}/${y}`; };
 
+  // Bandeira tarifária da ANEEL pela função uby-dados-publicos (a API da ANEEL não aceita chamada
+  // direta do site). Busca uma vez por sessão; sem a função publicada, o aviso só não aparece.
+  const flags = { list: null, loading: false };
+  function loadFlags() {
+    if (flags.list || flags.loading) return;
+    let sb = null;
+    try { sb = document.getElementById("motorFrame").contentWindow.UBY_SUPABASE?.client?.() || null; } catch (_) {}
+    if (!sb) return;
+    flags.loading = true;
+    sb.functions.invoke("uby-dados-publicos", { body: { action: "bandeira" } })
+      .then(({ data }) => { if (data && data.ok && Array.isArray(data.months)) flags.list = data.months; })
+      .catch(() => {})
+      .finally(() => { flags.loading = false; if (flags.list && location.hash.startsWith("#/avisos")) UBY.rerender(); });
+  }
+  // Mês mais recente publicado pela ANEEL (no fim do mês já sai a bandeira do mês seguinte).
+  function flagItem() {
+    const [cur, prev] = flags.list || [];
+    if (!cur) return null;
+    const per100 = v => `R$ ${(v / 10).toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+    const up = cur.rsPerMWh > 0;
+    return { level: up ? "atencao" : "info", title: `Bandeira tarifária de ${monthName(cur.month)}: ${cur.flag}${up ? ` · +${per100(cur.rsPerMWh)} a cada 100 kWh` : " · sem adicional"}`,
+      detail: `${prev ? `Em ${monthName(prev.month)} foi ${prev.flag}${prev.rsPerMWh > 0 ? ` (+${per100(prev.rsPerMWh)} a cada 100 kWh)` : ""}. ` : ""}Vale para a energia comprada da Copel nos postos. Fonte: ANEEL, dados abertos.` };
+  }
+
   // Contas pagas: lista geral para controle (data, conta, origem, valor), filtrável por mês do pagamento e tipo.
   function paidSection() {
     let p;
@@ -43,6 +67,8 @@
   function render(target) {
     const a = UBY.data("alerts");
     const t = a.totals;
+    loadFlags();
+    const flag = flagItem(), items = flag ? [...a.items, flag] : a.items;
     const bills = a.bills.filter(b => !ui.bucket || b.bucket === ui.bucket);
     const urgentTotal = t.vencida.amount + t.hoje.amount;
     const weekTotal = urgentTotal + t["3dias"].amount + t["7dias"].amount;
@@ -81,7 +107,7 @@
       ${paidSection()}
 
       <section class="section"><div class="section-head"><div><p class="kicker">Operação e fechamentos</p><h2>Outros avisos</h2></div></div>
-        ${a.items.length ? `<div class="list">${a.items.slice().sort((x, y) => ["critico", "atencao", "info"].indexOf(x.level) - ["critico", "atencao", "info"].indexOf(y.level)).map(i => `
+        ${items.length ? `<div class="list">${items.slice().sort((x, y) => ["critico", "atencao", "info"].indexOf(x.level) - ["critico", "atencao", "info"].indexOf(y.level)).map(i => `
           <div class="list-row" style="align-items:center;white-space:normal"><span><span class="badge ${LEVEL[i.level][0]}">${LEVEL[i.level][1]}</span> <strong>${esc(i.title)}</strong>${i.amount ? ` · ${fmt.brl(i.amount)}` : ""}<br><small>${esc(i.detail)}</small></span>
             ${i.link ? `<a class="btn" href="${esc(i.link)}">Abrir →</a>` : ""}</div>`).join("")}</div>`
         : `<div class="note">Sem avisos de operação: importações em dia, carregadores com recargas recentes e fechamentos em ordem.</div>`}

@@ -6,6 +6,8 @@
     ["caixa", "Caixa e documentos"], ["investidores", "Investidores"], ["fechamentos", "Fechamentos arquivados"]];
   const docsCache = new Map();
   const ui = { station: "", reportsFilter: "all" };
+  // CDI e IPCA do Banco Central (app/bcb.js), para comparar com o retorno das cotas.
+  const bcb = { data: null, error: "", loading: false };
   let reports = null, reportsKey = "";
 
   const paybackShort = m => !m || !Number.isFinite(m) ? "—" : m < 12 ? `${UBY.fmt.n1(m)} meses` : `${UBY.fmt.n1(m / 12)} anos`;
@@ -448,7 +450,32 @@
   }
   const groupHead = (g, cols) => `<tr><td colspan="${cols}" style="${g.sep ? "border-top:2px dashed var(--uby-muted);" : ""}padding-top:${g.sep ? 14 : 6}px"><strong style="font-size:12px;letter-spacing:.04em;text-transform:uppercase">${esc(g.title)}</strong> <small style="display:inline;margin-left:6px">${esc(g.note)}</small></td></tr>`;
 
+  function bcbData() {
+    if (!bcb.data && !bcb.loading && !bcb.error && window.UBY_BCB) {
+      bcb.loading = true;
+      window.UBY_BCB.load().then(d => { bcb.data = d; }).catch(err => { bcb.error = err.message || "sem resposta"; })
+        .finally(() => { bcb.loading = false; if (location.hash.startsWith("#/financeiro/investidores")) UBY.rerender(); });
+    }
+    return bcb.data;
+  }
+  // CDI composto nos mesmos meses em que o cotista aparece na tabela (os meses do "Retorno acum.").
+  function cdiCell(i, inv, data) {
+    if (!data || i.waitingOperation) return "—";
+    const cdi = window.UBY_BCB.compound(data.cdi, inv.months.map(m => m.key).filter(k => !i.eligibleFrom || k >= i.eligibleFrom));
+    if (cdi === null) return "—";
+    const diff = i.returnRate * 100 - cdi;
+    return `${fmt.pct(cdi)}<small style="color:${diff >= 0 ? "var(--uby-green)" : "var(--uby-red)"}">cota ${diff >= 0 ? "+" : "−"}${fmt.n1(Math.abs(diff))} p.p.</small>`;
+  }
+  function bcbLine() {
+    const d = bcbData(), B = window.UBY_BCB;
+    if (!B) return "";
+    if (!d) return `<p class="source-line">${bcb.error ? `CDI do Banco Central indisponível agora (${esc(bcb.error)}); a comparação volta quando a API responder.` : "Buscando o CDI e o IPCA no Banco Central…"}</p>`;
+    const mn = k => UBY.state.api.monthName(k), cdi = B.last12(d.cdi), ipca = B.last12(d.ipca);
+    return `<p class="source-line">${cdi ? `CDI 12 meses (${esc(mn(cdi.from))} a ${esc(mn(cdi.to))}): <strong>${fmt.pct(cdi.pct)}</strong>` : ""}${ipca ? ` · IPCA 12 meses (até ${esc(mn(ipca.to))}): <strong>${fmt.pct(ipca.pct)}</strong>` : ""}. A coluna "CDI no período" compõe o CDI dos mesmos meses de cada cotista na tabela; o mês em andamento entra parcial. Fonte: Banco Central (SGS ${B.SERIES.cdi} e ${B.SERIES.ipca}).</p>`;
+  }
+
   function investidores(inv) {
+    const bcbNow = bcbData();
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Rodada 1 · apuração por competência</p><h2>Distribuição por período de aporte</h2><p>Cada mês é dividido só entre as cotas habilitadas no primeiro dia do mês, sem proporcionalidade retroativa.${inv.investors.some(i => i.founder) ? ` Da cota 11 em diante, ${fmt.pct1(inv.founderPct)} do que cada cota recebe vão para a REBP como taxa da desenvolvedora (linha à parte); a rodada 1 recebe o valor cheio por cota.` : ""}</p></div>
           <div class="meta">${inv.valid ? '<span class="badge ok">conferência fecha</span>' : '<span class="badge bad">conferência não fecha</span>'}<br>alocado ${fmt.brl(inv.totalAllocated)} · pool ${fmt.brl(inv.totalPool)}</div></div>
@@ -460,10 +487,10 @@
           <tbody>${inv.months.map(m => `<tr><td><strong>${esc(m.label)}</strong></td><td class="num">${signed(m.preTax ?? m.result)}</td><td class="num">${m.taxes ? fmt.brl(m.taxes) : "—"}<small>${esc(m.taxSource || "")}</small></td><td class="num">${signed(m.result)}</td><td class="num">${m.carryIn < 0 ? signed(m.carryIn) : "—"}</td><td class="num">${fmt.brl(m.legalReserve)}</td><td class="num">${fmt.brl(m.expansionReserve)}</td><td class="num">${fmt.brl(m.investorPool)}</td><td class="num">${m.eligibleQuotas}</td><td class="num">${fmt.brl(m.perQuota)}</td><td class="num">${m.newQuotas ? fmt.brl(m.perNewQuota) : "—"}</td><td class="num">${m.newQuotas ? `${fmt.brl(m.developerFee)}<small>${fmt.pct1(m.founderPct)} de ${m.newQuotas} cota(s) 11+</small>` : "—"}</td>
             <td><span class="badge ${m.status === "pago" || m.status === "paid" ? "ok" : m.status === "aprovado" ? "dc" : "neutral"}">${esc(m.status)}</span></td></tr>`).join("") || `<tr><td colspan="13" class="empty">Sem competências apuradas.</td></tr>`}</tbody></table></div>
       </section>
-      <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Apuração por cotista</h2><p>Cada cotista usa o valor da cota da própria rodada (padrão ${fmt.brl(inv.quotaValue || window.UBY_CONFIG.quotaValueDefault)}); a distribuição por cota é igual para todas${inv.investors.some(i => i.founder) ? `, e as cotas 11+ ficam com ${fmt.pct1(100 - inv.founderPct)} dela` : ""}. Distribuição a partir de ${esc(UBY.state.api.monthName(inv.distributionStartMonth || window.UBY_CONFIG.distributionStartDefault))}. Payback indicativo pelo retorno anualizado.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th class="num">Cotas</th><th class="num">Valor da cota</th><th class="num">Investido</th><th>Início</th>${inv.months.map(m => `<th class="num">${esc(m.label)}</th>`).join("")}<th class="num">Total devido</th><th class="num">Retorno acum.</th><th class="num">Payback</th><th>Situação</th><th></th></tr></thead>
-          <tbody>${investorGroups(inv).map(g => g.head ? groupHead(g, 10 + inv.months.length) : g.fee ? `<tr><td><strong>REBP</strong><small>taxa da desenvolvedora</small></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>${fmt.pct1(inv.founderPct)} das cotas 11+</td>${g.fee.allocations.map(a => `<td class="num">${fmt.brl(a)}</td>`).join("")}<td class="num"><strong>${fmt.brl(g.fee.due)}</strong></td><td class="num">—</td><td class="num">—</td><td></td><td><button class="btn ghost" data-extrato="${esc(UBY.reports.FEE_KEY)}" type="button">Extrato</button></td></tr>` : g.rows.map(i => `<tr><td><strong>${esc(i.name)}</strong></td><td class="num">${i.quotas}</td><td class="num">${fmt.brl(i.quotaValue || inv.quotaValue || window.UBY_CONFIG.quotaValueDefault)}</td><td class="num">${fmt.brl(i.investment)}</td><td>${i.waitingOperation ? "aguardando operação" : esc(i.eligibleFrom ? UBY.state.api.monthName(i.eligibleFrom) : "—")}</td>${i.allocations.map(a => `<td class="num">${fmt.brl(a)}</td>`).join("")}
-            <td class="num"><strong>${fmt.brl(i.due)}</strong></td><td class="num">${fmt.pct(i.returnRate * 100)}</td><td class="num">${i.paybackYears ? `${fmt.n1(i.paybackYears)} anos` : "—"}</td><td>${esc(i.status)}</td><td><button class="btn ghost" data-extrato="${esc(i.name)}" type="button">Extrato</button></td></tr>`).join("")).join("") || `<tr><td colspan="${10 + inv.months.length}" class="empty">Nenhum cotista cadastrado.</td></tr>`}</tbody></table></div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Apuração por cotista</h2><p>Cada cotista usa o valor da cota da própria rodada (padrão ${fmt.brl(inv.quotaValue || window.UBY_CONFIG.quotaValueDefault)}); a distribuição por cota é igual para todas${inv.investors.some(i => i.founder) ? `, e as cotas 11+ ficam com ${fmt.pct1(100 - inv.founderPct)} dela` : ""}. Distribuição a partir de ${esc(UBY.state.api.monthName(inv.distributionStartMonth || window.UBY_CONFIG.distributionStartDefault))}. Payback indicativo pelo retorno anualizado.</p>${bcbLine()}</div></div>
+        <div class="table-wrap"><table><thead><tr><th>Cotista</th><th class="num">Cotas</th><th class="num">Valor da cota</th><th class="num">Investido</th><th>Início</th>${inv.months.map(m => `<th class="num">${esc(m.label)}</th>`).join("")}<th class="num">Total devido</th><th class="num">Retorno acum.</th><th class="num">CDI no período</th><th class="num">Payback</th><th>Situação</th><th></th></tr></thead>
+          <tbody>${investorGroups(inv).map(g => g.head ? groupHead(g, 11 + inv.months.length) : g.fee ? `<tr><td><strong>REBP</strong><small>taxa da desenvolvedora</small></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>${fmt.pct1(inv.founderPct)} das cotas 11+</td>${g.fee.allocations.map(a => `<td class="num">${fmt.brl(a)}</td>`).join("")}<td class="num"><strong>${fmt.brl(g.fee.due)}</strong></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td></td><td><button class="btn ghost" data-extrato="${esc(UBY.reports.FEE_KEY)}" type="button">Extrato</button></td></tr>` : g.rows.map(i => `<tr><td><strong>${esc(i.name)}</strong></td><td class="num">${i.quotas}</td><td class="num">${fmt.brl(i.quotaValue || inv.quotaValue || window.UBY_CONFIG.quotaValueDefault)}</td><td class="num">${fmt.brl(i.investment)}</td><td>${i.waitingOperation ? "aguardando operação" : esc(i.eligibleFrom ? UBY.state.api.monthName(i.eligibleFrom) : "—")}</td>${i.allocations.map(a => `<td class="num">${fmt.brl(a)}</td>`).join("")}
+            <td class="num"><strong>${fmt.brl(i.due)}</strong></td><td class="num">${fmt.pct(i.returnRate * 100)}</td><td class="num">${cdiCell(i, inv, bcbNow)}</td><td class="num">${i.paybackYears ? `${fmt.n1(i.paybackYears)} anos` : "—"}</td><td>${esc(i.status)}</td><td><button class="btn ghost" data-extrato="${esc(i.name)}" type="button">Extrato</button></td></tr>`).join("")).join("") || `<tr><td colspan="${11 + inv.months.length}" class="empty">Nenhum cotista cadastrado.</td></tr>`}</tbody></table></div>
       </section>`;
   }
 

@@ -9,7 +9,7 @@
 
   const GROUPS = [
     { title: "Rede de recargas", items: [
-      { t: "Planilhas de recargas", d: "Spott (lista-de-transacoes .csv), Move (relatorio-recargas .xlsx) e Go Grid. Escolha a obra e o mês e carregue o arquivo. A importação elimina duplicadas e guarda histórico para desfazer.", freq: "diário ou semanal", route: "#/importar", where: "Importar planilhas" },
+      { t: "Planilhas de recargas", d: "Spott (lista-de-transacoes .csv), Move (relatorio-recargas .xlsx, ou “Buscar recargas da Move” direto pela API, sem baixar arquivo) e Go Grid. Escolha a obra e o mês e carregue o arquivo. A importação elimina duplicadas e guarda histórico para desfazer.", freq: "diário ou semanal", route: "#/importar", where: "Importar planilhas" },
       { t: "Cadastro geral de clientes", d: "Planilha de clientes exportada da plataforma de recarga (.csv/.xlsx). Só clientes novos são enviados; os existentes ficam preservados.", freq: "mensal", route: "#/importar", where: "Importar planilhas · cadastro de clientes" },
       { t: "Carregadores na operação UBY", d: "Marca quais carregadores entram na operação UBY (resultado, rateio da matriz e cotistas).", freq: "quando um ponto entra ou sai", route: P("operacao"), where: "Parâmetros e custos · Operação e carregadores" },
       { t: "Horário e disponibilidade das estações", d: "Base do cálculo de ocupação: dias e horas de funcionamento, início da operação e conectores.", freq: "quando mudar o funcionamento", route: P("operacao"), where: "Parâmetros e custos · Operação e carregadores · Horários e cortesia" },

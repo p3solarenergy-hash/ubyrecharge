@@ -201,10 +201,12 @@
       const local = rd.local(r);
       const mk = w.monthKey(rd.date(r));
       const k = local + "\u0000" + mk;
-      if (!byKey.has(k)) byKey.set(k, { local, month: mk, rows: [], ids: new Set(), charges: 0, energy: 0, revenue: 0, uEnergy: 0, uRevenue: 0 });
+      if (!byKey.has(k)) byKey.set(k, { local, month: mk, rows: [], ids: new Set(), starts: new Map(), charges: 0, energy: 0, revenue: 0, uEnergy: 0, uRevenue: 0 });
       const g = byKey.get(k);
       g.rows.push(r); g.charges++;
       const rowId = rd.id(r), kwh = rd.kwh(r), brl = rd.brl(r);
+      // Move: início de cada Recarga(ID), para a conferência de fuso da busca pela API.
+      if (rd.platform === "Move") g.starts.set(rowId, rd.date(r)?.getTime() || 0);
       g.energy += kwh; g.revenue += brl;
       if (!g.ids.has(rowId)) { g.ids.add(rowId); g.uEnergy += kwh; g.uRevenue += brl; }
     }
@@ -212,7 +214,7 @@
     let groups = [...byKey.values()];
     groups.filter(g => g.month === "unknown").forEach(u => {
       const same = groups.filter(g => g.local === u.local && g.month !== "unknown");
-      if (same.length === 1) { const t = same[0]; t.rows.push(...u.rows); u.ids.forEach(x => t.ids.add(x)); t.charges += u.charges; t.energy += u.energy; t.revenue += u.revenue; t.uEnergy += u.uEnergy; t.uRevenue += u.uRevenue; u.merged = true; }
+      if (same.length === 1) { const t = same[0]; t.rows.push(...u.rows); u.ids.forEach(x => t.ids.add(x)); u.starts.forEach((v, x) => t.starts.set(x, v)); t.charges += u.charges; t.energy += u.energy; t.revenue += u.revenue; t.uEnergy += u.uEnergy; t.uRevenue += u.uRevenue; u.merged = true; }
     });
     groups = groups.filter(g => !g.merged);
     if (!groups.length) return { file: file.name, error: "planilha sem recargas." };
@@ -231,12 +233,55 @@
             { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         }
         return { source: file.name, platform: rd.platform, local: g.local, month: g.month === "unknown" ? "" : g.month, charges: g.charges, unique: g.ids.size, uEnergy: g.uEnergy, uRevenue: g.uRevenue,
-          energy: g.energy, revenue: g.revenue, ...routeLocal(w, g.local, hist, works), part, status: "pronto", msg: "" };
+          energy: g.energy, revenue: g.revenue, starts: g.starts, ...routeLocal(w, g.local, hist, works), part, status: "pronto", msg: "" };
       })
     };
   }
 
   const monthName = mk => { const [y, m] = mk.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(". de ", "/").replace(" de ", "/"); };
+
+  // ---- Move pela API -------------------------------------------------------
+  // A função uby-move do Supabase baixa da Move o relatório de recargas do mês (o mesmo
+  // .xlsx do painel da Move) e ele entra na importação automática como se fosse arrastado.
+  const spMonth = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+  ui.move = { month: spMonth(), busy: false, status: null };
+
+  async function moveCall(w, action, extra) {
+    const sb = w.UBY_SUPABASE_CLIENT;
+    if (!sb) throw new Error("O banco ainda não conectou. Espere a tela carregar e tente de novo.");
+    const { data, error } = await sb.functions.invoke("uby-move", { body: { action, ...extra } });
+    if (error) {
+      let msg = "";
+      try { const b = await error.context.json(); msg = (b && b.error) || ""; } catch (_) {}
+      if (!msg && (error.context?.status === 404 || /failed to send/i.test(error.message))) msg = "a função uby-move ainda não foi publicada no Supabase.";
+      throw new Error(msg || error.message);
+    }
+    if (data && data.ok === false) throw new Error(data.error || "Não deu certo.");
+    return data || {};
+  }
+
+  // Recarga(ID) que já está na base com outro horário de início = a API veio em outro fuso.
+  // O motor reconhece recarga repetida pelo horário de início: gravar assim duplicaria tudo.
+  function moveTimeClash(w, g) {
+    const base = new Map();
+    (w.eval("allCharges") || []).forEach(c => { const id = String(c.id ?? "").trim(); if (id) base.set(id, c); });
+    let n = 0, hours = 0;
+    (g.starts || new Map()).forEach((ms, id) => {
+      const c = base.get(String(id).trim());
+      if (!c || !ms) return;
+      const d = typeof c.startDate?.getTime === "function" ? c.startDate : c.startIso ? new Date(c.startIso) : w.parseDate(c.startStr);
+      const t = d ? d.getTime() : NaN;
+      if (Number.isFinite(t) && Math.abs(ms - t) >= 60000) { n++; hours = hours || (ms - t) / 3600000; }
+    });
+    return n ? `A API da Move trouxe ${n} recarga(s) que já estão na base com outro horário de início (${hours > 0 ? "+" : ""}${fmt.n1(hours)} h). Nada foi gravado, para não duplicar: o fuso da busca precisa de ajuste.` : "";
+  }
+
+  function moveStateText() {
+    const s = ui.move.status;
+    if (!s) return "conferindo a conexão…";
+    if (s.error) return `indisponível: ${s.error}`;
+    return s.configured ? `conectada (${s.host})` : `falta configurar no Supabase: ${(s.missing || []).join(", ") || "MOVE_API_BASE_URL"}`;
+  }
 
   // Estado legível pelo robô (sem os arquivos): window.UBY_SPOTT_STATE.
   // Registra a rodada no histórico de auditoria (app_audit_log, liberado na importação),
@@ -283,11 +328,17 @@
         <td>${g.status === "pronto" ? `<button class="btn" data-auto-skip="${i}" title="Não importar esta linha">✕</button>` : ""}</td></tr>`).join("");
     return `<section class="section" style="margin-bottom:18px">
       <div class="section-head"><div><p class="kicker">Automático · Spott e Move</p><h2>Importação automática (Spott e Move)</h2>
-        <p>Arraste de uma vez as listas de transações da Spott (um arquivo por local ou um com todos) e o relatório de recargas da Move (um arquivo com todas as estações). A plataforma separa por Local/Estação e mês, identifica a obra de cada um, mostra o resumo e importa tudo em "Consolidar" (sem duplicar recargas).</p></div></div>
+        <p>Arraste de uma vez as listas de transações da Spott (um arquivo por local ou um com todos) e o relatório de recargas da Move (um arquivo com todas as estações), ou busque o mês da Move direto pela API. A plataforma separa por Local/Estação e mês, identifica a obra de cada um, mostra o resumo e importa tudo em "Consolidar" (sem duplicar recargas).</p></div></div>
       <label id="autoDrop" style="display:grid;place-items:center;gap:6px;padding:26px 16px;border:2px dashed var(--uby-green);border-radius:12px;background:var(--uby-surface-soft);cursor:pointer;text-align:center;${a.running ? "opacity:.5;pointer-events:none" : ""}">
         <span style="font-size:24px">⇪</span><strong>Arraste aqui os arquivos da Spott e da Move</strong><small>.xlsx, .xls ou .csv · pode soltar vários de uma vez</small>
         <input type="file" id="autoFile" accept=".xlsx,.xls,.csv" multiple hidden>
       </label>
+      <div class="toolbar" style="margin-top:10px;gap:8px;flex-wrap:wrap;align-items:center">
+        <strong style="font-size:12px">Ou direto da Move, sem baixar arquivo:</strong>
+        <input class="select" type="month" id="moveMonth" value="${esc(ui.move.month)}" max="${esc(spMonth())}" ${a.running || ui.move.busy ? "disabled" : ""}>
+        <button class="btn" id="moveFetch" ${a.running || ui.move.busy || ui.move.status?.configured === false ? "disabled" : ""}>${ui.move.busy ? "Buscando na Move…" : "Buscar recargas da Move"}</button>
+        <small id="moveState" style="color:var(--uby-muted)">API da Move: ${esc(moveStateText())}</small>
+      </div>
       ${a.errors.map(e => `<div class="note" style="margin-top:10px">${esc(e)}</div>`).join("")}
       ${a.groups.length ? `<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Local / Estação</th><th>Obra</th><th>Mês</th><th class="num">Recargas</th><th class="num">Energia</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
@@ -442,7 +493,8 @@
 
     // Importação automática Spott
     const a = ui.auto, adrop = $("#autoDrop"), label = id => works.find(x => x.id === id)?.label || id;
-    const addSpott = async fileList => {
+    // opts.month: só as recargas desse mês (a busca da Move pela API pega um dia a mais de cada lado).
+    const addSpott = async (fileList, opts = {}) => {
       const arr = [...fileList].filter(isSheetFile);
       if (!arr.length) { a.errors = [`Arquivo não reconhecido (${[...fileList].map(f => f.name).join(", ")}). Envie a planilha .xlsx, .xls ou .csv exportada da Spott ou da Move.`]; draw(target, w, works); return; }
       a.errors = [];
@@ -451,8 +503,11 @@
       for (const f of arr) {
         try {
           const r = await analyzeSpott(w, f, works, hist);
-          if (r.error) a.errors.push(`${f.name}: ${r.error}`);
-          else a.groups.push(...r.groups);
+          if (r.error) { a.errors.push(`${f.name}: ${r.error}`); continue; }
+          const groups = opts.month ? r.groups.filter(g => g.month === opts.month) : r.groups;
+          if (!groups.length) a.errors.push(`${f.name}: nenhuma recarga em ${monthName(opts.month)}.`);
+          groups.forEach(g => { g.api = !!opts.api; });
+          a.groups.push(...groups);
         } catch (err) { a.errors.push(`${f.name}: ${err.message}`); }
       }
       a.groups.sort((x, y) => String(x.workId).localeCompare(String(y.workId)) || String(x.month).localeCompare(String(y.month)));
@@ -460,6 +515,35 @@
       draw(target, w, works);
     };
     $("#autoFile").onchange = e => addSpott(e.target.files);
+    $("#moveMonth").onchange = e => { ui.move.month = e.target.value; };
+    $("#moveFetch").onclick = async e => {
+      const mk = ui.move.month, btn = e.currentTarget;
+      if (!/^\d{4}-\d{2}$/.test(mk)) { a.errors = ["Escolha o mês para buscar na Move."]; draw(target, w, works); return; }
+      if (a.groups.some(g => g.api && g.month === mk && g.status === "pronto")) { a.errors = [`As recargas da Move de ${monthName(mk)} já estão na lista abaixo.`]; draw(target, w, works); return; }
+      ui.move.busy = true; a.errors = [];
+      btn.disabled = true; btn.textContent = "Buscando na Move…";
+      try {
+        const r = await moveCall(w, "report", { month: mk });
+        const bin = Uint8Array.from(atob(r.file || ""), ch => ch.charCodeAt(0));
+        const file = new File([bin], r.filename || `relatorio-recargas-move-api-${mk}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        ui.move.busy = false;
+        await addSpott([file], { month: mk, api: true });
+        return;
+      } catch (err) { a.errors = [`API da Move: ${err.message}`]; }
+      ui.move.busy = false;
+      if (location.hash.startsWith("#/importar")) draw(target, w, works);
+    };
+    // Conexão com a Move: consulta uma vez por sessão e só atualiza a linha da Move (sem redesenhar a tela).
+    if (!ui.move.status && !ui.move.checking) {
+      ui.move.checking = true;
+      moveCall(w, "status").then(s => { ui.move.status = s; }).catch(err => { ui.move.status = { error: err.message }; })
+        .finally(() => {
+          ui.move.checking = false;
+          const st = document.getElementById("moveState"), btn = document.getElementById("moveFetch");
+          if (st) st.textContent = `API da Move: ${moveStateText()}`;
+          if (btn && ui.move.status?.configured === false) btn.disabled = true;
+        });
+    }
     adrop.ondragover = e => { e.preventDefault(); adrop.style.background = "var(--uby-green-soft)"; };
     adrop.ondragleave = () => { adrop.style.background = ""; };
     adrop.ondrop = e => { e.preventDefault(); adrop.style.background = ""; addSpott(e.dataTransfer.files); };
@@ -492,6 +576,8 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
         try {
           await selectWork(w, g.workId);
           ui.work = g.workId; w.__novaWorkLoaded = true;
+          const clash = g.api ? moveTimeClash(w, g) : "";
+          if (clash) { g.status = "erro"; g.msg = clash; log(`${g.platform} ${g.local} ${g.month} → ${clash}`, "bad"); continue; }
           // Sem novidade: a obra já tem exatamente estas recargas (quantidade, kWh e R$)
           // deste Local no mês. Não grava de novo (cada gravação guarda um backup da base).
           const k0 = localKey(w, g.local);
