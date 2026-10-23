@@ -1123,27 +1123,49 @@
       const months = [...new Set((row.charges || []).map(chargeMonthKey).filter(isPlausibleMonthKey))].sort();
       let mk = months.at(-1) || "";
       if (mk === curMk && months.length > 1 && asOfDate.getDate() < 28) mk = months.at(-2);
-      let s = null;
-      try { s = stationFinance(row.workId, row.station, mk); } catch (_) {}
-      const f = s?.finance;
+      // Mês de inauguração é incompleto (ex.: Aurora AC set/2026, 54 recargas): usa o mês atual projetado no
+      // ritmo de agora (usuário, 23/10/2026: "a ocupação do AC do Aurora não é essa").
+      const firstT = mine.filter(x => x.valid).reduce((m, x) => Math.min(m, x.t), Infinity);
+      const firstDay = new Date(firstT);
+      const firstMk = `${firstDay.getFullYear()}-${pad(firstDay.getMonth() + 1)}`;
+      if (mk === firstMk && mk !== curMk && months.includes(curMk)) mk = curMk;
+      const projected = mk === curMk;
+      // Custos reais: motor oficial (v2, o dos relatórios) — energia por fatura/estimativa, área, gestão,
+      // plataforma, custos fixos e da matriz. Imposto central (sobre o recebido pela UBY) entra à parte.
+      const fvRow = (FV2.rows || []).find(r => String(r.workId) === String(row.workId) && normalizeStationForCompare(r.stationName || r.station) === normalizeStationForCompare(row.station));
+      let f = null;
+      try { f = fvRow ? fv2Month(fvRow, mk, ON()) : null; } catch (_) {}
       if (!f || !(f.energy > 0) || !(f.revenue > 0)) return null;
       const ageDays = (asOf - mine.reduce((m, x) => Math.min(m, x.t), Infinity)) / 86400000;
       const power = Number(workPowerById(row.workId) || 0);
-      // capacidade do mês = potência × horas disponíveis (mesma conta da ocupação do Comando/Análise de uso)
+      // capacidade = potência × horas disponíveis, contando só desde a primeira recarga (mês de inauguração);
+      // no mês atual, a ocupação é a de até agora e o volume é projetado para o mês inteiro no mesmo ritmo.
       const [cy, cm] = mk.split("-").map(Number);
-      let capacityKwh = 0;
-      try { capacityKwh = power * stationAvailableHours(stationAvailabilityFor(row.workId, row.station, row.workName), new Date(cy, cm - 1, 1), new Date(cy, cm, 1)); } catch (_) {}
+      const mStart = new Date(cy, cm - 1, 1), mEnd = new Date(cy, cm, 1);
+      const from = firstT > mStart.getTime() ? new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate()) : mStart;
+      const avail = stationAvailabilityFor(row.workId, row.station, row.workName);
+      let hoursFull = 0, hoursSoFar = 0;
+      try { hoursFull = stationAvailableHours(avail, from, mEnd); hoursSoFar = projected ? stationAvailableHours(avail, from, new Date(Math.min(asOf, mEnd.getTime()))) : hoursFull; } catch (_) {}
+      const factor = projected && hoursSoFar > 0 && hoursFull > hoursSoFar ? hoursFull / hoursSoFar : 1;
+      const capacityKwh = power * hoursFull;
+      const own = ["uby", "hybrid"].includes(f.operationModel);
+      const taxRate = own ? taxRateFor(mk) / 100 : 0;
+      const taxCost = taxRate * Math.max(0, f.revenue - f.platform - f.management);
+      const variablePct = (f.areaParticipation + f.platform + f.management + f.ubyRoyalty + f.taxes + taxCost) / f.revenue;
+      const fixedMonth = Number(f.matrizCost || 0) + Number(f.localExtraCosts || 0) + Number(f.matrizTaxCost || 0);
+      const kwhMonth = f.energy * factor, revMonth = f.revenue * factor;
+      const netMonth = revMonth * (1 - variablePct) - f.energyCost / f.energy * kwhMonth - fixedMonth;
       const profiles = core.customerProfiles(mine, asOf);
       const freq = profiles.filter(p => p.n >= core.DEFAULTS.frequentSessions);
       const sum = k => freq.reduce((t, p) => t + p[k], 0);
       return {
-        site: abbreviatedStationLabel(row.station), ref, workId: row.workId, station: row.station, kind: row.kind, power, capacityKwh, model: s.modelLabel || "",
-        month: mk, monthLabel: monthLabel(mk), ageDays: Math.round(ageDays), short: ageDays < 56,
-        params: { kwh: f.energy, price: f.revenue / f.energy, listNow: core.listPrice(mine, asOf) || f.revenue / f.energy,
-          energyPerKwh: f.energyCost / f.energy, pctCost: (f.areaParticipation + f.platform + f.management + f.ubyRoyalty + f.taxes) / f.revenue,
-          fixedMonth: Number(f.matrizCost || 0) + Number(f.localExtraCosts || 0) + Number(f.matrizTaxCost || 0) },
-        result: { operationNet: f.operationNet, margin: f.operationMargin },
-        costParts: { area: f.areaParticipation / f.revenue, platform: f.platform / f.revenue, management: f.management / f.revenue, tax: f.taxes / f.revenue },
+        site: abbreviatedStationLabel(row.station), ref, workId: row.workId, station: row.station, kind: row.kind, power, capacityKwh, model: operationModelLabel(f.operationModel),
+        month: mk, monthLabel: projected ? `${monthLabel(mk)} projetado (ritmo até ${pad(asOfDate.getDate())}/${pad(asOfDate.getMonth() + 1)})` : monthLabel(mk),
+        projected, factor, ageDays: Math.round(ageDays), short: ageDays < 56,
+        params: { kwh: kwhMonth, price: f.revenue / f.energy, listNow: core.listPrice(mine, asOf) || f.revenue / f.energy,
+          energyPerKwh: f.energyCost / f.energy, pctCost: variablePct, fixedMonth },
+        result: { operationNet: netMonth, margin: revMonth ? netMonth / revMonth * 100 : 0 },
+        costParts: { area: f.areaParticipation / f.revenue, platform: f.platform / f.revenue, management: f.management / f.revenue, tax: (f.taxes + taxCost) / f.revenue, taxRatePct: taxRate * 100 },
         ladder: core.priceLadder(mine.filter(x => asOf - x.t < 90 * 86400000)),
         profile: core.loadProfile(mine, asOf, power, 56),
         freq: { clients: freq.length, active: freq.filter(p => p.n30 > 0).length, kwh30: sum("kwh30"), rev30: sum("rev30"), kwhP30: sum("kwhP30"), price30: sum("kwh30") ? sum("rev30") / sum("kwh30") : 0 }
