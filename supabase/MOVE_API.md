@@ -2,9 +2,8 @@
 
 Na tela **Importar planilhas**, o botão **Buscar recargas da Move** traz o relatório de recargas do mês direto da Move, sem baixar arquivo. O relatório entra na **Importação automática (Spott e Move)** como se o arquivo tivesse sido arrastado: o mesmo leitor separa por estação e mês, acha a obra de cada estação, elimina duplicadas e guarda histórico para desfazer.
 
-Junto entraram dois índices públicos:
+Junto entrou um índice público:
 
-- **CDI e IPCA (Banco Central)** em **Financeiro → Investidores**: coluna "CDI no período" (o CDI dos mesmos meses de cada cotista, para comparar com o "Retorno acum.") e o CDI/IPCA dos últimos 12 meses. O navegador busca direto na API do Banco Central; não precisa de função nem de chave.
 - **Bandeira tarifária (ANEEL)** em **Avisos → Outros avisos**: a bandeira do mês mais recente publicado e o adicional por 100 kWh. A API da ANEEL não aceita chamada direta do site, então passa pela função `uby-dados-publicos`.
 
 ## Peças
@@ -14,7 +13,6 @@ Junto entraram dois índices públicos:
   - `report`: faz login na Move e baixa o relatório oficial de recargas (`POST /api/v1/report/xlsx/transactions`) do mês pedido.
 - `supabase/functions/uby-dados-publicos/index.ts`: ação `bandeira` (ANEEL, dados abertos).
 - `docs/nova/app/views/importar.js`: botão e conferências da busca da Move.
-- `docs/nova/app/bcb.js` e `docs/nova/app/views/financeiro.js`: CDI e IPCA.
 - `docs/nova/app/views/avisos.js`: aviso da bandeira tarifária.
 
 ## Publicar
@@ -66,4 +64,3 @@ Depois disso, use no mês em andamento quantas vezes quiser: o modo é sempre "C
 - **"A conta da Move pede verificação em duas etapas"**: peça à Move um usuário só para a API, sem essa verificação.
 - **"A Move retornou HTTP 403/404 no relatório de recargas"**: o usuário não tem permissão de relatórios, ou o endereço de `MOVE_API_BASE_URL` não é o da API.
 - **"não reconheci como relatório da Spott nem da Move"**: a planilha da API veio com colunas diferentes da baixada no painel. Mande o arquivo para ajustarmos o leitor.
-- **CDI não aparece em Investidores**: a API do Banco Central não respondeu; a tela mostra o aviso e tenta de novo na próxima abertura.
