@@ -35,6 +35,7 @@
     ["Estudos de preço", "#/precos", "preco tarifa kwh concorrencia reajuste cupom", "Rede"],
     ["Clube UBY (parceiros e cupons)", "#/clube", "clube parceiros cupom desconto beneficio qr", "Clientes"],
     ["Obras e pendências", "#/obras", "obra obras implantacao pendencia prazo", "Obras"],
+    ["Mercado EV · eletrificados por cidade", "#/mercado/pfrota", "eletrificados eletricos plug-in hibridos frota carros cidade municipio senatran ibge prospeccao expansao", "Obras"],
     ["Backups e restauração", "#/backups", "backup restaurar versao historico", "Dados"]
   ];
 
