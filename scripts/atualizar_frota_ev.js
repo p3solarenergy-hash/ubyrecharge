@@ -1,4 +1,5 @@
-// Frota de veículos elétricos por município (Mercado EV · Frota por cidade).
+// Eletrificados por município (Mercado EV · Eletrificados por cidade). Só elétricos, plug-in e
+// híbridos: a frota a combustão não entra no arquivo.
 // Junta duas fontes públicas e grava docs/nova/app/data/frota-ev.json:
 //  - Senatran (RENAVAM): "Frota por UF, Município e Combustível", planilha mensal. Usa o mês mais
 //    recente publicado e o mesmo mês do ano anterior (crescimento em 12 meses);
@@ -79,7 +80,7 @@ async function discover() {
   return { month, url: files.get(month), prevMonth: files.has(prevMonth) ? prevMonth : '', prevUrl: files.get(prevMonth) || '' };
 }
 
-// Planilha → Map("UF|MUNICÍPIO") com { uf, city, total, bev, phev, hybrid }.
+// Planilha → Map("UF|MUNICÍPIO") com { uf, city, bev, phev, hybrid } (todo município, mesmo sem eletrificados).
 function readFleet(buffer) {
   const XLSX = require('xlsx');
   const wb = XLSX.read(buffer, { type: 'buffer' });
@@ -104,13 +105,12 @@ function readFleet(buffer) {
       continue;
     }
     const key = `${uf}|${city}`;
-    const c = out.get(key) || { uf, city, total: 0, bev: 0, phev: 0, hybrid: 0 };
+    const c = out.get(key) || { uf, city, bev: 0, phev: 0, hybrid: 0 };
     const fuel = norm(r[cFuel]);
-    c.total += qty;
     for (const k of Object.keys(sets)) if (sets[k].has(fuel)) c[k] += qty;
     out.set(key, c);
   }
-  if (unknownUf) console.warn(`${unknownUf} veículos sem UF/município (${unknownPlugin} plug-in) ficam só no total "sem município".`);
+  if (unknownUf) console.warn(`${unknownPlugin} plug-in sem UF/município na planilha: ficam só no total do Brasil.`);
   out.unassignedPlugin = unknownPlugin;
   return out;
 }
@@ -155,9 +155,9 @@ async function main() {
     const p = pop.find(c.uf, c.city);
     if (!p) unmatched.push(key);
     const before = prev.get(key);
-    rows.push([c.uf, p ? p.name : c.city, p ? p.ibge : 0, p ? p.pop : 0, c.total, c.bev, c.phev, c.hybrid, before ? before.bev + before.phev : null]);
+    rows.push([c.uf, p ? p.name : c.city, p ? p.ibge : 0, p ? p.pop : 0, c.bev, c.phev, c.hybrid, before ? before.bev + before.phev : null, before ? before.hybrid : null]);
   });
-  rows.sort((a, b) => a[0].localeCompare(b[0]) || (b[5] + b[6]) - (a[5] + a[6]) || a[1].localeCompare(b[1], 'pt-BR'));
+  rows.sort((a, b) => a[0].localeCompare(b[0]) || (b[4] + b[5]) - (a[4] + a[5]) || a[1].localeCompare(b[1], 'pt-BR'));
   if (rows.length < 5000) throw new Error(`Só ${rows.length} municípios lidos: a planilha da Senatran mudou de formato.`);
   if (unmatched.length) console.warn(`${unmatched.length} município(s) sem população do IBGE: ${unmatched.slice(0, 15).join(', ')}${unmatched.length > 15 ? '…' : ''}`);
 
@@ -174,12 +174,12 @@ async function main() {
     // Plug-in de veículos sem UF/município na Senatran (frotas sem endereço): entram só no total do Brasil.
     unassignedPlugin: now.unassignedPlugin || 0,
     unassignedPluginPrev: src.prevUrl ? prev.unassignedPlugin || 0 : null,
-    columns: ['uf', 'city', 'ibge', 'pop', 'total', 'bev', 'phev', 'hybrid', 'pluginPrev'],
+    columns: ['uf', 'city', 'ibge', 'pop', 'bev', 'phev', 'hybrid', 'pluginPrev', 'hybridPrev'],
     rows
   };
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(data) + '\n');
-  const plug = rows.reduce((s, r) => s + r[5] + r[6], 0);
+  const plug = rows.reduce((s, r) => s + r[4] + r[5], 0);
   console.log(`Gravado ${path.relative(process.cwd(), OUT)}: ${rows.length} municípios, ${plug} plug-in no Brasil.`);
 }
 

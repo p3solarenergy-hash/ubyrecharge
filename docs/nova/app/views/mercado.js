@@ -5,9 +5,9 @@
   const SRC = "legado/obra-ev/mercado.html";
   const ui = { tab: "p2026", uf: "PR", sort: "eletropostos", fUf: "PR", fSort: "plug", fq: "" };
   let data = null, error = null, loading = false;
-  // Aba própria (não vem da página original): frota por município, de app/data/frota-ev.json
+  // Aba própria (não vem da página original): eletrificados por município, de app/data/frota-ev.json
   // (Senatran + IBGE, atualizado pelo scripts/atualizar_frota_ev.js).
-  const FROTA = { id: "pfrota", label: "🚗 Frota por cidade" };
+  const FROTA = { id: "pfrota", label: "🔌 Eletrificados por cidade" };
   const frota = { data: null, error: "", loading: false };
 
   // Executa dentro da página original e devolve só dados (texto e números).
@@ -115,55 +115,60 @@
   }
 
   const plugOf = c => c.bev + c.phev;
+  const elecOf = c => c.bev + c.phev + c.hybrid;
+  const elecPrev = c => c.pluginPrev === null ? null : c.pluginPrev + (c.hybridPrev || 0);
   // Crescimento em 12 meses só com base mínima (cidade com 2 → 6 carros não é "+200%" que interesse).
-  const growthOf = c => c.pluginPrev >= 20 ? (plugOf(c) / c.pluginPrev - 1) * 100 : null;
-  const perMil = c => c.total >= 1000 ? plugOf(c) / c.total * 1000 : null;
+  const pct12 = (now, before) => before >= 20 ? (now / before - 1) * 100 : null;
+  const growthOf = c => pct12(plugOf(c), c.pluginPrev);
   const per10k = c => c.pop >= 5000 ? plugOf(c) / c.pop * 10000 : null;
-  const FSORT = [["plug", "Mais carros plug-in", plugOf], ["growth", "Mais crescimento em 12 meses", growthOf], ["share", "Mais plug-in por mil veículos", perMil], ["capita", "Mais plug-in por 10 mil habitantes", per10k]];
+  const FSORT = [["plug", "Mais carros plug-in", plugOf], ["elec", "Mais eletrificados", elecOf], ["growth", "Plug-in que mais cresce (12 meses)", growthOf], ["capita", "Mais plug-in por 10 mil habitantes", per10k]];
   const monthLong = mk => { const [y, m] = String(mk).split("-").map(Number); return y ? new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : "—"; };
-  const growthCell = c => { const g = growthOf(c); return g === null ? (c.pluginPrev ? `<small>${fmt.int(c.pluginPrev)} há 12 meses</small>` : "—") : `<strong style="color:${g >= 0 ? "var(--uby-green)" : "var(--uby-red)"}">${g >= 0 ? "+" : ""}${fmt.pct1(g)}</strong><small>${fmt.int(c.pluginPrev)} há 12 meses</small>`; };
+  const signedPct = g => `<strong style="color:${g >= 0 ? "var(--uby-green)" : "var(--uby-red)"}">${g >= 0 ? "+" : ""}${fmt.pct1(g)}</strong>`;
+  const growthCell = c => { const g = growthOf(c); return g === null ? (c.pluginPrev ? `<small>${fmt.int(c.pluginPrev)} há 12 meses</small>` : "—") : `${signedPct(g)}<small>${fmt.int(c.pluginPrev)} há 12 meses</small>`; };
 
   function frotaRows() {
     const f = frota.data, sort = FSORT.find(x => x[0] === ui.fSort) || FSORT[0];
     const term = ui.fq.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const list = f.list.filter(c => c.uf === ui.fUf && (!term || c.city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(term)))
       .sort((a, b) => (sort[2](b) ?? -1) - (sort[2](a) ?? -1) || plugOf(b) - plugOf(a));
-    return list.map((c, i) => `<tr><td class="num"><small>${i + 1}</small></td><td><strong>${esc(c.city)}</strong></td><td class="num">${c.pop ? fmt.int(c.pop) : "—"}</td>
+    return list.map((c, i) => { const ge = pct12(elecOf(c), elecPrev(c)); return `<tr><td class="num"><small>${i + 1}</small></td><td><strong>${esc(c.city)}</strong></td><td class="num">${c.pop ? fmt.int(c.pop) : "—"}</td>
+      <td class="num"><strong>${fmt.int(elecOf(c))}</strong>${ge === null ? "" : `<small>${ge >= 0 ? "+" : ""}${fmt.pct1(ge)} em 12 meses</small>`}</td>
       <td class="num"><strong>${fmt.int(plugOf(c))}</strong><small>${fmt.int(c.bev)} elétricos + ${fmt.int(c.phev)} híbridos plug-in</small></td><td class="num">${growthCell(c)}</td>
-      <td class="num">${perMil(c) === null ? "—" : fmt.n1(perMil(c))}</td><td class="num">${per10k(c) === null ? "—" : fmt.n1(per10k(c))}</td><td class="num">${fmt.int(c.hybrid)}</td><td class="num">${fmt.int(c.total)}</td></tr>`).join("")
-      || `<tr><td colspan="9" class="empty">Nenhum município encontrado.</td></tr>`;
+      <td class="num">${per10k(c) === null ? "—" : fmt.n1(per10k(c))}</td><td class="num">${fmt.int(c.hybrid)}</td></tr>`; }).join("")
+      || `<tr><td colspan="8" class="empty">Nenhum município encontrado.</td></tr>`;
   }
 
   function frotaHtml(target) {
     loadFrota(target);
-    if (!frota.data) return frota.error ? `<div class="note">Não foi possível carregar a frota por cidade (${esc(frota.error)}).</div>` : `<div class="loading"><div class="spinner"></div><h2>Carregando a frota por município</h2></div>`;
+    if (!frota.data) return frota.error ? `<div class="note">Não foi possível carregar os eletrificados por cidade (${esc(frota.error)}).</div>` : `<div class="loading"><div class="spinner"></div><h2>Carregando os eletrificados por município</h2></div>`;
     const f = frota.data, ufs = [...new Set(f.list.map(c => c.uf))].sort();
     if (!ufs.includes(ui.fUf)) ui.fUf = "PR";
     const inUf = f.list.filter(c => c.uf === ui.fUf);
     const sum = (list, fn) => list.reduce((s, c) => s + (fn(c) || 0), 0);
-    const plug = sum(inUf, plugOf), prev = sum(inUf, c => c.pluginPrev), withPlug = inUf.filter(c => plugOf(c) > 0).length;
-    const top = inUf.slice().sort((a, b) => plugOf(b) - plugOf(a))[0];
-    const br = sum(f.list, plugOf) + (f.unassignedPlugin || 0), brPrev = f.unassignedPluginPrev === null ? 0 : sum(f.list, c => c.pluginPrev) + (f.unassignedPluginPrev || 0);
+    const plug = sum(inUf, plugOf), prev = sum(inUf, c => c.pluginPrev), elec = sum(inUf, elecOf), eprev = sum(inUf, elecPrev);
+    const withPlug = inUf.filter(c => plugOf(c) > 0).length, top = inUf.slice().sort((a, b) => plugOf(b) - plugOf(a))[0];
+    const br = sum(f.list, plugOf) + (f.unassignedPlugin || 0);
     const ufName = uf => data.estados?.[uf]?.name || uf;
-    return `<section class="section"><div class="section-head"><div><p class="kicker">Frota registrada · ${esc(monthLong(f.month))}</p><h2>Carros que recarregam na tomada, por município</h2>
-        <p>Plug-in = 100% elétricos + híbridos plug-in registrados na cidade (Senatran). Onde a frota cresce mais rápido do que a oferta de recarga está a próxima estação. É um piso: parte dos híbridos plug-in é registrada como "gasolina/elétrico" e entra em Híbridos.</p></div>
+    const since = f.prevMonth ? `de ${esc(monthLong(f.prevMonth))} a ${esc(monthLong(f.month))}` : "sem a base do ano anterior";
+    return `<section class="section"><div class="section-head"><div><p class="kicker">Eletrificados registrados · ${esc(monthLong(f.month))}</p><h2>Eletrificados por município</h2>
+        <p>Só veículos eletrificados registrados na cidade (Senatran). <strong>Plug-in</strong> recarregam na tomada: 100% elétricos + híbridos plug-in. <strong>Eletrificados</strong> = plug-in + híbridos. Onde o plug-in cresce mais rápido do que a oferta de recarga está a próxima estação. O plug-in é um piso: parte dos híbridos plug-in é registrada como "gasolina/elétrico" e entra em Híbridos.</p></div>
         <div class="toolbar" style="gap:8px;flex-wrap:wrap"><select class="select" id="mkFUf">${ufs.map(uf => `<option value="${esc(uf)}" ${uf === ui.fUf ? "selected" : ""}>${esc(uf)} · ${esc(ufName(uf))}</option>`).join("")}</select>
           <select class="select" id="mkFSort">${FSORT.map(([v, l]) => `<option value="${v}" ${ui.fSort === v ? "selected" : ""}>${l}</option>`).join("")}</select>
           <input class="select" id="mkFq" type="search" placeholder="Buscar município" value="${esc(ui.fq)}" style="min-width:180px"></div></div>
       <div class="grid g4" style="margin-bottom:12px">
         ${kpi(`Plug-in em ${ui.fUf}`, fmt.int(plug), prev ? `${fmt.int(prev)} em ${esc(monthLong(f.prevMonth))}` : "", "", "lead")}
-        ${kpi("Crescimento em 12 meses", prev ? `${plug >= prev ? "+" : ""}${fmt.pct1((plug / prev - 1) * 100)}` : "—", f.prevMonth ? `de ${esc(monthLong(f.prevMonth))} a ${esc(monthLong(f.month))}` : "sem a base do ano anterior")}
+        ${kpi("Plug-in · 12 meses", prev ? `${plug >= prev ? "+" : ""}${fmt.pct1((plug / prev - 1) * 100)}` : "—", since)}
+        ${kpi(`Eletrificados em ${ui.fUf}`, fmt.int(elec), eprev ? `${elec >= eprev ? "+" : ""}${fmt.pct1((elec / eprev - 1) * 100)} em 12 meses · plug-in + híbridos` : "plug-in + híbridos")}
         ${kpi("Municípios com plug-in", `${fmt.int(withPlug)} de ${fmt.int(inUf.length)}`, top ? `líder: ${esc(top.city)} (${fmt.int(plugOf(top))})` : "")}
-        ${kpi("Brasil", fmt.int(br), brPrev ? `${br >= brPrev ? "+" : ""}${fmt.pct1((br / brPrev - 1) * 100)} em 12 meses · ${fmt.int(f.unassignedPlugin || 0)} sem município` : `${fmt.int(f.unassignedPlugin || 0)} sem município informado`)}
       </div>
-      <div class="table-wrap" style="max-height:640px"><table><thead><tr><th class="num">#</th><th>Município</th><th class="num">População</th><th class="num">Plug-in</th><th class="num">12 meses</th><th class="num">Por mil veículos</th><th class="num">Por 10 mil hab.</th><th class="num">Híbridos</th><th class="num">Frota total</th></tr></thead>
+      <div class="table-wrap" style="max-height:640px"><table><thead><tr><th class="num">#</th><th>Município</th><th class="num">População</th><th class="num">Eletrificados</th><th class="num">Plug-in</th><th class="num">Plug-in · 12 meses</th><th class="num">Plug-in por 10 mil hab.</th><th class="num">Híbridos</th></tr></thead>
         <tbody id="mkFBody">${frotaRows()}</tbody></table></div>
-      <p class="source-line">Fontes: ${esc(f.sources?.fleet || "Senatran")} (${esc(monthLong(f.month))}${f.prevMonth ? `, comparado com ${esc(monthLong(f.prevMonth))}` : ""}); ${esc(f.sources?.population || "IBGE")}. "12 meses" só para cidades com 20+ plug-in na base anterior; "por mil veículos" e "por 10 mil hab." só para cidades com 1.000+ veículos e 5.000+ habitantes. Atualizado sozinho quando a Senatran publica um mês novo.</p>
+      <p class="source-line">Fontes: ${esc(f.sources?.fleet || "Senatran")}, só categorias eletrificadas (${esc(monthLong(f.month))}${f.prevMonth ? `, comparado com ${esc(monthLong(f.prevMonth))}` : ""}); ${esc(f.sources?.population || "IBGE")}. Brasil: ${fmt.int(br)} plug-in, dos quais ${fmt.int(f.unassignedPlugin || 0)} sem município informado. Crescimento só para cidades com 20+ veículos na base anterior; "por 10 mil hab." só para cidades com 5.000+ habitantes. Atualizado sozinho quando a Senatran publica um mês novo.</p>
     </section>`;
   }
 
   function render(target, params = []) {
-    // #/mercado/pfrota abre direto a frota por cidade (só enquanto o endereço for esse: a troca de aba o reescreve).
+    // #/mercado/pfrota abre direto os eletrificados por cidade (só enquanto o endereço for esse: a troca de aba o reescreve).
     if (params[0] === FROTA.id && location.hash.startsWith("#/mercado/pfrota")) ui.tab = FROTA.id;
     if (!data && !error) {
       target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Lendo o painel de mercado</h2></div>`;
@@ -225,7 +230,7 @@
     }
     target.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
       ui.tab = b.dataset.tab;
-      // O endereço acompanha a aba da frota (link direto), sem disparar nova navegação.
+      // O endereço acompanha a aba dos eletrificados (link direto), sem disparar nova navegação.
       history.replaceState(null, "", ui.tab === FROTA.id ? "#/mercado/pfrota" : "#/mercado");
       render(target);
     });
