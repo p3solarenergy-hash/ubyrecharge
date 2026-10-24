@@ -251,9 +251,12 @@
   }
   function roundRect(g, x, y, w, h, r, fill) { g.beginPath(); g.roundRect(x, y, w, h, r); g.fillStyle = fill; g.fill(); }
   function loadImg(src) { return new Promise((resolve, reject) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error("Não consegui abrir a imagem.")); im.src = src; }); }
-  // A logo fica guardada no próprio cadastro do parceiro. As bordas vazias (transparentes
-  // ou brancas) são cortadas, para todas as logos ocuparem a caixa do mesmo jeito; depois
-  // ela é reduzida a no máximo 480px (WebP; PNG no navegador que não grava WebP).
+  // A logo fica guardada no próprio cadastro do parceiro. Lê o fundo pelos cantos da imagem:
+  //  - fundo transparente: corta a sobra transparente; logo clara (ex.: texto branco) ganha
+  //    caixa azul-marinho, as demais caixa branca;
+  //  - fundo de cor sólida (branco, azul…): corta a sobra dessa cor e a caixa usa a mesma cor.
+  // Assim toda logo ocupa a caixa do mesmo jeito. Depois reduz a no máximo 480px
+  // (WebP; PNG no navegador que não grava WebP). Devolve { logo, logoBg }.
   async function logoDataUrl(file) {
     if (!/^image\//.test(file.type)) throw new Error("Escolha uma imagem (PNG, JPG, WebP ou SVG).");
     const url = URL.createObjectURL(file);
@@ -261,21 +264,31 @@
       const img = await loadImg(url), MAX = 480, BIG = 1200;
       const w0 = img.naturalWidth || BIG, h0 = img.naturalHeight || BIG, k0 = Math.min(1, BIG / Math.max(w0, h0));
       const src = document.createElement("canvas"); src.width = Math.max(1, Math.round(w0 * k0)); src.height = Math.max(1, Math.round(h0 * k0));
-      const sg = src.getContext("2d"); sg.drawImage(img, 0, 0, src.width, src.height);
-      const px = sg.getImageData(0, 0, src.width, src.height).data;
-      let x0 = src.width, y0 = src.height, x1 = -1, y1 = -1;
-      for (let y = 0; y < src.height; y++) for (let x = 0; x < src.width; x++) {
-        const i = (y * src.width + x) * 4;
-        if (px[i + 3] > 16 && !(px[i] > 240 && px[i + 1] > 240 && px[i + 2] > 240)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      const sg = src.getContext("2d", { willReadFrequently: true }); sg.drawImage(img, 0, 0, src.width, src.height);
+      const W = src.width, H = src.height, px = sg.getImageData(0, 0, W, H).data;
+      const at = (x, y) => (y * W + x) * 4;
+      const corners = [at(0, 0), at(W - 1, 0), at(0, H - 1), at(W - 1, H - 1)];
+      const transparente = corners.filter(i => px[i + 3] < 16).length >= 3;
+      const med = k => corners.map(i => px[i + k]).sort((a, b) => a - b)[1];
+      const bg = transparente ? null : [med(0), med(1), med(2)];
+      const conteudo = i => px[i + 3] > 16 && (!bg || Math.max(Math.abs(px[i] - bg[0]), Math.abs(px[i + 1] - bg[1]), Math.abs(px[i + 2] - bg[2])) > 40);
+      let x0 = W, y0 = H, x1 = -1, y1 = -1, lum = 0, peso = 0;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = at(x, y);
+        if (!conteudo(i)) continue;
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        const a = px[i + 3] / 255; lum += a * (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]); peso += a;
       }
-      if (x1 < 0) { x0 = 0; y0 = 0; x1 = src.width - 1; y1 = src.height - 1; }
-      const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.04);
-      x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(src.width - 1, x1 + pad); y1 = Math.min(src.height - 1, y1 + pad);
+      if (x1 < 0) { x0 = 0; y0 = 0; x1 = W - 1; y1 = H - 1; }
+      const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.06);
+      x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
       const cw = x1 - x0 + 1, ch = y1 - y0 + 1, k = Math.min(1, MAX / Math.max(cw, ch));
       const cv = document.createElement("canvas"); cv.width = Math.max(1, Math.round(cw * k)); cv.height = Math.max(1, Math.round(ch * k));
       cv.getContext("2d").drawImage(src, x0, y0, cw, ch, 0, 0, cv.width, cv.height);
+      const hex = rgb => "#" + rgb.map(v => v.toString(16).padStart(2, "0")).join("");
+      const logoBg = bg ? hex(bg) : (peso && lum / peso > 200 ? BRAND.navy : "#ffffff");
       const webp = cv.toDataURL("image/webp", 0.9);
-      return webp.startsWith("data:image/webp") ? webp : cv.toDataURL("image/png");
+      return { logo: webp.startsWith("data:image/webp") ? webp : cv.toDataURL("image/png"), logoBg };
     } finally { URL.revokeObjectURL(url); }
   }
   async function downloadDisplay(p) {
@@ -338,12 +351,11 @@
 
     // rodapé com o parceiro
     if (logo) {
-      // logo do parceiro num cartão branco, no lugar do nome
+      // logo do parceiro numa caixa de tamanho fixo (na cor de fundo da logo), no lugar do nome
       g.fillStyle = grad(0, H - 260, W, H); g.fillRect(0, H - 260, W, 260);
-      // caixa branca de tamanho fixo; a logo cabe dentro dela, centralizada
       const BW = 600, BH = 160, bx = (W - BW) / 2, by = H - 250;
-      const nw = logo.naturalWidth || 1, nh = logo.naturalHeight || 1, k = Math.min((BW - 60) / nw, (BH - 40) / nh), dw = nw * k, dh = nh * k;
-      roundRect(g, bx, by, BW, BH, 36, "#fff");
+      const nw = logo.naturalWidth || 1, nh = logo.naturalHeight || 1, k = Math.min((BW - 60) / nw, (BH - 24) / nh), dw = nw * k, dh = nh * k;
+      roundRect(g, bx, by, BW, BH, 36, p.logoBg || "#fff");
       g.drawImage(logo, bx + (BW - dw) / 2, by + (BH - dh) / 2, dw, dh);
       center("PARCEIRO DO CLUBE UBY", H - 76, 38, 600, BRAND.navy, "10px");
     } else {
@@ -444,7 +456,7 @@
           </div>
           <div class="imp-field" style="min-width:0;margin-top:8px"><span style="font-size:10.5px;color:var(--uby-muted);font-weight:760">Logo do parceiro (vai no display e na página do QR)</span>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
-              ${f.logo ? `<img src="${esc(f.logo)}" alt="Logo de ${esc(f.name || "parceiro")}" style="width:150px;height:60px;object-fit:contain;background:#fff;border-radius:8px;padding:6px 10px;box-sizing:border-box">` : ""}
+              ${f.logo ? `<img src="${esc(f.logo)}" alt="Logo de ${esc(f.name || "parceiro")}" style="width:150px;height:60px;object-fit:contain;background:${esc(f.logoBg || "#fff")};border-radius:8px;padding:6px 10px;box-sizing:border-box">` : ""}
               <label class="btn" style="cursor:pointer;display:inline-flex;align-items:center">${f.logo ? "Trocar logo" : "Enviar logo"}<input id="clubLogoFile" type="file" accept="image/*" hidden></label>
               ${f.logo ? `<button class="btn ghost" id="clubLogoDel" type="button">Remover logo</button>` : ""}
             </div></div>
@@ -578,11 +590,11 @@
       readForm();
       const file = e.target.files && e.target.files[0];
       if (!file) return;
-      try { ui.partnerForm.logo = await logoDataUrl(file); ui.msg = { ok: true, text: "Logo carregada. Clique em salvar para gravar." }; }
+      try { Object.assign(ui.partnerForm, await logoDataUrl(file)); ui.msg = { ok: true, text: "Logo carregada. Clique em salvar para gravar." }; }
       catch (err) { ui.msg = { ok: false, text: `Logo: ${err.message || err}` }; }
       paint();
     };
-    if ($("#clubLogoDel")) $("#clubLogoDel").onclick = () => { readForm(); ui.partnerForm.logo = ""; paint(); };
+    if ($("#clubLogoDel")) $("#clubLogoDel").onclick = () => { readForm(); ui.partnerForm.logo = ""; ui.partnerForm.logoBg = ""; paint(); };
     if ($("#clubPartnerSave")) $("#clubPartnerSave").onclick = () => {
       readForm();
       const f = { ...ui.partnerForm, name: String(ui.partnerForm.name || "").trim() };

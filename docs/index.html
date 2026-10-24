@@ -263,7 +263,7 @@
   /* Com alguma logo na lista, todas as caixas (logo ou inicial) têm o mesmo tamanho e o texto fica alinhado. */
   .vlist.com-logo .vitem .av{width:104px;height:48px}
   .vitem .av.logo{background:#fff;padding:0;overflow:hidden}
-  .vitem .av.logo img{display:block;width:86px;height:36px;object-fit:contain}
+  .vitem .av.logo img{display:block;width:90px;height:42px;object-fit:contain}
   .skel{height:70px;border-radius:16px;background:linear-gradient(90deg,var(--bg3) 0%,#16294a 50%,var(--bg3) 100%);background-size:200% 100%;animation:sk 1.4s linear infinite}
   @keyframes sk{to{background-position:-200% 0}}
   .vempty{padding:22px;border-radius:16px;border:1px dashed var(--line2);text-align:center;color:var(--muted2);font-size:14px}
@@ -957,7 +957,7 @@
       box.replaceChildren(...list.map(v => {
         const el = document.createElement('div'); el.className = 'vitem';
         const av = document.createElement('span'); av.className = 'av';
-        if (v.logo) { const im = document.createElement('img'); im.src = v.logo; im.alt = 'Logo de ' + v.parceiro; av.classList.add('logo'); av.append(im); }
+        if (v.logo) { const im = document.createElement('img'); im.src = v.logo; im.alt = 'Logo de ' + v.parceiro; av.classList.add('logo'); av.style.background = v.logoBg || '#fff'; av.append(im); }
         else av.textContent = String(v.parceiro || '?').trim().charAt(0).toUpperCase();
         const body = document.createElement('div');
         const b = document.createElement('b'); b.textContent = v.parceiro;
