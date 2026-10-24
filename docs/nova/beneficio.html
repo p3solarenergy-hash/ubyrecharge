@@ -38,9 +38,10 @@
   .hide{display:none!important}
   .lista div{border-top:1px solid var(--linha);padding:12px 0;font-size:14px;color:var(--suave)}
   .lista strong{display:block;color:var(--texto);font-size:16px}
-  .logo-parceiro{display:block;max-height:76px;max-width:220px;object-fit:contain;background:#fff;border-radius:14px;padding:8px 12px;margin:0 0 12px}
-  .lista .logo-parceiro{max-height:44px;max-width:140px;padding:5px 8px;border-radius:10px;margin:0 0 6px}
-  #ok .logo-parceiro{margin:18px auto 0;max-height:64px}
+  /* Caixa branca de tamanho fixo: toda logo ocupa o mesmo espaço, centralizada. */
+  .logo-parceiro{display:block;width:200px;height:80px;object-fit:contain;background:#fff;border-radius:14px;padding:10px 14px;margin:0 0 12px}
+  .lista .logo-parceiro{width:120px;height:48px;padding:6px 10px;border-radius:10px;margin:0 0 6px}
+  #ok .logo-parceiro{width:180px;height:72px;margin:18px auto 0}
   .passos{margin:12px 0 0;padding:0;list-style:none;counter-reset:p}
   .passos li{counter-increment:p;display:flex;gap:10px;align-items:center;color:var(--suave);font-size:14px;margin:6px 0}
   .passos li::before{content:counter(p);flex:0 0 24px;height:24px;border-radius:50%;background:#00ff851f;color:var(--verde);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
