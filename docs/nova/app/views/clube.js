@@ -250,8 +250,24 @@
     g.fillStyle = fill; g.fill();
   }
   function roundRect(g, x, y, w, h, r, fill) { g.beginPath(); g.roundRect(x, y, w, h, r); g.fillStyle = fill; g.fill(); }
+  function loadImg(src) { return new Promise((resolve, reject) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error("Não consegui abrir a imagem.")); im.src = src; }); }
+  // A logo fica guardada no próprio cadastro do parceiro: reduzida a no máximo 480px
+  // (WebP; PNG no navegador que não grava WebP) para não pesar a página do QR.
+  async function logoDataUrl(file) {
+    if (!/^image\//.test(file.type)) throw new Error("Escolha uma imagem (PNG, JPG, WebP ou SVG).");
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await loadImg(url), MAX = 480;
+      const w0 = img.naturalWidth || MAX, h0 = img.naturalHeight || MAX, k = Math.min(1, MAX / Math.max(w0, h0));
+      const cv = document.createElement("canvas"); cv.width = Math.max(1, Math.round(w0 * k)); cv.height = Math.max(1, Math.round(h0 * k));
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      const webp = cv.toDataURL("image/webp", 0.9);
+      return webp.startsWith("data:image/webp") ? webp : cv.toDataURL("image/png");
+    } finally { URL.revokeObjectURL(url); }
+  }
   async function downloadDisplay(p) {
     const [qrcode] = await Promise.all([ensureQrLib(), ensurePoppins()]);
+    const logo = p.logo ? await loadImg(p.logo).catch(() => null) : null;
     const qr = qrcode(0, "M"); qr.addData(qrLink(p)); qr.make();
     const W = 1748, H = 2480, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
     const g = cv.getContext("2d");
@@ -281,7 +297,7 @@
     const chamada = String(p.headline || rulesOf(p).find(r => r.audience === "TODOS")?.description || "Benefício exclusivo").trim();
     // Sem Enter: até 2 linhas. Com Enter: cabe quantas linhas forem, diminuindo a letra até
     // o bloco caber acima do QR sem empurrar os passos para cima do rodapé.
-    const quebras = /\n/.test(chamada), ALTURA_MAX = 360;
+    const quebras = /\n/.test(chamada), ALTURA_MAX = logo ? 330 : 360;
     let px = 140, lines = fit(chamada, px, W - 220);
     while (((!quebras && lines.length > 2) || lines.length * (px + 18) > ALTURA_MAX) && px > 40) { px -= 4; lines = fit(chamada, px, W - 220); }
     let y = 650; lines.forEach(l => { center(l, y, px, 800, "#fff"); y += px + 18; });
@@ -308,9 +324,18 @@
     });
 
     // rodapé com o parceiro
-    g.fillStyle = grad(0, H - 210, W, H); g.fillRect(0, H - 210, W, 210);
-    center(String(p.name || "").toUpperCase(), H - 170, 64, 800, BRAND.navy, "2px");
-    center("PARCEIRO DO CLUBE UBY", H - 82, 38, 600, BRAND.navy, "10px");
+    if (logo) {
+      // logo do parceiro num cartão branco, no lugar do nome
+      g.fillStyle = grad(0, H - 260, W, H); g.fillRect(0, H - 260, W, 260);
+      const lh = 120, lw = Math.min(W - 360, lh * (logo.naturalWidth || 1) / (logo.naturalHeight || 1)), dh = lw * (logo.naturalHeight || 1) / (logo.naturalWidth || 1);
+      roundRect(g, (W - lw) / 2 - 36, H - 245, lw + 72, 150, 36, "#fff");
+      g.drawImage(logo, (W - lw) / 2, H - 245 + (150 - dh) / 2, lw, dh);
+      center("PARCEIRO DO CLUBE UBY", H - 76, 38, 600, BRAND.navy, "10px");
+    } else {
+      g.fillStyle = grad(0, H - 210, W, H); g.fillRect(0, H - 210, W, 210);
+      center(String(p.name || "").toUpperCase(), H - 170, 64, 800, BRAND.navy, "2px");
+      center("PARCEIRO DO CLUBE UBY", H - 82, 38, 600, BRAND.navy, "10px");
+    }
     const a = document.createElement("a");
     a.download = `display-${String(p.name).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()}.png`;
     a.href = cv.toDataURL("image/png"); a.click();
@@ -402,6 +427,12 @@
             ${sel("status", "Situação", [["active", "Ativo"], ["prospect", "Em negociação"], ["paused", "Pausado"]])}${sel("priority", "Prioridade", [["high", "Alta"], ["medium", "Média"], ["low", "Baixa"]])}
             ${inp("contact", "Contato")}${inp("validity", "Validade (texto)")}
           </div>
+          <div class="imp-field" style="min-width:0;margin-top:8px"><span style="font-size:10.5px;color:var(--uby-muted);font-weight:760">Logo do parceiro (vai no display e na página do QR)</span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+              ${f.logo ? `<img src="${esc(f.logo)}" alt="Logo de ${esc(f.name || "parceiro")}" style="height:56px;max-width:160px;object-fit:contain;background:#fff;border-radius:8px;padding:4px">` : ""}
+              <label class="btn" style="cursor:pointer;display:inline-flex;align-items:center">${f.logo ? "Trocar logo" : "Enviar logo"}<input id="clubLogoFile" type="file" accept="image/*" hidden></label>
+              ${f.logo ? `<button class="btn ghost" id="clubLogoDel" type="button">Remover logo</button>` : ""}
+            </div></div>
           ${ta("headline", "Frase grande do display (ex.: 10% no almoço) · Enter pula linha")}${ta("benefit", "Descrição do benefício")}${ta("notes", "Observações", 2)}
           <p class="kicker" style="margin:14px 0 6px">Regras do QR · o cliente vê a de maior prioridade a que tem direito</p>
           ${f.rules.map((r, i) => `<div class="panel" style="padding:10px;margin-bottom:8px">
@@ -528,6 +559,15 @@
       try { await navigator.clipboard.writeText(link); alert(`Link copiado:\n${link}`); } catch (_) { window.prompt("Link do QR:", link); }
     });
     if ($("#clubPartnerNew")) $("#clubPartnerNew").onclick = () => { ui.partnerForm = null; paint(); };
+    if ($("#clubLogoFile")) $("#clubLogoFile").onchange = async e => {
+      readForm();
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try { ui.partnerForm.logo = await logoDataUrl(file); ui.msg = { ok: true, text: "Logo carregada. Clique em salvar para gravar." }; }
+      catch (err) { ui.msg = { ok: false, text: `Logo: ${err.message || err}` }; }
+      paint();
+    };
+    if ($("#clubLogoDel")) $("#clubLogoDel").onclick = () => { readForm(); ui.partnerForm.logo = ""; paint(); };
     if ($("#clubPartnerSave")) $("#clubPartnerSave").onclick = () => {
       readForm();
       const f = { ...ui.partnerForm, name: String(ui.partnerForm.name || "").trim() };

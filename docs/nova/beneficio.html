@@ -38,6 +38,9 @@
   .hide{display:none!important}
   .lista div{border-top:1px solid var(--linha);padding:12px 0;font-size:14px;color:var(--suave)}
   .lista strong{display:block;color:var(--texto);font-size:16px}
+  .logo-parceiro{display:block;max-height:76px;max-width:220px;object-fit:contain;background:#fff;border-radius:14px;padding:8px 12px;margin:0 0 12px}
+  .lista .logo-parceiro{max-height:44px;max-width:140px;padding:5px 8px;border-radius:10px;margin:0 0 6px}
+  #ok .logo-parceiro{margin:18px auto 0;max-height:64px}
   .passos{margin:12px 0 0;padding:0;list-style:none;counter-reset:p}
   .passos li{counter-increment:p;display:flex;gap:10px;align-items:center;color:var(--suave);font-size:14px;margin:6px 0}
   .passos li::before{content:counter(p);flex:0 0 24px;height:24px;border-radius:50%;background:#00ff851f;color:var(--verde);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
@@ -78,6 +81,7 @@
     <canvas id="logo" class="logo" role="img" aria-label="UBY Recharge"></canvas>
     <span class="selo">CLUBE UBY</span>
   </div>
+  <img id="logoParceiro" class="logo-parceiro hide" alt="">
   <h1 id="titulo">Benefícios UBY</h1>
   <p class="sub" id="subtitulo">Carregando…</p>
 
@@ -138,6 +142,7 @@
   <div class="faixa topo"></div>
   <div class="ok-marca">CLUBE UBY · BENEFÍCIO CONFIRMADO</div>
   <div class="raio-ok"><svg viewBox="142 99 95 181"><path d="M215 99L142 203L186 203L165 280L237 177L197 177Z" fill="#00ff85"/></svg></div>
+  <img id="okLogo" class="logo-parceiro hide" alt="">
   <div class="ok-parceiro" id="okParceiro"></div>
   <div class="ok-desc" id="okDesc"></div>
   <div class="ok-nome" id="okNome"></div>
@@ -153,7 +158,8 @@
   const $ = id => document.getElementById(id);
   const telas = ['vitrine','ident','beneficio','indisp','erro'];
   const codigo = new URLSearchParams(location.search).get('p') || '';
-  let parceiro = '', offset = 0, timer = null;
+  let parceiro = '', logo = '', offset = 0, timer = null;
+  function mostrarLogo(img, src, nome){ img.classList.toggle('hide', !src); if (src){ img.src = src; img.alt = 'Logo de ' + nome; } }
 
   function ler(k){ try { return localStorage.getItem(k) || ''; } catch(e){ return ''; } }
   function gravar(k,v){ try { v ? localStorage.setItem(k,v) : localStorage.removeItem(k); } catch(e){} }
@@ -180,10 +186,13 @@
       $('subtitulo').textContent = 'Descontos exclusivos para clientes da rede UBY.';
       const lista = $('vitrineLista'); lista.replaceChildren();
       if (!r.vitrine.length) lista.textContent = 'Em breve, novos parceiros.';
-      r.vitrine.forEach(v => { const d = document.createElement('div'); const s = document.createElement('strong'); s.textContent = v.parceiro; d.append(s, v.beneficios.join(' · ')); lista.append(d); });
+      r.vitrine.forEach(v => { const d = document.createElement('div'); const s = document.createElement('strong'); s.textContent = v.parceiro;
+        if (v.logo){ const im = document.createElement('img'); im.className = 'logo-parceiro'; im.src = v.logo; im.alt = 'Logo de ' + v.parceiro; d.append(im); }
+        d.append(s, v.beneficios.join(' · ')); lista.append(d); });
       return mostrar('vitrine');
     }
-    parceiro = r.parceiro;
+    parceiro = r.parceiro; logo = r.logo || '';
+    mostrarLogo($('logoParceiro'), logo, parceiro);
     $('titulo').textContent = r.parceiro;
     $('subtitulo').textContent = 'Parceiro do Clube UBY';
     $('btnTrocar').classList.toggle('hide', !r.identificado);
@@ -215,6 +224,7 @@
   }
 
   function confirmar(c){
+    mostrarLogo($('okLogo'), logo, parceiro);
     $('okParceiro').textContent = parceiro;
     $('okDesc').textContent = c.descricao;
     $('okNome').textContent = 'Cliente UBY · ' + c.nome;
