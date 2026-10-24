@@ -258,7 +258,15 @@
     const font = (px, w = 700) => `${w} ${px}px Poppins, Arial, sans-serif`;
     const grad = (x0, y0, x1, y1) => { const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, BRAND.green); gr.addColorStop(1, BRAND.teal); return gr; };
     const center = (t, y, px, w, color, spacing = "0px") => { g.font = font(px, w); g.letterSpacing = spacing; g.fillStyle = color; g.textAlign = "center"; g.textBaseline = "top"; g.fillText(t, W / 2, y); g.letterSpacing = "0px"; };
-    const fit = (t, px, max) => { const out = []; let line = ""; g.font = font(px, 800); t.split(/\s+/).forEach(w => { const s2 = (line + " " + w).trim(); if (g.measureText(s2).width <= max) line = s2; else { out.push(line); line = w; } }); out.push(line); return out; };
+    const fit = (t, px, max) => {
+      const out = []; g.font = font(px, 800);
+      t.split(/\r?\n/).forEach(par => {
+        let line = "";
+        par.split(/\s+/).filter(Boolean).forEach(w => { const s2 = (line + " " + w).trim(); if (g.measureText(s2).width <= max) line = s2; else { if (line) out.push(line); line = w; } });
+        out.push(line);
+      });
+      return out;
+    };
 
     // fundo azul-marinho com brilho verde discreto no topo
     g.fillStyle = BRAND.navy; g.fillRect(0, 0, W, H);
@@ -271,8 +279,11 @@
     // chamada
     center("CLIENTE DA REDE UBY?", 560, 60, 700, BRAND.green, "8px");
     const chamada = String(p.headline || rulesOf(p).find(r => r.audience === "TODOS")?.description || "Benefício exclusivo").trim();
+    // Sem Enter: até 2 linhas. Com Enter: cabe quantas linhas forem, diminuindo a letra até
+    // o bloco caber acima do QR sem empurrar os passos para cima do rodapé.
+    const quebras = /\n/.test(chamada), ALTURA_MAX = 360;
     let px = 140, lines = fit(chamada, px, W - 220);
-    while (lines.length > 2 && px > 70) { px -= 8; lines = fit(chamada, px, W - 220); }
+    while (((!quebras && lines.length > 2) || lines.length * (px + 18) > ALTURA_MAX) && px > 40) { px -= 4; lines = fit(chamada, px, W - 220); }
     let y = 650; lines.forEach(l => { center(l, y, px, 800, "#fff"); y += px + 18; });
 
     // QR num cartão branco com moldura verde
@@ -361,6 +372,9 @@
     const f = ui.partnerForm || (ui.partnerForm = { id: "", name: "", category: "", status: "active", benefit: "", headline: "", rule: "", coupon: "", contact: "", validity: "", priority: "medium", notes: "", rules: [] });
     if (!Array.isArray(f.rules) || !f.rules.length) f.rules = rulesOf(f).map(r => ({ ...r }));
     const inp = (k, label, type = "text", extra = "") => `<label class="imp-field" style="min-width:0"><span style="font-size:10.5px;color:var(--uby-muted);font-weight:760">${esc(label)}</span><input class="select" data-pf="${k}" type="${type}" value="${esc(f[k] ?? "")}" ${extra} style="width:100%"></label>`;
+    // Textos longos: Enter pula linha, e a quebra aparece no display e na tela verde.
+    const TA_STYLE = "width:100%;height:auto;padding:8px;line-height:1.35;white-space:pre-wrap;overflow:auto;resize:vertical;cursor:text";
+    const ta = (k, label, rows = 3) => `<label class="imp-field" style="min-width:0"><span style="font-size:10.5px;color:var(--uby-muted);font-weight:760">${esc(label)}</span><textarea class="select" data-pf="${k}" rows="${rows}" style="${TA_STYLE}">${esc(f[k] ?? "")}</textarea></label>`;
     const sel = (k, label, opts) => `<label class="imp-field" style="min-width:0"><span style="font-size:10.5px;color:var(--uby-muted);font-weight:760">${esc(label)}</span><select class="select" data-pf="${k}">${opts.map(([v, l]) => `<option value="${v}" ${String(f[k]) === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
     const rsel = (i, k, opts, v) => `<select class="select" data-rf="${i}:${k}">${opts.map(([o, l]) => `<option value="${o}" ${String(v) === o ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
     const confirmed = (uses.rows || []).filter(u => u.status === "CONFIRMADO");
@@ -388,10 +402,10 @@
             ${sel("status", "Situação", [["active", "Ativo"], ["prospect", "Em negociação"], ["paused", "Pausado"]])}${sel("priority", "Prioridade", [["high", "Alta"], ["medium", "Média"], ["low", "Baixa"]])}
             ${inp("contact", "Contato")}${inp("validity", "Validade (texto)")}
           </div>
-          ${inp("headline", "Frase grande do display (ex.: 10% no almoço)")}${inp("benefit", "Descrição do benefício")}${inp("notes", "Observações")}
+          ${ta("headline", "Frase grande do display (ex.: 10% no almoço) · Enter pula linha")}${ta("benefit", "Descrição do benefício")}${ta("notes", "Observações", 2)}
           <p class="kicker" style="margin:14px 0 6px">Regras do QR · o cliente vê a de maior prioridade a que tem direito</p>
           ${f.rules.map((r, i) => `<div class="panel" style="padding:10px;margin-bottom:8px">
-            <div class="grid g2" style="gap:6px"><input class="select" data-rf="${i}:description" value="${esc(r.description || "")}" placeholder="O que aparece na tela verde (ex.: 10% em todos os serviços)" style="grid-column:1/-1">
+            <div class="grid g2" style="gap:6px"><textarea class="select" data-rf="${i}:description" rows="3" placeholder="O que aparece na tela verde (ex.: 10% em todos os serviços) · Enter pula linha" style="grid-column:1/-1;${TA_STYLE}">${esc(r.description || "")}</textarea>
               ${rsel(i, "audience", AUDIENCE, r.audience || "TODOS")}<input class="select" data-rf="${i}:n" type="number" min="0" step="1" value="${esc(r.n ?? "")}" placeholder="N (Top N, primeiras N, lote N)">
               <span style="display:flex;gap:6px"><input class="select" data-rf="${i}:limit" type="number" min="0" step="1" value="${esc(r.limit ?? "")}" placeholder="Limite" style="width:90px">${rsel(i, "period", PERIOD, r.period || "DIA")}</span>
               <span style="display:flex;gap:6px;align-items:center"><input class="select" data-rf="${i}:priority" type="number" step="1" value="${esc(r.priority ?? "")}" placeholder="Prioridade" style="width:100px">
