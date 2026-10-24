@@ -250,8 +250,37 @@
     g.fillStyle = fill; g.fill();
   }
   function roundRect(g, x, y, w, h, r, fill) { g.beginPath(); g.roundRect(x, y, w, h, r); g.fillStyle = fill; g.fill(); }
+  function loadImg(src) { return new Promise((resolve, reject) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error("Não consegui abrir a imagem.")); im.src = src; }); }
+  // A logo fica guardada no próprio cadastro do parceiro. As bordas vazias (transparentes
+  // ou brancas) são cortadas, para todas as logos ocuparem a caixa do mesmo jeito; depois
+  // ela é reduzida a no máximo 480px (WebP; PNG no navegador que não grava WebP).
+  async function logoDataUrl(file) {
+    if (!/^image\//.test(file.type)) throw new Error("Escolha uma imagem (PNG, JPG, WebP ou SVG).");
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await loadImg(url), MAX = 480, BIG = 1200;
+      const w0 = img.naturalWidth || BIG, h0 = img.naturalHeight || BIG, k0 = Math.min(1, BIG / Math.max(w0, h0));
+      const src = document.createElement("canvas"); src.width = Math.max(1, Math.round(w0 * k0)); src.height = Math.max(1, Math.round(h0 * k0));
+      const sg = src.getContext("2d"); sg.drawImage(img, 0, 0, src.width, src.height);
+      const px = sg.getImageData(0, 0, src.width, src.height).data;
+      let x0 = src.width, y0 = src.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < src.height; y++) for (let x = 0; x < src.width; x++) {
+        const i = (y * src.width + x) * 4;
+        if (px[i + 3] > 16 && !(px[i] > 240 && px[i + 1] > 240 && px[i + 2] > 240)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      }
+      if (x1 < 0) { x0 = 0; y0 = 0; x1 = src.width - 1; y1 = src.height - 1; }
+      const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.04);
+      x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(src.width - 1, x1 + pad); y1 = Math.min(src.height - 1, y1 + pad);
+      const cw = x1 - x0 + 1, ch = y1 - y0 + 1, k = Math.min(1, MAX / Math.max(cw, ch));
+      const cv = document.createElement("canvas"); cv.width = Math.max(1, Math.round(cw * k)); cv.height = Math.max(1, Math.round(ch * k));
+      cv.getContext("2d").drawImage(src, x0, y0, cw, ch, 0, 0, cv.width, cv.height);
+      const webp = cv.toDataURL("image/webp", 0.9);
+      return webp.startsWith("data:image/webp") ? webp : cv.toDataURL("image/png");
+    } finally { URL.revokeObjectURL(url); }
+  }
   async function downloadDisplay(p) {
     const [qrcode] = await Promise.all([ensureQrLib(), ensurePoppins()]);
+    const logo = p.logo ? await loadImg(p.logo).catch(() => null) : null;
     const qr = qrcode(0, "M"); qr.addData(qrLink(p)); qr.make();
     const W = 1748, H = 2480, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
     const g = cv.getContext("2d");
@@ -281,7 +310,7 @@
     const chamada = String(p.headline || rulesOf(p).find(r => r.audience === "TODOS")?.description || "Benefício exclusivo").trim();
     // Sem Enter: até 2 linhas. Com Enter: cabe quantas linhas forem, diminuindo a letra até
     // o bloco caber acima do QR sem empurrar os passos para cima do rodapé.
-    const quebras = /\n/.test(chamada), ALTURA_MAX = 360;
+    const quebras = /\n/.test(chamada), ALTURA_MAX = logo ? 330 : 360;
     let px = 140, lines = fit(chamada, px, W - 220);
     while (((!quebras && lines.length > 2) || lines.length * (px + 18) > ALTURA_MAX) && px > 40) { px -= 4; lines = fit(chamada, px, W - 220); }
     let y = 650; lines.forEach(l => { center(l, y, px, 800, "#fff"); y += px + 18; });
@@ -308,9 +337,20 @@
     });
 
     // rodapé com o parceiro
-    g.fillStyle = grad(0, H - 210, W, H); g.fillRect(0, H - 210, W, 210);
-    center(String(p.name || "").toUpperCase(), H - 170, 64, 800, BRAND.navy, "2px");
-    center("PARCEIRO DO CLUBE UBY", H - 82, 38, 600, BRAND.navy, "10px");
+    if (logo) {
+      // logo do parceiro num cartão branco, no lugar do nome
+      g.fillStyle = grad(0, H - 260, W, H); g.fillRect(0, H - 260, W, 260);
+      // caixa branca de tamanho fixo; a logo cabe dentro dela, centralizada
+      const BW = 600, BH = 160, bx = (W - BW) / 2, by = H - 250;
+      const nw = logo.naturalWidth || 1, nh = logo.naturalHeight || 1, k = Math.min((BW - 60) / nw, (BH - 40) / nh), dw = nw * k, dh = nh * k;
+      roundRect(g, bx, by, BW, BH, 36, "#fff");
+      g.drawImage(logo, bx + (BW - dw) / 2, by + (BH - dh) / 2, dw, dh);
+      center("PARCEIRO DO CLUBE UBY", H - 76, 38, 600, BRAND.navy, "10px");
+    } else {
+      g.fillStyle = grad(0, H - 210, W, H); g.fillRect(0, H - 210, W, 210);
+      center(String(p.name || "").toUpperCase(), H - 170, 64, 800, BRAND.navy, "2px");
+      center("PARCEIRO DO CLUBE UBY", H - 82, 38, 600, BRAND.navy, "10px");
+    }
     const a = document.createElement("a");
     a.download = `display-${String(p.name).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()}.png`;
     a.href = cv.toDataURL("image/png"); a.click();
@@ -402,6 +442,12 @@
             ${sel("status", "Situação", [["active", "Ativo"], ["prospect", "Em negociação"], ["paused", "Pausado"]])}${sel("priority", "Prioridade", [["high", "Alta"], ["medium", "Média"], ["low", "Baixa"]])}
             ${inp("contact", "Contato")}${inp("validity", "Validade (texto)")}
           </div>
+          <div class="imp-field" style="min-width:0;margin-top:8px"><span style="font-size:10.5px;color:var(--uby-muted);font-weight:760">Logo do parceiro (vai no display e na página do QR)</span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+              ${f.logo ? `<img src="${esc(f.logo)}" alt="Logo de ${esc(f.name || "parceiro")}" style="width:150px;height:60px;object-fit:contain;background:#fff;border-radius:8px;padding:6px 10px;box-sizing:border-box">` : ""}
+              <label class="btn" style="cursor:pointer;display:inline-flex;align-items:center">${f.logo ? "Trocar logo" : "Enviar logo"}<input id="clubLogoFile" type="file" accept="image/*" hidden></label>
+              ${f.logo ? `<button class="btn ghost" id="clubLogoDel" type="button">Remover logo</button>` : ""}
+            </div></div>
           ${ta("headline", "Frase grande do display (ex.: 10% no almoço) · Enter pula linha")}${ta("benefit", "Descrição do benefício")}${ta("notes", "Observações", 2)}
           <p class="kicker" style="margin:14px 0 6px">Regras do QR · o cliente vê a de maior prioridade a que tem direito</p>
           ${f.rules.map((r, i) => `<div class="panel" style="padding:10px;margin-bottom:8px">
@@ -528,6 +574,15 @@
       try { await navigator.clipboard.writeText(link); alert(`Link copiado:\n${link}`); } catch (_) { window.prompt("Link do QR:", link); }
     });
     if ($("#clubPartnerNew")) $("#clubPartnerNew").onclick = () => { ui.partnerForm = null; paint(); };
+    if ($("#clubLogoFile")) $("#clubLogoFile").onchange = async e => {
+      readForm();
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try { ui.partnerForm.logo = await logoDataUrl(file); ui.msg = { ok: true, text: "Logo carregada. Clique em salvar para gravar." }; }
+      catch (err) { ui.msg = { ok: false, text: `Logo: ${err.message || err}` }; }
+      paint();
+    };
+    if ($("#clubLogoDel")) $("#clubLogoDel").onclick = () => { readForm(); ui.partnerForm.logo = ""; paint(); };
     if ($("#clubPartnerSave")) $("#clubPartnerSave").onclick = () => {
       readForm();
       const f = { ...ui.partnerForm, name: String(ui.partnerForm.name || "").trim() };
