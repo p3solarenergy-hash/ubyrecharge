@@ -214,7 +214,7 @@ export async function handle(body: any, db: Db, now = new Date()): Promise<Recor
     const base = { ok: true, agora: now.getTime() };
     if (!body.p) {
       const vitrine = (club.partners || []).filter((p: any) => p.status === "active" && p.qrCode)
-        .map((p: any) => ({ parceiro: p.name, logo: p.logo || "", beneficios: activeRules(p, now).map(r => r.description) }))
+        .map((p: any) => ({ parceiro: p.name, logo: p.logo || "", logoBg: p.logoBg || "", beneficios: activeRules(p, now).map(r => r.description) }))
         .filter((v: any) => v.beneficios.length);
       return { ...base, vitrine };
     }
@@ -222,7 +222,7 @@ export async function handle(body: any, db: Db, now = new Date()): Promise<Recor
     if (!partner) return { ok: false, mensagem: "QR Code não reconhecido. Peça ajuda ao atendente." };
     const rules = activeRules(partner, now);
     const aberto = rules.find(r => String(r.audience || "TODOS").toUpperCase() === "TODOS") || rules[0];
-    const res: Record<string, unknown> = { ...base, parceiro: partner.name, logo: partner.logo || "", destaque: aberto?.description || "" };
+    const res: Record<string, unknown> = { ...base, parceiro: partner.name, logo: partner.logo || "", logoBg: partner.logoBg || "", destaque: aberto?.description || "" };
     const me = await clientOf(db, body.aparelho);
     if (!me) return { ...res, identificado: false };
     const ev = await evaluate(db, partner, me.client, club, now);

@@ -39,8 +39,8 @@
   .lista div{border-top:1px solid var(--linha);padding:12px 0;font-size:14px;color:var(--suave)}
   .lista strong{display:block;color:var(--texto);font-size:16px}
   /* Caixa branca de tamanho fixo: toda logo ocupa o mesmo espaço, centralizada. */
-  .logo-parceiro{display:block;width:200px;height:80px;object-fit:contain;background:#fff;border-radius:14px;padding:10px 14px;margin:0 0 12px}
-  .lista .logo-parceiro{width:120px;height:48px;padding:6px 10px;border-radius:10px;margin:0 0 6px}
+  .logo-parceiro{display:block;width:200px;height:80px;object-fit:contain;background:#fff;border-radius:14px;padding:6px 12px;margin:0 0 12px}
+  .lista .logo-parceiro{width:120px;height:48px;padding:4px 8px;border-radius:10px;margin:0 0 6px}
   #ok .logo-parceiro{width:180px;height:72px;margin:18px auto 0}
   .passos{margin:12px 0 0;padding:0;list-style:none;counter-reset:p}
   .passos li{counter-increment:p;display:flex;gap:10px;align-items:center;color:var(--suave);font-size:14px;margin:6px 0}
@@ -159,7 +159,7 @@
   const $ = id => document.getElementById(id);
   const telas = ['vitrine','ident','beneficio','indisp','erro'];
   const codigo = new URLSearchParams(location.search).get('p') || '';
-  let parceiro = '', logo = '', offset = 0, timer = null;
+  let parceiro = '', logo = '', logoBg = '', offset = 0, timer = null;
   // Texto do benefício: cada linha digitada tenta caber inteira, diminuindo a letra até o mínimo;
   // só quebra a linha se nem assim couber. "R$ 1.300,00" nunca separa o R$ do valor.
   const TAMANHO = {destaqueIdent:[28,13], desc:[28,13], okDesc:[32,14]};
@@ -173,7 +173,7 @@
   function textoBeneficio(el, t){ el.textContent = String(t || '').replace(/R\$\s+/g, 'R$\u00a0'); }
   function ajustarTextos(){ Object.keys(TAMANHO).forEach(id => caber($(id))); }
   addEventListener('resize', ajustarTextos);
-  function mostrarLogo(img, src, nome){ img.classList.toggle('hide', !src); if (src){ img.src = src; img.alt = 'Logo de ' + nome; } }
+  function mostrarLogo(img, src, nome, fundo){ img.classList.toggle('hide', !src); if (src){ img.src = src; img.alt = 'Logo de ' + nome; img.style.background = fundo || '#fff'; } }
 
   function ler(k){ try { return localStorage.getItem(k) || ''; } catch(e){ return ''; } }
   function gravar(k,v){ try { v ? localStorage.setItem(k,v) : localStorage.removeItem(k); } catch(e){} }
@@ -201,12 +201,12 @@
       const lista = $('vitrineLista'); lista.replaceChildren();
       if (!r.vitrine.length) lista.textContent = 'Em breve, novos parceiros.';
       r.vitrine.forEach(v => { const d = document.createElement('div'); const s = document.createElement('strong'); s.textContent = v.parceiro;
-        if (v.logo){ const im = document.createElement('img'); im.className = 'logo-parceiro'; im.src = v.logo; im.alt = 'Logo de ' + v.parceiro; d.append(im); }
+        if (v.logo){ const im = document.createElement('img'); im.className = 'logo-parceiro'; im.src = v.logo; im.alt = 'Logo de ' + v.parceiro; im.style.background = v.logoBg || '#fff'; d.append(im); }
         d.append(s, v.beneficios.join(' · ')); lista.append(d); });
       return mostrar('vitrine');
     }
-    parceiro = r.parceiro; logo = r.logo || '';
-    mostrarLogo($('logoParceiro'), logo, parceiro);
+    parceiro = r.parceiro; logo = r.logo || ''; logoBg = r.logoBg || '';
+    mostrarLogo($('logoParceiro'), logo, parceiro, logoBg);
     $('titulo').textContent = r.parceiro;
     $('subtitulo').textContent = 'Parceiro do Clube UBY';
     $('btnTrocar').classList.toggle('hide', !r.identificado);
@@ -238,7 +238,7 @@
   }
 
   function confirmar(c){
-    mostrarLogo($('okLogo'), logo, parceiro);
+    mostrarLogo($('okLogo'), logo, parceiro, logoBg);
     $('okParceiro').textContent = parceiro;
     textoBeneficio($('okDesc'), c.descricao);
     $('okNome').textContent = 'Cliente UBY · ' + c.nome;
