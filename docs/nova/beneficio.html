@@ -159,6 +159,19 @@
   const telas = ['vitrine','ident','beneficio','indisp','erro'];
   const codigo = new URLSearchParams(location.search).get('p') || '';
   let parceiro = '', logo = '', offset = 0, timer = null;
+  // Texto do benefício: cada linha digitada tenta caber inteira, diminuindo a letra até o mínimo;
+  // só quebra a linha se nem assim couber. "R$ 1.300,00" nunca separa o R$ do valor.
+  const TAMANHO = {destaqueIdent:[28,13], desc:[28,13], okDesc:[32,14]};
+  function caber(el){
+    const [max, min] = TAMANHO[el.id] || [28,15];
+    if (!el.clientWidth) return;
+    el.style.whiteSpace = 'pre'; let px = max; el.style.fontSize = px + 'px';
+    while (px > min && el.scrollWidth > el.clientWidth){ px--; el.style.fontSize = px + 'px'; }
+    el.style.whiteSpace = 'pre-line';
+  }
+  function textoBeneficio(el, t){ el.textContent = String(t || '').replace(/R\$\s+/g, 'R$\u00a0'); }
+  function ajustarTextos(){ Object.keys(TAMANHO).forEach(id => caber($(id))); }
+  addEventListener('resize', ajustarTextos);
   function mostrarLogo(img, src, nome){ img.classList.toggle('hide', !src); if (src){ img.src = src; img.alt = 'Logo de ' + nome; } }
 
   function ler(k){ try { return localStorage.getItem(k) || ''; } catch(e){ return ''; } }
@@ -196,9 +209,9 @@
     $('titulo').textContent = r.parceiro;
     $('subtitulo').textContent = 'Parceiro do Clube UBY';
     $('btnTrocar').classList.toggle('hide', !r.identificado);
-    if (!r.identificado){ $('destaqueIdent').textContent = r.destaque || 'Benefício UBY'; return mostrar('ident'); }
+    if (!r.identificado){ textoBeneficio($('destaqueIdent'), r.destaque || 'Benefício UBY'); mostrar('ident'); return caber($('destaqueIdent')); }
     if (r.confirmacao) return confirmar(r.confirmacao);
-    if (r.beneficio){ $('ola').textContent = 'Olá, ' + r.nome + '! Seu benefício aqui:'; $('desc').textContent = r.beneficio.descricao; return mostrar('beneficio'); }
+    if (r.beneficio){ $('ola').textContent = 'Olá, ' + r.nome + '! Seu benefício aqui:'; textoBeneficio($('desc'), r.beneficio.descricao); mostrar('beneficio'); return caber($('desc')); }
     $('olaIndisp').textContent = 'Olá, ' + r.nome + '!'; $('msgIndisp').textContent = r.mensagem; mostrar('indisp');
   }
 
@@ -226,10 +239,11 @@
   function confirmar(c){
     mostrarLogo($('okLogo'), logo, parceiro);
     $('okParceiro').textContent = parceiro;
-    $('okDesc').textContent = c.descricao;
+    textoBeneficio($('okDesc'), c.descricao);
     $('okNome').textContent = 'Cliente UBY · ' + c.nome;
     $('okCodigo').textContent = 'Código ' + c.codigo;
     $('ok').classList.remove('hide','expirado');
+    caber($('okDesc'));
     clearInterval(timer);
     const tick = () => {
       const agora = Date.now() + offset, resta = c.expiraEm - agora;
