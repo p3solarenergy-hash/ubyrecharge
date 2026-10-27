@@ -22,8 +22,8 @@
       { t: "Custos centrais da matriz", d: "Aluguel, seguro, sistemas, tributos corporativos: recorrente, parcelado ou pontual, com a regra de rateio.", freq: "quando surgir um custo", route: P("matriz"), where: "Parâmetros e custos · Custos da matriz" },
       { t: "Pagamentos programados e baixa", d: "Calendário do mês, pagamentos recorrentes por carregador e Marcar pago / Reabrir.", freq: "a cada pagamento", route: P("pagamentos"), where: "Parâmetros e custos · Pagamentos" },
       { t: "Boletos, notas e documentos", d: "Anexar boleto, nota fiscal, fatura ou contrato à competência (arquivo privado).", freq: "a cada documento", route: P("documentos"), where: "Parâmetros e custos · Documentos" },
-      { t: "Cotas, rodadas e cotistas", d: "Valor da cota por rodada, cotistas, reservas legal e de expansão, e percentual dos cotistas.", freq: "a cada mudança", route: P("cotas"), where: "Parâmetros e custos · Cotas, impostos e rodadas" },
-      { t: "Impostos sobre o faturamento", d: "Alíquota sobre tudo o que a UBY faturou e valor exato de cada mês quando a guia sair. Sai do resultado antes das reservas e dos cotistas.", freq: "mensal", route: P("cotas"), where: "Parâmetros e custos · Cotas, impostos e rodadas" }
+      { t: "Cotas, rodadas e cotistas", d: "Valor da cota por rodada, cotistas, fundo de reserva (10% do lucro líquido) e percentual dos cotistas.", freq: "a cada mudança", route: P("cotas"), where: "Parâmetros e custos · Cotas, impostos e rodadas" },
+      { t: "Impostos sobre o recebido", d: "Alíquota sobre o que a UBY recebe (faturamento dos ativos próprios menos Spott, P3 e a parte da área, mais royalties) e valor exato de cada mês quando a guia sair. Sai do resultado antes do fundo de reserva e dos cotistas.", freq: "mensal", route: P("cotas"), where: "Parâmetros e custos · Cotas, impostos e rodadas" }
     ] },
     { title: "Gestão de obras", items: [
       { t: "Obras, fases e tarefas", d: "Nova obra, avanço das fases, protocolos, responsáveis e prazos.", freq: "contínuo", route: "#/obras-classico", original: true, where: "Obras · tela original (migração em andamento)" },

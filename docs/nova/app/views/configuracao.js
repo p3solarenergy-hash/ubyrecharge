@@ -52,7 +52,7 @@
       ${outside.length ? `<details class="section"><summary style="cursor:pointer;font-weight:850;color:var(--uby-forest)">Fora da UBY: ${outside.length} carregador(es) (${esc(outside.map(r => r.station).join(", "))})</summary>
         <p style="margin:10px 0">Carregadores só com gestão P3, sociedades P3 ou sem base de recargas. Ficam aqui para conferência dos parâmetros.</p>${table(outside)}</details>` : ""}
 
-      <p class="source-line">Fonte: configurações financeiras salvas por carregador (obra_recargas_base) e horários de disponibilidade, lidas pelo motor original. Gestão P3, plataforma e área em % do faturamento total; plataforma só sobre recargas e ociosidade. Reserva legal S.A., fundo de expansão e cotistas não são por carregador: ficam centralizados em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a> e valem sobre o resultado consolidado.</p>`;
+      <p class="source-line">Fonte: configurações financeiras salvas por carregador (obra_recargas_base) e horários de disponibilidade, lidas pelo motor original. Gestão P3, plataforma e área em % do faturamento total; plataforma só sobre recargas e ociosidade. Fundo de reserva e cotistas não são por carregador: ficam centralizados em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a> e valem sobre o resultado consolidado.</p>`;
   }
 
   UBY.register("configuracao", { render });

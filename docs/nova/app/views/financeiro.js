@@ -51,7 +51,7 @@
     const costName = c => c.matrix && !c.dedicated ? `Matriz · ${c.label}` : c.label;
     const otherCosts = [...s.costLines.map(c => [costName(c), c.actual, costHref(c)]),
       ["Gestão P3", f.management, edit("carregador", "managementPct")], ["App / plataforma", f.platform, edit("carregador", "platformPct")], ["Royalty UBY", f.ubyRoyalty, edit("carregador", "ubyRoyaltyPct")],
-      [`Repasse da área${f.areaSharePct ? ` (${fmt.pct1(f.areaSharePct)})` : ""}`, f.areaParticipation, edit("carregador", AREA)], ["Impostos", f.taxes, edit("carregador", "taxRatePct")]].filter(([, v]) => Number(v) > 0);
+      [`Repasse da área${f.areaSharePct ? ` (${fmt.pct1(f.areaSharePct)})` : ""}`, f.areaParticipation, edit("carregador", AREA)], [f.receivedBase ? "Impostos sobre o recebido" : "Impostos", f.taxes, f.receivedBase ? "#/parametros/cotas" : edit("carregador", "taxRatePct")]].filter(([, v]) => Number(v) > 0);
     const otherTotal = otherCosts.reduce((a, [, v]) => a + Number(v || 0), 0);
     const uRow = (label, v, cls = "") => `<tr class="${cls}"><td>${label}</td><td class="num">${fmt.brl(v)}</td><td class="num">${perKwh(perSold(v))}</td></tr>`;
     return `
@@ -91,7 +91,7 @@
           ${line(go("App / plataforma", edit("carregador", "platformPct")), `${fmt.brl(f.platform)}${pct(f.platform)}`, "só sobre recargas e ociosidade")}
           ${f.ubyRoyalty ? line(go("Royalty UBY", edit("carregador", "ubyRoyaltyPct")), `${fmt.brl(f.ubyRoyalty)}${pct(f.ubyRoyalty)}`, "uso da marca · sobre o líquido (faturamento − plataforma)") : ""}
           ${line(go("Repasse da área", edit("carregador", AREA)), `${fmt.brl(f.areaParticipation)}${pct(f.areaParticipation)}`, f.areaSharePct ? `${fmt.pct1(f.areaSharePct)} do faturamento total` : "")}
-          ${f.taxes ? line(go("Impostos", st.taxRatePct ? edit("carregador", "taxRatePct") : "#/parametros/cotas"), `${fmt.brl(f.taxes)}${pct(f.taxes)}`, `${(f.revenue ? f.taxes / f.revenue * 100 : st.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do faturamento${st.taxRatePct ? "" : " · alíquota central da UBY"}`) : ""}
+          ${f.taxes ? line(go("Impostos", st.taxRatePct ? edit("carregador", "taxRatePct") : "#/parametros/cotas"), `${fmt.brl(f.taxes)}${pct(f.taxes)}`, f.receivedBase ? `${(f.taxes / f.receivedBase * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% sobre ${fmt.brl(f.receivedBase)} recebidos pela UBY · alíquota central` : `${(f.revenue ? f.taxes / f.revenue * 100 : st.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do faturamento${st.taxRatePct ? "" : " · alíquota central da UBY"}`) : ""}
           </tbody><tfoot><tr><td>Custo total</td><td class="num">${fmt.brl(f.totalOperatingCost)}</td></tr><tr><td>= ${partner ? "Resultado do parceiro" : "Resultado operacional"}</td><td class="num">${signed(f.operationNet)}</td></tr></tfoot>
         </table></div></section>
         <section class="section"><div class="section-head"><div><p class="kicker">Economia da unidade</p><h2>Preço, custos e margem</h2><p>Valores oficiais da competência. "Por kWh" = valor ÷ ${fmt.kwh(kwhSold)} vendidos.</p></div></div>
@@ -108,7 +108,7 @@
           ${ec.estimatedCost ? `<p class="source-line">Energia inclui ${fmt.brl(ec.estimatedCost)} de estimativa (${fmt.date(ec.estimatedFrom + "T12:00:00")} a ${fmt.date(ec.estimatedTo + "T12:00:00")}): dias ainda sem fatura lançada. Acerta quando a próxima fatura entrar.</p>` : ""}
           ${f.courtesyCharges ? `<div class="note" style="margin-top:10px">Cortesia: ${fmt.kwh(f.courtesyEnergy)} em ${f.courtesyCharges} sessão(ões); ${fmt.brl(f.courtesyCostExcluded)} fora do resultado UBY.</div>` : ""}
           ${!partner && UBY.isUbyModel(f.model) ? (() => { const p = (UBY.data("finance", mk) || {}).dre?.policy || {}; return `<h3 style="margin:14px 0 8px">Destino do resultado</h3>
-            <div class="note">O resultado deste carregador (${signed(f.operationNet)}) entra no resultado consolidado da UBY. A reserva legal S.A. (${fmt.pct1(p.legalReservePct || 0)}), o fundo de expansão (${fmt.pct1(p.expansionReservePct || 0)}) e a parte dos cotistas são aplicados uma vez só, no total da rede: veja <a href="#/financeiro/dre">DRE e fechamento</a>. Os percentuais ficam em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a>.</div>`; })() : ""}
+            <div class="note">O resultado deste carregador (${signed(f.operationNet)}) entra no resultado consolidado da UBY. O fundo de reserva (${fmt.pct1(p.expansionReservePct || 0)} do lucro líquido) e a parte dos cotistas são aplicados uma vez só, no total da rede: veja <a href="#/financeiro/dre">DRE e fechamento</a>. Os percentuais ficam em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a>.</div>`; })() : ""}
           ${f.p3SocietyProfit ? `<div class="list" style="margin-top:10px"><div class="list-row"><span>Sociedade P3</span><strong>${fmt.brl(f.p3SocietyProfit)}</strong></div></div>` : ""}
         </section>
       </div>
@@ -163,17 +163,17 @@
           <div class="meta">${u.units} ativo(s) UBY · investimento ${fmt.brl(u.investmentValue)}</div></div>
         <div class="grid g5">
           ${kpi("Resultado UBY e royalties", signed(u.ubyNet), `royalties ${fmt.brl(u.ubyRoyalty)}`, "", "lead big")}
-          ${kpi("Cotistas UBY", fmt.brl(cent.pool), "pool por cotas, após as reservas")}
-          ${kpi("Reservas centralizadas", fmt.brl(cent.legal + cent.expansion), `reserva legal ${fmt.brl(cent.legal)} · expansão ${fmt.brl(cent.expansion)}`)}
+          ${kpi("Cotistas UBY", fmt.brl(cent.pool), "pool por cotas, após o fundo de reserva")}
+          ${kpi("Fundo de reserva", fmt.brl(cent.legal + cent.expansion), "10% do lucro líquido, centralizado")}
           ${kpi("Payback dos ativos UBY", paybackShort(u.paybackMonths), `${u.paybackMonths ? `${Math.round(u.paybackMonths)} meses · ` : ""}retorno ${fmt.pct(u.roiMonthly)} ao mês`)}
           ${kpi("Faturamento dos ativos UBY", fmt.brl(u.revenue), `custo total ${fmt.brl(u.totalOperatingCost)}`)}
         </div>
       </section>
       <div class="grid g3" style="gap:14px;margin-bottom:18px">
         ${group("UBY", "dc", d.groups.uby, "Resultado dos ativos UBY e royalties de marca, antes da distribuição.", "Nenhuma unidade.")}
-        <article class="panel ac"><div class="panel-head"><div><h2>Cotistas UBY</h2><p>Pool de cada competência, calculado sobre o resultado consolidado depois da reserva legal e do fundo de expansão.</p></div></div>
+        <article class="panel ac"><div class="panel-head"><div><h2>Cotistas UBY</h2><p>Pool de cada competência, calculado sobre o resultado consolidado depois do fundo de reserva (10% do lucro líquido).</p></div></div>
           <p style="margin:0 0 8px;font-size:22px;font-weight:850;color:var(--uby-forest)">${fmt.brl(cent.pool)}</p>
-          <div class="list">${cent.months.slice().reverse().map(m => `<div class="list-row"><span>${esc(m.label)}<small style="display:block;color:var(--uby-muted)">reservas ${fmt.brl(m.legalReserve + m.expansionReserve)} · ${fmt.brl(m.perQuota)}/cota</small></span><strong>${fmt.brl(m.investorPool)}</strong></div>`).join("") || `<div class="note">Nenhuma distribuição.</div>`}</div></article>
+          <div class="list">${cent.months.slice().reverse().map(m => `<div class="list-row"><span>${esc(m.label)}<small style="display:block;color:var(--uby-muted)">fundo de reserva ${fmt.brl(m.legalReserve + m.expansionReserve)} · ${fmt.brl(m.perQuota)}/cota</small></span><strong>${fmt.brl(m.investorPool)}</strong></div>`).join("") || `<div class="note">Nenhuma distribuição.</div>`}</div></article>
         ${group("P3 · gestão dos ativos UBY", "consolidated", p3Uby, "Prestação de serviço: gestão cobrada dos ativos UBY e de parceiros com a marca.", "Nenhuma gestão.")}
       </div>
       <div class="split" style="margin-bottom:18px">
@@ -279,9 +279,8 @@
       ${(() => { const r = f.dre, p = r.policy; return `<section class="section"><div class="section-head"><div><p class="kicker">Distribuição UBY · centralizada</p><h2>Como o resultado UBY se divide</h2><p>${r.networkResult > 0 ? "Reservas aplicadas uma vez só, sobre o resultado consolidado da rede (royalties, matriz e impostos já considerados). Os percentuais ficam em Cotas, impostos e rodadas." : "Sem destinação enquanto o resultado consolidado for prejuízo."}</p></div></div>
         <div class="grid g4">
           ${kpi("Resultado consolidado", signed(r.networkResult), r.lossCarried ? `prejuízo anterior compensado ${fmt.brl(r.lossCarried)}` : "antes da distribuição", "", "lead")}
-          ${kpi(`Reserva legal S.A. (${fmt.pct1(p.legalReservePct)})`, fmt.brl(r.legalReserve), "fica na S.A.")}
-          ${kpi(`Fundo de expansão (${fmt.pct1(p.expansionReservePct)})`, fmt.brl(r.expansionReserve), "fica na UBY")}
-          ${kpi(`Cotistas (${fmt.pct1(p.investorPct)} após reservas)`, fmt.brl(r.investorPool), `${fmt.brl(r.perQuota)} por cota`)}
+          ${kpi(`Fundo de reserva (${fmt.pct1(p.expansionReservePct)})`, fmt.brl(r.expansionReserve), "do lucro líquido · fica na UBY")}
+          ${kpi(`Cotistas (${fmt.pct1(p.investorPct)} após o fundo de reserva)`, fmt.brl(r.investorPool), `${fmt.brl(r.perQuota)} por cota`)}
         </div>
       </section>`; })()}
 
@@ -319,8 +318,8 @@
         </div>
         <div class="grid g3">
           ${kpi("Rateio central", fmt.brl(d.matrizCost), "custos corporativos atribuídos aos pontos")}
-          ${kpi("Reservas e expansão", fmt.brl(d.reserve), `legal ${fmt.pct1(p.legalReservePct)} · expansão ${fmt.pct1(p.expansionReservePct)}`)}
-          ${kpi("Pool dos cotistas", fmt.brl(d.investorPool), `${fmt.pct1(p.investorPct)} após reservas · ${d.soldQuotas} cotas · ${fmt.brl(d.perQuota)}/cota`)}
+          ${kpi("Fundo de reserva", fmt.brl(d.reserve), `${fmt.pct1(p.expansionReservePct)} do lucro líquido`)}
+          ${kpi("Pool dos cotistas", fmt.brl(d.investorPool), `${fmt.pct1(p.investorPct)} após o fundo de reserva · ${d.soldQuotas} cotas · ${fmt.brl(d.perQuota)}/cota`)}
         </div>
       </section>
       <div class="split" style="margin-bottom:18px">
@@ -334,32 +333,30 @@
           ${group("Custos reconhecidos na rede")}
           ${cost("Energia", d.energyCost, "Fatura de energia vinculada às recargas dos ativos UBY.", "#/parametros/energia")}
           ${cost("Operação direta por ativo", d.directOperation, "Despesas próprias dos carregadores, sem tributos e sem rateio da matriz.", "#/parametros/carregador")}
-          ${d.taxes ? cost("Impostos lançados por carregador (regra antiga)", d.taxes, "O imposto agora é central (guia da matriz) e sai no resultado final da rede; este valor só aparece se algum carregador ainda tiver alíquota própria.", "#/parametros/cotas") : ""}
           ${cost("Tributos corporativos centralizados", d.matrizTaxCost, "Impostos da matriz, distribuídos entre os destinos do rateio.", matrizHref)}
           ${d.matrizDedicated ? cost("Custos exclusivos de carregadores", d.matrizDedicated, "Lançados na matriz para um carregador só (ex.: seguro do Aurora DC); não são rateio.", matrizHref) : ""}
           ${cost("Demais custos centralizados da matriz", d.otherMatriz, "Aluguel, sistemas e outros custos divididos entre os carregadores.", matrizHref)}
           ${cost("Gestão P3", d.management, "Percentual sobre o faturamento total conforme contrato.", "#/parametros/carregador")}
           ${cost("App / plataforma", d.platform, "Somente sobre recargas e ociosidade; não incide sobre marketing ou royalties.", "#/parametros/carregador")}
           ${cost("Participação de área", d.areaParticipation, "Repasse ao parceiro da área sobre o faturamento total.", "#/parametros/area")}
-          </tbody><tfoot><tr><td>Resultado operacional dos ativos UBY</td><td class="num">${fmt.brl(d.operationalResult)}</td></tr></tfoot><tbody>
+          </tbody><tfoot><tr><td>Resultado operacional dos ativos UBY (antes dos impostos)</td><td class="num">${fmt.brl(d.operationalResult + (d.taxes || 0))}</td></tr></tfoot><tbody>
           ${group("Resultado final da rede")}
-          ${line("Resultado operacional UBY", d.operationalResult)}
+          ${line("Resultado operacional UBY (antes dos impostos)", d.operationalResult + (d.taxes || 0))}
           ${line("+ Royalties UBY", d.royalties)}
-          ${line(`− Impostos sobre o recebido pela UBY (guia da matriz)${d.taxRatePct ? ` · ${Number(d.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : ""}`, d.networkTaxes || 0, d.taxesTotal ? `sobre ${fmt.brl(d.networkTaxBase || 0)} recebidos pela UBY (faturamento dos ativos próprios menos Spott e P3, mais royalties) · valor exato quando a guia for lançada em Parâmetros → Cotas, impostos e rodadas` : "ainda sem alíquota ou guia lançada para o período")}
+          ${line(`− Impostos sobre o recebido pela UBY (guia da matriz)${d.taxRatePct ? ` · ${Number(d.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : ""}`, d.taxesTotal || 0, d.taxesTotal ? `sobre ${fmt.brl(d.networkTaxBase || 0)} recebidos pela UBY (faturamento dos ativos próprios menos Spott, P3 e área paga na origem, mais royalties)${d.taxes ? ` · ${fmt.brl(d.taxes)} já aparecem no resultado de cada carregador` : ""} · valor exato quando a guia for lançada em Parâmetros → Cotas, impostos e rodadas` : "ainda sem alíquota ou guia lançada para o período")}
           </tbody><tfoot><tr><td>= Resultado consolidado antes da distribuição</td><td class="num">${signed(d.networkResult)}</td></tr></tfoot><tbody>
           ${group("Destinação do resultado")}
           ${d.lossCarried ? line("Prejuízo de meses anteriores compensado", d.lossCarried, "o lucro só é distribuído depois de cobrir prejuízos acumulados") : ""}
           ${line("Resultado distribuível", d.distributable || 0)}
-          ${line(`− Reserva legal S.A. (${fmt.pct1(p.legalReservePct)})`, d.legalReserve)}
-          ${line(`− Fundo de expansão (${fmt.pct1(p.expansionReservePct)})`, d.expansionReserve)}
-          </tbody><tfoot><tr><td>= Pool dos cotistas (${fmt.pct1(p.investorPct)} após reservas)</td><td class="num">${fmt.brl(d.investorPool)}</td></tr></tfoot>
+          ${line(`− Fundo de reserva (${fmt.pct1(p.expansionReservePct)} do lucro líquido)`, d.expansionReserve)}
+          </tbody><tfoot><tr><td>= Pool dos cotistas (${fmt.pct1(p.investorPct)} após o fundo de reserva)</td><td class="num">${fmt.brl(d.investorPool)}</td></tr></tfoot>
         </table></div></section>
         <section class="section"><div class="section-head"><div><p class="kicker">Política da rodada</p><h2>${esc(p.roundLabel || "Rodada")}</h2><p>Parâmetros salvos na plataforma. Edite em <a href="#/parametros">Parâmetros e custos → Cotas, impostos e rodadas</a>.</p></div></div>
           <div class="grid g2">
             ${mini("Cotas emitidas", fmt.int(p.totalQuotas))}${mini("Cotas vendidas", fmt.int(p.soldQuotas))}
-            ${mini("% cotistas", fmt.pct1(p.investorPct))}${mini("% reserva legal S.A.", fmt.pct1(p.legalReservePct))}
-            ${mini("% fundo expansão", fmt.pct1(p.expansionReservePct))}${mini("Valor por cota", fmt.brl(d.perQuota), "no período")}
-            ${mini("Impostos sobre faturamento", p.taxRatePct ? `${Number(p.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : "—", p.taxRatePct ? "ou valor lançado no mês" : "não cadastrado")}${mini("Impostos no período", fmt.brl(d.taxesTotal || 0))}
+            ${mini("% cotistas", fmt.pct1(p.investorPct))}
+            ${mini("% fundo de reserva", fmt.pct1(p.expansionReservePct), "do lucro líquido")}${mini("Valor por cota", fmt.brl(d.perQuota), "no período")}
+            ${mini("Impostos sobre o recebido", p.taxRatePct ? `${Number(p.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : "—", p.taxRatePct ? "ou valor lançado no mês" : "não cadastrado")}${mini("Impostos no período", fmt.brl(d.taxesTotal || 0))}
           </div>
           <div class="note" style="margin-top:12px">Prévia gerencial: confirme documentos, impostos e aprovação do fechamento antes de pagar ou contabilizar distribuição.</div>
         </section>
@@ -455,10 +452,10 @@
         <div class="toolbar" style="margin-bottom:10px"><strong style="font-size:12px">Relatórios de repasse</strong>
           <select class="select" id="repMonth">${inv.months.slice().reverse().map(m => `<option value="${esc(m.key)}">${esc(m.label)}</option>`).join("")}</select>
           <button class="btn primary" id="repMonthBtn" type="button" ${inv.months.length ? "" : "disabled"}>Gerar relatório da competência</button>
-          <span class="spacer"></span><small>${inv.taxRatePct ? `Impostos: ${fmt.pct1(inv.taxRatePct)} do faturamento (ou valor lançado no mês)` : `<span class="badge warn">impostos ainda não cadastrados</span> <a href="#/parametros">cadastrar</a>`}</small></div>
-        <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Antes dos impostos</th><th class="num">Impostos</th><th class="num">Resultado</th><th class="num">Prejuízo compensado</th><th class="num">Reserva legal S.A.</th><th class="num">Fundo expansão</th><th class="num">Pool cotistas</th><th class="num">Cotas habilitadas</th><th class="num">Por cota</th><th class="num">Cota 11+ recebe</th><th class="num">Taxa desenvolvedora</th><th>Pagamento</th></tr></thead>
-          <tbody>${inv.months.map(m => `<tr><td><strong>${esc(m.label)}</strong></td><td class="num">${signed(m.preTax ?? m.result)}</td><td class="num">${m.taxes ? fmt.brl(m.taxes) : "—"}<small>${esc(m.taxSource || "")}</small></td><td class="num">${signed(m.result)}</td><td class="num">${m.carryIn < 0 ? signed(m.carryIn) : "—"}</td><td class="num">${fmt.brl(m.legalReserve)}</td><td class="num">${fmt.brl(m.expansionReserve)}</td><td class="num">${fmt.brl(m.investorPool)}</td><td class="num">${m.eligibleQuotas}</td><td class="num">${fmt.brl(m.perQuota)}</td><td class="num">${m.newQuotas ? fmt.brl(m.perNewQuota) : "—"}</td><td class="num">${m.newQuotas ? `${fmt.brl(m.developerFee)}<small>${fmt.pct1(m.founderPct)} de ${m.newQuotas} cota(s) 11+</small>` : "—"}</td>
-            <td><span class="badge ${m.status === "pago" || m.status === "paid" ? "ok" : m.status === "aprovado" ? "dc" : "neutral"}">${esc(m.status)}</span></td></tr>`).join("") || `<tr><td colspan="13" class="empty">Sem competências apuradas.</td></tr>`}</tbody></table></div>
+          <span class="spacer"></span><small>${inv.taxRatePct ? `Impostos: ${fmt.pct1(inv.taxRatePct)} do recebido pela UBY (ou guia lançada no mês)` : `<span class="badge warn">impostos ainda não cadastrados</span> <a href="#/parametros">cadastrar</a>`}</small></div>
+        <div class="table-wrap"><table><thead><tr><th>Competência</th><th class="num">Antes dos impostos</th><th class="num">Impostos</th><th class="num">Resultado</th><th class="num">Prejuízo compensado</th><th class="num">Fundo de reserva</th><th class="num">Pool cotistas</th><th class="num">Cotas habilitadas</th><th class="num">Por cota</th><th class="num">Cota 11+ recebe</th><th class="num">Taxa desenvolvedora</th><th>Pagamento</th></tr></thead>
+          <tbody>${inv.months.map(m => `<tr><td><strong>${esc(m.label)}</strong></td><td class="num">${signed(m.preTax ?? m.result)}</td><td class="num">${m.taxes ? fmt.brl(m.taxes) : "—"}<small>${esc(m.taxSource || "")}</small></td><td class="num">${signed(m.result)}</td><td class="num">${m.carryIn < 0 ? signed(m.carryIn) : "—"}</td><td class="num">${fmt.brl(m.legalReserve + m.expansionReserve)}</td><td class="num">${fmt.brl(m.investorPool)}</td><td class="num">${m.eligibleQuotas}</td><td class="num">${fmt.brl(m.perQuota)}</td><td class="num">${m.newQuotas ? fmt.brl(m.perNewQuota) : "—"}</td><td class="num">${m.newQuotas ? `${fmt.brl(m.developerFee)}<small>${fmt.pct1(m.founderPct)} de ${m.newQuotas} cota(s) 11+</small>` : "—"}</td>
+            <td><span class="badge ${m.status === "pago" || m.status === "paid" ? "ok" : m.status === "aprovado" ? "dc" : "neutral"}">${esc(m.status)}</span></td></tr>`).join("") || `<tr><td colspan="12" class="empty">Sem competências apuradas.</td></tr>`}</tbody></table></div>
       </section>
       <section class="section"><div class="section-head"><div><p class="kicker">Cotistas</p><h2>Apuração por cotista</h2><p>Cada cotista usa o valor da cota da própria rodada (padrão ${fmt.brl(inv.quotaValue || window.UBY_CONFIG.quotaValueDefault)}); a distribuição por cota é igual para todas${inv.investors.some(i => i.founder) ? `, e as cotas 11+ ficam com ${fmt.pct1(100 - inv.founderPct)} dela` : ""}. Distribuição a partir de ${esc(UBY.state.api.monthName(inv.distributionStartMonth || window.UBY_CONFIG.distributionStartDefault))}. Payback indicativo pelo retorno anualizado.</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Cotista</th><th class="num">Cotas</th><th class="num">Valor da cota</th><th class="num">Investido</th><th>Início</th>${inv.months.map(m => `<th class="num">${esc(m.label)}</th>`).join("")}<th class="num">Total devido</th><th class="num">Retorno acum.</th><th class="num">Payback</th><th>Situação</th><th></th></tr></thead>

@@ -103,9 +103,9 @@
       ${changed ? `<div class="note" style="border-color:#e0a4a0;background:#fdf0ef;color:#8a2f2a"><strong>Os números mudaram depois da aprovação.</strong> Aprovado: resultado ${signed(m.snapshot.result)} · pool ${fmt.brl(m.snapshot.investorPool)} (${fmt.brl(m.snapshot.perQuota)} por cota). Agora: resultado ${signed(m.result)} · pool ${fmt.brl(m.investorPool)}. Revise em Parâmetros e custos → Fechamentos.</div>` : ""}
       <div class="kpis k5">
         <div class="kpi big"><b>${fmt.brl(d.networkRevenue)}</b><span>Faturamento bruto</span><small>${fmt.int(sessions)} recargas · ${fmt.kwh0(energy)}</small></div>
-        ${kpi("Recebido pela UBY", fmt.brl(d.networkRevenue - d.platform - d.management + d.royalties), "após Spott e P3, mais royalties")}
+        ${kpi("Recebido pela UBY", fmt.brl(d.networkRevenue - d.platform - d.management - (d.areaAtSource || 0) + d.royalties), d.areaAtSource ? "após Spott, P3 e área paga na origem, mais royalties" : "após Spott e P3, mais royalties")}
         ${kpi("Resultado após impostos", signed(d.networkResult), d.taxesTotal ? `impostos do período ${fmt.brl(d.taxesTotal)}` : "sem imposto lançado")}
-        ${kpi("Reservas", fmt.brl(d.reserve), `legal ${fmt.pct1(p.legalReservePct)} · expansão ${fmt.pct1(p.expansionReservePct)}`)}
+        ${kpi("Fundo de reserva", fmt.brl(d.reserve), `${fmt.pct1(p.expansionReservePct)} do lucro líquido`)}
         ${kpi("Pool dos cotistas", fmt.brl(d.investorPool), acc ? "soma das competências" : `${fmt.brl(m?.perQuota || 0)} por cota`, true)}
       </div>
       <h2>Operação por carregador</h2>
@@ -120,22 +120,23 @@
         ${row("Faturamento bruto", d.networkRevenue, "t")}
         <tr class="g"><td colspan="2">Splits retidos antes do repasse</td></tr>
         ${d.platform ? row("App / plataforma (Spott)", -d.platform, "", "retido pela Spott no repasse") : ""}${d.management ? row("Gestão P3", -d.management, "", "split pago direto à P3") : ""}
-        ${row("Repasse dos ativos UBY (cai na conta)", d.networkRevenue - d.platform - d.management, "t")}
+        ${d.areaAtSource ? row("Área paga na origem", -d.areaAtSource, "", "a Spott divide direto com o local (ex.: Shopping Aurora); não passa pela conta da UBY") : ""}
+        ${row("Repasse dos ativos UBY (cai na conta)", d.networkRevenue - d.platform - d.management - (d.areaAtSource || 0), "t")}
         ${d.royalties ? row("Royalties de parceiros", d.royalties) : ""}
-        ${row("Recebido pela UBY", d.networkRevenue - d.platform - d.management + d.royalties, "t")}
+        ${row("Recebido pela UBY", d.networkRevenue - d.platform - d.management - (d.areaAtSource || 0) + d.royalties, "t")}
         ${d.management || d.partnerManagement ? row("Recebido pela P3 (gestão)", d.management + (d.partnerManagement || 0), "", d.partnerManagement ? `${fmt.brl(d.management)} dos ativos UBY + ${fmt.brl(d.partnerManagement)} da gestão de parceiros` : "split pago direto à P3") : ""}
         <tr class="g"><td colspan="2">Custos da UBY</td></tr>
         ${row("Energia", -d.energyCost)}${d.directOperation ? row("Operação direta dos carregadores", -d.directOperation) : ""}${d.matrizDedicated ? row("Custos exclusivos de carregadores", -d.matrizDedicated) : ""}${d.otherMatriz ? row("Custos centrais da matriz (rateio)", -d.otherMatriz) : ""}${d.matrizTaxCost ? row("Tributos centralizados da matriz", -d.matrizTaxCost) : ""}
-        ${d.areaParticipation ? row("Participação da área", -d.areaParticipation) : ""}${d.taxes ? row("Tributos por carregador", -d.taxes) : ""}
-        ${row("Resultado antes dos impostos", d.operationalResult + d.royalties, "t")}
-        ${row(`Impostos sobre o recebido pela UBY${m?.taxSource ? ` (${m.taxSource})` : ""}`, -(d.networkTaxes || 0), "",
-          d.taxesTotal ? `base: ${fmt.brl(d.networkTaxBase || 0)} recebidos pela UBY (faturamento bruto menos Spott e P3, mais royalties)${d.taxes ? ` · ${fmt.brl(d.taxes)} já descontados em "Tributos por carregador"` : ""}` : "nenhum imposto lançado no período")}
+        ${d.areaParticipation - (d.areaAtSource || 0) > 0.004 ? row("Participação da área", -(d.areaParticipation - (d.areaAtSource || 0))) : ""}
+        ${row("Resultado antes dos impostos", d.operationalResult + (d.taxes || 0) + d.royalties, "t")}
+        ${row(`Impostos sobre o recebido pela UBY${m?.taxSource ? ` (${m.taxSource})` : ""}`, -(d.taxesTotal || 0), "",
+          d.taxesTotal ? `base: ${fmt.brl(d.networkTaxBase || 0)} recebidos pela UBY (faturamento bruto menos Spott, P3 e área paga na origem, mais royalties)${d.taxes ? ` · ${fmt.brl(d.taxes)} já aparecem no resultado de cada carregador` : ""}` : "nenhum imposto lançado no período")}
         ${row("Resultado após impostos", d.networkResult, "t")}
         <tr class="g"><td colspan="2">Destinação</td></tr>
         ${!acc && m && m.carryIn < 0 ? row("Compensação de prejuízo de meses anteriores", m.carryIn, "s") : ""}
         ${row("Resultado distribuível", d.distributable || 0)}
-        ${row(`Reserva legal S.A. (${fmt.pct1(p.legalReservePct)})`, -d.legalReserve)}${row(`Fundo de expansão (${fmt.pct1(p.expansionReservePct)})`, -d.expansionReserve)}
-        ${row(`Pool dos cotistas (${fmt.pct1(p.investorPct)} após reservas)`, d.investorPool, "t")}
+        ${row(`Fundo de reserva (${fmt.pct1(p.expansionReservePct)} do lucro líquido)`, -d.expansionReserve)}
+        ${row(`Pool dos cotistas (${fmt.pct1(p.investorPct)} após o fundo de reserva)`, d.investorPool, "t")}
       </tbody></table>
       <h2>Resultado por carregador</h2>
       <table><thead><tr><th>Carregador</th><th>Modelo</th><th class="n">Faturamento</th><th class="n">Custos</th><th class="n">Resultado</th><th class="n">Margem</th></tr></thead><tbody>
@@ -195,7 +196,7 @@
         ${row("Energia", -f.energyCost)}
         ${localCosts.map(l => row(esc(l.label), -l.actual)).join("")}
         ${matrix.map(l => row(`${esc(l.label)} (matriz)`, -l.actual, "", l.rule)).join("")}
-        ${f.taxes ? row(`Impostos (${(f.revenue ? f.taxes / f.revenue * 100 : st.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%)`, -f.taxes) : ""}
+        ${f.taxes ? row(f.receivedBase ? `Impostos sobre o recebido pela UBY (${(f.taxes / f.receivedBase * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%)` : `Impostos (${(f.revenue ? f.taxes / f.revenue * 100 : st.taxRatePct).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%)`, -f.taxes, "", f.receivedBase ? `sobre ${fmt.brl(f.receivedBase)} que a UBY recebe deste carregador (faturamento − Spott − P3${f.areaAtSource ? " − área paga na origem" : ""})` : "") : ""}
         ${row(`Gestão P3 (${fmt.pct1(st.managementPct)}${model === "third_party_management" || model === "management_only" ? " do líquido" : ""})`, -f.management)}${f.platform ? row(`App / plataforma (${fmt.pct1(st.platformPct)})`, -f.platform) : ""}
         ${f.areaParticipation ? row(`Participação da área (${fmt.pct1(f.areaSharePct)})`, -f.areaParticipation) : ""}${f.ubyRoyalty ? row(`Royalty de marca UBY (${fmt.pct1(st.ubyRoyaltyPct)} do líquido)`, -f.ubyRoyalty) : ""}
         ${row("Resultado operacional do ponto", f.operationNet, "t")}
@@ -252,7 +253,7 @@
         ${rows.map(r => `<tr><td>${esc(r.m.label)}</td><td class="n">${signed(r.m.result)}</td><td class="n">${fmt.brl(r.m.investorPool)}</td><td class="n">${r.m.eligibleQuotas}</td><td class="n">${fmt.brl(i.newQuota && !i.founder && r.m.newQuotas ? r.m.perNewQuota : r.m.perQuota)}</td><td class="n"><strong>${fmt.brl(r.value)}</strong></td><td>${esc(r.m.status)}</td></tr>`).join("") || `<tr><td colspan="7">Sem competências desde a habilitação.</td></tr>`}
         <tr class="t"><td>Total</td><td></td><td></td><td></td><td></td><td class="n">${fmt.brl(i.due)}</td><td></td></tr>
       </tbody></table>
-      <div class="note">O resultado da rede já considera energia, custos dos carregadores, custos centrais, gestão, impostos sobre o faturamento e a compensação de prejuízos anteriores. Reserva legal e fundo de expansão são descontados antes do pool dos cotistas.${i.founder ? ` A taxa da desenvolvedora (${fmt.pct1(inv.founderPct)} das cotas 11+) tem extrato próprio.` : i.newQuota ? ` Como cota 11+, você recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota; ${fmt.pct1(inv.founderPct)} vão para a desenvolvedora.` : ""}${i.paybackYears ? ` Payback indicativo no ritmo atual: ${fmt.n1(i.paybackYears)} anos.` : ""}</div>${foot()}`;
+      <div class="note">O resultado da rede já considera energia, custos dos carregadores, custos centrais, gestão, impostos sobre o recebido pela UBY (11,33%) e a compensação de prejuízos anteriores. O fundo de reserva (10% do lucro líquido) é descontado antes do pool dos cotistas.${i.founder ? ` A taxa da desenvolvedora (${fmt.pct1(inv.founderPct)} das cotas 11+) tem extrato próprio.` : i.newQuota ? ` Como cota 11+, você recebe ${fmt.pct1(100 - inv.founderPct)} do valor por cota; ${fmt.pct1(inv.founderPct)} vão para a desenvolvedora.` : ""}${i.paybackYears ? ` Payback indicativo no ritmo atual: ${fmt.n1(i.paybackYears)} anos.` : ""}</div>${foot()}`;
   }
 
   // ---------------------------------------------------------------- área (dono do local)
@@ -268,10 +269,15 @@
     const d = iso => iso ? fmt.date(iso) : "—";
     return `<div class="sub" style="margin-bottom:10px"><strong>UBY RECHARGE LTDA</strong> · CNPJ 66.737.561/0001-86 · Londrina - PR</div>
       ${header("Prestação de contas do ponto", `${esc(a.workName)} · parceiro da área: <strong>${esc(a.config.payee)}</strong><br>Período do relatório: <strong>${d(m.periodStart)} a ${d(m.periodEnd)}</strong> · competência ${esc(m.label)}`, m.paidAt ? "pago" : "aprovado")}
-      <div class="kpis">
-        ${kpi("Faturamento do período", fmt.brl(m.revenue))}${kpi(a.config.reimburseEnergy ? "Energia vendida" : "Energia entregue", fmt.kwh(m.energy))}
-        ${kpi("Reembolso de energia", m.reimbursement ? fmt.brl(m.reimbursement) : "—", a.config.reimburseEnergy ? "" : "ponto com padrão próprio")}${kpi("Total para a área", fmt.brl(m.total), m.paidAt ? `pago em ${fmt.date(m.paidAt + "T12:00:00")}` : `vence em ${fmt.date(m.due + "T12:00:00")}`, true)}
-      </div>
+      ${(() => {
+        // Ocupação só nos pontos marcados em Repasse à área ("mostrar ocupação na prestação de contas").
+        const occ = a.config.showOccupancy && m.occupancy !== null && m.occupancy !== undefined;
+        const cards = [kpi("Faturamento do período", fmt.brl(m.revenue)), kpi(a.config.reimburseEnergy ? "Energia vendida" : "Energia entregue", fmt.kwh(m.energy)),
+          ...(occ ? [kpi("Ocupação do ponto", fmt.pct1(m.occupancy), `${fmt.kwh(m.energy)} de ${fmt.kwh(m.occPower * m.occHours)} possíveis`)] : []),
+          ...(a.config.reimburseEnergy || !occ ? [kpi("Reembolso de energia", m.reimbursement ? fmt.brl(m.reimbursement) : "—", a.config.reimburseEnergy ? "" : "ponto com padrão próprio")] : []),
+          kpi("Total para a área", fmt.brl(m.total), m.atSource ? "pago pela Spott na origem" : m.paidAt ? `pago em ${fmt.date(m.paidAt + "T12:00:00")}` : `vence em ${fmt.date(m.due + "T12:00:00")}`, true)];
+        return `<div class="kpis" style="grid-template-columns:repeat(${cards.length},1fr)">${cards.join("")}</div>`;
+      })()}
       <h2>Composição do fechamento</h2>
       <table><tbody>
         ${a.config.reimburseEnergy ? `<tr class="g"><td colspan="2">Energia</td></tr>
@@ -292,10 +298,10 @@
       <div class="sub">Do início da operação até este fechamento</div>
       <div class="kpis">${kpi("Faturamento acumulado", fmt.brl(sum("revenue")))}${kpi("Energia acumulada", fmt.kwh(sum("energy")))}${kpi("Energia reembolsada", fmt.brl(sum("reimbursement")))}${kpi("Total acumulado para a área", fmt.brl(sum("total")), "", true)}</div>
       <h2>Linha do tempo mensal</h2>
-      <table><thead><tr><th>Período</th><th class="n">Faturamento</th><th class="n">Energia</th><th class="n">R$/kWh</th><th class="n">% área</th><th class="n">Participação</th><th class="n">Total área</th><th>Situação</th></tr></thead><tbody>
-        ${upTo.map(x => `<tr class="${x.key === m.key ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.brl(x.revenue)}</td><td class="n">${fmt.kwh(x.energy)}</td><td class="n">${x.reimbursement ? `${fmt.brl(x.rate)}/kWh` : "—"}</td><td class="n">${fmt.pct(x.areaPct)}</td><td class="n">${fmt.brl(x.area)}</td><td class="n">${fmt.brl(x.total)}</td><td>${x.paidAt ? `pago ${fmt.date(x.paidAt + "T12:00:00")}` : esc(x.status)}</td></tr>`).join("")}
+      <table><thead><tr><th>Período</th><th class="n">Faturamento</th><th class="n">Energia</th>${a.config.showOccupancy ? '<th class="n">Ocupação</th>' : ""}<th class="n">R$/kWh</th><th class="n">% área</th><th class="n">Participação</th><th class="n">Total área</th><th>Situação</th></tr></thead><tbody>
+        ${upTo.map(x => `<tr class="${x.key === m.key ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.brl(x.revenue)}</td><td class="n">${fmt.kwh(x.energy)}</td>${a.config.showOccupancy ? `<td class="n">${x.occupancy === null || x.occupancy === undefined ? "—" : fmt.pct1(x.occupancy)}</td>` : ""}<td class="n">${x.reimbursement ? `${fmt.brl(x.rate)}/kWh` : "—"}</td><td class="n">${fmt.pct(x.areaPct)}</td><td class="n">${fmt.brl(x.area)}</td><td class="n">${fmt.brl(x.total)}</td><td>${x.paidAt ? `pago ${fmt.date(x.paidAt + "T12:00:00")}` : esc(x.status)}</td></tr>`).join("")}
       </tbody></table>
-      <div class="note">Relatório destinado ao parceiro da área. ${a.config.reimburseEnergy ? "O reembolso de energia corresponde aos kWh vendidos no ponto multiplicados pela tarifa de energia do mês. " : ""}Conferir tarifa de energia, percentual contratual e documentos fiscais antes do envio final.</div>
+      <div class="note">Relatório destinado ao parceiro da área. ${a.config.reimburseEnergy ? "O reembolso de energia corresponde aos kWh vendidos no ponto multiplicados pela tarifa de energia do mês. " : ""}${a.config.showOccupancy ? "Ocupação = kWh entregues ÷ (potência instalada × horas em que o ponto esteve disponível no período). " : ""}Conferir tarifa de energia, percentual contratual e documentos fiscais antes do envio final.</div>
       <div class="sign"><div>Responsável · UBY Recharge</div><div>${esc(a.config.payee)}</div></div>${foot()}`;
   }
 

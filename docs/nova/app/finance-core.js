@@ -183,7 +183,10 @@
     // Parceria: a Spott retém a plataforma antes de repassar; gestão e royalty incidem sobre o líquido.
     const feesOnNet = !!fixes.partnerNetBase && (model === "third_party_management" || model === "management_only");
     const ubyRoyalty = model === "third_party_management" ? (feesOnNet ? revenue - platform : revenue) * num(cfg.ubyRoyaltyPct) / 100 : 0;
-    const taxes = revenue * num(cfg.taxRatePct) / 100;
+    // Imposto: com input.receivedTax (imposto central da UBY), sai do próprio carregador sobre o que a UBY
+    // RECEBE dele — faturamento − plataforma − gestão P3 − área paga na origem —, calculado mais abaixo.
+    const receivedTax = input.receivedTax && num(input.receivedTax.pct) > 0 ? input.receivedTax : null;
+    let taxes = receivedTax ? 0 : revenue * num(cfg.taxRatePct) / 100;
     // Com faturas por período de leitura, a energia da competência vem delas
     // (parte das faturas + estimativa dos dias ainda sem fatura).
     const inv = input.energyInvoice || null;
@@ -220,8 +223,6 @@
     const management = spottNetSplit
       ? ((revenue - platform) * Math.round(num(cfg.managementPct) / (1 - num(cfg.platformPct) / 100) * 100) / 100 + (totalRevenue - revenue) * num(cfg.managementPct)) / 100
       : (feesOnNet ? totalRevenue - platform : totalRevenue) * num(cfg.managementPct) / 100;
-    const costs = energyCost + extraCosts + taxes;
-    const preAreaNet = totalRevenue - management - platform - ubyRoyalty - costs;
     const areaEligible = model === "uby" || model === "hybrid";
     const areaSharePct = cfg.ownerTransferMode === "net" ? num(cfg.ownerNetProfitSharePct) : num(cfg.ownerRevenueSharePct);
     const areaParticipationCalc = areaEligible ? totalRevenue * areaSharePct / 100 : 0;
@@ -231,6 +232,15 @@
     // adj.total null = vale o calculado; adj.extra = saldo trazido do mês anterior.
     const areaParticipation = !areaEligible || !adj ? areaParticipationCalc
       : (adj.total !== null && adj.total !== undefined && Number.isFinite(Number(adj.total)) ? num(adj.total) - (adj.reimburse ? energyCost : 0) : areaParticipationCalc + num(adj.extra));
+    // Área paga na origem (a Spott divide direto com o local, ex.: Shopping Aurora a partir de out/2026):
+    // continua como custo do carregador, mas não passa pela conta da UBY nem entra na base do imposto.
+    const areaAtSource = receivedTax && receivedTax.areaAtSource ? areaParticipation : 0;
+    // Imposto sobre o que entra na conta da UBY: com o split na origem, a parte da área nem passa pela UBY e fica
+    // fora da base; antes do split (ex.: Aurora set/2026) a UBY recebeu tudo e recolhe sobre tudo.
+    const receivedBase = receivedTax ? Math.max(0, totalRevenue - platform - management - areaAtSource) : 0;
+    if (receivedTax) taxes = receivedBase * num(receivedTax.pct) / 100;
+    const costs = energyCost + extraCosts + taxes;
+    const preAreaNet = totalRevenue - management - platform - ubyRoyalty - costs;
     const operationNet = preAreaNet - areaParticipation;
 
     const splitNet = part => {
@@ -271,7 +281,7 @@
     return {
       monthKey: input.monthKey || "", operationModel: model,
       revenue, chargingRevenue: revenue, energy, commercialEnergy, acRevenue, dcRevenue,
-      extraRevenue, marketingRevenue, totalRevenue, spottAdjust,
+      extraRevenue, marketingRevenue, totalRevenue, spottAdjust, receivedBase, areaAtSource, taxRateReceived: receivedTax ? num(receivedTax.pct) : 0,
       management, platform, ubyRoyalty, feesOnNet, taxes, energyCost, energyComposition: comp, courtesyInvoiceExcluded,
       localExtraCosts, matrizCost, matrizTaxCost, matrizDedicatedCost, matrizCash, extraCosts, areaSharePct, areaParticipation, areaParticipationCalc,
       preAreaNet, operationNet, acNet, dcNet, unknownNet,
@@ -292,7 +302,7 @@
   }
 
   // Campos que somam entre meses/carregadores.
-  const ADDITIVE = ["revenue", "chargingRevenue", "energy", "commercialEnergy", "acRevenue", "dcRevenue", "extraRevenue", "marketingRevenue", "totalRevenue", "spottAdjust",
+  const ADDITIVE = ["revenue", "chargingRevenue", "energy", "commercialEnergy", "acRevenue", "dcRevenue", "extraRevenue", "marketingRevenue", "totalRevenue", "spottAdjust", "receivedBase", "areaAtSource",
     "management", "platform", "ubyRoyalty", "taxes", "energyCost", "courtesyInvoiceExcluded", "localExtraCosts", "matrizCost", "matrizTaxCost", "matrizDedicatedCost", "matrizCash", "extraCosts",
     "areaParticipation", "preAreaNet", "operationNet", "ubyNet", "p3SocietyProfit", "partnerShare", "p3Gross", "p3OperationalResult", "ownResult", "paybackBase",
     "saRetention", "ubyDistributable", "investorDistribution", "partnerInvestorDistribution", "finalDistribution", "ubyRetained", "totalOperatingCost",

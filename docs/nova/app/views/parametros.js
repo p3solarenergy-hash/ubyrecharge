@@ -194,7 +194,7 @@
     return field(c.label || row.name, input);
   }
 
-  // Retenção S.A. e % de cotas não são mais por carregador: a reserva legal, o fundo de expansão e a
+  // Retenção e % de cotas não são mais por carregador: o fundo de reserva (SCP, sem reserva legal) e a
   // parte dos cotistas valem sobre o resultado consolidado (Cotas, impostos e rodadas).
   const CENTRAL_KEYS = ["saRetentionPct", "investorQuotaPct"];
   function chargerTab(w, data) {
@@ -254,7 +254,7 @@
     return {
       toolbar, cards, rules, ruleRows, hasInv, model,
       contract: `<div class="grid g2" style="gap:14px">${visible.filter(r => r.key !== "energyCostPerKWh").map(rowHtml).join("")}</div>
-        ${["uby", "hybrid"].includes(model) ? `<div class="note" style="margin-top:12px">Reserva legal S.A., fundo de expansão e cotistas não são configurados por carregador: valem uma vez só sobre o resultado consolidado da rede, em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a>.</div>` : ""}`,
+        ${["uby", "hybrid"].includes(model) ? `<div class="note" style="margin-top:12px">Fundo de reserva e cotistas não são configurados por carregador: valem uma vez só sobre o resultado consolidado da rede, em <a href="#/parametros/cotas">Cotas, impostos e rodadas</a>.</div>` : ""}`,
       energyRow: hasInv ? "" : visible.filter(r => r.key === "energyCostPerKWh").map(rowHtml).join("")
     };
   }
@@ -527,7 +527,7 @@
         const f = sf.finance, ec = sf.energyComposition || {}, key = enc(`${s.workId}|${s.station}`);
         if (ec.estimatedCost > 0) add("Energia", "warn", `${s.station}: energia com estimativa de ${fmt.brl(ec.estimatedCost)}`, `Consumo de ${fmtDay(ec.estimatedFrom)} a ${fmtDay(ec.estimatedTo)} ainda sem fatura lançada. Acerta quando a fatura entrar.`,
           `#/parametros/energia/${key}/${enc("inv:new")}`, "Lançar fatura");
-        else if (!(f.energyCost > 0)) add("Energia", "bad", `${s.station}: energia sem custo`, `${fmt.kwh(f.energy)} vendidos e custo de energia R$ 0,00 — a margem fica inflada.`,
+        else if (!(f.energyCost > 0) && !UBY.data("areaAccount", s.workId, s.station)?.config?.energyByHost) add("Energia", "bad", `${s.station}: energia sem custo`, `${fmt.kwh(f.energy)} vendidos e custo de energia R$ 0,00 — a margem fica inflada.`,
           `#/parametros/carregador/${key}/energyCostPerKWh/${mk}`, "Cadastrar energia");
         if (!(f.platform > 0)) add("Custos do carregador", "warn", `${s.station}: App / plataforma zerado`, "Nenhum percentual de plataforma nesta competência. Se o ponto paga app, cadastre.",
           `#/parametros/carregador/${key}/platformPct/${mk}`, "Conferir");
@@ -1409,11 +1409,11 @@
     const [workId, station] = (ui.arCharger || "|").split("|");
     const a = api.areaAccount(workId, station);
     if (!a) return `<div class="note">Carregador não encontrado no motor.</div>`;
-    const f = ui.arForm || (ui.arForm = { reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay });
+    const f = ui.arForm || (ui.arForm = { reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, splitAtSourceFrom: a.config.splitAtSourceFrom || "", showOccupancy: !!a.config.showOccupancy, energyByHost: !!a.config.energyByHost });
     const can = canWrite(w) && !busy ? "" : "disabled";
     const today = new Date().toISOString().slice(0, 10);
-    const dirty = f.reimburseEnergy !== a.config.reimburseEnergy || f.payee !== a.config.payee || (f.payeeEmail || "") !== (a.config.payeeEmail || "") || Number(f.dueDay) !== Number(a.config.dueDay) || !a.config.configured;
-    const st = s => `<span class="badge ${s === "pago" ? "ok" : s === "vencido" ? "bad" : s === "sem repasse" ? "neutral" : "warn"}">${esc(s)}</span>`;
+    const dirty = f.reimburseEnergy !== a.config.reimburseEnergy || f.payee !== a.config.payee || (f.payeeEmail || "") !== (a.config.payeeEmail || "") || Number(f.dueDay) !== Number(a.config.dueDay) || (f.splitAtSourceFrom || "") !== (a.config.splitAtSourceFrom || "") || !!f.showOccupancy !== !!a.config.showOccupancy || !!f.energyByHost !== !!a.config.energyByHost || !a.config.configured;
+    const st = s => `<span class="badge ${s === "pago" || s === "na origem (Spott)" ? "ok" : s === "vencido" ? "bad" : s === "sem repasse" ? "neutral" : "warn"}">${esc(s)}</span>`;
     return `
       <div class="toolbar">${embedded ? `<strong style="font-size:12.5px">Repasse ao dono do local</strong>` : `<select class="select" id="pmArCharger" style="min-width:280px">${list.map(c => `<option value="${esc(c.key)}" ${c.key === ui.arCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</select>`}
         <span class="spacer"></span><button class="btn" id="pmArReport" type="button">Prestação de contas (relatório)</button></div>
@@ -1427,6 +1427,11 @@
           </div>
           <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12.5px"><input type="checkbox" data-ar="reimburseEnergy" ${f.reimburseEnergy ? "checked" : ""}> Reembolsar a energia ao dono do local (o ponto ainda usa o padrão/energia do local)</label>
           <p class="source-line">Quando o ponto tiver padrão próprio, desmarque: a energia passa a vir das Faturas de energia e o repasse fica só com a participação.</p>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px">${field("Split na origem a partir de (a Spott paga a área direto ao local)", `<input class="select" type="month" data-ar="splitAtSourceFrom" value="${esc(f.splitAtSourceFrom || "")}" style="width:190px">`)}
+            ${f.splitAtSourceFrom ? `<button class="btn ghost" type="button" data-ar-split-clear>Tirar</button>` : ""}</div>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12.5px"><input type="checkbox" data-ar="showOccupancy" ${f.showOccupancy ? "checked" : ""}> Mostrar a ocupação do ponto na prestação de contas (relatório da área)</label>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:12.5px"><input type="checkbox" data-ar="energyByHost" ${f.energyByHost ? "checked" : ""}> Energia 100% paga pelo local (sem custo de energia para a UBY; o fechamento não cobra fatura)</label>
+          <p class="source-line">Split na origem: a Spott deposita a parte do local direto na conta dele. A área continua no resultado do carregador, mas não vira conta a pagar da UBY e não entra na base do imposto (a UBY só recolhe sobre o que de fato recebe). Antes do split, a área entra na conta da UBY, paga imposto junto e é repassada no dia escolhido do mês seguinte.</p>
           <button class="btn primary" id="pmArSave" type="button" style="margin-top:8px" ${dirty ? can : "disabled"}>${a.config.configured ? "Salvar regra" : "Ativar repasse deste carregador"}</button>
         </section>
         <section class="section" style="margin:0"><div class="section-head"><div><p class="kicker">Acumulado</p><h2>Do início da operação até hoje</h2></div></div>
@@ -1441,7 +1446,7 @@
             <td class="num">${fmt.brl(m.revenue)}</td><td class="num">${fmt.kwh(m.energy)}</td><td class="num">${m.reimbursement ? `${fmt.brl(m.rate)}/kWh` : "—"}</td><td class="num">${m.reimbursement ? fmt.brl(m.reimbursement) : "—"}</td>
             <td class="num">${fmt.pct1(m.areaPct)}</td><td class="num">${fmt.brl(m.area)}</td><td class="num"><strong>${fmt.brl(m.total)}</strong>${m.adjusted ? `<small>ajustado · calculado ${fmt.brl(m.computedTotal)}${m.adjustNote ? ` · ${esc(m.adjustNote)}` : ""}</small>` : ""}${m.carryIn ? `<small>inclui diferença de ${esc(m.carryFromLabel)}: ${fmt.brl(m.carryIn)}</small>` : ""}${m.paidAmount !== null && m.paidDiff ? `<small>devido ${fmt.brl(m.dueAmount)} · diferença ${fmt.brl(m.paidDiff)} ${m.paidDiffMode === "next" ? "levada ao mês seguinte" : "zerada"}</small>` : ""}</td><td>${fmt.date(m.due + "T12:00:00")}</td>
             <td>${st(m.status)}${m.paidAt ? `<small>em ${fmt.date(m.paidAt + "T12:00:00")}</small>` : ""}</td>
-            <td style="white-space:nowrap">${a.config.configured ? (m.paidAt ? `<button class="btn ghost" data-ar-unpay="${esc(m.key)}" type="button" ${can}>Desfazer</button>` : `${m.total > 0 ? `<button class="btn primary" data-ar-pay-open="${esc(m.key)}" type="button" ${can}>Marcar pago</button> ` : ""}<button class="btn ghost" data-ar-adj="${esc(m.key)}" type="button" ${can}>Ajustar valor</button>`) : ""}
+            <td style="white-space:nowrap">${m.atSource ? `<small>paga pela Spott na origem</small> ` : a.config.configured ? (m.paidAt ? `<button class="btn ghost" data-ar-unpay="${esc(m.key)}" type="button" ${can}>Desfazer</button>` : `${m.total > 0 ? `<button class="btn primary" data-ar-pay-open="${esc(m.key)}" type="button" ${can}>Marcar pago</button> ` : ""}<button class="btn ghost" data-ar-adj="${esc(m.key)}" type="button" ${can}>Ajustar valor</button>`) : ""}
               <button class="btn ghost" data-ar-rep="${esc(m.key)}" type="button">Relatório</button></td></tr>
             ${ui.arPay === m.key && !m.paidAt ? `<tr><td colspan="11"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
               ${field("Pago em", `<input class="select" type="date" data-ar-date="${esc(m.key)}" value="${today}" style="width:150px">`)}
@@ -1604,19 +1609,19 @@
     const feePct = Number(e.founderPct ?? 20);
     const kindOf = i => i.founder ? "founder" : i.newQuota ? "new" : "round1";
     return `
-      <section class="section"><div class="section-head"><div><p class="kicker">Política de distribuição</p><h2>Rodadas, valor da cota e reservas</h2><p>O valor padrão da cota vale para cotistas sem valor próprio. Cada cotista pode ter o valor da sua rodada (ex.: rodada 1 a R$ 80 mil, novas a R$ 100 mil). A distribuição por cota é igual para todas; o valor pago muda o investido, o retorno e o payback.</p></div></div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Política de distribuição</p><h2>Rodadas, valor da cota e fundo de reserva</h2><p>O valor padrão da cota vale para cotistas sem valor próprio. Cada cotista pode ter o valor da sua rodada (ex.: rodada 1 a R$ 80 mil, novas a R$ 100 mil). A distribuição por cota é igual para todas; o valor pago muda o investido, o retorno e o payback.</p></div></div>
         <div class="grid g4" style="gap:8px">
           ${inp("quotaValue", "Valor padrão da cota (R$)", "number", 'min="0" step="1000"')}${inp("distributionStartMonth", "Distribuição a partir de", "month")}
-          ${inp("legalReservePct", "Reserva legal (%)", "number", 'min="0" max="100" step="0.1"')}${inp("expansionReservePct", "Fundo de expansão (%)", "number", 'min="0" max="100" step="0.1"')}
-          ${inp("investorPct", "Parte dos cotistas após reservas (%)", "number", 'min="0" max="100" step="0.1"')}${inp("totalQuotas", "Cotas da rodada atual", "number", 'min="1" step="1"')}
+          ${inp("expansionReservePct", "Fundo de reserva (% do lucro líquido)", "number", 'min="0" max="100" step="0.1"')}
+          ${inp("investorPct", "Parte dos cotistas após o fundo de reserva (%)", "number", 'min="0" max="100" step="0.1"')}${inp("totalQuotas", "Cotas da rodada atual", "number", 'min="1" step="1"')}
           ${inp("soldQuotas", "Cotas vendidas", "number", 'min="0" step="1"')}${inp("roundLabel", "Nome da rodada atual", "text")}
           ${inp("founderPct", "Taxa da desenvolvedora nas cotas 11+ (%)", "number", 'min="0" max="100" step="0.1"')}
         </div>
         <p class="meta" style="margin:10px 0 0">Rodada 1: 10 cotas (8 de investidores + 2 da REBP), todas recebendo o mesmo valor por cota. Da cota 11 em diante, cada cota fica com ${esc(fmt.pct1(100 - feePct))} do que recebe e ${esc(fmt.pct1(feePct))} vão para a REBP como taxa da desenvolvedora, mostrada à parte. Indique o tipo de cada cotista na coluna "Tipo da cota".</p>
       </section>
       ${startWarn}
-      <section class="section"><div class="section-head"><div><p class="kicker">Impostos da UBY</p><h2>Impostos sobre o faturamento</h2><p>Incidem sobre tudo o que a UBY faturou no mês (recargas e receitas dos ativos próprios + royalties) e saem do resultado antes das reservas e dos cotistas. Use o percentual e, quando a guia sair, lance o valor exato do mês — ele substitui o percentual naquela competência.</p></div></div>
-        <div class="grid g4" style="gap:8px">${inp("taxRatePct", "Alíquota sobre o faturamento (%)", "number", 'min="0" max="100" step="0.01"')}</div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Impostos da UBY</p><h2>Impostos sobre o recebido</h2><p>Incidem sobre o que a UBY recebe no mês (faturamento dos ativos próprios menos Spott, P3 e a parte da área, mais royalties), não sobre o faturamento bruto, e saem do resultado antes do fundo de reserva e dos cotistas. Use o percentual e, quando a guia sair, lance o valor exato do mês — ele substitui o percentual naquela competência.</p></div></div>
+        <div class="grid g4" style="gap:8px">${inp("taxRatePct", "Alíquota sobre o recebido pela UBY (%)", "number", 'min="0" max="100" step="0.01"')}</div>
         <p class="meta" style="margin:10px 0 6px">A alíquota sai do resultado de cada carregador próprio da UBY (e dos relatórios). Quando ela mudar, cadastre a nova "a partir de" um mês: os meses anteriores continuam com a antiga.</p>
         <div class="table-wrap"><table><thead><tr><th>A partir de</th><th class="num">Nova alíquota (%)</th><th></th></tr></thead><tbody>
           ${Object.keys(e.taxRateFrom || {}).sort().map(k => `<tr><td>${esc(UBY.state.api?.monthName?.(k) || k)}</td><td class="num"><input class="select" type="number" min="0" max="100" step="0.01" data-tax-from="${esc(k)}" value="${esc(e.taxRateFrom[k])}" style="width:120px"></td><td><button class="btn" type="button" data-tax-from-del="${esc(k)}">Remover</button></td></tr>`).join("")}
@@ -1664,7 +1669,7 @@
       try { d = UBY.data("finance", mk).dre; } catch (_) {}
       if (!d) return null;
       const nx = nextMonthKey(mk);
-      const uby = Math.round((d.networkRevenue - d.platform - d.management + d.royalties) * 100) / 100;
+      const uby = Math.round((d.networkRevenue - d.platform - d.management - (d.areaAtSource || 0) + d.royalties) * 100) / 100;
       const p3 = Math.round((d.management + (d.partnerManagement || 0)) * 100) / 100;
       const got = infl[nx]?.Spott;
       const covered = lastTx >= `${nx}-15`;
@@ -2108,8 +2113,9 @@
     // --- repasse à área ---
     if ($("#pmArCharger")) $("#pmArCharger").onchange = e => { ui.arCharger = e.target.value; ui.arForm = null; draw(target, w); };
     target.querySelectorAll("[data-ar]").forEach(el => el.onchange = () => { ui.arForm[el.dataset.ar] = el.type === "checkbox" ? el.checked : el.dataset.ar === "dueDay" ? Number(el.value || 10) : el.value; draw(target, w); });
+    target.querySelectorAll("[data-ar-split-clear]").forEach(b => b.onclick = () => { ui.arForm.splitAtSourceFrom = ""; draw(target, w); });
     const arCtx = () => { const c = data.chargers.find(x => x.key === ui.arCharger); const a = UBY.state.api.areaAccount(c.workId, c.station); return { c, a }; };
-    const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, paid: { ...(a.config.paid || {}) }, paidInfo: { ...(a.config.paidInfo || {}) }, adjust: { ...(a.config.adjust || {}) } });
+    const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, splitAtSourceFrom: a.config.splitAtSourceFrom || "", showOccupancy: !!a.config.showOccupancy, energyByHost: !!a.config.energyByHost, paid: { ...(a.config.paid || {}) }, paidInfo: { ...(a.config.paidInfo || {}) }, adjust: { ...(a.config.adjust || {}) } });
       run(target, w, `${label} · ${c.station}`, async () => { await saveChargerField(w, c.workId, c.station, c.workName, "areaAccount", next); ui.arForm = null; return "salvo"; }); };
     // --- tarifa pela fatura do posto (reembolso) ---
     if ($("#pmPiPdf")) $("#pmPiPdf").onchange = async e => {
@@ -2144,7 +2150,7 @@
         return `tarifa R$ ${rate.toLocaleString("pt-BR", { maximumFractionDigits: 6 })}/kWh gravada em ${mk}${saved}`;
       });
     };
-    if ($("#pmArSave")) $("#pmArSave").onclick = () => arSave("Regra do repasse à área", cfg => ({ ...cfg, reimburseEnergy: !!ui.arForm.reimburseEnergy, payee: String(ui.arForm.payee || "").trim() || cfg.payee, payeeEmail: String(ui.arForm.payeeEmail || "").trim().toLowerCase(), dueDay: Math.min(Math.max(Number(ui.arForm.dueDay) || 10, 1), 28) }));
+    if ($("#pmArSave")) $("#pmArSave").onclick = () => arSave("Regra do repasse à área", cfg => ({ ...cfg, reimburseEnergy: !!ui.arForm.reimburseEnergy, payee: String(ui.arForm.payee || "").trim() || cfg.payee, payeeEmail: String(ui.arForm.payeeEmail || "").trim().toLowerCase(), dueDay: Math.min(Math.max(Number(ui.arForm.dueDay) || 10, 1), 28), splitAtSourceFrom: /^\d{4}-\d{2}$/.test(ui.arForm.splitAtSourceFrom || "") ? ui.arForm.splitAtSourceFrom : "", showOccupancy: !!ui.arForm.showOccupancy, energyByHost: !!ui.arForm.energyByHost }));
     target.querySelectorAll("[data-ar-pay-open]").forEach(b => b.onclick = () => { ui.arPay = ui.arPay === b.dataset.arPayOpen ? "" : b.dataset.arPayOpen; ui.arAdjust = ""; draw(target, w); });
     target.querySelectorAll("[data-ar-pay-cancel]").forEach(b => b.onclick = () => { ui.arPay = ""; draw(target, w); });
     target.querySelectorAll("[data-ar-pay]").forEach(b => b.onclick = () => {

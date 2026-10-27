@@ -722,7 +722,7 @@
     const operationalResult = Number(owned.operationNet || 0);
     const networkResult = operationalResult + royalties;
     const positive = Math.max(networkResult, 0);
-    const legalReserve = positive * Number(policy.legalReservePct || 0) / 100;
+    const legalReserve = 0; // SCP: sem reserva legal (26/10/2026)
     const expansionReserve = positive * Number(policy.expansionReservePct || 0) / 100;
     const investorPool = (positive - legalReserve - expansionReserve) * Number(policy.investorPct || 0) / 100;
     const soldQuotas = Math.min(Number(policy.soldQuotas || 0), Number(policy.totalQuotas || 1));
@@ -738,7 +738,7 @@
       operationalResult, networkResult, margin: networkRevenue ? networkResult / networkRevenue * 100 : 0,
       legalReserve, expansionReserve, reserve: legalReserve + expansionReserve, investorPool, soldQuotas, perQuota: soldQuotas > 0 ? investorPool / soldQuotas : 0,
       policy: { roundLabel: policy.roundLabel, totalQuotas: Number(policy.totalQuotas || 0), soldQuotas, investorPct: Number(policy.investorPct || 0),
-        legalReservePct: Number(policy.legalReservePct || 0), expansionReservePct: Number(policy.expansionReservePct || 0) }
+        legalReservePct: 0, expansionReservePct: Number(policy.expansionReservePct || 0) }
     };
 
     const monthly = buildUbyMonthlySeries(ownRows, sourceMonths).map(m => ({ key: m.mk, label: m.label, revenue: m.revenue, cost: m.totalOperatingCost,
@@ -763,7 +763,7 @@
           energyCost: f.energyCost, extraCosts: f.extraCosts, matrizCost: f.matrizCost, taxes: f.taxes, management: f.management, platform: f.platform,
           areaParticipation: f.areaParticipation, ubyRoyalty: f.ubyRoyalty, totalOperatingCost: f.totalOperatingCost, operationNet: f.operationNet,
           operationMargin: f.operationMargin, totalCostPerKWh: f.totalCostPerKWh, resultPerKWh: f.resultPerKWh,
-          courtesyCharges: f.courtesyCharges, courtesyEnergy: f.courtesyEnergy, courtesyCostExcluded: f.courtesyCostExcluded
+          courtesyCharges: f.courtesyCharges, courtesyEnergy: f.courtesyEnergy, courtesyCostExcluded: f.courtesyCostExcluded, receivedBase: f.receivedBase, areaAtSource: f.areaAtSource
         };
       })
     };
@@ -1501,7 +1501,7 @@
     p3SocietyProfit: r.p3SocietyProfit, partnerShare: r.partnerShare, saRetention: r.saRetention, investorDistribution: r.investorDistribution,
     partnerInvestorDistribution: r.partnerInvestorDistribution, ubyRetained: r.ubyRetained, investmentValue: r.investmentValue,
     paybackInvestmentValue: r.paybackInvestmentValue, paybackBase: r.paybackBase, paybackMonths: r.paybackMonths, roiMonthly: r.roiMonthly,
-    courtesyCharges: r.courtesyCharges, courtesyEnergy: r.courtesyEnergy, courtesyCostExcluded: r.courtesyCostExcluded
+    courtesyCharges: r.courtesyCharges, courtesyEnergy: r.courtesyEnergy, courtesyCostExcluded: r.courtesyCostExcluded, receivedBase: r.receivedBase, areaAtSource: r.areaAtSource
   });
 
   function stationFinanceLegacy(workId, station, monthKey) {
@@ -1870,7 +1870,10 @@
       acRevenue: charges.filter(c => chargerKind(c) === "ac").reduce((s, c) => s + c.revenue, 0),
       dcRevenue: charges.filter(c => chargerKind(c) === "dc").reduce((s, c) => s + c.revenue, 0),
       courtesy: { treatment: courtesy.treatment, energy: courtesy.energy, energyCost: courtesy.energyCost, commercialEnergy: courtesy.commercialEnergy, charges: courtesy.charges, revenue: courtesy.revenue },
-      planning, matrixItems: fv2MatrixItems(row, mk, fixes), energyInvoice, areaAdjust
+      planning, matrixItems: fv2MatrixItems(row, mk, fixes), energyInvoice, areaAdjust,
+      // Imposto da UBY sobre o recebido, já no carregador (usuário, 26/10/2026: "aparecer já no relatório e nas
+      // leituras individuais, sem duplicar"). A rede cobra o total e desconta o que saiu de cada carregador.
+      receivedTax: fixes.centralTax && ["uby", "hybrid"].includes(cfg.operationModel) ? { pct: taxRateFor(mk), areaAtSource: areaAtSourceIn(areaCfg, mk) } : null
     }, fixes);
     result.flags = flags;
     result.sessions = charges.length;
@@ -1893,7 +1896,9 @@
   }
   function fv2Policy() {
     const p = loadNetworkDistribution();
-    return { legalReservePct: p.legalReservePct, expansionReservePct: p.expansionReservePct, investorPct: p.investorPct, founderPct: p.founderPct,
+    // SCP, não S.A. (usuário, 26/10/2026): sem reserva legal, desde o início; fica só o fundo de reserva
+    // (expansionReservePct, 10% do lucro líquido).
+    return { legalReservePct: 0, expansionReservePct: p.expansionReservePct, investorPct: p.investorPct, founderPct: p.founderPct,
       quotaValue: p.quotaValue, distributionStartMonth: p.distributionStartMonth, investors: applyInvestorOperationStart(normalizeNetworkInvestors(p.investors)).sort(compareInvestorsByStart),
       taxRatePct: p.taxRatePct || 0, taxRateFrom: p.taxRateFrom || {}, taxByMonth: p.taxByMonth || {}, paymentLedger: p.paymentLedger || {} };
   }
@@ -1909,7 +1914,7 @@
         const owned = r.operationModel === "uby" || r.operationModel === "hybrid";
         // Imposto sobre o que a UBY RECEBE (usuário, 14/10/2026): a Spott retém a plataforma e repassa a gestão
         // da P3 direto (split); só o restante cai na conta da UBY. Com centralTax; sem ele, faturamento total.
-        if (owned) { ownedNet += r.operationNet; taxBase += fixes.centralTax ? n0(r.totalRevenue) - n0(r.platform) - n0(r.management) : r.totalRevenue; if (fixes.centralTax) taxesApplied += n0(r.taxes); }
+        if (owned) { ownedNet += r.operationNet; taxBase += fixes.centralTax ? (r.taxRateReceived ? n0(r.receivedBase) : n0(r.totalRevenue) - n0(r.platform) - n0(r.management)) : r.totalRevenue; if (fixes.centralTax) taxesApplied += n0(r.taxes); }
         else if (r.operationModel === "third_party_management") { royalties += r.ubyRoyalty; taxBase += r.ubyRoyalty; }
         if (owned || r.operationModel === "third_party_management") rows.push({ station: row.stationName, active, model: r.operationModel, revenue: r.revenue, energyCost: r.energyCost,
           localExtraCosts: r.localExtraCosts, matrizCost: r.matrizCost, taxes: r.taxes, operationNet: r.operationNet, royalty: r.ubyRoyalty, flags: r.flags });
@@ -2072,7 +2077,7 @@
       ownedCount: ownedDre.length, partnerCount: partnerRows.length,
       rechargeRevenue: n0(owned.revenue), extraRevenue: n0(owned.extraRevenue), royalties, marketing: n0(owned.marketingRevenue),
       networkRevenue, energyCost: n0(owned.energyCost), directOperation: Math.max(0, n0(owned.extraCosts) - n0(owned.matrizCost)),
-      taxes: n0(owned.taxes), matrizTaxCost: n0(owned.matrizTaxCost), matrizDedicated: n0(owned.matrizDedicatedCost),
+      taxes: n0(owned.taxes), areaAtSource: n0(owned.areaAtSource), matrizTaxCost: n0(owned.matrizTaxCost), matrizDedicated: n0(owned.matrizDedicatedCost),
       otherMatriz: Math.max(0, n0(owned.matrizCost) - n0(owned.matrizTaxCost) - n0(owned.matrizDedicatedCost)), matrizCost: n0(owned.matrizCost),
       management: n0(owned.management), platform: n0(owned.platform), areaParticipation: n0(owned.areaParticipation),
       partnerManagement: sumF(partnerRows, "management"),
@@ -2108,7 +2113,7 @@
           energyCost: f.energyCost, extraCosts: f.extraCosts, matrizCost: f.matrizCost, taxes: f.taxes, management: f.management, platform: f.platform,
           areaParticipation: f.areaParticipation, ubyRoyalty: f.ubyRoyalty, totalOperatingCost: f.totalOperatingCost, operationNet: f.operationNet,
           operationMargin: f.operationMargin, totalCostPerKWh: f.totalCostPerKWh, resultPerKWh: f.resultPerKWh,
-          courtesyCharges: f.courtesyCharges, courtesyEnergy: f.courtesyEnergy, courtesyCostExcluded: f.courtesyCostExcluded };
+          courtesyCharges: f.courtesyCharges, courtesyEnergy: f.courtesyEnergy, courtesyCostExcluded: f.courtesyCostExcluded, receivedBase: f.receivedBase, areaAtSource: f.areaAtSource };
       })
     };
   }
@@ -2156,7 +2161,7 @@
       resultPerKWh: r.energy > 0 ? r.operationNet / r.energy : null, ubyNet: r.ubyNet, p3OperationalResult: r.p3OperationalResult, p3SocietyProfit: r.p3SocietyProfit,
       partnerShare: r.partnerShare, saRetention: r.saRetention, investorDistribution: r.investorDistribution, partnerInvestorDistribution: r.partnerInvestorDistribution,
       ubyRetained: r.ubyRetained, investmentValue: r.investmentValue, paybackInvestmentValue: r.paybackInvestmentValue, paybackBase: r.paybackBase,
-      courtesyCharges: r.courtesyCharges, courtesyEnergy: r.courtesyEnergy, courtesyCostExcluded: r.courtesyCostExcluded });
+      courtesyCharges: r.courtesyCharges, courtesyEnergy: r.courtesyEnergy, courtesyCostExcluded: r.courtesyCostExcluded, receivedBase: r.receivedBase, areaAtSource: r.areaAtSource });
     const monthly = rowMonths.map(m => ({ key: m, label: monthLabel(m), ...v2Pick(fv2Month(row, m, fixes)) }));
     const v = mk ? fv2Month(row, mk, fixes) : null;
     const legacy = mk ? financeForRowMonth(row, mk).result : null; // só métricas de planejamento (break-even, custo variável, meta)
@@ -2261,6 +2266,9 @@
   // (own = null → vale o calculado). paidInfo[mês] = { amount, due, diff, diffMode }: valor
   // efetivamente pago; a diferença (devido − pago, gravada no pagamento) vai ao mês seguinte
   // (diffMode "next") ou é zerada ("drop"). Pago = valor que fica no resultado do mês.
+  // Área paga na origem: a Spott divide direto com o local a partir do mês marcado (ex.: Shopping Aurora,
+  // out/2026). A UBY não paga esse repasse nem recolhe imposto sobre ele.
+  const areaAtSourceIn = (cfg, mk) => !!(cfg && /^\d{4}-\d{2}$/.test(cfg.splitAtSourceFrom || "") && mk >= cfg.splitAtSourceFrom);
   function areaAdjustState(cfg, mk) {
     const adj = cfg?.adjust?.[mk];
     const own = adj && adj.total !== null && adj.total !== "" && Number.isFinite(Number(adj.total)) ? Math.round(Number(adj.total) * 100) / 100 : null;
@@ -2277,6 +2285,11 @@
     const cfg = fv2AreaConfig(row) || {};
     const reimburse = !!cfg.reimburseEnergy;
     const dueDay = Math.min(Math.max(Number(cfg.dueDay) || 10, 1), 28);
+    // Ocupação do mês (opcional na prestação de contas): kWh ÷ (potência × horas disponíveis), desde a 1ª recarga
+    // e, no mês corrente, até agora — a mesma conta do painel da estação.
+    const occPower = n0(workPowerById(row.workId));
+    let occAvail = null;
+    try { occAvail = stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName); } catch (_) {}
     const months = fv2RowMonths(row, fixes, "").map(mk => {
       const r = fv2Month(row, mk, fixes);
       const charges = FV2.rowMonths.get(row.fv2Id)?.get(mk) || [];
@@ -2299,16 +2312,20 @@
       const own = aa.own === null ? computedTotal : aa.own;
       const dueAmount = Math.round((own + aa.carryIn) * 100) / 100;
       const total = aa.paidAmount !== null ? aa.paidAmount : dueAmount;
-      const status = paidAt ? "pago" : total < 0 ? "saldo negativo" : !(total > 0) ? "sem repasse" : (new Date(`${due}T23:59:59`) < new Date() ? "vencido" : "a pagar");
+      const atSource = areaAtSourceIn(cfg, mk);
+      let occHours = 0;
+      try { occHours = occAvail ? stationAvailableHours(occAvail, first, new Date(Math.min(new Date(y, m, 1).getTime(), Date.now()))) : 0; } catch (_) {}
+      const occupancy = occPower > 0 && occHours > 0 ? n0(r.energy) / (occPower * occHours) * 100 : null;
+      const status = atSource ? "na origem (Spott)" : paidAt ? "pago" : total < 0 ? "saldo negativo" : !(total > 0) ? "sem repasse" : (new Date(`${due}T23:59:59`) < new Date() ? "vencido" : "a pagar");
       return { key: mk, label: monthLabel(mk), periodStart: iso(first), periodEnd: iso(monthEnd), revenue: n0(r.totalRevenue), energy, rate: energy > 0 ? n0(r.energyCost) / energy : 0,
         reimbursement, reimbursementExact: reimburse ? n0(r.energyCost) : 0, areaExact: areaCalc, areaPct: n0(r.areaSharePct), areaMode: "gross", area, total, due, paidAt,
         computedTotal, own, dueAmount, adjusted: aa.own !== null, adjustment: Math.round((own - computedTotal) * 100) / 100, adjustNote: aa.note,
         carryIn: aa.carryIn, carryFrom: aa.carryFrom, carryFromLabel: aa.carryFrom ? monthLabel(aa.carryFrom) : "",
-        paidAmount: aa.paidAmount, paidDiff: aa.paidAmount !== null ? aa.diff : 0, paidDiffMode: aa.diffMode, status };
+        paidAmount: aa.paidAmount, paidDiff: aa.paidAmount !== null ? aa.diff : 0, paidDiffMode: aa.diffMode, status, atSource, occupancy, occHours, occPower };
     }).filter(m => m.total !== 0 || m.revenue > 0);
     const sum = k => months.reduce((s, m) => s + n0(m[k]), 0);
     return { workId: row.workId, workName: row.workName, station: row.stationName || row.station, kind: row.kind,
-      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, paidInfo: cfg.paidInfo || {}, adjust: cfg.adjust || {}, configured: !!fv2AreaConfig(row) },
+      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, paidInfo: cfg.paidInfo || {}, adjust: cfg.adjust || {}, splitAtSourceFrom: cfg.splitAtSourceFrom || "", showOccupancy: !!cfg.showOccupancy, energyByHost: !!cfg.energyByHost, configured: !!fv2AreaConfig(row) },
       months, totals: { revenue: sum("revenue"), energy: sum("energy"), reimbursement: sum("reimbursement"), area: sum("area"), total: sum("total"),
         paid: months.filter(m => m.paidAt).reduce((s, m) => s + m.total, 0) } };
   }
@@ -2324,7 +2341,7 @@
     const out = [];
     FV2.rows.filter(r => r.included && fv2AreaConfig(r)).forEach(row => {
       const acc = areaAccountRow(row);
-      acc.months.filter(m => String(m.due).slice(0, 7) === mk && m.total > 0).forEach(m => {
+      acc.months.filter(m => String(m.due).slice(0, 7) === mk && m.total > 0 && !m.atSource).forEach(m => {
         out.push({ id: `area-${row.workId}-${m.key}`, kind: "area", workId: row.workId, competence: m.key, dueAmount: m.dueAmount, paidAmount: m.paidAmount,
           name: `Repasse à área · ${acc.config.payee} · ${m.label}`, category: "Repasse à área", supplier: acc.config.payee,
           station: acc.station, workName: row.workName, due: m.due, dueDay: acc.config.dueDay, amount: m.total,
