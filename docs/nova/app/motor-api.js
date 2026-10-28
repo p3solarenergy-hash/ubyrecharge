@@ -2184,7 +2184,8 @@
       })() : null,
       settings: v ? { managementPct: n0(cfg.managementPct), platformPct: n0(cfg.platformPct), taxRatePct: n0(cfg.taxRatePct), ubyRoyaltyPct: n0(cfg.ubyRoyaltyPct),
         energyCostPerKWh: n0(cfg.energyCostPerKWh), investmentValue: n0(cfg.investmentValue), saRetentionPct: n0(cfg.saRetentionPct), investorQuotaPct: n0(cfg.investorQuotaPct),
-        p3SocietyPct: n0(cfg.p3SocietyPct), energyBillingMode: cfg.energyBillingMode || "" } : null,
+        p3SocietyPct: n0(cfg.p3SocietyPct), energyBillingMode: cfg.energyBillingMode || "",
+        reservePct: n0(fv2Policy().expansionReservePct) } : null, // fundo de reserva da SCP (% do lucro líquido), só para leitura por ponto
       energyComposition: v?.energyComposition ? JSON.parse(JSON.stringify(v.energyComposition)) : null,
       costLines: v ? [
         ...v.costRuleDetails.filter(d => d.enabled !== false && (n0(d.actual) || n0(d.planned))).map(d => ({ id: d.id || "", label: d.label, rule: d.displayRule || "", actual: n0(d.actual), planned: n0(d.planned), perKWh: v.energy > 0 ? n0(d.actual) / v.energy : null, matrix: false })),

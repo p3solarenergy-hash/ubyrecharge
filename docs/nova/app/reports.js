@@ -163,11 +163,18 @@
     let u = null;
     try { u = UBY.data("usage", { kind: "station", workId, station, monthKey: s.monthKey }).kpis; } catch (_) {}
     const model = f.model;
+    // Fundo de reserva da SCP (10% do lucro líquido): aplicado de fato uma vez só no consolidado da rede;
+    // aqui mostra a parte que este ponto gera, para o relatório chegar ao valor real do ponto.
+    const reserveOn = (model === "uby" || model === "hybrid") && n(st.reservePct) > 0;
+    const reserveOf = v => reserveOn ? Math.max(n(v), 0) * n(st.reservePct) / 100 : 0;
+    const reserve = reserveOf(f.ubyNet), realValue = n(f.ubyNet) - reserve;
     const opRevenue = s.revenueLines.filter(l => l.scope !== "non_operational"), mkt = s.revenueLines.filter(l => l.scope === "non_operational");
     // Custo lançado na matriz para um carregador só (ex.: seguro) aparece como custo dele, não como rateio.
     const localCosts = s.costLines.filter(l => !l.matrix || l.dedicated), matrix = s.costLines.filter(l => l.matrix && !l.dedicated);
     const dest = {
-      uby: () => row("Resultado do ponto para a UBY", f.ubyNet, "t"),
+      uby: () => reserveOn
+        ? `${row("Resultado do ponto para a UBY (lucro líquido)", f.ubyNet)}${row(`Fundo de reserva (${fmt.pct1(st.reservePct)} do lucro líquido)`, -reserve, "", f.ubyNet > 0 ? "retido na UBY antes do pool dos cotistas" : "sem retenção em mês de prejuízo")}${row("Valor real do ponto (após o fundo de reserva)", realValue, "t")}`
+        : row("Resultado do ponto para a UBY", f.ubyNet, "t"),
       hybrid: () => dest.uby() + (f.p3SocietyProfit ? row("Participação P3 (sociedade AC/DC)", f.p3SocietyProfit) : ""),
       third_party_management: () => `${row("Royalty de marca UBY", f.ubyRoyalty)}${row("Gestão P3", f.management)}${row("Resultado do parceiro (repasse)", f.partnerShare, "t")}`,
       management_only: () => `${row("Gestão P3", f.management)}${row("Resultado do parceiro (repasse)", f.partnerShare, "t")}`,
@@ -178,7 +185,8 @@
         ${kpi("Faturamento", fmt.brl(f.totalRevenue || f.revenue), `${fmt.int(u?.validSessions ?? u?.sessions ?? 0)} recargas · ${fmt.int(u?.clients ?? 0)} clientes`)}
         ${kpi("Energia entregue", fmt.kwh0(f.energy), u ? `ocupação ${fmt.pct1(u.occupancy)}` : "")}
         ${kpi("Custos totais", fmt.brl(f.totalOperatingCost), f.totalCostPerKWh ? `${fmt.brl(f.totalCostPerKWh)}/kWh` : "")}
-        ${kpi(model === "third_party_management" ? "Repasse ao parceiro" : "Resultado do ponto", signed(model === "third_party_management" || model === "management_only" ? f.partnerShare : f.operationNet), f.operationMargin ? `margem ${fmt.pct1(f.operationMargin)}` : "", true)}
+        ${reserveOn ? kpi("Valor real do ponto", signed(realValue), `resultado ${signed(f.ubyNet)} − fundo de reserva ${fmt.brl(reserve)}`, true)
+          : kpi(model === "third_party_management" ? "Repasse ao parceiro" : "Resultado do ponto", signed(model === "third_party_management" || model === "management_only" ? f.partnerShare : f.operationNet), f.operationMargin ? `margem ${fmt.pct1(f.operationMargin)}` : "", true)}
       </div>
       ${u ? `<h2>Operação</h2><div class="two"><table><tbody>
           <tr><td>Recargas</td><td class="n">${fmt.int(u.validSessions)}</td></tr><tr><td>Clientes</td><td class="n">${fmt.int(u.clients)}</td></tr>
@@ -210,13 +218,15 @@
         const sum = k => list.reduce((a, x) => a + n(x[k]), 0);
         const pct = v => inv > 0 ? fmt.pct(v / inv * 100) : "—";
         const accResult = sum("paybackBase");
+        const accReserve = list.reduce((a, x) => a + reserveOf(x.ubyNet), 0);
         return `${inv ? `<h2>Valor investido</h2><table><tbody><tr><td>Investimento no ponto</td><td class="n">${fmt.brl(inv)}</td></tr></tbody></table>` : ""}
       <h2>Evolução mensal do ponto</h2>
-      <table><thead><tr><th>Competência</th><th class="n">Energia</th><th class="n">Faturamento</th><th class="n">Custos</th><th class="n">Resultado</th>${inv ? `<th class="n">% do investido</th>` : ""}</tr></thead><tbody>
-        ${list.map(x => `<tr class="${x.key === s.monthKey ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.kwh0(x.energy)}</td><td class="n">${fmt.brl(x.totalRevenue || x.revenue)}</td><td class="n">${fmt.brl(x.totalOperatingCost)}</td><td class="n">${signed(x.operationNet)}</td>${inv ? `<td class="n">${pct(n(x.paybackBase))}</td>` : ""}</tr>`).join("")}
-        <tr class="t"><td>Acumulado</td><td class="n">${fmt.kwh0(sum("energy"))}</td><td class="n">${fmt.brl(list.reduce((a, x) => a + n(x.totalRevenue || x.revenue), 0))}</td><td class="n">${fmt.brl(sum("totalOperatingCost"))}</td><td class="n">${signed(sum("operationNet"))}</td>${inv ? `<td class="n">${pct(accResult)}</td>` : ""}</tr>
+      <table><thead><tr><th>Competência</th><th class="n">Energia</th><th class="n">Faturamento</th><th class="n">Custos</th><th class="n">Resultado</th>${reserveOn ? `<th class="n">Fundo de reserva</th><th class="n">Valor real</th>` : ""}${inv ? `<th class="n">% do investido</th>` : ""}</tr></thead><tbody>
+        ${list.map(x => `<tr class="${x.key === s.monthKey ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.kwh0(x.energy)}</td><td class="n">${fmt.brl(x.totalRevenue || x.revenue)}</td><td class="n">${fmt.brl(x.totalOperatingCost)}</td><td class="n">${signed(x.operationNet)}</td>${reserveOn ? `<td class="n">${fmt.brl(reserveOf(x.ubyNet))}</td><td class="n">${signed(n(x.ubyNet) - reserveOf(x.ubyNet))}</td>` : ""}${inv ? `<td class="n">${pct(n(x.paybackBase))}</td>` : ""}</tr>`).join("")}
+        <tr class="t"><td>Acumulado</td><td class="n">${fmt.kwh0(sum("energy"))}</td><td class="n">${fmt.brl(list.reduce((a, x) => a + n(x.totalRevenue || x.revenue), 0))}</td><td class="n">${fmt.brl(sum("totalOperatingCost"))}</td><td class="n">${signed(sum("operationNet"))}</td>${reserveOn ? `<td class="n">${fmt.brl(accReserve)}</td><td class="n">${signed(sum("ubyNet") - accReserve)}</td>` : ""}${inv ? `<td class="n">${pct(accResult)}</td>` : ""}</tr>
       </tbody></table>`;
       })()}
+      ${reserveOn ? `<div class="note">O fundo de reserva (${fmt.pct1(st.reservePct)} do lucro líquido) é retido uma vez só, no resultado consolidado da rede, antes do pool dos cotistas; aqui aparece a parte gerada por este ponto para mostrar o valor real dele. Em mês de prejuízo não há retenção.</div>` : ""}
       ${(s.flags || []).includes("fatura-copiada") ? `<div class="note">A fatura de energia desta competência era cópia do mês anterior; o custo foi calculado por kWh × tarifa até a fatura real ser lançada.</div>` : ""}
       <div class="sign"><div>Responsável · UBY Recharge</div><div>${model === "third_party_management" || model === "management_only" || model === "p3_society" ? "Parceiro" : "Aprovação"}</div></div>${foot()}`;
   }
