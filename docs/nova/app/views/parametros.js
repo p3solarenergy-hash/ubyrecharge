@@ -1368,6 +1368,8 @@
   }
 
   // ---------- repasse à área (dono do local) ----------
+  // Itens de uso que cada ponto escolhe mostrar na prestação de contas da área.
+  const AR_SHOW = [["showSessions", "Número de recargas"], ["showAvgTime", "Tempo médio das recargas"], ["showClients", "Clientes"], ["showOccTime", "Ocupação por tempo"], ["showOccupancy", "Ocupação real (energia)"]];
   // Participação da área sobre o faturamento e, quando o ponto ainda usa a energia
   // do local, o reembolso dos kWh vendidos × tarifa do mês (Por carregador · energia).
   // Ponto sem padrão próprio (reembolso ao dono do local): a fatura é a do posto inteiro. Dela sai só a
@@ -1409,10 +1411,10 @@
     const [workId, station] = (ui.arCharger || "|").split("|");
     const a = api.areaAccount(workId, station);
     if (!a) return `<div class="note">Carregador não encontrado no motor.</div>`;
-    const f = ui.arForm || (ui.arForm = { reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, splitAtSourceFrom: a.config.splitAtSourceFrom || "", showOccupancy: !!a.config.showOccupancy, energyByHost: !!a.config.energyByHost });
+    const f = ui.arForm || (ui.arForm = { reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, splitAtSourceFrom: a.config.splitAtSourceFrom || "", showSessions: !!a.config.showSessions, showAvgTime: !!a.config.showAvgTime, showClients: !!a.config.showClients, showOccTime: !!a.config.showOccTime, showOccupancy: !!a.config.showOccupancy, energyByHost: !!a.config.energyByHost });
     const can = canWrite(w) && !busy ? "" : "disabled";
     const today = new Date().toISOString().slice(0, 10);
-    const dirty = f.reimburseEnergy !== a.config.reimburseEnergy || f.payee !== a.config.payee || (f.payeeEmail || "") !== (a.config.payeeEmail || "") || Number(f.dueDay) !== Number(a.config.dueDay) || (f.splitAtSourceFrom || "") !== (a.config.splitAtSourceFrom || "") || !!f.showOccupancy !== !!a.config.showOccupancy || !!f.energyByHost !== !!a.config.energyByHost || !a.config.configured;
+    const dirty = f.reimburseEnergy !== a.config.reimburseEnergy || f.payee !== a.config.payee || (f.payeeEmail || "") !== (a.config.payeeEmail || "") || Number(f.dueDay) !== Number(a.config.dueDay) || (f.splitAtSourceFrom || "") !== (a.config.splitAtSourceFrom || "") || AR_SHOW.some(([k]) => !!f[k] !== !!a.config[k]) || !!f.energyByHost !== !!a.config.energyByHost || !a.config.configured;
     const st = s => `<span class="badge ${s === "pago" || s === "na origem (Spott)" ? "ok" : s === "vencido" ? "bad" : s === "sem repasse" ? "neutral" : "warn"}">${esc(s)}</span>`;
     return `
       <div class="toolbar">${embedded ? `<strong style="font-size:12.5px">Repasse ao dono do local</strong>` : `<select class="select" id="pmArCharger" style="min-width:280px">${list.map(c => `<option value="${esc(c.key)}" ${c.key === ui.arCharger ? "selected" : ""}>${esc(c.station)} · ${esc(c.workName)}</option>`).join("")}</select>`}
@@ -1429,7 +1431,8 @@
           <p class="source-line">Quando o ponto tiver padrão próprio, desmarque: a energia passa a vir das Faturas de energia e o repasse fica só com a participação.</p>
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px">${field("Split na origem a partir de (a Spott paga a área direto ao local)", `<input class="select" type="month" data-ar="splitAtSourceFrom" value="${esc(f.splitAtSourceFrom || "")}" style="width:190px">`)}
             ${f.splitAtSourceFrom ? `<button class="btn ghost" type="button" data-ar-split-clear>Tirar</button>` : ""}</div>
-          <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12.5px"><input type="checkbox" data-ar="showOccupancy" ${f.showOccupancy ? "checked" : ""}> Mostrar a ocupação do ponto na prestação de contas (relatório da área)</label>
+          <div style="margin-top:10px;font-size:12.5px"><strong>Mostrar na prestação de contas (relatório da área):</strong>
+            <div style="display:flex;gap:6px 16px;flex-wrap:wrap;margin-top:6px">${AR_SHOW.map(([k, label]) => `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-ar="${k}" ${f[k] ? "checked" : ""}> ${label}</label>`).join("")}</div></div>
           <label style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:12.5px"><input type="checkbox" data-ar="energyByHost" ${f.energyByHost ? "checked" : ""}> Energia 100% paga pelo local (sem custo de energia para a UBY; o fechamento não cobra fatura)</label>
           <p class="source-line">Split na origem: a Spott deposita a parte do local direto na conta dele. A área continua no resultado do carregador, mas não vira conta a pagar da UBY e não entra na base do imposto (a UBY só recolhe sobre o que de fato recebe). Antes do split, a área entra na conta da UBY, paga imposto junto e é repassada no dia escolhido do mês seguinte.</p>
           <button class="btn primary" id="pmArSave" type="button" style="margin-top:8px" ${dirty ? can : "disabled"}>${a.config.configured ? "Salvar regra" : "Ativar repasse deste carregador"}</button>
@@ -2115,7 +2118,7 @@
     target.querySelectorAll("[data-ar]").forEach(el => el.onchange = () => { ui.arForm[el.dataset.ar] = el.type === "checkbox" ? el.checked : el.dataset.ar === "dueDay" ? Number(el.value || 10) : el.value; draw(target, w); });
     target.querySelectorAll("[data-ar-split-clear]").forEach(b => b.onclick = () => { ui.arForm.splitAtSourceFrom = ""; draw(target, w); });
     const arCtx = () => { const c = data.chargers.find(x => x.key === ui.arCharger); const a = UBY.state.api.areaAccount(c.workId, c.station); return { c, a }; };
-    const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, splitAtSourceFrom: a.config.splitAtSourceFrom || "", showOccupancy: !!a.config.showOccupancy, energyByHost: !!a.config.energyByHost, paid: { ...(a.config.paid || {}) }, paidInfo: { ...(a.config.paidInfo || {}) }, adjust: { ...(a.config.adjust || {}) } });
+    const arSave = (label, mutate) => { const { c, a } = arCtx(); const next = mutate({ reimburseEnergy: a.config.reimburseEnergy, payee: a.config.payee, payeeEmail: a.config.payeeEmail || "", dueDay: a.config.dueDay, splitAtSourceFrom: a.config.splitAtSourceFrom || "", showSessions: !!a.config.showSessions, showAvgTime: !!a.config.showAvgTime, showClients: !!a.config.showClients, showOccTime: !!a.config.showOccTime, showOccupancy: !!a.config.showOccupancy, energyByHost: !!a.config.energyByHost, paid: { ...(a.config.paid || {}) }, paidInfo: { ...(a.config.paidInfo || {}) }, adjust: { ...(a.config.adjust || {}) } });
       run(target, w, `${label} · ${c.station}`, async () => { await saveChargerField(w, c.workId, c.station, c.workName, "areaAccount", next); ui.arForm = null; return "salvo"; }); };
     // --- tarifa pela fatura do posto (reembolso) ---
     if ($("#pmPiPdf")) $("#pmPiPdf").onchange = async e => {
@@ -2150,7 +2153,7 @@
         return `tarifa R$ ${rate.toLocaleString("pt-BR", { maximumFractionDigits: 6 })}/kWh gravada em ${mk}${saved}`;
       });
     };
-    if ($("#pmArSave")) $("#pmArSave").onclick = () => arSave("Regra do repasse à área", cfg => ({ ...cfg, reimburseEnergy: !!ui.arForm.reimburseEnergy, payee: String(ui.arForm.payee || "").trim() || cfg.payee, payeeEmail: String(ui.arForm.payeeEmail || "").trim().toLowerCase(), dueDay: Math.min(Math.max(Number(ui.arForm.dueDay) || 10, 1), 28), splitAtSourceFrom: /^\d{4}-\d{2}$/.test(ui.arForm.splitAtSourceFrom || "") ? ui.arForm.splitAtSourceFrom : "", showOccupancy: !!ui.arForm.showOccupancy, energyByHost: !!ui.arForm.energyByHost }));
+    if ($("#pmArSave")) $("#pmArSave").onclick = () => arSave("Regra do repasse à área", cfg => ({ ...cfg, reimburseEnergy: !!ui.arForm.reimburseEnergy, payee: String(ui.arForm.payee || "").trim() || cfg.payee, payeeEmail: String(ui.arForm.payeeEmail || "").trim().toLowerCase(), dueDay: Math.min(Math.max(Number(ui.arForm.dueDay) || 10, 1), 28), splitAtSourceFrom: /^\d{4}-\d{2}$/.test(ui.arForm.splitAtSourceFrom || "") ? ui.arForm.splitAtSourceFrom : "", showSessions: !!ui.arForm.showSessions, showAvgTime: !!ui.arForm.showAvgTime, showClients: !!ui.arForm.showClients, showOccTime: !!ui.arForm.showOccTime, showOccupancy: !!ui.arForm.showOccupancy, energyByHost: !!ui.arForm.energyByHost }));
     target.querySelectorAll("[data-ar-pay-open]").forEach(b => b.onclick = () => { ui.arPay = ui.arPay === b.dataset.arPayOpen ? "" : b.dataset.arPayOpen; ui.arAdjust = ""; draw(target, w); });
     target.querySelectorAll("[data-ar-pay-cancel]").forEach(b => b.onclick = () => { ui.arPay = ""; draw(target, w); });
     target.querySelectorAll("[data-ar-pay]").forEach(b => b.onclick = () => {

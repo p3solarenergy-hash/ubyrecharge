@@ -2291,6 +2291,10 @@
     const occPower = n0(workPowerById(row.workId));
     let occAvail = null;
     try { occAvail = stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName); } catch (_) {}
+    const seenClients = new Set();
+    // Carregadores do ponto = nomes distintos no conector das recargas, sem o nº do conector
+    // (ex.: "…AURORA DC 3 - 1" → "…AURORA DC 3"), para a ocupação por tempo.
+    const occPoints = Math.max(1, new Set((row.charges || []).map(c => String(c.connType || "").trim().replace(/\s*-\s*\d+$/, "")).filter(Boolean)).size);
     const months = fv2RowMonths(row, fixes, "").map(mk => {
       const r = fv2Month(row, mk, fixes);
       const charges = FV2.rowMonths.get(row.fv2Id)?.get(mk) || [];
@@ -2317,16 +2321,26 @@
       let occHours = 0;
       try { occHours = occAvail ? stationAvailableHours(occAvail, first, new Date(Math.min(new Date(y, m, 1).getTime(), Date.now()))) : 0; } catch (_) {}
       const occupancy = occPower > 0 && occHours > 0 ? n0(r.energy) / (occPower * occHours) * 100 : null;
+      // Uso do ponto (opcional na prestação de contas): recargas executadas, tempo médio, clientes e ocupação por
+      // tempo = horas carregando somadas de todos os carregadores ÷ (nº de carregadores × horas disponíveis).
+      const exec = charges.filter(c => isExecutedCharge(c) && c.startDate instanceof Date && !Number.isNaN(c.startDate.getTime()));
+      const spans = exec.map(c => { const s = c.startDate.getTime(); const e = c.endDate instanceof Date && c.endDate.getTime() > s ? c.endDate.getTime() : s + Math.max(n0(durToHours(c.duration)), 1 / 60) * 3600000; return [s, e]; });
+      const busyHours = spans.reduce((t, [s, e]) => t + (e - s), 0) / 3600000;
+      const monthClients = new Set(exec.map(c => clientKeyFromCharge(c)).filter(Boolean));
+      monthClients.forEach(k => seenClients.add(k));
+      const sessions = exec.length, avgMinutes = sessions ? busyHours * 60 / sessions : null;
+      const timeOccupancy = occHours > 0 ? Math.min(100, busyHours / (occPoints * occHours) * 100) : null;
       const status = atSource ? "na origem (Spott)" : paidAt ? "pago" : total < 0 ? "saldo negativo" : !(total > 0) ? "sem repasse" : (new Date(`${due}T23:59:59`) < new Date() ? "vencido" : "a pagar");
       return { key: mk, label: monthLabel(mk), periodStart: iso(first), periodEnd: iso(monthEnd), revenue: n0(r.totalRevenue), energy, rate: energy > 0 ? n0(r.energyCost) / energy : 0,
         reimbursement, reimbursementExact: reimburse ? n0(r.energyCost) : 0, areaExact: areaCalc, areaPct: n0(r.areaSharePct), areaMode: "gross", area, total, due, paidAt,
         computedTotal, own, dueAmount, adjusted: aa.own !== null, adjustment: Math.round((own - computedTotal) * 100) / 100, adjustNote: aa.note,
         carryIn: aa.carryIn, carryFrom: aa.carryFrom, carryFromLabel: aa.carryFrom ? monthLabel(aa.carryFrom) : "",
-        paidAmount: aa.paidAmount, paidDiff: aa.paidAmount !== null ? aa.diff : 0, paidDiffMode: aa.diffMode, status, atSource, occupancy, occHours, occPower };
+        paidAmount: aa.paidAmount, paidDiff: aa.paidAmount !== null ? aa.diff : 0, paidDiffMode: aa.diffMode, status, atSource, occupancy, occHours, occPower,
+        sessions, busyHours, avgMinutes, occPoints, timeOccupancy, clients: monthClients.size, clientsToDate: seenClients.size };
     }).filter(m => m.total !== 0 || m.revenue > 0);
     const sum = k => months.reduce((s, m) => s + n0(m[k]), 0);
     return { workId: row.workId, workName: row.workName, station: row.stationName || row.station, kind: row.kind,
-      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, paidInfo: cfg.paidInfo || {}, adjust: cfg.adjust || {}, splitAtSourceFrom: cfg.splitAtSourceFrom || "", showOccupancy: !!cfg.showOccupancy, energyByHost: !!cfg.energyByHost, configured: !!fv2AreaConfig(row) },
+      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, paidInfo: cfg.paidInfo || {}, adjust: cfg.adjust || {}, splitAtSourceFrom: cfg.splitAtSourceFrom || "", showOccupancy: !!cfg.showOccupancy, showSessions: !!cfg.showSessions, showAvgTime: !!cfg.showAvgTime, showClients: !!cfg.showClients, showOccTime: !!cfg.showOccTime, energyByHost: !!cfg.energyByHost, configured: !!fv2AreaConfig(row) },
       months, totals: { revenue: sum("revenue"), energy: sum("energy"), reimbursement: sum("reimbursement"), area: sum("area"), total: sum("total"),
         paid: months.filter(m => m.paidAt).reduce((s, m) => s + m.total, 0) } };
   }

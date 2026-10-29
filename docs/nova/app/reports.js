@@ -277,17 +277,26 @@
     // Acumulado pela soma dos valores exatos, arredondada uma vez (como nos relatórios já enviados).
     const sum = k => { const exact = { reimbursement: "reimbursementExact", area: "areaExact" }[k]; return Math.round(upTo.reduce((s, x) => s + n(exact && x[exact] !== undefined ? x[exact] : x[k]), 0) * 100) / 100; };
     const d = iso => iso ? fmt.date(iso) : "—";
+    // Uso do ponto: cada item aparece só se marcado em Repasse à área ("Mostrar na prestação de contas").
+    const cf = a.config, nil = v => v === null || v === undefined;
+    const hm = h => { const t = Math.round(n(h) * 60); return t < 60 ? `${t} min` : `${Math.floor(t / 60)} h${t % 60 ? ` ${String(t % 60).padStart(2, "0")} min` : ""}`; };
+    const USE = [
+      ["showSessions", "Recargas", x => String(n(x.sessions)), x => ""],
+      ["showAvgTime", "Tempo médio por recarga", x => nil(x.avgMinutes) ? "—" : hm(x.avgMinutes / 60), x => `${hm(x.busyHours)} carregando no período`],
+      ["showClients", "Clientes", x => String(n(x.clients)), x => `${n(x.clientsToDate)} desde o início`],
+      ["showOccTime", "Ocupação por tempo", x => nil(x.timeOccupancy) ? "—" : fmt.pct1(x.timeOccupancy), x => `${hm(x.busyHours)} carregando de ${hm(n(x.occPoints) * n(x.occHours))} possíveis (${n(x.occPoints)} carregador${n(x.occPoints) > 1 ? "es" : ""})`],
+      ["showOccupancy", "Ocupação real (energia)", x => nil(x.occupancy) ? "—" : fmt.pct1(x.occupancy), x => `${fmt.kwh(x.energy)} de ${fmt.kwh(n(x.occPower) * n(x.occHours))} possíveis`]
+    ].filter(([k]) => cf[k]);
     return `<div class="sub" style="margin-bottom:10px"><strong>UBY RECHARGE LTDA</strong> · CNPJ 66.737.561/0001-86 · Londrina - PR</div>
       ${header("Prestação de contas do ponto", `${esc(a.workName)} · parceiro da área: <strong>${esc(a.config.payee)}</strong><br>Período do relatório: <strong>${d(m.periodStart)} a ${d(m.periodEnd)}</strong> · competência ${esc(m.label)}`, m.paidAt ? "pago" : "aprovado")}
       ${(() => {
-        // Ocupação só nos pontos marcados em Repasse à área ("mostrar ocupação na prestação de contas").
-        const occ = a.config.showOccupancy && m.occupancy !== null && m.occupancy !== undefined;
         const cards = [kpi("Faturamento do período", fmt.brl(m.revenue)), kpi(a.config.reimburseEnergy ? "Energia vendida" : "Energia entregue", fmt.kwh(m.energy)),
-          ...(occ ? [kpi("Ocupação do ponto", fmt.pct1(m.occupancy), `${fmt.kwh(m.energy)} de ${fmt.kwh(m.occPower * m.occHours)} possíveis`)] : []),
-          ...(a.config.reimburseEnergy || !occ ? [kpi("Reembolso de energia", m.reimbursement ? fmt.brl(m.reimbursement) : "—", a.config.reimburseEnergy ? "" : "ponto com padrão próprio")] : []),
+          ...(a.config.reimburseEnergy || !USE.length ? [kpi("Reembolso de energia", m.reimbursement ? fmt.brl(m.reimbursement) : "—", a.config.reimburseEnergy ? "" : "ponto com padrão próprio")] : []),
           kpi("Total para a área", fmt.brl(m.total), m.atSource ? "pago pela Spott na origem" : m.paidAt ? `pago em ${fmt.date(m.paidAt + "T12:00:00")}` : `vence em ${fmt.date(m.due + "T12:00:00")}`, true)];
         return `<div class="kpis" style="grid-template-columns:repeat(${cards.length},1fr)">${cards.join("")}</div>`;
       })()}
+      ${USE.length ? `<h2>Uso do ponto no período</h2>
+      <div class="kpis" style="grid-template-columns:repeat(${USE.length},1fr)">${USE.map(([k, label, val, sub]) => kpi(label, val(m), sub(m), k === "showOccupancy")).join("")}</div>` : ""}
       <h2>Composição do fechamento</h2>
       <table><tbody>
         ${a.config.reimburseEnergy ? `<tr class="g"><td colspan="2">Energia</td></tr>
@@ -306,12 +315,12 @@
       </tbody></table>
       <h2>Acumulado do ponto</h2>
       <div class="sub">Do início da operação até este fechamento</div>
-      <div class="kpis">${kpi("Faturamento acumulado", fmt.brl(sum("revenue")))}${kpi("Energia acumulada", fmt.kwh(sum("energy")))}${kpi("Energia reembolsada", fmt.brl(sum("reimbursement")))}${kpi("Total acumulado para a área", fmt.brl(sum("total")), "", true)}</div>
+      <div class="kpis">${kpi("Faturamento acumulado", fmt.brl(sum("revenue")))}${kpi("Energia acumulada", fmt.kwh(sum("energy")))}${cf.showSessions ? kpi("Recargas acumuladas", String(upTo.reduce((s, x) => s + n(x.sessions), 0))) : ""}${cf.showClients ? kpi("Clientes desde o início", String(n(m.clientsToDate))) : ""}${a.config.reimburseEnergy || !(cf.showSessions || cf.showClients) ? kpi("Energia reembolsada", fmt.brl(sum("reimbursement"))) : ""}${kpi("Total acumulado para a área", fmt.brl(sum("total")), "", true)}</div>
       <h2>Linha do tempo mensal</h2>
-      <table><thead><tr><th>Período</th><th class="n">Faturamento</th><th class="n">Energia</th>${a.config.showOccupancy ? '<th class="n">Ocupação</th>' : ""}<th class="n">R$/kWh</th><th class="n">% área</th><th class="n">Participação</th><th class="n">Total área</th><th>Situação</th></tr></thead><tbody>
-        ${upTo.map(x => `<tr class="${x.key === m.key ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.brl(x.revenue)}</td><td class="n">${fmt.kwh(x.energy)}</td>${a.config.showOccupancy ? `<td class="n">${x.occupancy === null || x.occupancy === undefined ? "—" : fmt.pct1(x.occupancy)}</td>` : ""}<td class="n">${x.reimbursement ? `${fmt.brl(x.rate)}/kWh` : "—"}</td><td class="n">${fmt.pct(x.areaPct)}</td><td class="n">${fmt.brl(x.area)}</td><td class="n">${fmt.brl(x.total)}</td><td>${x.paidAt ? `pago ${fmt.date(x.paidAt + "T12:00:00")}` : esc(x.status)}</td></tr>`).join("")}
+      <table><thead><tr><th>Período</th><th class="n">Faturamento</th><th class="n">Energia</th>${USE.map(([, label]) => `<th class="n">${esc(label.replace(" por recarga", "").replace(" (energia)", ""))}</th>`).join("")}<th class="n">R$/kWh</th><th class="n">% área</th><th class="n">Participação</th><th class="n">Total área</th><th>Situação</th></tr></thead><tbody>
+        ${upTo.map(x => `<tr class="${x.key === m.key ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.brl(x.revenue)}</td><td class="n">${fmt.kwh(x.energy)}</td>${USE.map(([, , val]) => `<td class="n">${val(x)}</td>`).join("")}<td class="n">${x.reimbursement ? `${fmt.brl(x.rate)}/kWh` : "—"}</td><td class="n">${fmt.pct(x.areaPct)}</td><td class="n">${fmt.brl(x.area)}</td><td class="n">${fmt.brl(x.total)}</td><td>${x.paidAt ? `pago ${fmt.date(x.paidAt + "T12:00:00")}` : esc(x.status)}</td></tr>`).join("")}
       </tbody></table>
-      <div class="note">Relatório destinado ao parceiro da área. ${a.config.reimburseEnergy ? "O reembolso de energia corresponde aos kWh vendidos no ponto multiplicados pela tarifa de energia do mês. " : ""}${a.config.showOccupancy ? "Ocupação = kWh entregues ÷ (potência instalada × horas em que o ponto esteve disponível no período). " : ""}Conferir tarifa de energia, percentual contratual e documentos fiscais antes do envio final.</div>
+      <div class="note">Relatório destinado ao parceiro da área. ${a.config.reimburseEnergy ? "O reembolso de energia corresponde aos kWh vendidos no ponto multiplicados pela tarifa de energia do mês. " : ""}${cf.showSessions || cf.showAvgTime || cf.showClients ? "Recargas e clientes contam só recargas efetivadas; o tempo médio vai do início ao fim de cada recarga. " : ""}${cf.showOccTime ? "Ocupação por tempo = horas carregando, somadas de todos os carregadores do ponto ÷ (nº de carregadores × horas em que o ponto esteve disponível no período). " : ""}${cf.showOccupancy ? "Ocupação real = kWh entregues ÷ (potência instalada × horas em que o ponto esteve disponível no período). " : ""}Conferir tarifa de energia, percentual contratual e documentos fiscais antes do envio final.</div>
       <div class="sign"><div>Responsável · UBY Recharge</div><div>${esc(a.config.payee)}</div></div>${foot()}`;
   }
 
