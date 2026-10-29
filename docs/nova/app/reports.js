@@ -43,6 +43,11 @@
     .note{margin-top:16px;padding:12px 14px;border-radius:10px;background:#fbf7ec;border:1px solid #eedcad;color:#6b5217;font-size:11.5px;line-height:1.5}
     .sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:46px}.sign div{border-top:1px solid #9aa59d;padding-top:6px;font-size:11px;color:#5f6b62;text-align:center}
     .foot{margin-top:24px;font-size:10px;color:#8a958c;text-align:center}
+    table.tl{font-size:11px}table.tl th{white-space:normal;line-height:1.25;vertical-align:bottom}table.tl td,table.tl th{padding:6px 5px}
+    .chart{border:1px solid #dfe6e0;border-radius:10px;padding:10px 12px 6px;background:#fbfdfb;margin:8px 0 4px;break-inside:avoid}
+    .chart .ct{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#3d4a41;font-weight:700;margin-bottom:2px}
+    .chart .lg{display:flex;gap:12px;font-weight:600;color:#5f6b62}.chart .lg i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
+    .chart svg{width:100%;height:auto;display:block}.peak{display:inline-block;background:#0a1628;color:#fff;border-radius:99px;padding:3px 9px;font-size:10.5px;font-weight:800}
     .actions{max-width:900px;margin:18px auto 0;display:flex;gap:8px;justify-content:flex-end}.actions button{border:0;border-radius:8px;padding:9px 14px;font-weight:800;cursor:pointer;background:#0a1628;color:#fff}
     @media print{body{background:#fff}.page{box-shadow:none;margin:0;max-width:none;border-radius:0;padding:12mm;break-after:page}.page:last-child{break-after:auto}.actions{display:none}}`;
 
@@ -269,6 +274,39 @@
   // ---------------------------------------------------------------- área (dono do local)
   // Prestação de contas ao parceiro da área: reembolso da energia (kWh vendidos ×
   // tarifa, quando o ponto usa a energia do local) + participação sobre o faturamento.
+  // Gráfico de curvas suaves com área (SVG, imprime igual na tela e no PDF). Cada série tem a própria escala
+  // (axis "right" usa a escala da direita); mark = faixa destacada (ex.: horário de pico).
+  function curveChart({ title, labels, series, h = 150, legend = true, mark = null, tick = 1, shared = false }) {
+    const W = 820, H = h, L = 40, R = series.some(s => s.axis === "right") ? 40 : 12, T = 10, B = 22, iw = W - L - R, ih = H - T - B;
+    const xs = i => L + (labels.length > 1 ? i * iw / (labels.length - 1) : iw / 2);
+    // Topo da escala em 4 passos redondos (1, 2, 2,5 ou 5 × 10ⁿ); shared = todas as séries na mesma escala.
+    const maxOf = s => Math.max(...(shared ? series.flatMap(x => x.values) : s.values).map(v => n(v)), 0) || 1;
+    const topOf = s => { const raw = maxOf(s) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag * 4; };
+    const scale = s => { const top = topOf(s); return v => T + ih - n(v) / top * ih; };
+    const cl = y => Math.min(T + ih, Math.max(T, y));
+    const path = pts => pts.length < 2 ? "" : pts.reduce((d, p, i) => {
+      if (!i) return `M${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+      const p0 = pts[i - 2] || pts[i - 1], p1 = pts[i - 1], p3 = pts[i + 1] || p;
+      const c1 = [p1[0] + (p[0] - p0[0]) / 6, cl(p1[1] + (p[1] - p0[1]) / 6)], c2 = [p[0] - (p3[0] - p1[0]) / 6, cl(p[1] - (p3[1] - p1[1]) / 6)];
+      return `${d} C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p[0].toFixed(1)},${p[1].toFixed(1)}`; }, "");
+    const left = series.find(s => s.axis !== "right"), right = series.find(s => s.axis === "right");
+    const lab = (s, v) => (s.fmt || (x => x.toLocaleString("pt-BR", { maximumFractionDigits: x < 10 ? 1 : 0 })))(v);
+    const grid = [0, .25, .5, .75, 1].map(f => { const y = T + ih - f * ih; return `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="#e3e9e4" stroke-width="1"/>`
+      + (left ? `<text x="${L - 6}" y="${y + 3}" text-anchor="end" font-size="9.5" fill="#7a867d">${esc(lab(left, topOf(left) * f))}</text>` : "")
+      + (right ? `<text x="${W - R + 6}" y="${y + 3}" font-size="9.5" fill="#7a867d">${esc(lab(right, topOf(right) * f))}</text>` : ""); }).join("");
+    const xl = labels.map((lb, i) => i % tick === 0 || i === labels.length - 1 ? `<text x="${xs(i)}" y="${H - 6}" text-anchor="${labels.length > 1 && i === 0 ? "start" : labels.length > 1 && i === labels.length - 1 ? "end" : "middle"}" font-size="9.5" fill="#7a867d">${esc(lb)}</text>` : "").join("");
+    const stepX = iw / Math.max(1, labels.length - 1);
+    const band = mark ? `<rect x="${Math.max(L, xs(mark.from) - stepX / 2)}" y="${T}" width="${(mark.to - mark.from + 1) * stepX}" height="${ih}" fill="#00c46a" opacity=".1"/>` : "";
+    const lines = series.map((s, k) => { const y = scale(s), pts = s.values.map((v, i) => [xs(i), y(v)]), d = path(pts); if (!d) return "";
+      return (s.area ? `<path d="${d} L${pts[pts.length - 1][0]},${T + ih} L${pts[0][0]},${T + ih} Z" fill="url(#g${k})"/>` : "")
+        + `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2.2}" ${s.dash ? 'stroke-dasharray="5 4"' : ""} stroke-linecap="round"/>`; }).join("");
+    const defs = `<defs>${series.map((s, k) => `<linearGradient id="g${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.color}" stop-opacity=".32"/><stop offset="1" stop-color="${s.color}" stop-opacity="0"/></linearGradient>`).join("")}</defs>`;
+    return `<div class="chart"><div class="ct"><span>${title}</span>${legend ? `<span class="lg">${series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join("")}</span>` : ""}</div>
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${defs}${band}${grid}${lines}${xl}</svg></div>`;
+  }
+  // Janela de pico: as 3 horas seguidas com mais tempo de carga.
+  const peakWindow = arr => { let best = 0, at = 0; for (let i = 0; i < 22; i++) { const v = n(arr[i]) + n(arr[i + 1]) + n(arr[i + 2]); if (v > best) { best = v; at = i; } } return best > 0 ? { from: at, to: at + 2, label: `${at}h às ${at + 3}h` } : null; };
+
   function pageArea(workId, station, mk) {
     const a = UBY.state.api.areaAccount(workId, station);
     if (!a || !a.months.length) return `${header("Prestação de contas do ponto", "Sem competência com operação para este ponto.", "pendente")}${foot()}`;
@@ -297,6 +335,32 @@
       })()}
       ${USE.length ? `<h2>Uso do ponto no período</h2>
       <div class="kpis" style="grid-template-columns:repeat(${USE.length},1fr)">${USE.map(([k, label, val, sub]) => kpi(label, val(m), sub(m), k === "showOccupancy")).join("")}</div>` : ""}
+      ${cf.showPeak && m.hourly ? (() => {
+        const pts = Math.max(1, n(m.occPoints)), days = Math.max(1, n(m.periodDays));
+        const occH = m.hourly.map(x => Math.min(100, n(x.busyMin) / (pts * days * 60) * 100));
+        const pk = peakWindow(m.hourly.map(x => x.busyMin)), top = occH.indexOf(Math.max(...occH));
+        const WD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"], wd = m.weekday.map(x => n(x.sessions)), best = wd.indexOf(Math.max(...wd));
+        return `<h2>Horários de pico</h2>
+        <div class="sub">Quanto do tempo os carregadores ficaram ocupados em cada hora do dia, na média do período${pk ? ` · <span class="peak">pico: ${esc(pk.label)}</span>` : ""}${occH[top] > 0 ? ` · hora mais cheia: <strong>${top}h</strong> (${fmt.pct1(occH[top])} de ocupação)` : ""}</div>
+        ${curveChart({ title: "Ocupação por hora do dia", labels: occH.map((_, i) => `${i}h`), tick: 2, mark: pk, series: [
+          { label: "Ocupação (% do tempo)", values: occH, color: "#00a85a", area: true, fmt: v => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` },
+          { label: "Recargas iniciadas", values: m.hourly.map(x => x.starts), color: "#0a1628", axis: "right", dash: true, width: 1.6 }] })}
+        ${curveChart({ title: `Recargas por dia da semana${wd[best] > 0 ? ` · mais movimentado: ${WD[best]}` : ""}`, labels: WD, h: 120, series: [
+          { label: "Recargas", values: wd, color: "#00a85a", area: true },
+          { label: "Energia (kWh)", values: m.weekday.map(x => x.kWh), color: "#0a1628", axis: "right", dash: true, width: 1.6 }] })}`;
+      })() : ""}
+      ${cf.showNewClients ? (() => {
+        const pctNew = m.clients ? n(m.newClients) / m.clients * 100 : 0;
+        return `<h2>Clientes</h2>
+        <div class="kpis">${kpi("Clientes no período", String(n(m.clients)))}${kpi("Novos clientes", String(n(m.newClients)), `${fmt.pct1(pctNew)} dos clientes do período`, true)}${kpi("Recorrentes", String(n(m.returningClients)), "já tinham recarregado neste ponto")}${kpi("Clientes desde o início", String(n(m.clientsToDate)))}</div>
+        ${upTo.length > 1 ? curveChart({ title: "Clientes por mês", labels: upTo.map(x => x.label), h: 130, shared: true, series: [
+          { label: "Clientes", values: upTo.map(x => n(x.clients)), color: "#0a1628", area: true },
+          { label: "Novos", values: upTo.map(x => n(x.newClients)), color: "#00a85a", area: true }] }) : ""}`;
+      })() : ""}
+      ${cf.showDaily && m.daily && m.daily.length ? `<h2>Movimento dia a dia</h2>
+        ${curveChart({ title: `Recargas e energia por dia · ${esc(m.label)}`, labels: m.daily.map(x => String(x.day)), tick: m.daily.length > 16 ? 2 : 1, series: [
+          { label: "Energia (kWh)", values: m.daily.map(x => x.kWh), color: "#00a85a", area: true },
+          { label: "Recargas", values: m.daily.map(x => x.sessions), color: "#0a1628", axis: "right", dash: true, width: 1.6 }] })}` : ""}
       <h2>Composição do fechamento</h2>
       <table><tbody>
         ${a.config.reimburseEnergy ? `<tr class="g"><td colspan="2">Energia</td></tr>
@@ -315,12 +379,15 @@
       </tbody></table>
       <h2>Acumulado do ponto</h2>
       <div class="sub">Do início da operação até este fechamento</div>
-      <div class="kpis">${kpi("Faturamento acumulado", fmt.brl(sum("revenue")))}${kpi("Energia acumulada", fmt.kwh(sum("energy")))}${cf.showSessions ? kpi("Recargas acumuladas", String(upTo.reduce((s, x) => s + n(x.sessions), 0))) : ""}${cf.showClients ? kpi("Clientes desde o início", String(n(m.clientsToDate))) : ""}${a.config.reimburseEnergy || !(cf.showSessions || cf.showClients) ? kpi("Energia reembolsada", fmt.brl(sum("reimbursement"))) : ""}${kpi("Total acumulado para a área", fmt.brl(sum("total")), "", true)}</div>
+      ${(() => { const acc = [kpi("Faturamento acumulado", fmt.brl(sum("revenue"))), kpi("Energia acumulada", fmt.kwh(sum("energy"))),
+        ...(cf.showSessions ? [kpi("Recargas acumuladas", String(upTo.reduce((s, x) => s + n(x.sessions), 0)))] : []), ...(cf.showClients ? [kpi("Clientes desde o início", String(n(m.clientsToDate)))] : []),
+        ...(a.config.reimburseEnergy || !(cf.showSessions || cf.showClients) ? [kpi("Energia reembolsada", fmt.brl(sum("reimbursement")))] : []), kpi("Total acumulado para a área", fmt.brl(sum("total")), "", true)];
+        return `<div class="kpis" style="grid-template-columns:repeat(${acc.length},1fr)">${acc.join("")}</div>`; })()}
       <h2>Linha do tempo mensal</h2>
-      <table><thead><tr><th>Período</th><th class="n">Faturamento</th><th class="n">Energia</th>${USE.map(([, label]) => `<th class="n">${esc(label.replace(" por recarga", "").replace(" (energia)", ""))}</th>`).join("")}<th class="n">R$/kWh</th><th class="n">% área</th><th class="n">Participação</th><th class="n">Total área</th><th>Situação</th></tr></thead><tbody>
-        ${upTo.map(x => `<tr class="${x.key === m.key ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.brl(x.revenue)}</td><td class="n">${fmt.kwh(x.energy)}</td>${USE.map(([, , val]) => `<td class="n">${val(x)}</td>`).join("")}<td class="n">${x.reimbursement ? `${fmt.brl(x.rate)}/kWh` : "—"}</td><td class="n">${fmt.pct(x.areaPct)}</td><td class="n">${fmt.brl(x.area)}</td><td class="n">${fmt.brl(x.total)}</td><td>${x.paidAt ? `pago ${fmt.date(x.paidAt + "T12:00:00")}` : esc(x.status)}</td></tr>`).join("")}
+      <table class="tl"><thead><tr><th>Período</th><th class="n">Faturamento</th><th class="n">Energia</th>${USE.map(([, label]) => `<th class="n">${esc(label.replace(" por recarga", "").replace(" (energia)", ""))}</th>`).join("")}${cf.reimburseEnergy ? '<th class="n">R$/kWh</th>' : ""}<th class="n">% área</th>${cf.reimburseEnergy ? '<th class="n">Participação</th>' : ""}<th class="n">Total área</th><th>Situação</th></tr></thead><tbody>
+        ${upTo.map(x => `<tr class="${x.key === m.key ? "t" : ""}"><td>${esc(x.label)}</td><td class="n">${fmt.brl(x.revenue)}</td><td class="n">${fmt.kwh(x.energy)}</td>${USE.map(([, , val]) => `<td class="n">${val(x)}</td>`).join("")}${cf.reimburseEnergy ? `<td class="n">${x.reimbursement ? `${fmt.brl(x.rate)}/kWh` : "—"}</td>` : ""}<td class="n">${fmt.pct(x.areaPct)}</td>${cf.reimburseEnergy ? `<td class="n">${fmt.brl(x.area)}</td>` : ""}<td class="n">${fmt.brl(x.total)}</td><td>${x.paidAt ? `pago ${fmt.date(x.paidAt + "T12:00:00")}` : esc(x.status)}</td></tr>`).join("")}
       </tbody></table>
-      <div class="note">Relatório destinado ao parceiro da área. ${a.config.reimburseEnergy ? "O reembolso de energia corresponde aos kWh vendidos no ponto multiplicados pela tarifa de energia do mês. " : ""}${cf.showSessions || cf.showAvgTime || cf.showClients ? "Recargas e clientes contam só recargas efetivadas; o tempo médio vai do início ao fim de cada recarga. " : ""}${cf.showOccTime ? "Ocupação por tempo = horas carregando, somadas de todos os carregadores do ponto ÷ (nº de carregadores × horas em que o ponto esteve disponível no período). " : ""}${cf.showOccupancy ? "Ocupação real = kWh entregues ÷ (potência instalada × horas em que o ponto esteve disponível no período). " : ""}Conferir tarifa de energia, percentual contratual e documentos fiscais antes do envio final.</div>
+      <div class="note">Relatório destinado ao parceiro da área. ${a.config.reimburseEnergy ? "O reembolso de energia corresponde aos kWh vendidos no ponto multiplicados pela tarifa de energia do mês. " : ""}${cf.showSessions || cf.showAvgTime || cf.showClients ? "Recargas e clientes contam só recargas efetivadas; o tempo médio vai do início ao fim de cada recarga. " : ""}${cf.showOccTime ? "Ocupação por tempo = horas carregando, somadas de todos os carregadores do ponto ÷ (nº de carregadores × horas em que o ponto esteve disponível no período). " : ""}${cf.showOccupancy ? "Ocupação real = kWh entregues ÷ (potência instalada × horas em que o ponto esteve disponível no período). " : ""}${cf.showPeak ? "Horários de pico: tempo de carga em cada hora do dia ÷ (nº de carregadores × dias do período × 60 min); a faixa verde marca as 3 horas seguidas mais ocupadas. " : ""}${cf.showNewClients ? "Novo cliente = primeira recarga neste ponto dentro do período; recorrente = já tinha recarregado aqui antes. " : ""}Conferir tarifa de energia, percentual contratual e documentos fiscais antes do envio final.</div>
       <div class="sign"><div>Responsável · UBY Recharge</div><div>${esc(a.config.payee)}</div></div>${foot()}`;
   }
 
