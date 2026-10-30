@@ -4,7 +4,7 @@ import webpush from "npm:web-push@3.6.7";
 // Notificações no celular (Web Push). Chamada pela plataforma com a sessão do
 // usuário (functions.invoke): guarda/remove o aparelho e envia o teste.
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, authorization, apikey, x-client-info", "Access-Control-Allow-Methods": "POST, OPTIONS" };
-const DEFAULT_SUBJECT = "https://p3solarenergy-hash.github.io/ubyrecharge/nova/";
+const DEFAULT_SUBJECT = "https://ubyrecharge.net.br/nova/";
 const TABLE = "uby_push_subscriptions";
 const VAPID_TABLE = "uby_push_vapid";
 

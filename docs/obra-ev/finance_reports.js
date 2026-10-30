@@ -11,7 +11,7 @@
     if (typeof document !== 'undefined' && document.currentScript && document.currentScript.src) {
       return document.currentScript.src.replace(/[^/]+(?:\?.*)?$/, '');
     }
-    return 'https://p3solarenergy-hash.github.io/ubyrecharge/obra-ev/';
+    return 'https://ubyrecharge.net.br/obra-ev/';
   })();
 
   function num(value) {

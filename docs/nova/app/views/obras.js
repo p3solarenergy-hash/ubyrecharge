@@ -145,7 +145,7 @@
 
   // ---------- Detalhe de uma obra (#/obras/obra/<id>/<aba>) ----------
   const OBRA_TABS = [["geral", "Visão geral"], ["fases", "Fases e tarefas"], ["pendencias", "Pendências"], ["documentos", "Documentos"], ["prospeccao", "Prospecção e contrato"], ["historico", "Histórico e mensagens"]];
-  const PUB = "https://p3solarenergy-hash.github.io/ubyrecharge/obra-ev/";
+  const PUB = "https://ubyrecharge.net.br/obra-ev/";
   const statusBadge = s => ({ done: "ok", na: "neutral", doing: "warn", pending: "bad" }[s] || "neutral");
   let obraCache = new Map(), obraCloudFlag = false;
 
