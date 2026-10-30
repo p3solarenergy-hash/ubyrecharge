@@ -98,6 +98,18 @@
       inv.days = days.length; inv.deliveredKWh = delivered;
       inv.ratePerDelivered = delivered > 0 ? inv.total / delivered : 0;
       inv.ratePerMetered = inv.kwh > 0 ? inv.total / inv.kwh : 0;
+      // Medidor × vendido (usuário, 30/10/2026): a diferença custa o custo médio do kWh medido. Com medidor
+      // próprio do carregador, separa o que ficou fora dele (consumo do local, cobrável) da perda do carregador.
+      inv.diffKWh = delivered > 0 ? inv.kwh - delivered : 0;
+      inv.diffPct = delivered > 0 && inv.kwh > 0 ? inv.diffKWh / inv.kwh * 100 : 0;
+      inv.diffCost = Math.round(inv.diffKWh * inv.ratePerMetered * 100) / 100;
+      inv.chargerMeterKWh = pos(inv.chargerMeterKWh);
+      if (inv.chargerMeterKWh > 0) {
+        inv.outsideKWh = inv.kwh - inv.chargerMeterKWh;
+        inv.outsideCost = Math.round(inv.outsideKWh * inv.ratePerMetered * 100) / 100;
+        inv.chargerLossKWh = delivered > 0 ? inv.chargerMeterKWh - delivered : 0;
+        inv.chargerLossPct = delivered > 0 ? inv.chargerLossKWh / inv.chargerMeterKWh * 100 : 0;
+      }
       const m = month(inv.ref);
       const part = { id: inv.id, ref: inv.ref, start: inv.start, end: inv.end, share: 1, kwh: inv.kwh, leaseKWh: inv.leaseKWh, copel: inv.copel, lease: inv.lease, total: inv.total,
         deliveredKWh: delivered, from: inv.start, to: addDays(inv.end, -1) };
