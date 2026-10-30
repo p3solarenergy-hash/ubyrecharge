@@ -1917,6 +1917,7 @@
     const el = want.map(k => all.find(x => x.dataset.focus === k) || all.find(x => x.dataset.focusAlt === k)).find(Boolean)
       || (want[0].startsWith("cost:") ? target.querySelector("#pmCostSave")?.closest("section") : null);
     if (!el) return;
+    window.UBY_SCROLL_KEEP?.reset();
     el.scrollIntoView({ block: "center" });
     el.classList.add("focus-flash");
     const input = el.querySelector("input:not([type=checkbox]), select");
