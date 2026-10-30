@@ -446,12 +446,11 @@
   .pf-host{border-style:dashed;border-color:var(--line2);transition:border-color .2s}
   .pf-host:hover{border-color:var(--volt)}
   .pf .more{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--volt);font-size:14px}
-  .risks{display:grid;grid-template-columns:.8fr 1.2fr;gap:48px;padding:48px;border-radius:28px;background:var(--bg2);border:1px solid var(--line2)}
-  .risks h2{font-size:clamp(28px,3.4vw,40px);margin-bottom:12px}
-  .risks>div>p{color:var(--muted2)}
-  .risk-list{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .risk-list li{padding:18px;border-radius:16px;background:var(--bg);border:1px solid var(--line);font-size:14px;color:var(--muted2);border-left:3px solid var(--solar)}
-  .risk-list b{display:block;color:#fff;font-size:15px;margin-bottom:4px}
+  .proj{display:grid;grid-template-columns:1.2fr 1fr;gap:48px;align-items:center;padding:48px;border-radius:28px;background:radial-gradient(70% 120% at 0% 0%,rgba(0,255,133,.10),transparent 60%),var(--bg2);border:1px solid var(--line2)}
+  .proj h2{font-size:clamp(28px,3.4vw,40px);margin-bottom:12px}
+  .proj p{color:var(--muted2)}
+  .proj p strong{color:#fff}
+  .proj .checks{margin:0}
   .journey{list-style:none;display:grid;grid-template-columns:repeat(5,1fr);gap:14px;counter-reset:none}
   .journey li{padding:24px 20px;border-radius:18px;background:var(--bg2);border:1px solid var(--line)}
   .journey i{font-style:normal;font-family:var(--display);font-weight:800;font-size:28px;color:var(--volt);display:block;margin-bottom:10px;line-height:1}
@@ -471,21 +470,21 @@
   @media (max-width:1024px){
     .thesis,.profiles{grid-template-columns:1fr 1fr}
     .flow,.journey{grid-template-columns:repeat(3,1fr)}
-    .risks,.lead{padding:40px;gap:32px}
+    .proj,.lead{padding:40px;gap:32px}
   }
   @media (max-width:860px){
     .sites{grid-template-columns:1fr}
     .scp{grid-template-columns:1fr}
     .scp-arrow{transform:rotate(90deg);margin:0 auto}
-    .risks,.lead{grid-template-columns:1fr}
+    .proj,.lead{grid-template-columns:1fr}
     .future{border-radius:18px}
     .future .sep{display:none}
   }
   @media (max-width:600px){
     .inv-hero{padding:118px 0 64px}
     .inv-hero h1{font-size:clamp(28px,8.2vw,38px)}
-    .thesis,.profiles,.flow,.journey,.risk-list{grid-template-columns:1fr}
-    .risks,.lead{padding:28px 20px;border-radius:24px}
+    .thesis,.profiles,.flow,.journey{grid-template-columns:1fr}
+    .proj,.lead{padding:28px 20px;border-radius:24px}
     .platform{flex-direction:column;padding:22px}
   }
 </style>
@@ -520,7 +519,7 @@
       <li><a href="#tese">Por que agora</a></li>
       <li><a href="#uby">A UBY</a></li>
       <li><a href="#scp">Como funciona</a></li>
-      <li><a href="#riscos">Riscos</a></li>
+      <li><a href="#projecoes">Projeções</a></li>
       <li><a href="#faq">Dúvidas</a></li>
     </ul>
     <div class="nav-cta">
@@ -534,7 +533,7 @@
   <a href="#tese">Por que agora</a>
   <a href="#uby">A UBY hoje</a>
   <a href="#scp">Como funciona a SCP</a>
-  <a href="#riscos">Riscos</a>
+  <a href="#projecoes">Projeções</a>
   <a href="#passos">Próximos passos</a>
   <a href="#faq">Dúvidas</a>
   <a href="index.html">Site da rede UBY</a>
@@ -698,22 +697,19 @@
   </div>
 </section>
 
-<!-- RISCOS -->
-<section class="sec" id="riscos" style="padding-top:0">
+<!-- PROJEÇÕES -->
+<section class="sec" id="projecoes" style="padding-top:0">
   <div class="wrap">
-    <div class="risks rv">
+    <div class="proj rv">
       <div>
         <div class="eyebrow">Transparência</div>
-        <h2>Riscos que você precisa conhecer</h2>
-        <p>Todo investimento tem riscos. Preferimos falar deles desde o primeiro contato.</p>
+        <h2>Projeções, não promessas</h2>
+        <p>Os números da operação e do plano de expansão são apresentados na conversa privada. São <strong>projeções</strong> feitas a partir dos dados reais da plataforma, e não promessa nem garantia de resultado. O desempenho passado não garante o futuro.</p>
       </div>
-      <ul class="risk-list">
-        <li><b>Demanda</b>O uso dos pontos depende do ritmo de adoção dos veículos elétricos na região.</li>
-        <li><b>Energia</b>Mudanças no custo da energia e nas tarifas afetam a margem da operação.</li>
-        <li><b>Prazos</b>Aprovações de concessionária e licenças podem atrasar novos pontos.</li>
-        <li><b>Tecnologia</b>Equipamentos exigem manutenção e podem ficar parados ou se desatualizar.</li>
-        <li><b>Concorrência</b>Novas redes podem disputar os mesmos locais e clientes.</li>
-        <li><b>Sem garantia</b>Não há garantia de retorno nem de liquidez, e existe risco de perda do capital investido.</li>
+      <ul class="checks">
+        <li><svg><use href="#check"/></svg>Dados reais da operação, registrados na plataforma</li>
+        <li><svg><use href="#check"/></svg>Premissas explicadas uma a uma</li>
+        <li><svg><use href="#check"/></svg>Relatórios periódicos para acompanhar o realizado</li>
       </ul>
     </div>
   </div>
@@ -799,7 +795,7 @@
       <details class="qa rv"><summary>O que é uma SCP?<i>+</i></summary><p>A Sociedade em Conta de Participação é um modelo previsto no Código Civil em que um sócio ostensivo conduz o negócio em seu nome e os sócios participantes entram com capital e participam dos resultados, nas condições definidas em contrato.</p></details>
       <details class="qa rv"><summary>Quem é o sócio ostensivo?<i>+</i></summary><p>A UBY Recharge. É ela quem escolhe os locais, implanta e opera os eletropostos e responde pelo negócio perante clientes, fornecedores e parceiros.</p></details>
       <details class="qa rv"><summary>Esta página é uma oferta de investimento?<i>+</i></summary><p>Não. Esta página é institucional e serve para quem quer conhecer a UBY e conversar sobre a SCP. Não é oferta pública de valores mobiliários nem recomendação de investimento. Condições, números e contrato são apresentados apenas em conversa privada.</p></details>
-      <details class="qa rv"><summary>Existe retorno garantido?<i>+</i></summary><p>Não. O resultado depende do desempenho da rede, e o investimento envolve riscos, inclusive de perda do capital. Veja a seção de riscos acima.</p></details>
+      <details class="qa rv"><summary>Existe retorno garantido?<i>+</i></summary><p>Não. Os números apresentados são projeções baseadas na operação real da rede, não promessas. O resultado depende do desempenho da rede.</p></details>
       <details class="qa rv"><summary>Qual é o valor mínimo para participar?<i>+</i></summary><p>As condições, incluindo valores, são apresentadas na conversa com a equipe da UBY, junto com a minuta do contrato.</p></details>
       <details class="qa rv"><summary>Como acompanho os resultados?<i>+</i></summary><p>Os sócios recebem relatórios periódicos com o andamento e o resultado da rede, gerados a partir da plataforma de gestão da UBY.</p></details>
       <details class="qa rv"><summary>Posso sair da SCP depois?<i>+</i></summary><p>As regras de saída e de transferência de participação ficam definidas no contrato da SCP. Não há liquidez imediata.</p></details>
@@ -811,7 +807,7 @@
 <!-- AVISO -->
 <section class="legal">
   <div class="wrap">
-    <p><b>Aviso importante.</b> O conteúdo desta página tem caráter exclusivamente institucional e informativo. Não constitui oferta pública de valores mobiliários, promessa de rentabilidade nem recomendação de investimento. Condições, informações financeiras e o contrato da Sociedade em Conta de Participação são apresentados somente em material privado, a interessados identificados. Investir envolve riscos, inclusive de perda total do capital. Antes de decidir, avalie com seus próprios assessores.</p>
+    <p><b>Aviso importante.</b> O conteúdo desta página tem caráter exclusivamente institucional e informativo. Não constitui oferta pública de valores mobiliários nem recomendação de investimento. Eventuais números apresentados são projeções e não constituem promessa ou garantia de rentabilidade. Condições, informações financeiras e o contrato da Sociedade em Conta de Participação são apresentados somente em material privado, a interessados identificados. Todo investimento envolve riscos. Antes de decidir, avalie com seus próprios assessores.</p>
   </div>
 </section>
 </main>
@@ -827,7 +823,7 @@
           <a href="https://wa.me/5543988281585" target="_blank" rel="noopener" aria-label="WhatsApp"><svg><use href="#wa"/></svg></a>
         </div>
       </div>
-      <div><h4>Investidores</h4><ul><li><a href="#tese">Por que agora</a></li><li><a href="#scp">Como funciona a SCP</a></li><li><a href="#riscos">Riscos</a></li><li><a href="#faq">Dúvidas</a></li></ul></div>
+      <div><h4>Investidores</h4><ul><li><a href="#tese">Por que agora</a></li><li><a href="#scp">Como funciona a SCP</a></li><li><a href="#projecoes">Projeções</a></li><li><a href="#faq">Dúvidas</a></li></ul></div>
       <div><h4>A rede</h4><ul><li><a href="index.html#pontos">Pontos de recarga</a></li><li><a href="index.html#clube">Clube UBY</a></li><li><a href="index.html#empresas">Para empresas</a></li></ul></div>
       <div><h4>Contato</h4><ul><li><a href="#contato">Quero conversar</a></li><li><a href="https://wa.me/5543988281585" target="_blank" rel="noopener">WhatsApp</a></li><li><a href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener">Instagram</a></li></ul></div>
     </div>
