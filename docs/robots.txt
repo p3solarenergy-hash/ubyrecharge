@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+# Plataforma interna de gestão: fora dos buscadores
+Disallow: /nova/
+Disallow: /obra-ev/
+Disallow: /tarefas/
+Allow: /nova/beneficio.html
+
+Sitemap: https://ubyrecharge.net.br/sitemap.xml
