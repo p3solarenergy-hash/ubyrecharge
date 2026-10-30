@@ -90,7 +90,7 @@
             <td class="num">${w ? (isDone(w) ? "100%" : `${w.pct}%`) : "—"}</td><td class="num">${pf ? fmt.brl(pf.revenue) : "—"}</td></tr>`; }).join("")}</tbody></table></div>
       </section>`;
 
-    target.querySelectorAll("tr[data-point]").forEach(tr => tr.onclick = () => { selectedId = tr.dataset.point; draw(target, works); window.scrollTo({ top: 0, behavior: "smooth" }); });
+    target.querySelectorAll("tr[data-point]").forEach(tr => tr.onclick = () => { selectedId = tr.dataset.point; draw(target, works); window.UBY_SCROLL_KEEP?.reset(); window.scrollTo({ top: 0, behavior: "smooth" }); });
     const clr = target.querySelector("#mapClear"); if (clr) clr.onclick = e => { e.preventDefault(); selectedId = ""; draw(target, works); };
     const map = L.map(target.querySelector("#ubyMap"), { zoomControl: true });
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(map);

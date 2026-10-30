@@ -93,6 +93,24 @@
     // soma dos preços unitários com tributos das linhas de energia consumida (TE, TUSD/uso do sistema,
     // bandeira). Fica de fora: energia injetada (créditos do gerador do local) e iluminação pública.
     f.items = parseItems(t);
+    // kWh compensados = soma de TODAS as safras de crédito (uma linha TE e uma TUSD por mês de geração, ex.:
+    // 150 de 04/2023 + 5.150 de 05/2023). Conta só as linhas TE, senão dobraria; bandeira não é compensação.
+    const injected = f.items.filter(i => /^kWh$/i.test(i.unit) && i.qty < 0 && /INJ/i.test(i.desc) && !/BAND/i.test(i.desc));
+    const injTE = injected.filter(i => /\bTE\b/i.test(i.desc));
+    const credits = injTE.length ? injTE : injected.filter(i => /TUSD/i.test(i.desc));
+    if (credits.length) {
+      f.compensatedKWh = Math.round(credits.reduce((s, i) => s + Math.abs(i.qty), 0) * 100) / 100;
+      f.compensatedLines = credits.map(i => ({ period: (/(\d{2}\/\d{4})/.exec(i.desc) || [])[1] || "", kwh: Math.abs(i.qty) }));
+    }
+    f.uncompensatedKWh = Math.max(0, f.kwh - (f.compensatedKWh || 0));
+    const expiring = /Saldo a Expirar Pr[oó]ximo M[eê]s:\s*Todos os Per[ií]odos\s+(\d+)/i.exec(t.replace(/\s+/g, " "));
+    if (expiring) { f.creditExpiring = Number(expiring[1]); if (f.creditExpiring > 0) warnings.push(`${f.creditExpiring} kWh de crédito expiram no próximo mês.`); }
+    // Conferência: a soma dos itens tem que dar o total da fatura.
+    if (f.items.length) {
+      const sum = Math.round(f.items.reduce((s, i) => s + i.value, 0) * 100) / 100;
+      if (Math.abs(sum - f.copelAmount) > 0.02) warnings.push(`A soma dos itens (R$ ${sum.toFixed(2).replace(".", ",")}) difere do total da fatura: confira os valores.`);
+    }
+    if (f.compensatedKWh > f.kwh) warnings.push(`kWh compensados (${f.compensatedKWh}) maiores que o consumo (${f.kwh}): confira.`);
     const energyItems = f.items.filter(i => /^kWh$/i.test(i.unit) && i.qty > 0 && /ENERGIA/i.test(i.desc) && !/INJ/i.test(i.desc));
     f.energyRateItems = energyItems;
     f.energyRate = Math.round(energyItems.reduce((s, i) => s + i.price, 0) * 1e6) / 1e6;

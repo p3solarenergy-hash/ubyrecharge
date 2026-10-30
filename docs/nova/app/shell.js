@@ -526,6 +526,7 @@
     if (def.type === "classic") return openClassic(def);
     $("#classicWrap").classList.remove("on");
     $("#view").hidden = false;
+    window.UBY_SCROLL_KEEP?.reset();
     window.scrollTo({ top: 0 });
     rerender();
   }
