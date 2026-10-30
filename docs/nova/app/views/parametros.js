@@ -45,8 +45,11 @@
     return readyPromise;
   }
   window.addEventListener("hashchange", () => {
+    if (!location.hash.startsWith("#/parametros")) linkOpened = "";
     if (!location.hash.startsWith("#/parametros") && frame) { frame.remove(); frame = null; readyPromise = null; }
   });
+  // Endereço cujo link já foi aplicado: salvar aciona o Atualizar do painel, que não pode refazer o salto.
+  let linkOpened = "";
   const canWrite = w => w && w.UBY_WRITE_SCOPE === "parametros";
   const txt = el => (el?.textContent || "").replace(/\s+/g, " ").trim();
   const log = (msg, cls = "ok") => { ui.log.unshift({ at: new Date().toISOString(), msg, cls }); ui.log = ui.log.slice(0, 30); };
@@ -1792,7 +1795,8 @@
       location.replace(`#/parametros/fechamento/-/${encodeURIComponent(`sec:${CLOSING_ALIAS[params[0]]}`)}${month}`);
       return;
     }
-    if (TAB_IDS.includes(params[0])) {
+    if (TAB_IDS.includes(params[0]) && linkOpened !== location.hash) {
+      linkOpened = location.hash;
       ui.tab = params[0];
       const ref = params[1] && params[1] !== "-" ? decodeURIComponent(params[1]) : "";
       if (ref && ui.tab === "carregador") selectCharger(ref);
