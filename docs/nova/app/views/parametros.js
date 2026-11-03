@@ -781,8 +781,50 @@
         <button class="btn ghost" data-c-cancel type="button">Cancelar</button></div></td></tr>`;
     };
     const selTotal = sum(rows.filter(b => sel.has(b.key)));
+    // Contas a receber: repasse da Spott à UBY de cada competência, no dia 10 do mês seguinte (mesma conta e
+    // mesma conferência com o extrato da aba Fechamento). O mês corrente aparece com o valor até hoje e a projeção.
+    const curMk = today.slice(0, 7);
+    const rcv = (() => {
+      let rows = [];
+      try { rows = receivedRows(data.bank); } catch (_) { return []; }
+      return rows.filter(r => r.mk >= RCV_FROM).map(r => {
+        const due = `${r.nx}-10`, current = r.mk === curMk;
+        const [yy, mm] = r.mk.split("-").map(Number), days = new Date(yy, mm, 0).getDate(), elapsed = Math.max(1, Number(today.slice(8, 10)) - (current ? 1 : 0) || 1);
+        const projected = current ? Math.round(r.uby / elapsed * days * 100) / 100 : r.uby;
+        const st = current ? ["neutral", "Em andamento"] : r.ubyGot != null ? (Math.abs(r.ubyDiff) <= TOL ? ["ok", "Recebido"] : ["bad", `Recebido com diferença de ${fmt.brl(r.ubyDiff)}`])
+          : today > due ? (r.covered ? ["bad", "Não caiu no extrato"] : ["warn", "Venceu · anexe o extrato"]) : ["neutral", "A receber"];
+        return { ...r, due, current, projected, elapsed, st, open: r.ubyGot == null };
+      });
+    })();
     // Agenda dos próximos 30 dias: calendário, o que falta agendar no banco, saídas por semana e por categoria.
     // Clicar num dia ou categoria filtra a lista abaixo.
+    const receivePanel = () => {
+      if (!rcv.length) return "";
+      const mName = m => UBY.state.api?.monthName?.(m) || m;
+      const open = rcv.filter(r => r.open && !r.current), cur = rcv.find(r => r.current);
+      const next = [...open].sort((a, b) => a.due.localeCompare(b.due))[0] || cur;
+      const late = open.filter(r => today > r.due);
+      const inMonth = rcv.filter(r => r.nx === curMk && r.ubyGot != null);
+      const diffs = rcv.filter(r => r.ubyGot != null && Math.abs(r.ubyDiff) > TOL);
+      const rows = rcv.slice().reverse().slice(0, 6);
+      return `<section class="section" id="cfReceber"><div class="section-head"><div><p class="kicker">Financeiro</p><h2>Contas a receber</h2>
+          <p>Repasse da Spott à UBY: o fechamento de cada mês cai no dia 10 do mês seguinte. Previsto = faturamento − Spott − P3 − área paga na origem + royalties (a mesma conta do Fechamento), conferido com a entrada da Spott no extrato.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn" href="#/parametros/fechamento">Fechamento</a><a class="btn" href="#/parametros/pagamentos">🏦 Extrato</a></div></div>
+        <div class="grid g4" style="margin-bottom:12px">
+          ${kpi("A receber", fmt.brl(open.reduce((s, r) => s + r.uby, 0)), `${fmt.int(open.length)} competência(s) fechada(s)`, "", "lead")}
+          ${kpi("Próximo recebimento", next ? fmt.brl(next.current ? next.projected : next.uby) : "—", next ? `${esc(fmtDay(next.due))} · ${esc(mName(next.mk))}${next.current ? " (projeção)" : ""}` : "")}
+          ${kpi(`Recebido em ${esc(mName(curMk))}`, fmt.brl(inMonth.reduce((s, r) => s + r.ubyGot, 0)), inMonth.length ? "conferido no extrato" : "ainda nada no extrato")}
+          ${kpi("Atrasado ou com diferença", fmt.int(late.length + diffs.length), late.length + diffs.length ? "veja na tabela" : "tudo em dia", "", late.length + diffs.length ? "bad" : "")}
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Competência</th><th>Vencimento</th><th class="num">Previsto</th><th class="num">Recebido</th><th>Situação</th></tr></thead><tbody>
+          ${rows.map(r => `<tr${r.st[0] === "bad" ? ' style="background:rgba(183,84,80,.06)"' : ""}><td><strong>${esc(mName(r.mk))}</strong><small>Spott · repasse UBY</small></td><td>${esc(fmtDay(r.due))}</td>
+            <td class="num"><strong>${fmt.brl(r.current ? r.projected : r.uby)}</strong>${r.current ? `<small>${fmt.brl(r.uby)} em ${fmt.int(r.elapsed)} dia(s) · projeção pelo ritmo</small>` : ""}</td>
+            <td class="num">${r.ubyGot == null ? "—" : `${fmt.brl(r.ubyGot)}<small>${r.ubyManual ? "informado" : `extrato · ${esc(mName(r.nx))}`}</small>`}</td>
+            <td><span class="badge ${r.st[0]}">${esc(r.st[1])}</span></td></tr>`).join("")}
+        </tbody></table></div>
+        <p class="source-line">A projeção do mês em andamento segue o ritmo até hoje e muda a cada importação de recargas. Diferença de até ${fmt.brl(TOL)} é arredondamento. Se a Spott pagar a menos, confira em Fechamento › Recebidos.</p>
+      </section>`;
+    };
     const agendaPanel = () => {
       const end = plus(30), iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const open30 = all.filter(b => !b.paid && dueOf(b) >= today && dueOf(b) <= end);
@@ -793,14 +835,16 @@
       const byDay = new Map();
       open30.forEach(b => { const d = byDay.get(dueOf(b)) || { total: 0, n: 0, open: 0 }; d.total += b.amount; d.n++; if (!schedOf(b)) d.open++; byDay.set(dueOf(b), d); });
       const maxDay = Math.max(1, ...[...byDay.values()].map(d => d.total));
+      const inByDay = new Map(rcv.filter(r => r.open && r.due >= today && r.due <= end).map(r => [r.due, r.current ? r.projected : r.uby]));
       // Grade de segunda a domingo, da semana de hoje até a semana do último dia.
       const start = new Date(`${today}T12:00:00`); start.setDate(start.getDate() - (start.getDay() + 6) % 7);
       const cells = [];
       for (const d = new Date(start); iso(d) <= end || (cells.length % 7); d.setDate(d.getDate() + 1)) {
         const day = iso(d), info = byDay.get(day), out = day < today || day > end, mark = day === today ? " today" : "", on = f.view === "dia" && f.day === day ? " on" : "";
         const heat = info ? (.12 + .6 * info.total / maxDay).toFixed(2) : 0;
-        cells.push(out || !info ? `<div class="ag-day${out ? " out" : ""}${mark}"><span>${d.getDate()}</span></div>`
-          : `<button type="button" class="ag-day has${mark}${on}" data-cp-day="${day}" style="background:rgba(var(--uby-heat),${heat})" title="${esc(fmtDay(day))}: ${fmt.int(info.n)} conta(s), ${esc(fmt.brl(info.total))}${info.open ? "" : " · tudo agendado"}"><span>${d.getDate()}${info.open ? "" : " ✓"}</span><b>${esc(short(info.total))}</b></button>`);
+        const inc = inByDay.get(day), incTag = inc ? `<i class="ag-in" title="Repasse previsto da Spott">+${esc(short(inc))}</i>` : "";
+        cells.push(out || !info ? `<div class="ag-day${out ? " out" : ""}${mark}"><span>${d.getDate()}</span>${incTag}</div>`
+          : `<button type="button" class="ag-day has${mark}${on}" data-cp-day="${day}" style="background:rgba(var(--uby-heat),${heat})" title="${esc(fmtDay(day))}: ${fmt.int(info.n)} conta(s), ${esc(fmt.brl(info.total))}${info.open ? "" : " · tudo agendado"}"><span>${d.getDate()}${info.open ? "" : " ✓"}</span>${incTag}<b>${esc(short(info.total))}</b></button>`);
       }
       // Saídas por blocos de 7 dias a partir de hoje, em curva.
       const weeks = [0, 1, 2, 3].map(i => { const a = plus(i * 7), z = plus(i * 7 + 6); return { a, total: sum(open30.filter(b => dueOf(b) >= a && dueOf(b) <= z)) }; });
@@ -829,7 +873,7 @@
           ${kpi("Semana mais pesada", fmt.brl(biggest.total), `a partir de ${esc(fmtDay(biggest.a))}`)}
         </div>
         <div class="ag-grid">
-          <div class="ag-box"><div class="ag-title"><strong>Calendário de vencimentos</strong><small>quanto mais escuro, mais sai · ✓ tudo agendado</small></div>
+          <div class="ag-box"><div class="ag-title"><strong>Calendário de vencimentos</strong><small>quanto mais escuro, mais sai · ✓ tudo agendado · <span style="color:var(--uby-green)">+ entrada prevista</span></small></div>
             <div class="ag-cal">${["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map(d => `<em>${d}</em>`).join("")}${cells.join("")}</div></div>
           <div class="ag-box"><div class="ag-title"><strong>Precisa da sua ação</strong><small>${fmt.int(action.length)} conta(s) · ${esc(fmt.brl(sum(action)))}</small></div>
             ${action.length ? `<div class="ag-list">${action.slice(0, 7).map(b => { const [cls, label] = why(b); return `<button type="button" class="ag-item" data-cp-day="${esc(dueOf(b))}"><span class="ag-name">${esc(b.name)}<small>${esc(fmtDay(dueOf(b)))} · ${esc(billCenter(b))}</small></span><span class="ag-val"><strong>${esc(fmt.brl(b.amount))}</strong><span class="badge ${cls}" style="font-size:10px">${esc(label)}</span></span></button>`; }).join("")}</div>${action.length > 7 ? `<small>e mais ${fmt.int(action.length - 7)} na lista abaixo</small>` : ""}` : `<p class="source-line">Nada pendente: vencidas em dia e os próximos 7 dias agendados.</p>`}</div>
@@ -885,6 +929,7 @@
         ${kpi(`Pago em ${esc(UBY.state.api?.monthName?.(f.month) || f.month)}`, fmt.brl(sum(k.paid)), `${fmt.int(k.paid.length)} conta(s)`)}
       </div>
       ${agendaPanel()}
+      ${receivePanel()}
       ${taxPanel}
       <section class="section" id="cfList"><div class="section-head"><div><p class="kicker">Financeiro</p><h2>Contas a pagar</h2><p>Todas as contas numa lista só: internet, aluguel, seguro, energia (Copel e arrendamento), repasses às áreas e impostos. Pague aqui (com o valor real, se teve desconto ou juros), em lote, ou concilie com o extrato.</p></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn primary" href="#/parametros/pagamentos">＋ Nova conta</a><a class="btn" href="#/parametros/pagamentos">🏦 Conciliar extrato</a></div></div>

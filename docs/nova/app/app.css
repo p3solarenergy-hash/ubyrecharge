@@ -756,3 +756,4 @@ html[data-theme="night"] .sx-panel{background:#0F1F38}
 .ag-cat i{display:block;height:6px;border-radius:99px;background:var(--uby-surface-soft);overflow:hidden}
 .ag-cat u{display:block;height:100%;border-radius:99px;background:var(--uby-green);text-decoration:none}
 @media (max-width:860px){.ag-grid{grid-template-columns:minmax(0,1fr)}.ag-day{min-height:40px;padding:3px}.ag-day b{font-size:9.5px}}
+.ag-in{font-style:normal;font-size:10px;font-weight:800;color:var(--uby-green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
