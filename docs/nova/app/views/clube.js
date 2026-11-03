@@ -24,6 +24,25 @@
   // Sem regras gravadas, a função usa o benefício geral para todos, 1 vez por dia (mesmo padrão aqui).
   const rulesOf = p => Array.isArray(p.rules) && p.rules.length ? p.rules
     : (p.benefit ? [{ id: "geral", description: p.benefit, audience: "TODOS", n: "", period: "DIA", limit: 1, priority: 1, active: true }] : []);
+  // Aviso mensal (usuário, 03/11/2026: "colocar os demais parceiros"): pódio do motor + benefícios
+  // de cada parceiro ativo, tirados das regras cadastradas aqui (sem frase fixa do Muffatão).
+  const noticeText = c => {
+    const base = String(c.notice || "");
+    const cut = base.indexOf("\n\nParabéns"), tail = base.indexOf("\n\nIMPORTANTE");
+    if (cut < 0 || tail < 0) return base;
+    const clean = s => String(s || "").replace(/\s+/g, " ").trim().replace(/\.$/, "");
+    const ativos = (c.partners || []).filter(p => p.status === "active")
+      .sort((a, b) => (a.priority === "high" ? 0 : 1) - (b.priority === "high" ? 0 : 1) || String(a.name).localeCompare(String(b.name), "pt-BR"));
+    const top = [], todos = [];
+    ativos.forEach(p => rulesOf(p).filter(r => r.active !== false && clean(r.description)).forEach(r => {
+      const d = clean(r.description);
+      if (r.audience === "TOP_MES_ANTERIOR") top.push(`• ${p.name} (Top ${r.n || 3}): ${d}`);
+      else todos.push(`• ${p.name}: ${d}${r.audience === "PRIMEIRAS_COMPRAS" ? ` (nas ${r.n || "primeiras"} primeiras vezes)` : r.audience === "LOTE" ? " (enquanto durar o lote)" : ""}`);
+    }));
+    const premio = top.length ? `Prêmios dos vencedores:\n${top.join("\n")}` : "Os três primeiros colocados recebem 30% de desconto em alinhamento e balanceamento.";
+    const lista = todos.length ? `\n\nBenefícios para todos os participantes do Clube UBY:\n${todos.join("\n")}` : "";
+    return `${base.slice(0, cut)}\n\nParabéns aos vencedores do mês! ${premio}${lista}${base.slice(tail)}`;
+  };
   const spMonth = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
   const nextMonth = mk => { const [y, m] = mk.split("-").map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`; };
   const uses = { month: "", rows: null, error: "", loading: false };
@@ -533,8 +552,8 @@
     target.querySelectorAll("#clubTabs button").forEach(b => b.onclick = () => { ui.tab = b.dataset.v; ui.msg = null; paint(); });
     if ($("#clubMonth")) $("#clubMonth").onchange = async e => { ui.month = e.target.value; await load(false); paint(); };
     if ($("#copyNotice")) $("#copyNotice").onclick = async () => {
-      try { await navigator.clipboard.writeText(data.notice); alert("Aviso copiado. Valide grupo e cadastro antes de enviar."); }
-      catch (_) { window.prompt("Copie o aviso abaixo:", data.notice); }
+      try { await navigator.clipboard.writeText(noticeText(data)); alert("Aviso copiado. Valide grupo e cadastro antes de enviar."); }
+      catch (_) { window.prompt("Copie o aviso abaixo:", noticeText(data)); }
     };
     // participantes
     if ($("#clubSearch")) $("#clubSearch").oninput = e => { ui.search = e.target.value; clearTimeout(bind.t); bind.t = setTimeout(() => { paint(); const el = target.querySelector("#clubSearch"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 250); };
