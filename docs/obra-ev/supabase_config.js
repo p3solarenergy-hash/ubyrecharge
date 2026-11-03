@@ -11,7 +11,7 @@ window.UBY_SUPABASE_CONFIG = {
 // esses dados. Aqui o cliente Supabase só lê: login continua, gravações retornam erro.
 (function () {
   "use strict";
-  var NOVA_URL = "https://p3solarenergy-hash.github.io/ubyrecharge/nova/";
+  var NOVA_URL = "https://ubyrecharge.net.br/nova/";
   window.UBY_OLD_READ_ONLY = true;
   function roError(action) {
     var e = new Error("Plataforma antiga em modo consulta: \"" + action + "\" não foi gravado. Faça lançamentos e edições na Nova Plataforma: " + NOVA_URL);

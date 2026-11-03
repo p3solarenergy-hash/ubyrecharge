@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   const { fmt, esc, kpi } = UBY;
-  const PUB = "https://p3solarenergy-hash.github.io/ubyrecharge/obra-ev/";
+  const PUB = "https://ubyrecharge.net.br/obra-ev/";
   const basisLabel = b => ({ fixed: "R$/mês", per_kwh: "R$/kWh", revenue_pct: "% fat.", per_session: "R$/recarga" }[b] || b);
 
   function rulesText(rules) {

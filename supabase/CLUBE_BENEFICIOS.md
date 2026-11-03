@@ -16,7 +16,7 @@ Tudo roda dentro da plataforma, sem planilha:
 
 - `supabase/clube_beneficios.sql`: cria as tabelas `club_partner_uses`, `club_devices` e `club_identify_attempts` e as funções `club_find_client` e `club_register_use`.
 - `supabase/functions/clube-beneficio/index.ts`: função pública (sem JWT) chamada pela página do cliente.
-- `docs/nova/beneficio.html`: página pública. Endereço: `https://p3solarenergy-hash.github.io/ubyrecharge/nova/beneficio.html?p=<código>`.
+- `docs/nova/beneficio.html`: página pública. Endereço: `https://ubyrecharge.net.br/nova/beneficio.html?p=<código>`.
 - `docs/nova/app/views/clube.js`: abas Ranking (publicar Top 3) e Parceiros (regras, QR, display, usos, cancelar).
 - `scripts/test_clube_beneficio.mjs`: 16 cenários com dados fictícios (`node scripts/test_clube_beneficio.mjs`).
 

@@ -4,7 +4,7 @@
   const { fmt, esc, kpi } = UBY;
   const STATUSES = ["Pendente", "Em andamento", "Aguardando terceiro", "Concluida"];
   const STATUS_LABEL = { Pendente: "Pendente", "Em andamento": "Em andamento", "Aguardando terceiro": "Aguardando terceiro", Concluida: "Concluída" };
-  const PUB = "https://p3solarenergy-hash.github.io/ubyrecharge/tarefas/";
+  const PUB = "https://ubyrecharge.net.br/tarefas/";
   const ui = { search: "", status: "", priority: "", project: "", owner: "", critical: false, view: "quadro", showDone: false };
   let tasks = null, error = null, loading = false;
 

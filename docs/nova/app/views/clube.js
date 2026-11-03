@@ -16,7 +16,7 @@
   const PRIORITY = { high: "Alta", medium: "Média", low: "Baixa" };
 
   // Benefícios pelo QR fixo no balcão (página pública nova/beneficio.html + função clube-beneficio).
-  const BENEFIT_URL = "https://p3solarenergy-hash.github.io/ubyrecharge/nova/beneficio.html";
+  const BENEFIT_URL = "https://ubyrecharge.net.br/nova/beneficio.html";
   const AUDIENCE = [["TODOS", "Todos que recarregaram na UBY"], ["TOP_MES_ANTERIOR", "Top N do ranking do mês anterior"], ["PRIMEIRAS_COMPRAS", "N primeiras vezes de cada cliente"], ["LOTE", "Lote de N usos (ação)"]];
   const PERIOD = [["DIA", "por dia"], ["SEMANA", "por semana"], ["MES", "por mês"], ["TOTAL", "no total"], ["ILIMITADO", "sem limite"]];
   const newQrCode = () => [...crypto.getRandomValues(new Uint8Array(5))].map(b => b.toString(16).padStart(2, "0")).join("");

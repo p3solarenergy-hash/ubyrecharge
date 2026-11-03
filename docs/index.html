@@ -9,8 +9,17 @@
 <meta property="og:title" content="UBY Recharge · Eletropostos em Londrina">
 <meta property="og:description" content="3 locais ativos em Londrina: Posto Robert Koch, Posto Central JK e Shopping Aurora. Recarga DC rápida e AC 22 kW.">
 <meta property="og:type" content="website">
-<meta property="og:image" content="https://p3solarenergy-hash.github.io/ubyrecharge/obra-ev/assets/brand/v2/02_versao_dark.png">
+<meta property="og:image" content="https://ubyrecharge.net.br/assets/og-uby.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://ubyrecharge.net.br/">
+<meta property="og:site_name" content="UBY Recharge">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://ubyrecharge.net.br/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 88 88'%3E%3Crect width='88' height='88' rx='17' fill='%2300FF85'/%3E%3Cpath d='M53 8 45.5 38.5 62 39.5 34 79.5 41.5 49 24.5 49Z' fill='%230A1628'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -275,6 +284,17 @@
   .club-step b{display:block;color:#fff;font-size:15px}
   .club-step span{font-size:13px;color:var(--muted2)}
 
+  /* faixa investidores */
+  .inv-band-wrap{padding:0 0 112px;margin-top:-80px}
+  .inv-band{display:flex;align-items:center;gap:20px;padding:24px 28px;border-radius:24px;border:1px solid var(--line2);background:var(--bg2);transition:border-color .2s,transform .2s}
+  .inv-band:hover{border-color:var(--volt);transform:translateY(-2px)}
+  .inv-band .th-ic{width:50px;height:50px;border-radius:14px;background:var(--volt-a);color:var(--volt);display:grid;place-items:center;flex-shrink:0}
+  .inv-band .th-ic svg{width:24px;height:24px}
+  .inv-band b{display:block;font-family:var(--display);font-size:19px;color:#fff}
+  .inv-band span span{font-size:14px;color:var(--muted2)}
+  .inv-band .more{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-weight:700;color:var(--volt);white-space:nowrap}
+  @media (max-width:600px){.inv-band{flex-wrap:wrap}.inv-band .more{margin-left:0}}
+
   /* business */
   .biz{display:grid;grid-template-columns:1.2fr 1fr;gap:48px;align-items:center;border-radius:32px;padding:64px;background:var(--volt);color:var(--bg2);position:relative;overflow:hidden}
   .biz::after{content:"";position:absolute;right:-60px;bottom:-120px;width:420px;height:420px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 1 4 14h7l-2 9 11-14h-7z' fill='%230A1628' fill-opacity='.08'/%3E%3C/svg%3E") no-repeat center/contain;pointer-events:none}
@@ -396,6 +416,9 @@
     .f2{display:none}
   }
 </style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Organization","name":"UBY Recharge","url":"https://ubyrecharge.net.br/","logo":"https://ubyrecharge.net.br/assets/icon-512.png","sameAs":["https://www.instagram.com/uby.recharge"],"contactPoint":{"@type":"ContactPoint","telephone":"+55-43-98828-1585","contactType":"customer service","areaServed":"BR","availableLanguage":"Portuguese"},"address":{"@type":"PostalAddress","addressLocality":"Londrina","addressRegion":"PR","addressCountry":"BR"}}
+</script>
 </head>
 <body>
 
@@ -429,7 +452,7 @@
       <li><a href="#clube">Clube UBY</a></li>
       <li><a href="#tempo">Tempo de recarga</a></li>
       <li><a href="#empresas">Para empresas</a></li>
-      <li><a href="#faq">Dúvidas</a></li>
+      <li><a href="investidores.html">Investidores</a></li>
     </ul>
     <div class="nav-cta">
       <a href="#avaliar" class="btn btn-ghost btn-sm">Avaliar</a>
@@ -444,6 +467,7 @@
   <a href="#clube">Clube UBY</a>
   <a href="#tempo">Tempo de recarga</a>
   <a href="#empresas">Para empresas</a>
+  <a href="investidores.html">Seja investidor</a>
   <a href="#avaliar">Avaliar</a>
   <a href="#faq">Dúvidas</a>
   <a href="#app" class="btn btn-volt">Baixar o app SPOTT</a>
@@ -765,6 +789,16 @@
   </div>
 </section>
 
+<section class="inv-band-wrap" aria-label="Investidores">
+  <div class="wrap">
+    <a class="inv-band rv" href="investidores.html">
+      <span class="th-ic"><svg viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-7m5 7V3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+      <span><b>Quer investir na expansão da rede?</b><span>Conheça a SCP da UBY Recharge e seja sócio da infraestrutura da mobilidade elétrica.</span></span>
+      <span class="more">Seja investidor<svg width="18" height="18"><use href="#arrow"/></svg></span>
+    </a>
+  </div>
+</section>
+
 <!-- AVALIAR -->
 <section class="sec" id="avaliar" style="padding-top:0">
   <div class="wrap">
@@ -863,7 +897,7 @@
       </div>
       <div><h4>Pontos</h4><ul><li><a href="#pontos">Posto Robert Koch</a></li><li><a href="#pontos">Posto Central · JK</a></li><li><a href="#pontos">Shopping Aurora</a></li></ul></div>
       <div><h4>Recarga</h4><ul><li><a href="#como-funciona">Como funciona</a></li><li><a href="#tempo">Tempo de recarga</a></li><li><a href="#app">App SPOTT</a></li><li><a href="#clube">Clube UBY</a></li><li><a href="#faq">Dúvidas</a></li></ul></div>
-      <div><h4>Contato</h4><ul><li><a href="https://wa.me/5543988281585" target="_blank" rel="noopener">WhatsApp</a></li><li><a href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener">Instagram</a></li><li><a href="#empresas">Para empresas</a></li></ul></div>
+      <div><h4>Contato</h4><ul><li><a href="https://wa.me/5543988281585" target="_blank" rel="noopener">WhatsApp</a></li><li><a href="https://www.instagram.com/uby.recharge" target="_blank" rel="noopener">Instagram</a></li><li><a href="#empresas">Para empresas</a></li><li><a href="investidores.html">Seja investidor</a></li></ul></div>
     </div>
     <div class="fb"><span>© <span id="yr">2026</span> UBY Recharge · Londrina, PR</span><span>Energia que move.</span></div>
   </div>
