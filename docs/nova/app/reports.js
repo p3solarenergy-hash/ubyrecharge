@@ -20,6 +20,8 @@
   const initials = name => {
     const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
     if (parts.length < 2) return parts[0] || "";
+    // Já é sigla (com ponto ou toda maiúscula, ex.: "R.EBP 11ª Cota"): mostra a sigla, não "R.ª.C.".
+    if (/\./.test(parts[0]) || /^\p{Lu}{2,}$/u.test(parts[0])) return parts[0];
     return parts.map(p => p.replace(/[^\p{L}]/gu, "").charAt(0).toUpperCase()).filter(Boolean).join(".") + ".";
   };
 
