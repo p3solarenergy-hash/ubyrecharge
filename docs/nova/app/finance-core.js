@@ -23,6 +23,10 @@
     spottSplit      bate com o repasse da Spott: gestão P3 dos carregadores UBY = % do
                     líquido (5% do bruto ÷ 0,92 = 5,43%, em 2 casas, como o split da Spott);
                     receita "ajuste de fechamento Spott" entra como recarga (taxa e split)
+    matrixPaid      custo mensal da matriz pago com outro valor (baixa com valor informado)
+                    usa o valor pago naquele mês; o previsto segue nos outros. E, de out/2026
+                    em diante, a regra fixa do carregador (internet, aluguel…) usa a conta
+                    mensal do mesmo tipo: valor pago ou, sem baixa, o previsto (03/11/2026)
 
   Com todas as chaves desligadas (FIXES_OFF) o resultado é idêntico ao da
   plataforma original — é o que a auditoria compara centavo a centavo.
@@ -30,7 +34,7 @@
 (function (global) {
   "use strict";
 
-  const FIXES = Object.freeze(["aggregation", "zeroSaleMonths", "hybridMarketing", "courtesyInvoice", "monthScope", "matrixCents", "powerPerCharger", "lossCarry", "partnerNetBase", "centralTax", "spottSplit"]);
+  const FIXES = Object.freeze(["aggregation", "zeroSaleMonths", "hybridMarketing", "courtesyInvoice", "monthScope", "matrixCents", "powerPerCharger", "lossCarry", "partnerNetBase", "centralTax", "spottSplit", "matrixPaid"]);
   const FIXES_ON = Object.freeze(Object.fromEntries(FIXES.map(k => [k, true])));
   const FIXES_OFF = Object.freeze(Object.fromEntries(FIXES.map(k => [k, false])));
 

@@ -1646,7 +1646,8 @@
     lossCarry: "Prejuízo compensado antes de distribuir",
     partnerNetBase: "Parceria: gestão e royalty sobre o líquido da plataforma",
     centralTax: "Imposto central no resultado de cada carregador próprio",
-    spottSplit: "Gestão P3 pelo líquido, como o split da Spott, e ajuste de fechamento Spott como recarga"
+    spottSplit: "Gestão P3 pelo líquido, como o split da Spott, e ajuste de fechamento Spott como recarga",
+    matrixPaid: "Custo da matriz e regra fixa do carregador usam a conta do mês (valor pago)"
   };
   const MONTH_SPECIFIC = ["energyCopelAmount", "energyCopelKWh", "energyLeaseCreditedKWh"];
 
@@ -1658,7 +1659,8 @@
       if (u > updated) updated = u;
     });
     let matrix = 0;
-    try { matrix = (loadMatrizCosts() || []).length; } catch (_) {}
+    // Quantidade de custos + valores e baixas: pagar com outro valor muda o resultado do mês.
+    try { matrix = JSON.stringify((loadMatrizCosts() || []).map(i => [i.id, i.amount, i.paymentLedger || null])); } catch (_) {}
     let tax = "";
     try { const p = loadNetworkDistribution(); tax = JSON.stringify([p.taxRatePct, p.taxRateFrom, p.taxByMonth]); } catch (_) {}
     return `${Object.keys(allRechargeRecords || {}).length}|${charges}|${updated}|${matrix}|${tax}`;
@@ -1749,8 +1751,10 @@
     return FV2.eligible.get(k);
   }
   // Rateio de um custo da matriz entre todos os destinos da competência (calculado uma vez).
+  // Valor pago informado na baixa do mês (Contas a pagar), ou null.
+  const matrizPaidIn = (item, mk) => { const led = item.paymentLedger?.[mk]; const v = led?.status === "paid" ? led.amount : null; return v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v); };
   function fv2MatrixAlloc(item, mk, fixes) {
-    const k = `${item.id}|${mk}|${fixes.matrixCents ? 1 : 0}${fixes.powerPerCharger ? 1 : 0}${fixes.zeroSaleMonths ? 1 : 0}`;
+    const k = `${item.id}|${mk}|${fixes.matrixCents ? 1 : 0}${fixes.powerPerCharger ? 1 : 0}${fixes.zeroSaleMonths ? 1 : 0}${fixes.matrixPaid ? matrizPaidIn(item, mk) : ""}`;
     if (FV2.matrix.has(k)) return FV2.matrix.get(k);
     const rows = fv2Eligible(mk, fixes);
     const targets = (item.targets || []).filter(t => !t.startMonth || t.startMonth <= mk)
@@ -1765,7 +1769,10 @@
       }
       return matrizWeight(e.row, e.target, item, mk);
     });
-    const comp = matrizCompetencyAmount(item), cash = matrizCashAmount(item, mk);
+    let comp = matrizCompetencyAmount(item), cash = matrizCashAmount(item, mk);
+    // Custo mensal (competência = caixa) pago com outro valor: o mês usa o pago. Custos diluídos (seguro anual) não.
+    const paid = fixes.matrixPaid && !item.scheduledPayment ? matrizPaidIn(item, mk) : null;
+    if (paid !== null && cash > 0 && Math.abs(comp - cash) < 0.005) { comp = paid; cash = paid; }
     let shares, cashShares;
     if (fixes.matrixCents) { shares = CORE().allocate(comp, weights); cashShares = CORE().allocate(cash, weights); }
     else {
@@ -1830,6 +1837,27 @@
     return out;
   }
 
+  // Regra fixa do carregador ↔ conta mensal do mesmo tipo (mesma ligação de Parâmetros · Custos e contas).
+  // De out/2026 em diante o resultado usa a conta do mês (pago, ou previsto sem baixa); setembro já fechado fica.
+  const BILL_RULES_FROM = "2026-10";
+  const COST_KINDS = [/internet|dados|chip|camera|câmera/i, /alug|loca|vaga/i, /segur/i, /manut/i, /limpez|conserva/i, /monitor|telemetr/i, /licen|software/i];
+  const costKindOf = txt => COST_KINDS.findIndex(re => re.test(String(txt || "")));
+  function billRuleValues(row, mk, rules) {
+    if (mk < BILL_RULES_FROM || !Array.isArray(rules) || !rules.length) return rules;
+    let bills = [];
+    try { bills = loadMatrizCosts().filter(i => i.scheduledPayment && i.enabled !== false && scheduledPaymentApplies(i, mk) && (i.targets || []).some(t => matrizTargetMatchesRow(t, row))); } catch (_) { return rules; }
+    if (!bills.length) return rules;
+    const used = new Set();
+    return rules.map(r => {
+      if (r.basis !== "fixed" || r.enabled === false || !(Number(r.value) > 0)) return r;
+      const kind = costKindOf(`${r.id} ${r.label}`);
+      const bill = kind < 0 ? null : bills.find(i => !used.has(i.id) && costKindOf(`${i.name} ${i.category}`) === kind);
+      if (!bill) return r;
+      used.add(bill.id);
+      const paid = matrizPaidIn(bill, mk), value = paid !== null ? paid : Number(bill.amount) || 0;
+      return value > 0 ? { ...r, value, billId: bill.id } : r;
+    });
+  }
   function fv2Month(row, mk, fixes) {
     const k = `${row.fv2Id}|${mk}|${fixKey(fixes)}`;
     if (FV2.results.has(k)) return FV2.results.get(k);
@@ -1848,6 +1876,7 @@
       }
     }
     const cfg = fv2Cfg(settings);
+    if (fixes.matrixPaid) cfg.costRules = billRuleValues(row, mk, cfg.costRules);
     // Imposto da UBY é centralizado (decisão de 08/10/2026): a guia é emitida pela matriz sobre tudo o
     // que a UBY faturou, não por carregador. O resultado de cada carregador próprio fica antes do imposto;
     // a rede cobra o imposto inteiro (taxBase × alíquota ou valor da guia) numa linha própria.

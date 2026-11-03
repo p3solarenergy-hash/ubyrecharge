@@ -738,7 +738,8 @@
   // de custo e fornecedor, conferência com o extrato e baixa individual (com valor pago) ou em lote.
   function contasTab(w, data) {
     const can = canWrite(w) && !busy ? "" : "disabled";
-    const today = new Date().toISOString().slice(0, 10);
+    const now0 = new Date();
+    const today = `${now0.getFullYear()}-${String(now0.getMonth() + 1).padStart(2, "0")}-${String(now0.getDate()).padStart(2, "0")}`;
     const plus = n => { const d = new Date(`${today}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
     const in7 = plus(7);
     const bs = bankState(data);
@@ -752,7 +753,7 @@
     // Documentos (boleto, NF) ligados à conta: pela marca "conta:<chave>" ou pelo custo da matriz + competência.
     const docsOf = b => (data.billDocs || []).filter(d => String(d.notes || "").includes(`conta:${b.key}`) || (b.kind === "matriz" && d.matrix_cost_id === b.billId && d.competence_key === b.monthKey));
     const all = bs.bills.filter(b => b.amount > 0);
-    const VIEWS = [["vencidas", "Vencidas", b => sit(b) === "vencida" || sit(b) === "debitar"], ["hoje", "Vencem hoje", b => sit(b) === "hoje"], ["7dias", "Próximos 7 dias", b => !b.paid && dueOf(b) >= today && dueOf(b) <= in7],
+    const VIEWS = [...(f.day ? [["dia", `Dia ${fmtDay(f.day)}`, b => !b.paid && dueOf(b) === f.day]] : []), ["vencidas", "Vencidas", b => sit(b) === "vencida" || sit(b) === "debitar"], ["hoje", "Vencem hoje", b => sit(b) === "hoje"], ["7dias", "Próximos 7 dias", b => !b.paid && dueOf(b) >= today && dueOf(b) <= in7],
       ["abertas", "Todas em aberto", b => !b.paid], ["mes", "Vencem no mês", b => dueOf(b).slice(0, 7) === f.month], ["pagas", "Pagas no mês", b => b.paid && paidOf(b).slice(0, 7) === f.month]];
     const view = VIEWS.find(v => v[0] === f.view) || VIEWS[3];
     const q = String(f.q || "").toLowerCase();
@@ -780,6 +781,63 @@
         <button class="btn ghost" data-c-cancel type="button">Cancelar</button></div></td></tr>`;
     };
     const selTotal = sum(rows.filter(b => sel.has(b.key)));
+    // Agenda dos próximos 30 dias: calendário, o que falta agendar no banco, saídas por semana e por categoria.
+    // Clicar num dia ou categoria filtra a lista abaixo.
+    const agendaPanel = () => {
+      const end = plus(30), iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const open30 = all.filter(b => !b.paid && dueOf(b) >= today && dueOf(b) <= end);
+      if (!open30.length && !k.late.length) return "";
+      const short = v => v >= 1000 ? `${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : String(Math.round(v));
+      const scheduled = open30.filter(b => schedOf(b)), toSchedule = open30.filter(b => !schedOf(b));
+      const pctSched = sum(open30) > 0 ? sum(scheduled) / sum(open30) * 100 : 0;
+      const byDay = new Map();
+      open30.forEach(b => { const d = byDay.get(dueOf(b)) || { total: 0, n: 0, open: 0 }; d.total += b.amount; d.n++; if (!schedOf(b)) d.open++; byDay.set(dueOf(b), d); });
+      const maxDay = Math.max(1, ...[...byDay.values()].map(d => d.total));
+      // Grade de segunda a domingo, da semana de hoje até a semana do último dia.
+      const start = new Date(`${today}T12:00:00`); start.setDate(start.getDate() - (start.getDay() + 6) % 7);
+      const cells = [];
+      for (const d = new Date(start); iso(d) <= end || (cells.length % 7); d.setDate(d.getDate() + 1)) {
+        const day = iso(d), info = byDay.get(day), out = day < today || day > end, mark = day === today ? " today" : "", on = f.view === "dia" && f.day === day ? " on" : "";
+        const heat = info ? (.12 + .6 * info.total / maxDay).toFixed(2) : 0;
+        cells.push(out || !info ? `<div class="ag-day${out ? " out" : ""}${mark}"><span>${d.getDate()}</span></div>`
+          : `<button type="button" class="ag-day has${mark}${on}" data-cp-day="${day}" style="background:rgba(var(--uby-heat),${heat})" title="${esc(fmtDay(day))}: ${fmt.int(info.n)} conta(s), ${esc(fmt.brl(info.total))}${info.open ? "" : " · tudo agendado"}"><span>${d.getDate()}${info.open ? "" : " ✓"}</span><b>${esc(short(info.total))}</b></button>`);
+      }
+      // Saídas por blocos de 7 dias a partir de hoje, em curva.
+      const weeks = [0, 1, 2, 3].map(i => { const a = plus(i * 7), z = plus(i * 7 + 6); return { a, total: sum(open30.filter(b => dueOf(b) >= a && dueOf(b) <= z)) }; });
+      const W = 520, H = 170, L = 16, Rr = 16, T = 28, B = 26, top = Math.max(1, ...weeks.map(x => x.total));
+      const pts = weeks.map((x, i) => [L + i * (W - L - Rr) / (weeks.length - 1), T + (H - T - B) * (1 - x.total / top)]);
+      const base = H - B, cl = v => Math.min(Math.max(v, T), base);
+      let path = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+      pts.slice(0, -1).forEach((p1, i) => { const p0 = pts[i - 1] || p1, p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+        path += ` C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)},${cl(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)},${cl(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`; });
+      const biggest = weeks.reduce((m, x) => x.total > m.total ? x : m, weeks[0]);
+      const anchor = i => i === 0 ? "start" : i === weeks.length - 1 ? "end" : "middle";
+      const curve = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Saídas por semana" style="width:100%;height:auto;display:block"><defs><linearGradient id="agGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--uby-green)" stop-opacity=".3"/><stop offset="1" stop-color="var(--uby-green)" stop-opacity="0"/></linearGradient></defs>
+        <line x1="${L}" x2="${W - Rr}" y1="${base}" y2="${base}" stroke="var(--uby-line)"/><path d="${path} L${pts[pts.length - 1][0]},${base} L${pts[0][0]},${base} Z" fill="url(#agGrad)"/><path d="${path}" fill="none" stroke="var(--uby-green)" stroke-width="2.4" stroke-linecap="round"/>
+        ${weeks.map((x, i) => `<circle cx="${pts[i][0]}" cy="${pts[i][1]}" r="3.5" fill="${x === biggest && x.total ? "var(--uby-amber)" : "var(--uby-green)"}"/><text x="${pts[i][0]}" y="${pts[i][1] - 9}" text-anchor="${anchor(i)}" font-size="11.5" font-weight="700" fill="var(--uby-ink)">${esc(fmt.brl(x.total))}</text><text x="${pts[i][0]}" y="${H - 8}" text-anchor="${anchor(i)}" font-size="10.5" fill="var(--uby-muted)">a partir de ${esc(fmtDay(x.a).slice(0, 5))}</text>`).join("")}</svg>`;
+      // Categorias: maiores primeiro.
+      const cats = [...open30.reduce((m, b) => m.set(billCategory(b), (m.get(billCategory(b)) || 0) + b.amount), new Map())].sort((a, b) => b[1] - a[1]);
+      const catMax = Math.max(1, ...cats.map(c => c[1]));
+      // O que pede ação: vencidas, agendadas a confirmar e o que vence em 7 dias sem estar agendado.
+      const action = all.filter(b => !b.paid && (sit(b) === "vencida" || sit(b) === "debitar" || (!schedOf(b) && dueOf(b) >= today && dueOf(b) <= in7))).sort((a, b) => dueOf(a).localeCompare(dueOf(b)));
+      const why = b => sit(b) === "vencida" ? ["bad", "Vencida"] : sit(b) === "debitar" ? ["warn", "Confirmar no extrato"] : docsOf(b).length ? ["warn", "Agendar no banco"] : ["neutral", "Sem boleto · agendar"];
+      return `<section class="section"><div class="section-head"><div><p class="kicker">Próximos 30 dias</p><h2>Agenda de pagamentos</h2><p>Tudo que vence até ${esc(fmtDay(end))}. Clique num dia ou numa categoria para ver as contas na lista abaixo.</p></div></div>
+        <div class="grid g4" style="margin-bottom:12px">
+          ${kpi("A pagar em 30 dias", fmt.brl(sum(open30)), `${fmt.int(open30.length)} conta(s)`, "", "lead")}
+          ${kpi("Já agendado no banco", fmt.brl(sum(scheduled)), `${fmt.pct1(pctSched)} do total · ${fmt.int(scheduled.length)} conta(s)`)}
+          ${kpi("Falta agendar", fmt.brl(sum(toSchedule)), `${fmt.int(toSchedule.length)} conta(s)`)}
+          ${kpi("Semana mais pesada", fmt.brl(biggest.total), `a partir de ${esc(fmtDay(biggest.a))}`)}
+        </div>
+        <div class="ag-grid">
+          <div class="ag-box"><div class="ag-title"><strong>Calendário de vencimentos</strong><small>quanto mais escuro, mais sai · ✓ tudo agendado</small></div>
+            <div class="ag-cal">${["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map(d => `<em>${d}</em>`).join("")}${cells.join("")}</div></div>
+          <div class="ag-box"><div class="ag-title"><strong>Precisa da sua ação</strong><small>${fmt.int(action.length)} conta(s) · ${esc(fmt.brl(sum(action)))}</small></div>
+            ${action.length ? `<div class="ag-list">${action.slice(0, 7).map(b => { const [cls, label] = why(b); return `<button type="button" class="ag-item" data-cp-day="${esc(dueOf(b))}"><span class="ag-name">${esc(b.name)}<small>${esc(fmtDay(dueOf(b)))} · ${esc(billCenter(b))}</small></span><span class="ag-val"><strong>${esc(fmt.brl(b.amount))}</strong><span class="badge ${cls}" style="font-size:10px">${esc(label)}</span></span></button>`; }).join("")}</div>${action.length > 7 ? `<small>e mais ${fmt.int(action.length - 7)} na lista abaixo</small>` : ""}` : `<p class="source-line">Nada pendente: vencidas em dia e os próximos 7 dias agendados.</p>`}</div>
+          <div class="ag-box"><div class="ag-title"><strong>Saídas por semana</strong><small>blocos de 7 dias a partir de hoje</small></div>${curve}</div>
+          <div class="ag-box"><div class="ag-title"><strong>Por categoria</strong><small>próximos 30 dias</small></div>
+            ${cats.map(([c, v]) => `<button type="button" class="ag-cat${f.cat === c ? " on" : ""}" data-cp-cat="${esc(c)}"><span><span>${esc(c)}</span><strong>${esc(fmt.brl(v))}</strong></span><i><u style="width:${(v / catMax * 100).toFixed(1)}%"></u></i></button>`).join("")}</div>
+        </div></section>`;
+    };
     // Impostos projetados sobre o recebido no extrato: uma linha por guia (PIS/COFINS no mês, IRPJ/CSLL no trimestre).
     const taxPanel = (() => {
       const B = window.UBY_BANK;
@@ -826,8 +884,9 @@
         ${kpi("Total em aberto", fmt.brl(sum(k.open)), `${fmt.int(k.open.length)} conta(s)`, "", "lead")}
         ${kpi(`Pago em ${esc(UBY.state.api?.monthName?.(f.month) || f.month)}`, fmt.brl(sum(k.paid)), `${fmt.int(k.paid.length)} conta(s)`)}
       </div>
+      ${agendaPanel()}
       ${taxPanel}
-      <section class="section"><div class="section-head"><div><p class="kicker">Financeiro</p><h2>Contas a pagar</h2><p>Todas as contas numa lista só: internet, aluguel, seguro, energia (Copel e arrendamento), repasses às áreas e impostos. Pague aqui (com o valor real, se teve desconto ou juros), em lote, ou concilie com o extrato.</p></div>
+      <section class="section" id="cfList"><div class="section-head"><div><p class="kicker">Financeiro</p><h2>Contas a pagar</h2><p>Todas as contas numa lista só: internet, aluguel, seguro, energia (Copel e arrendamento), repasses às áreas e impostos. Pague aqui (com o valor real, se teve desconto ou juros), em lote, ou concilie com o extrato.</p></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn primary" href="#/parametros/pagamentos">＋ Nova conta</a><a class="btn" href="#/parametros/pagamentos">🏦 Conciliar extrato</a></div></div>
         <div class="seg" id="cfView" style="margin-bottom:10px">${VIEWS.map(([v, l, fn]) => `<button type="button" data-v="${v}" class="${f.view === v ? "on" : ""}">${esc(l)}${["vencidas", "hoje", "7dias"].includes(v) ? ` <b>${all.filter(fn).length}</b>` : ""}</button>`).join("")}</div>
         <div class="toolbar" style="box-shadow:none;margin-bottom:10px">
@@ -1947,6 +2006,9 @@
     const cBill = key => (data.bills || []).find(b => b.key === key);
     // Contas a pagar: visão rápida, filtros, seleção e baixa em lote.
     target.querySelectorAll("#cfView button").forEach(b => b.onclick = () => { ui.cf.view = b.dataset.v; ui.cPay = ""; draw(target, w); });
+    const toList = () => draw(target, w).then(() => target.querySelector("#cfList")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    target.querySelectorAll("[data-cp-day]").forEach(b => b.onclick = () => { ui.cf.day = b.dataset.cpDay; ui.cf.view = "dia"; ui.cf.cat = ""; ui.cPay = ""; toList(); });
+    target.querySelectorAll("[data-cp-cat]").forEach(b => b.onclick = () => { ui.cf.cat = ui.cf.cat === b.dataset.cpCat ? "" : b.dataset.cpCat; ui.cf.view = "abertas"; ui.cPay = ""; toList(); });
     target.querySelectorAll("select[data-cff], input[type=month][data-cff]").forEach(el => el.onchange = () => { ui.cf[el.dataset.cff] = el.value; draw(target, w); });
     target.querySelectorAll("input.search[data-cff]").forEach(el => el.oninput = () => { clearTimeout(el._t); el._t = setTimeout(() => { ui.cf.q = el.value; draw(target, w).then(() => { const n = target.querySelector("input.search[data-cff]"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }); }, 300); });
     target.querySelectorAll("[data-cf-sel]").forEach(cb => cb.onchange = () => { if (cb.checked) ui.cfSel.add(cb.dataset.cfSel); else ui.cfSel.delete(cb.dataset.cfSel); draw(target, w); });

@@ -726,3 +726,33 @@ html[data-theme="night"] .sx-panel{background:#0F1F38}
 .unit-jump .spacer{flex:1}
 [id^="sec"]{scroll-margin-top:120px}
 @media(max-width:860px){.unit-jump{position:static}.unit-jump .spacer{display:none}}
+
+/* Agenda de pagamentos (Contas a pagar) */
+.ag-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px}
+.ag-box{border:1px solid var(--uby-line);border-radius:12px;padding:12px 14px;background:var(--uby-surface);min-width:0}
+.ag-title{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px}
+.ag-title small{color:var(--uby-muted);font-size:11px}
+.ag-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.ag-cal em{font-style:normal;font-size:10.5px;color:var(--uby-muted);text-align:center}
+.ag-day{min-height:46px;border-radius:8px;border:1px solid var(--uby-line);background:transparent;color:var(--uby-ink);padding:4px 5px;display:flex;flex-direction:column;justify-content:space-between;font:inherit;text-align:left;min-width:0}
+.ag-day span{font-size:10.5px;color:var(--uby-muted)}
+.ag-day b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ag-day.out{opacity:.4;border-style:dashed}
+.ag-day.has{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.ag-day.has span{color:inherit}
+.ag-day.has:hover{transform:translateY(-1px);box-shadow:var(--uby-shadow)}
+.ag-day.today{border:2px solid var(--uby-green)}
+.ag-day.on{outline:2px solid var(--uby-amber);outline-offset:1px}
+.ag-list{display:flex;flex-direction:column}
+.ag-item{display:flex;justify-content:space-between;gap:10px;align-items:center;background:none;border:0;border-bottom:1px solid var(--uby-line);padding:7px 2px;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%}
+.ag-item:last-child{border-bottom:0}
+.ag-item:hover{background:var(--uby-surface-soft)}
+.ag-name{min-width:0;font-size:12.5px;font-weight:600}
+.ag-name small{display:block;font-weight:400;color:var(--uby-muted);font-size:11px}
+.ag-val{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none;font-size:12.5px}
+.ag-cat{display:block;width:100%;background:none;border:0;padding:6px 2px;font:inherit;color:inherit;cursor:pointer;text-align:left;border-radius:6px}
+.ag-cat:hover,.ag-cat.on{background:var(--uby-surface-soft)}
+.ag-cat>span{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;margin-bottom:4px}
+.ag-cat i{display:block;height:6px;border-radius:99px;background:var(--uby-surface-soft);overflow:hidden}
+.ag-cat u{display:block;height:100%;border-radius:99px;background:var(--uby-green);text-decoration:none}
+@media (max-width:860px){.ag-grid{grid-template-columns:minmax(0,1fr)}.ag-day{min-height:40px;padding:3px}.ag-day b{font-size:9.5px}}
