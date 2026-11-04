@@ -28,7 +28,10 @@
   // de cada parceiro ativo, tirados das regras cadastradas aqui (sem frase fixa do Muffatão).
   const noticeText = c => {
     const base = String(c.notice || "");
-    const cut = base.indexOf("\n\nParabéns"), tail = base.indexOf("\n\nIMPORTANTE");
+    // Usuário, 04/11/2026: por enquanto o Clube vale para todos que recarregaram; o aviso não
+    // exige grupo nem cadastro (o parágrafo "IMPORTANTE" do motor fica de fora). Voltar quando
+    // houver mais cadastrados.
+    const cut = base.indexOf("\n\nParabéns"), tail = base.indexOf("\n\nCada R$");
     if (cut < 0 || tail < 0) return base;
     const clean = s => String(s || "").replace(/\s+/g, " ").trim().replace(/\.$/, "");
     const ativos = (c.partners || []).filter(p => p.status === "active")
@@ -400,14 +403,14 @@
         ${kpi("Pontos do mês", fmt.int(s.points), "1 ponto por real gasto")}
         ${kpi("Receita do mês", fmt.brl(s.revenue), "base do ranking")}
         ${kpi("Com telefone", fmt.int(s.withPhone), s.participants ? `${fmt.pct1(s.withPhone / s.participants * 100)} dos participantes` : "")}
-        ${kpi("Cadastro no formulário", fmt.int(s.registered), s.participants ? `${fmt.pct1(s.registered / s.participants * 100)} do ranking` : "")}
+        ${kpi("Cadastro no formulário", fmt.int(s.registered), s.participants ? `${fmt.pct1(s.registered / s.participants * 100)} do ranking · só informativo` : "só informativo")}
       </div></section>
       <div class="split" style="margin-bottom:18px">
         <section class="section"><div class="section-head"><div><p class="kicker">Pódio · ${esc(c.label)}</p><h2>Top 3</h2>${publishLine}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">${closed && top.length ? `<button class="btn ${pub ? "" : "primary"}" id="clubPublishTop" type="button" ${ui.busy ? "disabled" : ""}>${pub ? "Publicar de novo" : "Publicar Top 3 para os parceiros"}</button>` : ""}<button class="btn" id="copyNotice" type="button">Copiar aviso dos vencedores</button></div></div>
           <div class="grid g3">${top.map((r, i) => `<div class="panel" style="border-top:3px solid ${medal[i]}"><p class="kicker" style="color:${medal[i]}">${i + 1}º lugar</p><h3 style="font-size:15px">${who(r.name)}</h3>
             <p style="margin:6px 0 0;font-size:22px;font-weight:850;color:var(--uby-forest)">${fmt.int(r.points)} pts</p><small>${fmt.brl(r.revenue)} · ${r.sessions} recarga(s)</small><br>
-            <span class="badge ${r.registered ? "ok" : "warn"}" style="margin-top:6px">${r.registered ? "cadastro ok" : "sem cadastro"}</span></div>`).join("") || `<div class="note">Ainda sem pontuação no mês.</div>`}</div>
+            </div>`).join("") || `<div class="note">Ainda sem pontuação no mês.</div>`}</div>
         </section>
         <section class="section"><div class="section-head"><div><p class="kicker">Formulário do Clube</p><h2>Cadastros</h2><p>${f.endpoint ? "Formulário conectado." : "Formulário não conectado."} ${f.updatedAt ? `Última leitura ${fmt.dt(f.updatedAt)}.` : ""}</p></div></div>
           <div class="grid g2">${kpi("Cadastrados", fmt.int(f.total), "respostas do formulário + importados")}${kpi("Com LGPD", fmt.int(f.lgpd), f.total ? fmt.pct1(f.lgpd / f.total * 100) : "")}
@@ -552,7 +555,7 @@
     target.querySelectorAll("#clubTabs button").forEach(b => b.onclick = () => { ui.tab = b.dataset.v; ui.msg = null; paint(); });
     if ($("#clubMonth")) $("#clubMonth").onchange = async e => { ui.month = e.target.value; await load(false); paint(); };
     if ($("#copyNotice")) $("#copyNotice").onclick = async () => {
-      try { await navigator.clipboard.writeText(noticeText(data)); alert("Aviso copiado. Valide grupo e cadastro antes de enviar."); }
+      try { await navigator.clipboard.writeText(noticeText(data)); alert("Aviso copiado."); }
       catch (_) { window.prompt("Copie o aviso abaixo:", noticeText(data)); }
     };
     // participantes

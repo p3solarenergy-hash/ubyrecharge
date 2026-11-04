@@ -11029,7 +11029,7 @@ function clubWinnerNotice(rows = [], month = '') {
   const ranking = rows.slice(0, 3).length
     ? rows.slice(0, 3).map((row, index) => `${index + 1}º lugar: ${row.name} - ${row.points.toLocaleString('pt-BR')} pontos`).join('\n')
     : 'Ainda não houve pontuação suficiente para definir vencedores.';
-  return `RESULTADO CLUBE UBY - ${monthLabel(month || monthKey(new Date()))}\n\n${ranking}\n\nParabéns aos vencedores do mês! Os três primeiros colocados recebem 30% de desconto em alinhamento e balanceamento. Todos os participantes do Clube UBY têm 10% de desconto nos serviços da rede Muffatão Autocenter.\n\nIMPORTANTE: a premiação é validada somente para quem estiver no grupo Clube UBY e com o cadastro do Clube preenchido. Caso uma dessas condições não seja atendida, não haverá direito ao prêmio.\n\nCada R$ 1 gasto nas recargas UBY gera 1 ponto. O próximo ranking começa no primeiro dia do próximo mês.`;
+  return `RESULTADO CLUBE UBY - ${monthLabel(month || monthKey(new Date()))}\n\n${ranking}\n\nParabéns aos vencedores do mês! Os três primeiros colocados recebem 30% de desconto em alinhamento e balanceamento. Todos os participantes do Clube UBY têm 10% de desconto nos serviços da rede Muffatão Autocenter.\n\nCada R$ 1 gasto nas recargas UBY gera 1 ponto. O próximo ranking começa no primeiro dia do próximo mês.`;
 }
 
 async function copyClubWinnerNotice() {
