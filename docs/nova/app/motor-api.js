@@ -832,7 +832,7 @@
   }
 
   // Agenda de pagamentos (renderScheduledPayments).
-  function payments(monthKeyValue) {
+  function payments(monthKeyValue, pre = null) {
     const mk = monthKeyValue || monthKey(new Date());
     const list = loadMatrizCosts().filter(item => scheduledPaymentApplies(item, mk))
       .sort((a, b) => scheduledPaymentDueDate(a, mk) - scheduledPaymentDueDate(b, mk))
@@ -848,7 +848,7 @@
           station: target.station || (item.scheduledPayment && !target.targetCount ? "Rede UBY · central" : "Carregador não identificado"), workName: target.workName || (target.targetCount > 1 ? `rateado para ${target.targetCount} carregadores` : ""),
           due: iso(scheduledPaymentDueDate(item, mk)), dueDay: item.dueDay, amount, status: status.key, statusLabel: status.label,
           paidAt: item.paymentLedger?.[mk]?.paidAt || "", paidAmount, dueAmount: planned };
-      }).concat(energyPayments(mk), areaPayments(mk)).sort((a, b) => String(a.due).localeCompare(String(b.due)));
+      }).concat(energyPayments(mk, pre?.energy), areaPayments(mk, pre?.area)).sort((a, b) => String(a.due).localeCompare(String(b.due)));
     const totals = list.reduce((acc, p) => { acc.total += p.amount; if (p.status === "paid") acc.paid += p.amount; else acc.pending += p.amount; if (p.status === "overdue") acc.overdue += p.amount; return acc; }, { total: 0, paid: 0, pending: 0, overdue: 0 });
     return { monthKey: mk, label: monthLabel(mk), list, totals };
   }
@@ -2399,26 +2399,31 @@
     return row ? JSON.parse(JSON.stringify(areaAccountRow(row))) : null;
   }
   const fmtPctPlain = v => `${String(Math.round(n0(v) * 100) / 100).replace(".", ",")}%`;
-  function areaPayments(mk) {
+  // Repasses à área de todos os meses, por mês de vencimento. Calcular uma vez e filtrar por mês: refazer a
+  // conta de área de todos os carregadores para cada mês deixava Contas a pagar ~1 s mais lenta.
+  function areaPaymentsByMonth() {
     fv2Ensure();
-    const out = [];
+    const byMonth = new Map();
     FV2.rows.filter(r => r.included && fv2AreaConfig(r)).forEach(row => {
       const acc = areaAccountRow(row);
-      acc.months.filter(m => String(m.due).slice(0, 7) === mk && m.total > 0 && !m.atSource).forEach(m => {
-        out.push({ id: `area-${row.workId}-${m.key}`, kind: "area", workId: row.workId, competence: m.key, dueAmount: m.dueAmount, paidAmount: m.paidAmount,
+      acc.months.filter(m => m.total > 0 && !m.atSource).forEach(m => {
+        const mk = String(m.due).slice(0, 7);
+        if (!byMonth.has(mk)) byMonth.set(mk, []);
+        byMonth.get(mk).push({ id: `area-${row.workId}-${m.key}`, kind: "area", workId: row.workId, competence: m.key, dueAmount: m.dueAmount, paidAmount: m.paidAmount,
           name: `Repasse à área · ${acc.config.payee} · ${m.label}`, category: "Repasse à área", supplier: acc.config.payee,
           station: acc.station, workName: row.workName, due: m.due, dueDay: acc.config.dueDay, amount: m.total,
           status: m.paidAt ? "paid" : m.status === "vencido" ? "overdue" : "pending", statusLabel: m.paidAt ? "Pago" : m.status === "vencido" ? "Vencido" : "A pagar",
           paidAt: m.paidAt, source: `Repasse à área (${m.reimbursement ? "energia + " : ""}${fmtPctPlain(m.areaPct)} do faturamento)` });
       });
     });
-    return out;
+    return byMonth;
   }
+  const areaPayments = (mk, pre) => ((pre || areaPaymentsByMonth()).get(mk) || []).slice();
 
   // Vencimentos das faturas de energia (Copel e arrendamento) no mês de pagamento.
-  function energyPayments(mk) {
+  function energyPaymentsByMonth() {
     fv2Ensure();
-    const out = [];
+    const byMonth = new Map();
     const seen = new Set();
     FV2.rows.forEach(row => {
       const list = fv2InvoiceList(row.workId, row.stationName || row.station, row.workName);
@@ -2427,17 +2432,20 @@
         if (seen.has(key)) return; seen.add(key);
         const lease = n0(inv.leaseAmount) > 0 ? Math.round(n0(inv.leaseAmount) * 100) / 100 : Math.round(n0(inv.leaseKWh) * n0(inv.leaseRate) * 100) / 100;
         [["Copel", n0(inv.copelAmount), inv.dueDate, inv.paidAt], ["Arrendamento de energia", lease, inv.leaseDueDate || inv.dueDate, inv.leasePaidAt !== undefined ? inv.leasePaidAt : inv.paidAt]].forEach(([name, amount, due, paidAt]) => {
-          if (!(amount > 0) || !due || String(due).slice(0, 7) !== mk) return;
+          if (!(amount > 0) || !due) return;
           const overdue = !paidAt && new Date(`${due}T23:59:59`) < new Date();
-          out.push({ id: `energia-${inv.id}-${name}`, kind: "energia", workId: row.workId, invoiceId: inv.id, part: name === "Copel" ? "copel" : "lease",
+          const mk = String(due).slice(0, 7);
+          if (!byMonth.has(mk)) byMonth.set(mk, []);
+          byMonth.get(mk).push({ id: `energia-${inv.id}-${name}`, kind: "energia", workId: row.workId, invoiceId: inv.id, part: name === "Copel" ? "copel" : "lease",
             name: `${name} · fatura ${inv.ref || inv.start}`, category: "Energia", supplier: name === "Copel" ? "Copel" : "Arrendamento",
             station: row.stationName || row.station, workName: row.workName, due, dueDay: Number(String(due).slice(8, 10)), amount,
             status: paidAt ? "paid" : overdue ? "overdue" : "pending", statusLabel: paidAt ? "Pago" : overdue ? "Vencido" : "A pagar", paidAt: paidAt || "", source: "Fatura de energia" });
         });
       });
     });
-    return out;
+    return byMonth;
   }
+  const energyPayments = (mk, pre) => ((pre || energyPaymentsByMonth()).get(mk) || []).slice();
 
   // ---------------------------------------------------------------------
   // Central de avisos (27/09/2026). Contas a pagar em primeiro lugar (usuário:
@@ -2751,9 +2759,11 @@
     const months = [...new Set([...(FV2.months || []), cur, nextMonth(cur)])].filter(isPlausibleMonthKey).sort();
     const out = [];
     const seen = new Set();
+    let pre = null;
+    try { pre = { area: areaPaymentsByMonth(), energy: energyPaymentsByMonth() }; } catch (_) {}
     months.forEach(mk => {
       let list = [];
-      try { list = payments(mk).list; } catch (_) { return; }
+      try { list = payments(mk, pre).list; } catch (_) { return; }
       list.forEach(p => {
         const key = `${p.id}|${mk}`;
         if (seen.has(key) || !(Number(p.amount) > 0)) return;

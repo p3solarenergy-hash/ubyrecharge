@@ -12,10 +12,15 @@
   const { fmt, esc, kpi } = UBY;
   const SRC = "legado/obra-ev/recargas.html?nova_params=1";
   const ui = { tab: "carregador", charger: "", month: "", edits: {}, rules: null, matrixMonth: "", editingCost: "", costForm: null, payMonth: new Date().toISOString().slice(0, 7), payForm: null, policyEdits: null, log: [] };
-  let frame = null, readyPromise = null, busy = false;
+  let frame = null, readyPromise = null, busy = false, leftAt = 0;
+  const STALE_MS = 20 * 60000;
 
   // ---------- motor original oculto ----------
+  // Abrir a plataforma original custa ~7 s (ela baixa a base inteira). Por isso ela fica aberta depois da
+  // 1ª visita e só é refeita quando se volta a Parâmetros depois de 20 min fora (pega o que outra pessoa gravou).
   function engine() {
+    if (readyPromise && frame && document.body.contains(frame) && leftAt && Date.now() - leftAt > STALE_MS && !busy) { frame.remove(); frame = null; readyPromise = null; }
+    leftAt = 0;
     if (readyPromise && frame && document.body.contains(frame)) return readyPromise;
     frame = document.createElement("iframe");
     frame.id = "paramsFrame";
@@ -45,9 +50,21 @@
     return readyPromise;
   }
   window.addEventListener("hashchange", () => {
-    if (!location.hash.startsWith("#/parametros")) linkOpened = "";
-    if (!location.hash.startsWith("#/parametros") && frame) { frame.remove(); frame = null; readyPromise = null; }
+    if (!location.hash.startsWith("#/parametros")) { linkOpened = ""; if (!leftAt) leftAt = Date.now(); }
   });
+  // No computador, abre a cópia de gravação em segundo plano depois que a tela principal terminou de
+  // carregar: a 1ª visita a Contas a pagar / Parâmetros já encontra tudo pronto. No celular não (dados e bateria).
+  (function preloadEngine() {
+    const small = () => { try { return matchMedia("(max-width: 900px)").matches || !!navigator.connection?.saveData; } catch (_) { return true; } };
+    let tries = 0;
+    const wait = setInterval(() => {
+      const done = performance.getEntriesByName("uby:tela2").length > 0;
+      if (!done && ++tries < 180) return;
+      clearInterval(wait);
+      if (small()) return;
+      setTimeout(() => (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => { if (!frame && !document.hidden) { leftAt = Date.now(); engine().catch(() => {}); } }, { timeout: 8000 }), 3000);
+    }, 1000);
+  })();
   // Endereço cujo link já foi aplicado: salvar aciona o Atualizar do painel, que não pode refazer o salto.
   let linkOpened = "";
   const canWrite = w => w && w.UBY_WRITE_SCOPE === "parametros";
@@ -86,7 +103,25 @@
   }
 
   // ---------- leitura dos dados do motor ----------
+  // Lista de carregadores e destinos das contas vêm da plataforma original e custam ~1,7 s e ~1,4 s cada.
+  // Ficam guardados até uma gravação (run limpa) ou 5 min; antes eram refeitos a cada redesenho.
+  let memo = { w: null, at: 0, chargers: null, targets: null };
+  const memoFor = w => { if (memo.w !== w || Date.now() - memo.at > 5 * 60000) memo = { w, at: Date.now(), chargers: null, targets: null }; return memo; };
+  const forgetMemo = () => { memo = { w: null, at: 0, chargers: null, targets: null }; };
+  function schedTargets(w) {
+    const m = memoFor(w);
+    if (m.targets) return m.targets;
+    w.renderScheduledPayments(w.getGeneralUnitData());
+    m.targets = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text, station: o.dataset.station || "" }));
+    return m.targets;
+  }
   function chargers(w) {
+    const m = memoFor(w);
+    if (m.chargers) return m.chargers.map(c => ({ ...c }));
+    m.chargers = chargersNow(w);
+    return m.chargers.map(c => ({ ...c }));
+  }
+  function chargersNow(w) {
     const rows = w.getUbyChargerRows(w.getGeneralUnitData());
     const latest = (w.getMonths?.() || []).at(-1) || "";
     return rows.map(r => {
@@ -293,10 +328,9 @@
     };
   }
   function payTargetFor(w, c) {
-    w.renderScheduledPayments(w.getGeneralUnitData());
-    const opts = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value);
+    const opts = schedTargets(w);
     const same = opts.filter(o => o.value.split("::")[0] === c.workId);
-    const hit = same.find(o => normSt(o.dataset.station) === normSt(c.station)) || (same.length === 1 ? same[0] : null);
+    const hit = same.find(o => normSt(o.station) === normSt(c.station)) || (same.length === 1 ? same[0] : null);
     return { value: hit?.value || "", options: opts.map(o => ({ value: o.value, text: o.text })) };
   }
   function matrixScopeFor(w, c, mk) {
@@ -662,8 +696,7 @@
       return { id: i.id, sched: !!i.scheduledPayment, name: i.name, category: i.category, supplier: i.supplier, source: i.scheduledPayment ? "" : "Custo da matriz", target: tg, due: w.scheduledPaymentDueDate(i, mk), dueDay: i.dueDay, amount, st };
     });
     const tot = rows.reduce((a, r) => { a.total += r.amount; if (r.st.key === "paid") a.paid += r.amount; else a.open += r.amount; if (r.st.key === "overdue") a.late += r.amount; return a; }, { total: 0, paid: 0, open: 0, late: 0 });
-    w.renderScheduledPayments(w.getGeneralUnitData());
-    const targets = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text }));
+    const targets = schedTargets(w);
     const editing = ui.payEditing ? w.loadMatrizCosts().find(c => c.id === ui.payEditing && c.scheduledPayment) || null : null;
     if (ui.payEditing && !editing) ui.payEditing = "";
     if (editing && !ui.payForm) {
@@ -1031,7 +1064,7 @@
         <option value="__new">＋ Lançar como conta nova (já paga)</option><option value="__ignore">Não é conta (transferência, retirada…)</option>`;
     };
     // Painel "lançar como conta nova": pagamento avulso do mês, já pago na data do banco.
-    const targets = (() => { try { w.renderScheduledPayments(w.getGeneralUnitData()); return [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text })); } catch (_) { return []; } })();
+    const targets = (() => { try { return schedTargets(w); } catch (_) { return []; } })();
     const newPanel = t => {
       const f = ui.bankNewForm || {};
       return `<tr><td colspan="5"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
@@ -1883,7 +1916,7 @@
   const bqNum = v => { let s = String(v ?? "").replace(/[R$\s]/g, ""); if (/,/.test(s)) s = s.replace(/\./g, "").replace(",", "."); const x = Number(s); return Number.isFinite(x) ? Math.round(x * 100) / 100 : 0; };
   const bqCat = t => { const k = costKindOf(t); return ["Internet / dados", "Locação / aluguel", "Seguro", "Manutenção", "Outros custos", "Outros custos", "Licença / plataforma"][k] || "Outros custos"; };
   function bqTargets(w) {
-    try { w.renderScheduledPayments(w.getGeneralUnitData()); return [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text })); } catch (_) { return []; }
+    try { return schedTargets(w); } catch (_) { return []; }
   }
   // Contas candidatas: em aberto (ou pagas há pouco, para comprovante), pontuadas por valor, fornecedor e vencimento.
   function bqCandidates(x, bills) {
@@ -2143,18 +2176,14 @@
         for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
         try { await Promise.race([UBY.state.api.loadFull(), new Promise(r => setTimeout(r, 15000))]); } catch (_) {}
       }
-      if (ui.tab === "fechamento") {
-        try { data.bank = (await w.UBY_SUPABASE.loadBankData()).payload || null; data.bankError = ""; }
-        catch (err) { data.bank = null; data.bankError = err.message; }
-      }
-      if (ui.tab === "contas" || ui.tab === "boleto") {
-        try { const [m, c] = await Promise.all([w.UBY_SUPABASE.loadFinanceDocuments({ limit: 200 }), w.UBY_SUPABASE.loadFinanceDocuments({ scope: "charger", limit: 200 })]); data.billDocs = [...(m || []), ...(c || [])]; }
-        catch (_) { data.billDocs = []; }
-      }
+      // Extrato e documentos ao mesmo tempo (antes, um depois do outro).
+      const needBank = ["fechamento", "pagamentos", "contas", "boleto"].includes(ui.tab), needDocs = ui.tab === "contas" || ui.tab === "boleto";
+      await Promise.all([
+        needBank ? w.UBY_SUPABASE.loadBankData().then(r => { data.bank = r.payload || null; data.bankError = ""; }, err => { data.bank = null; data.bankError = err.message; }) : null,
+        needDocs ? Promise.all([w.UBY_SUPABASE.loadFinanceDocuments({ limit: 200 }), w.UBY_SUPABASE.loadFinanceDocuments({ scope: "charger", limit: 200 })]).then(([m, c]) => { data.billDocs = [...(m || []), ...(c || [])]; }, () => { data.billDocs = []; }) : null
+      ]);
       if (ui.tab === "pagamentos" || ui.tab === "contas" || ui.tab === "boleto") {
         try { data.bills = UBY.state.api.allBills(); } catch (err) { data.bills = []; }
-        try { data.bank = (await w.UBY_SUPABASE.loadBankData()).payload || null; data.bankError = ""; }
-        catch (err) { data.bank = null; data.bankError = err.message; }
       }
       if (ui.tab === "documentos") {
         const mk = ui.docMonth || data.months.at(-1) || "";
@@ -2211,7 +2240,7 @@
     if (busy) return;
     busy = true;
     target.style.opacity = ".6";
-    try { const msg = await fn(); log(`${label}: ${msg || "salvo"}`, "ok"); refreshPanels(); }
+    try { const msg = await fn(); forgetMemo(); log(`${label}: ${msg || "salvo"}`, "ok"); refreshPanels(); }
     catch (err) { log(`${label}: ${err.message}`, "bad"); }
     finally { busy = false; target.style.opacity = ""; }
     await draw(target, w);

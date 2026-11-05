@@ -1,6 +1,9 @@
 (function () {
   const config = window.UBY_SUPABASE_CONFIG || {};
-  const USER_CACHE_TTL_MS = 30000;
+  // Confirmação do login no servidor: vale 5 min e é compartilhada entre leituras simultâneas (antes, cada
+  // leitura fazia a sua, em série). As regras do banco (RLS) continuam conferindo a permissão em toda leitura.
+  const USER_CACHE_TTL_MS = 5 * 60000;
+  let verifiedUserPending = null;
   let verifiedUserCache = null;
   let verifiedUserCachedAt = 0;
   const managedPrefixes = [
@@ -357,15 +360,19 @@
     if (verifiedUserCache && Date.now() - verifiedUserCachedAt < USER_CACHE_TTL_MS) {
       return verifiedUserCache;
     }
-    const { data, error } = await sb.auth.getUser();
-    if (error) {
-      verifiedUserCache = null;
-      verifiedUserCachedAt = 0;
-      return null;
-    }
-    verifiedUserCache = data.user || null;
-    verifiedUserCachedAt = Date.now();
-    return verifiedUserCache;
+    if (verifiedUserPending) return verifiedUserPending;
+    verifiedUserPending = (async () => {
+      const { data, error } = await sb.auth.getUser();
+      if (error) {
+        verifiedUserCache = null;
+        verifiedUserCachedAt = 0;
+        return null;
+      }
+      verifiedUserCache = data.user || null;
+      verifiedUserCachedAt = Date.now();
+      return verifiedUserCache;
+    })().finally(() => { verifiedUserPending = null; });
+    return verifiedUserPending;
   }
 
   async function currentProfile() {

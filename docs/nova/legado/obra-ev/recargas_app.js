@@ -13255,16 +13255,18 @@ async function ensureAllOverviewSessionsLoaded() {
   if (overviewSessionsHydrationPromise) return overviewSessionsHydrationPromise;
   overviewSessionsHydrationPromise = (async () => {
     setStorageState('Carregando historico completo sob demanda...');
+    // Resumos e 1ª página juntos; com o total em mãos, as demais páginas descem em paralelo (na ordem).
+    const summariesPromise = window.UBY_SUPABASE.loadAllRechargeSummaries
+      ? window.UBY_SUPABASE.loadAllRechargeSummaries()
+      : Promise.resolve(Object.values(allRechargeRecords));
     const firstPage = await window.UBY_SUPABASE.loadRechargeSessions({ limit: OVERVIEW_PAGE_SIZE });
     const rows = [...(firstPage.rows || [])];
-    for (let offset = rows.length; offset < firstPage.count; offset += OVERVIEW_PAGE_SIZE) {
-      const page = await window.UBY_SUPABASE.loadRechargeSessions({ limit: OVERVIEW_PAGE_SIZE, offset });
-      rows.push(...(page.rows || []));
-      await yieldToBrowser();
-    }
-    const summaries = window.UBY_SUPABASE.loadAllRechargeSummaries
-      ? await window.UBY_SUPABASE.loadAllRechargeSummaries()
-      : Object.values(allRechargeRecords);
+    const offsets = [];
+    for (let offset = rows.length; offset < firstPage.count; offset += OVERVIEW_PAGE_SIZE) offsets.push(offset);
+    const pages = await Promise.all(offsets.map(offset => window.UBY_SUPABASE.loadRechargeSessions({ limit: OVERVIEW_PAGE_SIZE, offset })));
+    pages.forEach(page => rows.push(...(page.rows || [])));
+    await yieldToBrowser();
+    const summaries = await summariesPromise;
     const byWork = new Map();
     rows.forEach(charge => {
       const workId = String(charge.workId || '');
