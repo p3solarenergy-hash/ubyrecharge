@@ -839,7 +839,9 @@
       .map(item => {
         const target = scheduledPaymentTarget(item);
         const status = scheduledPaymentStatus(item, mk);
-        const planned = item.scheduledPayment ? Number(item.amount || 0) : matrizCashAmount(item, mk);
+        // Boleto do mês com valor diferente do cadastro (ex.: internet R$ 140 em vez de R$ 106,97): vale o do boleto.
+        const ovr = item.paymentLedger?.[mk]?.billAmount, billOverride = ovr !== undefined && ovr !== null && ovr !== "" && Number.isFinite(Number(ovr)) ? Number(ovr) : null;
+        const planned = billOverride !== null ? billOverride : item.scheduledPayment ? Number(item.amount || 0) : matrizCashAmount(item, mk);
         // Pago com valor diferente (desconto, juros, mês proporcional): vale o pago; o previsto fica em dueAmount.
         const led = item.paymentLedger?.[mk];
         const paidAmount = led?.status === "paid" && led.amount !== undefined && led.amount !== null && led.amount !== "" ? Number(led.amount) : null;
@@ -1854,7 +1856,8 @@
       const bill = kind < 0 ? null : bills.find(i => !used.has(i.id) && costKindOf(`${i.name} ${i.category}`) === kind);
       if (!bill) return r;
       used.add(bill.id);
-      const paid = matrizPaidIn(bill, mk), value = paid !== null ? paid : Number(bill.amount) || 0;
+      const ov = bill.paymentLedger?.[mk]?.billAmount, override = ov !== undefined && ov !== null && ov !== "" && Number.isFinite(Number(ov)) ? Number(ov) : null;
+      const paid = matrizPaidIn(bill, mk), value = paid !== null ? paid : override !== null ? override : Number(bill.amount) || 0;
       return value > 0 ? { ...r, value, billId: bill.id } : r;
     });
   }

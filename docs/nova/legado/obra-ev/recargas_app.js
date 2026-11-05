@@ -6237,7 +6237,9 @@ function matrizNormalizeCost(raw = {}) {
           status: entry?.status === 'paid' ? 'paid' : 'pending',
           paidAt: String(entry?.paidAt || ''), updatedAt: String(entry?.updatedAt || ''),
           // NOVA PLATAFORMA (13/10/2026): valor efetivamente pago (desconto, juros, mês proporcional).
-          ...(entry?.status === 'paid' && entry?.amount !== undefined && entry?.amount !== null && entry?.amount !== '' && Number.isFinite(Number(entry.amount)) ? { amount: Math.max(0, Number(entry.amount)) } : {})
+          ...(entry?.status === 'paid' && entry?.amount !== undefined && entry?.amount !== null && entry?.amount !== '' && Number.isFinite(Number(entry.amount)) ? { amount: Math.max(0, Number(entry.amount)) } : {}),
+          // NOVA PLATAFORMA (05/11/2026): valor do boleto deste mês quando difere do cadastro (vale só no mês).
+          ...(entry?.billAmount !== undefined && entry?.billAmount !== null && entry?.billAmount !== '' && Number.isFinite(Number(entry.billAmount)) ? { billAmount: Math.max(0, Number(entry.billAmount)) } : {})
         };
         return ledger;
       }, {}) : {},

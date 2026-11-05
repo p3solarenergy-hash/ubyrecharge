@@ -1168,6 +1168,19 @@
       </section>`;
   }
   // Baixa (ou reabertura) de uma conta, pelo tipo: custo da matriz, fatura de energia ou repasse à área.
+  // Valor do boleto deste mês numa conta mensal (o cadastro e os outros meses não mudam).
+  async function setBillAmount(w, b, value) {
+    if (b.kind !== "matriz") return "";
+    await resyncMatrix(w);
+    const list = w.loadMatrizCosts();
+    const item = list.find(i => i.id === b.costId);
+    if (!item) throw new Error("Conta não encontrada na nuvem. Nada foi gravado.");
+    const now = new Date().toISOString(), cur = item.paymentLedger?.[b.monthKey] || { status: "pending", paidAt: "" };
+    item.paymentLedger = { ...(item.paymentLedger || {}), [b.monthKey]: { ...cur, billAmount: Math.round(Number(value) * 100) / 100, updatedAt: now } };
+    item.updatedAt = now;
+    w.saveMatrizCosts(list);
+    return await awaitMatrixSave(w);
+  }
   async function setBillPaid(w, b, date, opts = {}) {
     if (b.kind === "matriz") {
       await resyncMatrix(w);
@@ -1176,7 +1189,8 @@
       if (!item) throw new Error("Custo não encontrado na matriz. Nada foi gravado.");
       const now = new Date().toISOString();
       const paidAmount = opts.amount !== undefined && Math.abs(Number(opts.amount) - Number(opts.due ?? b.dueAmount ?? b.amount)) > 0.009 ? Math.round(Number(opts.amount) * 100) / 100 : undefined;
-      item.paymentLedger = { ...(item.paymentLedger || {}), [b.monthKey]: date ? { status: "paid", paidAt: `${date}T12:00:00`, updatedAt: now, ...(paidAmount !== undefined ? { amount: paidAmount } : {}) } : { status: "pending", paidAt: "", updatedAt: now } };
+      const keep = item.paymentLedger?.[b.monthKey]?.billAmount != null ? { billAmount: item.paymentLedger[b.monthKey].billAmount } : {};
+      item.paymentLedger = { ...(item.paymentLedger || {}), [b.monthKey]: date ? { status: "paid", paidAt: `${date}T12:00:00`, updatedAt: now, ...keep, ...(paidAmount !== undefined ? { amount: paidAmount } : {}) } : { status: "pending", paidAt: "", updatedAt: now, ...keep } };
       item.updatedAt = now;
       w.saveMatrizCosts(list);
       return await awaitMatrixSave(w);
@@ -1912,6 +1926,9 @@
   // carregador, com o arquivo guardado junto. Comprovante de pagamento já dá a baixa.
   const BQ_CACHE = "uby-nova-compartilhado";
   const BQ_TYPES = [["boleto", "Boleto"], ["fatura", "Fatura"], ["nota_fiscal", "Nota fiscal"], ["recibo", "Comprovante de pagamento"], ["contrato", "Contrato"], ["outro", "Outro"]];
+  // Fornecedor do boleto → conta em que você anexou (ex.: "HUGO FERNANDO… TELECOM" é a internet VOXX).
+  const bqAlias = { all: () => { try { return JSON.parse(localStorage.getItem("uby-boleto-fornecedor") || "{}"); } catch (_) { return {}; } },
+    set: (sup, billId) => { if (!sup || !billId) return; try { const a = bqAlias.all(); a[normSt(sup)] = billId; localStorage.setItem("uby-boleto-fornecedor", JSON.stringify(a)); } catch (_) {} } };
   const bqLast = { get: () => { try { return localStorage.getItem("uby-boleto-destino") || ""; } catch (_) { return ""; } }, set: v => { try { localStorage.setItem("uby-boleto-destino", v); } catch (_) {} } };
   const bqNum = v => { let s = String(v ?? "").replace(/[R$\s]/g, ""); if (/,/.test(s)) s = s.replace(/\./g, "").replace(",", "."); const x = Number(s); return Number.isFinite(x) ? Math.round(x * 100) / 100 : 0; };
   const bqCat = t => { const k = costKindOf(t); return ["Internet / dados", "Locação / aluguel", "Seguro", "Manutenção", "Outros custos", "Outros custos", "Licença / plataforma"][k] || "Outros custos"; };
@@ -1920,7 +1937,7 @@
   }
   // Contas candidatas: em aberto (ou pagas há pouco, para comprovante), pontuadas por valor, fornecedor e vencimento.
   function bqCandidates(x, bills) {
-    const f = x.f, words = normSt(`${f.supplier} ${f.description}`).split(" ").filter(t => t.length >= 4);
+    const f = x.f, words = normSt(`${f.supplier} ${f.description}`).split(" ").filter(t => t.length >= 4), alias = bqAlias.all();
     const days = (a, b) => a && b ? Math.abs(new Date(`${String(a).slice(0, 10)}T12:00:00`) - new Date(`${String(b).slice(0, 10)}T12:00:00`)) / 86400000 : null;
     return bills.filter(b => b.amount > 0 && (!b.paid || f.paid)).map(b => {
       let s = 0, ties = 0;
@@ -1930,7 +1947,8 @@
       const hay = normSt(`${b.name} ${b.supplier} ${b.category}`);
       if (words.some(t => hay.includes(t))) { s += 2; ties++; }
       const kb = costKindOf(`${b.name} ${b.category}`);
-      if (kb >= 0 && kb === costKindOf(`${f.supplier} ${f.description} ${x.text || ""}`)) s += 1;
+      if (kb >= 0 && kb === costKindOf(`${f.supplier} ${f.description} ${x.text || ""}`)) { s += 2; ties++; }
+      if (alias[normSt(f.supplier)] && alias[normSt(f.supplier)] === (b.billId || b.costId)) { s += 4; ties++; }
       const dd = days(b.due, f.due || f.paidAt);
       if (dd !== null) s += dd <= 1 ? 3 : dd <= 10 ? 1 : dd > 45 ? -3 : 0;
       if (b.paid && !f.paid) s -= 5;
@@ -2045,6 +2063,14 @@
     if (!(f.value > 0)) { alert("Informe o valor."); return; }
     if (!x.dest) { alert("Escolha onde lançar: uma conta que já existe ou o carregador."); return; }
     if (x.dest.startsWith("new:") && !/^\d{4}-\d{2}-\d{2}$/.test(f.due || f.paidAt || "")) { alert("Informe o vencimento (ou a data do pagamento)."); return; }
+    if (x.dest.startsWith("new:")) {
+      const tgt = x.dest.slice(4), wid = tgt.split("::")[0], mk = (f.due || f.paidAt).slice(0, 7), kind = costKindOf(`${f.supplier} ${f.description} ${x.text || ""}`);
+      const twin = kind >= 0 ? (data.bills || []).find(b => b.kind === "matriz" && String(b.workId) === wid && b.monthKey === mk && costKindOf(`${b.name} ${b.category}`) === kind) : null;
+      if (twin) {
+        const attach = confirm(`${billCenter(twin)} já tem a conta "${twin.name}" (${fmt.brl(twin.amount)}) em ${mk.slice(5)}/${mk.slice(0, 4)}.\n\nOK = anexar este boleto a ela (o valor deste mês passa a ${fmt.brl(f.value)}).\nCancelar = criar uma conta nova separada.`);
+        if (attach) x.dest = `bill:${twin.key}`;
+      }
+    }
     const docType = f.kind || "boleto";
     x.state = "enviando";
     run(target, w, `Documento ${x.file.name || ""}`, async () => {
@@ -2055,9 +2081,12 @@
           await w.UBY_SUPABASE.createFinanceDocument({ scope: b.workId ? "charger" : "matrix", workId: b.workId || null, matrixCostId: b.kind === "matriz" ? b.billId : null, competenceKey: b.monthKey,
             supplier: f.supplier || b.supplier || b.name, category: billCategory(b), documentNumber: f.line || "", documentType: docType, amount: f.value, dueDate: f.due || b.due || null,
             status: f.paid || b.paid ? "paid" : "pending", notes: `${b.name} · conta:${b.key}` }, x.file);
-          let paid = "";
+          let paid = "", changed = "";
+          const planned = Number(b.dueAmount ?? b.amount);
+          if (b.kind === "matriz" && !b.paid && Math.abs(planned - f.value) > 0.009) { await setBillAmount(w, b, f.value); changed = ` · valor deste mês ${fmt.brl(planned)} → ${fmt.brl(f.value)}`; }
+          bqAlias.set(f.supplier, b.billId || b.costId);
           if (f.paid && !b.paid) { await setBillPaid(w, b, f.paidAt || new Date().toISOString().slice(0, 10), { amount: f.value, due: Number(b.dueAmount ?? b.amount) }); paid = ` · paga em ${fmtDay(f.paidAt)}`; }
-          x.done = `Anexado a ${b.name} (${billCenter(b)}) · ${fmt.brl(f.value)}${paid}`;
+          x.done = `Anexado a ${b.name} (${billCenter(b)}) · ${fmt.brl(f.value)}${changed}${paid}`;
         } else {
           const tgt = x.dest.slice(4), when = f.due || f.paidAt, mk = when.slice(0, 7), name = String(f.description || f.supplier || "Conta avulsa").trim().slice(0, 80);
           await addScheduled(w, { target: tgt, name, supplier: f.supplier || "", category: bqCat(`${name} ${f.supplier} ${x.text || ""}`), amount: f.value, dueDay: Number(when.slice(8, 10)) || 10, startMonth: mk, endMonth: mk }, mk);
