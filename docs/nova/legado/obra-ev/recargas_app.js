@@ -13252,11 +13252,26 @@ async function refreshGeneralRechargeBases(forceCloud = false) {
   }
 }
 
-async function ensureAllOverviewSessionsLoaded() {
-  if (overviewSessionsFullyHydrated || !window.UBY_SUPABASE?.loadRechargeSessions) return;
-  if (overviewSessionsHydrationPromise) return overviewSessionsHydrationPromise;
-  overviewSessionsHydrationPromise = (async () => {
-    setStorageState('Carregando historico completo sob demanda...');
+// NOVA PLATAFORMA (05/11/2026): abre com as recargas guardadas no aparelho e confere com a nuvem em segundo
+// plano (como Gmail e apps de banco). Só as recargas vêm do aparelho; resumos e configurações financeiras são
+// sempre os da nuvem. A cópia de gravação (UBY_WRITE_SCOPE) nunca usa o aparelho.
+const OVERVIEW_CACHE_KEY = 'overview-charges:v1';
+const OVERVIEW_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+let overviewBackgroundRefresh = null;
+function overviewSignature(rows) {
+  let revenue = 0, energy = 0, last = '';
+  rows.forEach(c => { revenue += Number(c.revenue || 0); energy += Number(c.energyKWh || 0); const s = String(c.startIso || ''); if (s > last) last = s; });
+  return `${rows.length}|${Math.round(revenue * 100)}|${Math.round(energy * 100)}|${last}`;
+}
+function applyOverviewRecords(records) {
+  mergeCloudRechargeRecords(records);
+  records.forEach(record => fullRechargeWorkIds.add(String(record.workId || '')));
+  overviewSessionsFullyHydrated = true;
+  // Versão dos dados: o motor da Nova refaz os cálculos mesmo quando a quantidade de recargas não muda.
+  window.UBY_RECORDS_VERSION = (window.UBY_RECORDS_VERSION || 0) + 1;
+  markRechargeRecordsDirty();
+}
+async function fetchOverviewFromCloud() {
     // Resumos e 1ª página juntos; com o total em mãos, as demais páginas descem em paralelo (na ordem).
     const summariesPromise = window.UBY_SUPABASE.loadAllRechargeSummaries
       ? window.UBY_SUPABASE.loadAllRechargeSummaries()
@@ -13282,12 +13297,34 @@ async function ensureAllOverviewSessionsLoaded() {
       partialDetails: false,
       normalized: true
     }));
-    mergeCloudRechargeRecords(records);
-    records.forEach(record => fullRechargeWorkIds.add(String(record.workId || '')));
-    overviewSessionsFullyHydrated = true;
-    markRechargeRecordsDirty();
-    window.UBY_RECHARGE_RUNTIME?.cacheSet?.('general-records:all', records).catch(() => {});
-    setStorageState(`Historico completo carregado: ${rows.length} recarga(s).`);
+    const sig = overviewSignature(rows);
+    window.UBY_RECHARGE_RUNTIME?.cacheSet?.(OVERVIEW_CACHE_KEY, { byWork: Object.fromEntries(byWork), sig }).catch(() => {});
+    return { rows, records, sig };
+}
+async function ensureAllOverviewSessionsLoaded() {
+  if (overviewSessionsFullyHydrated || !window.UBY_SUPABASE?.loadRechargeSessions) return;
+  if (overviewSessionsHydrationPromise) return overviewSessionsHydrationPromise;
+  overviewSessionsHydrationPromise = (async () => {
+    if (!window.UBY_WRITE_SCOPE) {
+      let cached = null;
+      try { cached = await window.UBY_RECHARGE_RUNTIME?.cacheGet?.(OVERVIEW_CACHE_KEY, OVERVIEW_CACHE_MAX_AGE); } catch (_) {}
+      const current = Object.values(allRechargeRecords || {});
+      if (cached?.byWork && cached.sig && current.length) {
+        applyOverviewRecords(current.map(record => ({ ...record, charges: cached.byWork[String(record.workId || '')] || [], summaryOnly: false, partialDetails: false, normalized: true })));
+        window.UBY_OVERVIEW_FROM_CACHE = true;
+        setStorageState('Historico do aparelho; conferindo com a nuvem...');
+        overviewBackgroundRefresh = fetchOverviewFromCloud()
+          .then(fresh => { applyOverviewRecords(fresh.records); window.UBY_OVERVIEW_FROM_CACHE = false; setStorageState(`Historico completo conferido: ${fresh.rows.length} recarga(s).`); window.dispatchEvent(new CustomEvent('uby:history-updated', { detail: { changed: fresh.sig !== cached.sig } })); })
+          .catch(err => { console.warn('Conferencia do historico:', err.message); window.dispatchEvent(new CustomEvent('uby:history-updated', { detail: { changed: false, error: err.message } })); })
+          .finally(() => { overviewBackgroundRefresh = null; });
+        return;
+      }
+    }
+    setStorageState('Carregando historico completo sob demanda...');
+    const fresh = await fetchOverviewFromCloud();
+    applyOverviewRecords(fresh.records);
+    window.UBY_OVERVIEW_FROM_CACHE = false;
+    setStorageState(`Historico completo carregado: ${fresh.rows.length} recarga(s).`);
   })().finally(() => {
     overviewSessionsHydrationPromise = null;
   });

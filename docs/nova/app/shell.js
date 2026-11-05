@@ -301,7 +301,19 @@
       state.full = true;
       state.cache.clear();
       refreshMeta();
-      setStatus(`Dados reais · ${fmt.int(state.status.charges)} sessões · ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`, "");
+      const realStatus = () => setStatus(`Dados reais · ${fmt.int(state.status.charges)} sessões · ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`, "");
+      // Aberto com o histórico guardado no aparelho: confere com a nuvem em segundo plano e atualiza a tela se mudou.
+      if (state.status?.fromCache && api.onHistoryUpdated) {
+        setStatus(`Histórico do aparelho · conferindo com a nuvem…`, "warn");
+        api.onHistoryUpdated(detail => {
+          state.cache.clear();
+          refreshMeta();
+          if (detail.error) setStatus("Não consegui conferir com a nuvem; mostrando o histórico do aparelho", "warn"); else realStatus();
+          if (detail.changed && !String(location.hash).startsWith("#/parametros")) rerender();
+          updateBell();
+          mark("conferido");
+        });
+      } else realStatus();
       rerender();
       mark("tela2");
       updateBell();

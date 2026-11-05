@@ -136,6 +136,11 @@
     return fullPromise;
   }
 
+  // Avisa a tela quando a conferência do histórico (aberto com o que estava no aparelho) termina.
+  const historyListeners = [];
+  window.addEventListener("uby:history-updated", e => historyListeners.splice(0).forEach(fn => { try { fn(e.detail || {}); } catch (_) {} }));
+  function onHistoryUpdated(fn) { if (typeof fn === "function") historyListeners.push(fn); }
+
   function status() {
     const profile = window.UBY_AUTH?.current?.() || null;
     return {
@@ -144,6 +149,7 @@
       records: Object.keys(allRechargeRecords || {}).length,
       charges: countDetailedCharges(),
       fullHistory: !!overviewSessionsFullyHydrated,
+      fromCache: !!window.UBY_OVERVIEW_FROM_CACHE,
       readOnly: window.UBY_READ_ONLY !== false,
       user: profile ? { label: profile.label, email: profile.email, role: profile.role } : null,
       loadedAt: new Date().toISOString()
@@ -1665,7 +1671,7 @@
     try { matrix = JSON.stringify((loadMatrizCosts() || []).map(i => [i.id, i.amount, i.paymentLedger || null])); } catch (_) {}
     let tax = "";
     try { const p = loadNetworkDistribution(); tax = JSON.stringify([p.taxRatePct, p.taxRateFrom, p.taxByMonth]); } catch (_) {}
-    return `${Object.keys(allRechargeRecords || {}).length}|${charges}|${updated}|${matrix}|${tax}`;
+    return `${Object.keys(allRechargeRecords || {}).length}|${charges}|${updated}|${matrix}|${tax}|${window.UBY_RECORDS_VERSION || 0}`;
   }
   function fv2Ensure() {
     const stamp = fv2Stamp();
@@ -2789,7 +2795,7 @@
     return { list: out, total: out.reduce((s, p) => s + p.amount, 0) };
   }
 
-  window.UBY_MOTOR_API = { withUntil, alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
+  window.UBY_MOTOR_API = { onHistoryUpdated, withUntil, alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, clientRanking, customerWatch, compare, compareOptions, pricingBase, club, financeV2, financeV2Parity, financeV2Impact,
