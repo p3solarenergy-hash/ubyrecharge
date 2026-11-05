@@ -2,7 +2,9 @@
    Dados sempre vêm da rede (Supabase). Os arquivos da plataforma usam
    "rede primeiro": a versão nova entra na hora; o cache só serve se estiver
    sem internet, para o app abrir e avisar em vez de mostrar erro do navegador. */
-const CACHE = "uby-nova-v3";
+const CACHE = "uby-nova-v4";
+// Arquivos recebidos pelo "Compartilhar" do celular, até serem lançados (tela Lançar boleto).
+const SHARED = "uby-nova-compartilhado";
 // O endereço (github.io) é compartilhado com outros sites: só mexe nos caches deste app.
 const OWN = "uby-nova-";
 const SHELL = ["./", "index.html", "login.html", "offline.html", "app/app.css", "app/storage-ns.js", "app/shell.js", "assets/brand.svg", "assets/brand-night.svg", "assets/pwa/icon-192.png"];
@@ -13,14 +15,29 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith(OWN) && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith(OWN) && k !== CACHE && k !== SHARED).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 // Lê só do cache deste app (nunca de caches de outros sites do mesmo endereço).
 const fromOwn = (req, opts) => caches.open(CACHE).then(cache => cache.match(req, opts));
 
+// "Compartilhar → UBY": guarda os arquivos e abre a tela de lançamento (o login continua valendo).
+async function receiveShared(req) {
+  const form = await req.formData();
+  const cache = await caches.open(SHARED);
+  const now = Date.now();
+  let i = 0;
+  for (const f of form.getAll("arquivos")) {
+    if (!f || typeof f === "string" || !f.size) continue;
+    await cache.put(new Request(`./compartilhado/${now}-${i++}`), new Response(f, { headers: { "Content-Type": f.type || "application/octet-stream", "X-Nome": encodeURIComponent(f.name || "documento"), "X-Texto": encodeURIComponent(String(form.get("text") || form.get("title") || "").slice(0, 500)) } }));
+  }
+  return Response.redirect("./index.html#/parametros/boleto", 303);
+}
+
 self.addEventListener("fetch", event => {
   const req = event.request;
+  const shareUrl = new URL(req.url);
+  if (req.method === "POST" && shareUrl.origin === self.location.origin && shareUrl.pathname.endsWith("/compartilhar")) { event.respondWith(receiveShared(req)); return; }
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   // Só arquivos da própria plataforma; Supabase, CDNs e fontes passam direto.

@@ -78,7 +78,7 @@
       { icon: "◎", label: "Clientes e Clube", tabs: [["clientes", "Clientes"], ["clube", "Clube UBY"]] }
     ] },
     { label: "FINANCEIRO", items: [
-      { icon: "⇣", label: "Contas a pagar", tabs: [["#/parametros/contas", "Contas a pagar"], ["#/parametros/pagamentos", "Conciliação bancária"]] },
+      { icon: "⇣", label: "Contas a pagar", tabs: [["#/parametros/contas", "Contas a pagar"], ["#/parametros/boleto", "Lançar boleto"], ["#/parametros/pagamentos", "Conciliação bancária"]] },
       { icon: "R$", label: "Resultado e fechamento", tabs: [["financeiro", "Resultado"], ["#/parametros/fechamento", "Fechamento do mês"], ["relatorios", "Relatórios"], ["arquivo", "Documentos publicados"]] },
       { icon: "✎", label: "Parâmetros e custos", tabs: [["#/parametros/carregador", "Por carregador"], ["#/parametros/matriz", "Custos centrais"], ["#/parametros/documentos", "Documentos"], ["#/parametros/cotas", "Cotas e impostos"], ["auditoria", "Auditoria do motor"], ["operacao-uby", "Relatórios antigos"]] }
     ] },

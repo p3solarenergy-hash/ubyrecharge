@@ -15,8 +15,15 @@
     { "src": "assets/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "assets/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
+  "share_target": {
+    "action": "./compartilhar",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": { "title": "title", "text": "text", "files": [{ "name": "arquivos", "accept": ["application/pdf", ".pdf", "image/*", ".jpg", ".jpeg", ".png"] }] }
+  },
   "shortcuts": [
     { "name": "Comando da rede", "url": "./index.html#/comando", "icons": [{ "src": "assets/pwa/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Lançar boleto", "url": "./index.html#/parametros/boleto", "icons": [{ "src": "assets/pwa/icon-192.png", "sizes": "192x192" }] },
     { "name": "Financeiro", "url": "./index.html#/financeiro", "icons": [{ "src": "assets/pwa/icon-192.png", "sizes": "192x192" }] },
     { "name": "Importar planilhas", "url": "./index.html#/importar", "icons": [{ "src": "assets/pwa/icon-192.png", "sizes": "192x192" }] }
   ]

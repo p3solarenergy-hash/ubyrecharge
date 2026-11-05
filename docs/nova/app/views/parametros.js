@@ -1873,12 +1873,175 @@
       ${closingsTab(w)}`;
   }
 
+  // ---------- lançar boleto (PDF/foto pelo "Compartilhar" do celular ou escolhido à mão) ----------
+  // Cada arquivo é lido no aparelho (app/boleto-reader.js), a conta mais provável é sugerida (mesmo valor,
+  // fornecedor ou vencimento) e você confere: anexa à conta que já existe ou cria uma conta avulsa no
+  // carregador, com o arquivo guardado junto. Comprovante de pagamento já dá a baixa.
+  const BQ_CACHE = "uby-nova-compartilhado";
+  const BQ_TYPES = [["boleto", "Boleto"], ["fatura", "Fatura"], ["nota_fiscal", "Nota fiscal"], ["recibo", "Comprovante de pagamento"], ["contrato", "Contrato"], ["outro", "Outro"]];
+  const bqLast = { get: () => { try { return localStorage.getItem("uby-boleto-destino") || ""; } catch (_) { return ""; } }, set: v => { try { localStorage.setItem("uby-boleto-destino", v); } catch (_) {} } };
+  const bqNum = v => { let s = String(v ?? "").replace(/[R$\s]/g, ""); if (/,/.test(s)) s = s.replace(/\./g, "").replace(",", "."); const x = Number(s); return Number.isFinite(x) ? Math.round(x * 100) / 100 : 0; };
+  const bqCat = t => { const k = costKindOf(t); return ["Internet / dados", "Locação / aluguel", "Seguro", "Manutenção", "Outros custos", "Outros custos", "Licença / plataforma"][k] || "Outros custos"; };
+  function bqTargets(w) {
+    try { w.renderScheduledPayments(w.getGeneralUnitData()); return [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text })); } catch (_) { return []; }
+  }
+  // Contas candidatas: em aberto (ou pagas há pouco, para comprovante), pontuadas por valor, fornecedor e vencimento.
+  function bqCandidates(x, bills) {
+    const f = x.f, words = normSt(`${f.supplier} ${f.description}`).split(" ").filter(t => t.length >= 4);
+    const days = (a, b) => a && b ? Math.abs(new Date(`${String(a).slice(0, 10)}T12:00:00`) - new Date(`${String(b).slice(0, 10)}T12:00:00`)) / 86400000 : null;
+    return bills.filter(b => b.amount > 0 && (!b.paid || f.paid)).map(b => {
+      let s = 0, ties = 0;
+      const val = Number(b.dueAmount ?? b.amount);
+      if (f.value > 0 && (Math.abs(val - f.value) < 0.05 || Math.abs(b.amount - f.value) < 0.05)) { s += 4; ties++; }
+      else if (f.value > 0 && Math.abs(val - f.value) / Math.max(val, 1) < 0.15) { s += 1; ties++; }
+      const hay = normSt(`${b.name} ${b.supplier} ${b.category}`);
+      if (words.some(t => hay.includes(t))) { s += 2; ties++; }
+      const kb = costKindOf(`${b.name} ${b.category}`);
+      if (kb >= 0 && kb === costKindOf(`${f.supplier} ${f.description} ${x.text || ""}`)) s += 1;
+      const dd = days(b.due, f.due || f.paidAt);
+      if (dd !== null) s += dd <= 1 ? 3 : dd <= 10 ? 1 : dd > 45 ? -3 : 0;
+      if (b.paid && !f.paid) s -= 5;
+      return { b, s, ties };
+    }).filter(c => c.ties && c.s >= 2).sort((a, b) => b.s - a.s).slice(0, 6);
+  }
+  function bqGuessTarget(x, targets) {
+    const t = normSt(`${x.shared || ""} ${x.text || ""}`);
+    const hit = targets.find(o => normSt(o.text).split(" ").filter(p => p.length >= 4 && !/recharge|shopping|posto|central/.test(p)).some(p => t.includes(p)));
+    return hit?.value || (targets.some(o => o.value === bqLast.get()) ? bqLast.get() : "");
+  }
+  function boletoTab(w, data) {
+    return `<section class="section"><div class="section-head"><div><p class="kicker">Contas a pagar</p><h2>Lançar boleto ou comprovante</h2>
+        <p>No celular: no WhatsApp ou no e-mail, segure o arquivo → <strong>Compartilhar</strong> → <strong>UBY</strong> (com a plataforma instalada como app). Ou escolha os arquivos aqui. Nada é lançado sem você conferir.</p></div>
+        <div style="flex:none"><label class="btn primary" for="bqFiles" style="white-space:nowrap">＋ Escolher arquivos</label><input id="bqFiles" type="file" accept="application/pdf,image/*" multiple hidden></div></div>
+      <div id="bqList"><div class="note">Carregando…</div></div></section>`;
+  }
+  async function bqShared() {
+    if (!("caches" in window)) return [];
+    try {
+      const c = await caches.open(BQ_CACHE), out = [];
+      for (const req of await c.keys()) {
+        const r = await c.match(req); if (!r) continue;
+        const blob = await r.blob(), name = decodeURIComponent(r.headers.get("X-Nome") || "documento");
+        out.push({ key: req.url, file: new File([blob], name, { type: blob.type || r.headers.get("Content-Type") || "" }), shared: decodeURIComponent(r.headers.get("X-Texto") || "") });
+      }
+      return out;
+    } catch (_) { return []; }
+  }
+  const bqForget = async key => { if (key && "caches" in window) try { await (await caches.open(BQ_CACHE)).delete(key); } catch (_) {} };
+  let bqSeq = 0;
+  async function bqStart(target, w, data) {
+    ui.bq = ui.bq || [];
+    const add = items => items.forEach(it => {
+      const x = { id: ++bqSeq, key: it.key || "", file: it.file, url: URL.createObjectURL(it.file), shared: it.shared || "", state: "lendo", note: "Lendo…", text: "",
+        f: { kind: "boleto", value: 0, due: "", paid: false, paidAt: "", supplier: "", description: String(it.file.name || "Documento").replace(/\.[a-z0-9]+$/i, ""), line: "" }, dest: "" };
+      ui.bq.push(x);
+      window.UBY_BOLETO.read(it.file, msg => { x.note = msg; const el = target.querySelector(`[data-bq="${x.id}"] .bq-note`); if (el) el.textContent = msg; })
+        .then(text => { x.text = text; x.f = window.UBY_BOLETO.interpret(`${it.shared || ""}\n${text}`, it.file.name); x.note = ""; })
+        .catch(e => { x.note = `Não consegui ler (${e.message}). Preencha à mão.`; })
+        .finally(() => { x.state = "pronto"; bqPaint(target, w, data); });
+    });
+    const fileInput = target.querySelector("#bqFiles");
+    if (fileInput) fileInput.onchange = e => { add([...e.target.files].map(file => ({ file }))); e.target.value = ""; bqPaint(target, w, data); };
+    const known = new Set(ui.bq.map(x => x.key).filter(Boolean));
+    const arrived = (await bqShared()).filter(x => !known.has(x.key));
+    if (arrived.length) add(arrived);
+    bqPaint(target, w, data);
+  }
+  function bqPaint(target, w, data) {
+    const box = target.querySelector("#bqList"); if (!box) return;
+    const list = ui.bq || [];
+    if (!list.length) { box.innerHTML = `<div class="note">Nenhum documento na fila. Compartilhe um boleto pelo celular ou use <strong>＋ Escolher arquivos</strong>.</div>`; return; }
+    const can = canWrite(w) && !busy ? "" : "disabled";
+    const targets = bqTargets(w), bills = data.bills || [];
+    box.innerHTML = list.map(x => {
+      const f = x.f;
+      const prev = window.UBY_BOLETO.isPdf(x.file) ? `<div class="bq-pdf">PDF</div>` : `<img src="${x.url}" alt="">`;
+      if (x.state === "feito") return `<div class="bq-card done"><div class="bq-prev">${prev}</div><div class="bq-body"><p><strong>${esc(x.file.name || "documento")}</strong> <span class="badge ok">Lançado</span></p><small>${esc(x.done || "")}</small></div></div>`;
+      const cands = x.state === "pronto" ? bqCandidates(x, bills) : [];
+      if (!x.dest && x.state === "pronto") { const g = bqGuessTarget(x, targets); x.dest = cands.length && cands[0].s >= 6 ? `bill:${cands[0].b.key}` : g ? `new:${g}` : ""; }
+      const opt = (v, l) => `<option value="${esc(v)}" ${x.dest === v ? "selected" : ""}>${esc(l)}</option>`;
+      const destSel = `<select class="select" data-bqf="dest" style="width:100%"><option value="">Escolha onde lançar…</option>
+        ${cands.length ? `<optgroup label="Anexar a uma conta que já existe">${cands.map(c => opt(`bill:${c.b.key}`, `${c.b.name} · ${billCenter(c.b)} · vence ${fmtDay(String(c.b.due || "").slice(0, 10))} · ${fmt.brl(c.b.amount)}${c.b.paid ? " · paga" : ""}`)).join("")}</optgroup>` : ""}
+        <optgroup label="Criar conta nova no carregador / obra">${targets.map(t => opt(`new:${t.value}`, t.text)).join("")}</optgroup></select>`;
+      const isNew = x.dest.startsWith("new:");
+      return `<div class="bq-card" data-bq="${x.id}">
+        <div class="bq-prev">${prev}<a href="${x.url}" target="_blank" rel="noopener"><small>abrir</small></a></div>
+        <div class="bq-body">
+          <p><strong>${esc(x.file.name || "documento")}</strong> <small class="bq-note">${esc(x.note)}</small></p>
+          <div class="bq-grid">
+            ${field("Tipo", `<select class="select" data-bqf="kind">${BQ_TYPES.map(([v, l]) => `<option value="${v}" ${f.kind === v ? "selected" : ""}>${l}</option>`).join("")}</select>`)}
+            ${field("Valor (R$)", `<input class="select" data-bqf="value" inputmode="decimal" value="${f.value ? esc(f.value.toFixed(2).replace(".", ",")) : ""}">`)}
+            ${field("Vencimento", `<input class="select" type="date" data-bqf="due" value="${esc(f.due)}">`)}
+            ${field("Fornecedor", `<input class="select" data-bqf="supplier" value="${esc(f.supplier)}">`)}
+            <div class="bq-wide">${field("Onde lançar", destSel)}</div>
+            ${isNew ? `<div class="bq-wide">${field("Nome da conta", `<input class="select" data-bqf="description" value="${esc(f.description)}">`)}</div>` : ""}
+            <label class="bq-paid"><input type="checkbox" data-bqf="paid" ${f.paid ? "checked" : ""}> Já foi pago${f.paid ? ` em <input class="select" type="date" data-bqf="paidAt" value="${esc(f.paidAt || "")}" style="width:150px">` : ""}</label>
+          </div>
+          ${f.supplier === "Copel" ? `<div class="note" style="margin:8px 0">Fatura da Copel: o lugar certo é <a href="#/parametros/energia">Energia do carregador</a>, que lê kWh, arrendamento e tarifa e já cria a conta a pagar. Use esta tela só para anexar o arquivo a uma fatura já lançada.</div>` : ""}
+          ${f.line ? `<small>Linha digitável lida: ${esc(f.line)}</small>` : ""}
+          ${x.text ? `<details><summary><small>Ver o texto lido</small></summary><pre class="bq-text">${esc(x.text.trim().slice(0, 2500))}</pre></details>` : ""}
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-bq-go="${x.id}" ${x.state !== "pronto" ? "disabled" : can}>${x.state === "lendo" ? "Lendo…" : x.state === "enviando" ? "Lançando…" : "Lançar"}</button>
+            <button class="btn ghost" type="button" data-bq-drop="${x.id}">Descartar</button></div>
+        </div></div>`;
+    }).join("") + (list.some(x => x.state === "feito") ? `<button class="btn ghost" type="button" id="bqClear">Tirar os lançados da lista</button>` : "");
+    box.querySelectorAll("[data-bq]").forEach(card => {
+      const x = list.find(i => i.id === Number(card.dataset.bq)); if (!x) return;
+      card.querySelectorAll("[data-bqf]").forEach(el => el.onchange = () => {
+        const k = el.dataset.bqf;
+        if (k === "dest") x.dest = el.value;
+        else if (k === "paid") { x.f.paid = el.checked; if (el.checked && !x.f.paidAt) x.f.paidAt = new Date().toISOString().slice(0, 10); }
+        else x.f[k] = k === "value" ? bqNum(el.value) : el.value;
+        if (["dest", "paid", "value", "due", "supplier"].includes(k)) bqPaint(target, w, data);
+      });
+    });
+    box.querySelectorAll("[data-bq-drop]").forEach(b => b.onclick = async () => { const x = list.find(i => i.id === Number(b.dataset.bqDrop)); if (!x) return; await bqForget(x.key); URL.revokeObjectURL(x.url); ui.bq = list.filter(i => i !== x); bqPaint(target, w, data); });
+    const clr = box.querySelector("#bqClear"); if (clr) clr.onclick = () => { list.filter(x => x.state === "feito").forEach(x => URL.revokeObjectURL(x.url)); ui.bq = list.filter(x => x.state !== "feito"); bqPaint(target, w, data); };
+    box.querySelectorAll("[data-bq-go]").forEach(b => b.onclick = () => bqLaunch(target, w, data, list.find(i => i.id === Number(b.dataset.bqGo))));
+  }
+  function bqLaunch(target, w, data, x) {
+    if (!x) return;
+    const f = x.f;
+    if (!(f.value > 0)) { alert("Informe o valor."); return; }
+    if (!x.dest) { alert("Escolha onde lançar: uma conta que já existe ou o carregador."); return; }
+    if (x.dest.startsWith("new:") && !/^\d{4}-\d{2}-\d{2}$/.test(f.due || f.paidAt || "")) { alert("Informe o vencimento (ou a data do pagamento)."); return; }
+    const docType = f.kind || "boleto";
+    x.state = "enviando";
+    run(target, w, `Documento ${x.file.name || ""}`, async () => {
+      try {
+        if (x.dest.startsWith("bill:")) {
+          const b = (data.bills || []).find(i => i.key === x.dest.slice(5));
+          if (!b) throw new Error("Conta não encontrada. Atualize a tela e tente de novo.");
+          await w.UBY_SUPABASE.createFinanceDocument({ scope: b.workId ? "charger" : "matrix", workId: b.workId || null, matrixCostId: b.kind === "matriz" ? b.billId : null, competenceKey: b.monthKey,
+            supplier: f.supplier || b.supplier || b.name, category: billCategory(b), documentNumber: f.line || "", documentType: docType, amount: f.value, dueDate: f.due || b.due || null,
+            status: f.paid || b.paid ? "paid" : "pending", notes: `${b.name} · conta:${b.key}` }, x.file);
+          let paid = "";
+          if (f.paid && !b.paid) { await setBillPaid(w, b, f.paidAt || new Date().toISOString().slice(0, 10), { amount: f.value, due: Number(b.dueAmount ?? b.amount) }); paid = ` · paga em ${fmtDay(f.paidAt)}`; }
+          x.done = `Anexado a ${b.name} (${billCenter(b)}) · ${fmt.brl(f.value)}${paid}`;
+        } else {
+          const tgt = x.dest.slice(4), when = f.due || f.paidAt, mk = when.slice(0, 7), name = String(f.description || f.supplier || "Conta avulsa").trim().slice(0, 80);
+          await addScheduled(w, { target: tgt, name, supplier: f.supplier || "", category: bqCat(`${name} ${f.supplier} ${x.text || ""}`), amount: f.value, dueDay: Number(when.slice(8, 10)) || 10, startMonth: mk, endMonth: mk }, mk);
+          const item = w.loadMatrizCosts().filter(i => i.scheduledPayment && i.name === name && Math.abs(Number(i.amount) - f.value) < 0.005 && i.startMonth === mk).pop();
+          if (!item) throw new Error("A conta foi criada, mas não a encontrei para anexar o arquivo. Anexe em Contas a pagar.");
+          const key = `${item.id}|${mk}`;
+          await w.UBY_SUPABASE.createFinanceDocument({ scope: "charger", workId: tgt.split("::")[0] || null, matrixCostId: item.id, competenceKey: mk, supplier: f.supplier || name,
+            category: item.category || "Outros custos", documentNumber: f.line || "", documentType: docType, amount: f.value, dueDate: f.due || null, status: f.paid ? "paid" : "pending", notes: `${name} · conta:${key}` }, x.file);
+          if (f.paid) await setBillPaid(w, { kind: "matriz", costId: item.id, monthKey: mk, amount: f.value, dueAmount: f.value }, f.paidAt || when);
+          bqLast.set(tgt);
+          x.done = `Conta nova "${name}" de ${fmt.brl(f.value)} · vence ${fmtDay(f.due || when)}${f.paid ? ` · paga em ${fmtDay(f.paidAt || when)}` : ""}`;
+        }
+        await bqForget(x.key);
+        x.state = "feito";
+        return x.done;
+      } catch (e) { x.state = "pronto"; throw e; }
+    });
+  }
+
   // ---------- render ----------
   // As abas ficam no topo do painel (shell.js · NAV); aqui só os ids. Energia, repasse à área,
   // operação e contas mensais viraram blocos da página do carregador: os links antigos
   // (#/parametros/energia/<carregador>/inv:<id>…) abrem o bloco certo dela.
   const GROUPS = [
-    ["Contas a pagar", [["contas", "Contas a pagar"], ["pagamentos", "Conciliação e extrato"]]],
+    ["Contas a pagar", [["contas", "Contas a pagar"], ["boleto", "Lançar boleto"], ["pagamentos", "Conciliação e extrato"]]],
     ["Parâmetros e custos", [["carregador", "Por carregador"], ["matriz", "Custos centrais"], ["documentos", "Documentos"], ["cotas", "Cotas, impostos e rodadas"]]],
     ["Resultado e fechamento", [["fechamento", "Fechamento do mês"]]]
   ];
@@ -1967,7 +2130,7 @@
       }
     } else {
       data.months = (UBY.state.months && UBY.state.months.length ? UBY.state.months : (w.getMonths?.() || [])).slice();
-      if (ui.tab === "energia" || ui.tab === "area" || ui.tab === "pagamentos" || ui.tab === "contas" || ui.tab === "fechamento") {
+      if (ui.tab === "energia" || ui.tab === "area" || ui.tab === "pagamentos" || ui.tab === "contas" || ui.tab === "boleto" || ui.tab === "fechamento") {
         // Depois de gravar, o motor principal recarrega: espera ele voltar com o histórico completo.
         for (let i = 0; i < 120 && !(UBY.state.api && UBY.state.status); i++) await new Promise(r => setTimeout(r, 500));
         try { await Promise.race([UBY.state.api.loadFull(), new Promise(r => setTimeout(r, 15000))]); } catch (_) {}
@@ -1976,11 +2139,11 @@
         try { data.bank = (await w.UBY_SUPABASE.loadBankData()).payload || null; data.bankError = ""; }
         catch (err) { data.bank = null; data.bankError = err.message; }
       }
-      if (ui.tab === "contas") {
+      if (ui.tab === "contas" || ui.tab === "boleto") {
         try { const [m, c] = await Promise.all([w.UBY_SUPABASE.loadFinanceDocuments({ limit: 200 }), w.UBY_SUPABASE.loadFinanceDocuments({ scope: "charger", limit: 200 })]); data.billDocs = [...(m || []), ...(c || [])]; }
         catch (_) { data.billDocs = []; }
       }
-      if (ui.tab === "pagamentos" || ui.tab === "contas") {
+      if (ui.tab === "pagamentos" || ui.tab === "contas" || ui.tab === "boleto") {
         try { data.bills = UBY.state.api.allBills(); } catch (err) { data.bills = []; }
         try { data.bank = (await w.UBY_SUPABASE.loadBankData()).payload || null; data.bankError = ""; }
         catch (err) { data.bank = null; data.bankError = err.message; }
@@ -1999,6 +2162,7 @@
     if (seq !== drawSeq) return;
     const c = data.chargers.find(x => x.key === ui.charger);
     const hero = {
+      boleto: ["Financeiro", "Lançar boleto", "Boletos, faturas, notas e comprovantes em PDF ou foto. A plataforma lê valor, vencimento e fornecedor, sugere a conta ou o carregador, e você confere e lança: o arquivo fica guardado junto da conta."],
       contas: ["Financeiro", "Contas a pagar", "Tudo o que a UBY tem a pagar, de todas as origens, numa lista só: vencidas, a vencer, pagas, por categoria, centro de custo e fornecedor."],
       pagamentos: ["Financeiro", "Conciliação bancária", "Anexe o extrato do banco: a plataforma sugere a conta de cada saída, você confirma, e a conta fica paga na data e no valor do banco."],
       carregador: ["Parâmetros e custos", "Centro de custos do carregador", "Tudo de um carregador numa página: resultado, contrato e splits, energia, repasse à área, custos e contas, operação e documentos."],
@@ -2009,10 +2173,11 @@
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">${esc(hero[0])}</p><h1>${esc(hero[1])}</h1><p class="lead">${esc(hero[2])}</p></div>
         <div class="callout" style="${writable ? "border-left-color:var(--uby-red)" : ""}"><strong>${writable ? "Grava na base real" : "Somente leitura"}</strong><small>${writable ? "A mesma base da plataforma atual. Cada alteração fica no histórico por competência e no log de auditoria." : "A liberação de gravação desta tela não está ativa. Recarregue a página."}</small></div></div>
-      ${ui.tab === "carregador" ? chargerPage(w, data) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "contas" ? contasTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamento" ? closingPage(w, data) : quotasTab(w)}
+      ${ui.tab === "carregador" ? chargerPage(w, data) : ui.tab === "matriz" ? matrixTab(w, data) : ui.tab === "pagamentos" ? centralTab(w, data) : ui.tab === "contas" ? contasTab(w, data) : ui.tab === "boleto" ? boletoTab(w, data) : ui.tab === "programados" ? paymentsTab(w) : ui.tab === "documentos" ? docsTab(w, data) : ui.tab === "fechamento" ? closingPage(w, data) : quotasTab(w)}
       <section class="section"><div class="section-head"><div><p class="kicker">Registro</p><h2>O que foi feito nesta sessão</h2></div></div>
         <div class="list">${ui.log.map(l => `<div class="list-row" style="display:block;white-space:normal"><span class="badge ${l.cls}">${l.cls === "ok" ? "ok" : "atenção"}</span> <small>${new Date(l.at).toLocaleTimeString("pt-BR")}</small> ${esc(l.msg)}</div>`).join("") || `<div class="note">Nenhuma alteração ainda.${c ? ` Editando ${esc(c.station)}.` : ""}</div>`}</div></section>`;
     bind(target, w, data);
+    if (ui.tab === "boleto") bqStart(target, w, data);
     applyFocus(target);
   }
 
