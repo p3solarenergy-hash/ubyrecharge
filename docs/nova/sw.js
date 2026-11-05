@@ -2,7 +2,7 @@
    Dados sempre vêm da rede (Supabase). Os arquivos da plataforma usam
    "rede primeiro": a versão nova entra na hora; o cache só serve se estiver
    sem internet, para o app abrir e avisar em vez de mostrar erro do navegador. */
-const CACHE = "uby-nova-v4";
+const CACHE = "uby-nova-v5";
 // Arquivos recebidos pelo "Compartilhar" do celular, até serem lançados (tela Lançar boleto).
 const SHARED = "uby-nova-compartilhado";
 // O endereço (github.io) é compartilhado com outros sites: só mexe nos caches deste app.
@@ -26,11 +26,18 @@ async function receiveShared(req) {
   const form = await req.formData();
   const cache = await caches.open(SHARED);
   const now = Date.now();
+  const text = String(form.get("text") || form.get("title") || "").slice(0, 500);
+  const got = [];
   let i = 0;
   for (const f of form.getAll("arquivos")) {
-    if (!f || typeof f === "string" || !f.size) continue;
-    await cache.put(new Request(`./compartilhado/${now}-${i++}`), new Response(f, { headers: { "Content-Type": f.type || "application/octet-stream", "X-Nome": encodeURIComponent(f.name || "documento"), "X-Texto": encodeURIComponent(String(form.get("text") || form.get("title") || "").slice(0, 500)) } }));
+    if (!f || typeof f === "string") continue;
+    got.push({ name: f.name || "", type: f.type || "", size: f.size || 0 });
+    if (!f.size) continue;
+    await cache.put(new Request(`./compartilhado/${now}-${i++}`), new Response(f, { headers: { "Content-Type": f.type || "application/octet-stream", "X-Nome": encodeURIComponent(f.name || "documento"), "X-Texto": encodeURIComponent(text) } }));
   }
+  // Sem arquivo (ex.: compartilhou o e-mail ou um link, não o anexo): guarda o texto para a tela avisar.
+  if (!i && text) await cache.put(new Request(`./compartilhado/${now}-texto`), new Response(text, { headers: { "Content-Type": "text/plain", "X-Somente-Texto": "1" } }));
+  await cache.put(new Request("./compartilhado/ultimo"), new Response(JSON.stringify({ at: new Date(now).toISOString(), files: got, text: text.slice(0, 200) }), { headers: { "Content-Type": "application/json" } }));
   return Response.redirect("./index.html#/parametros/boleto", 303);
 }
 

@@ -19,7 +19,7 @@
     "action": "./compartilhar",
     "method": "POST",
     "enctype": "multipart/form-data",
-    "params": { "title": "title", "text": "text", "files": [{ "name": "arquivos", "accept": ["application/pdf", ".pdf", "image/*", ".jpg", ".jpeg", ".png"] }] }
+    "params": { "title": "title", "text": "text", "files": [{ "name": "arquivos", "accept": ["application/pdf", ".pdf", "image/*", ".jpg", ".jpeg", ".png", "application/octet-stream", "*/*"] }] }
   },
   "shortcuts": [
     { "name": "Comando da rede", "url": "./index.html#/comando", "icons": [{ "src": "assets/pwa/icon-192.png", "sizes": "192x192" }] },

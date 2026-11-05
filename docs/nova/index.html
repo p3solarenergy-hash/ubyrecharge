@@ -22,7 +22,7 @@
       try {
         var s = JSON.parse(localStorage.getItem("uby-auth-session-v1") || "null");
         var valid = s && s.email && s.loginAt && (Date.now() - new Date(s.loginAt).getTime()) < 12 * 3600 * 1000;
-        if (!valid) location.replace("login.html");
+        if (!valid) location.replace("login.html" + (/^#\/[\w\/.-]{1,120}$/.test(location.hash) && location.hash !== "#/comando" ? "?voltar=" + encodeURIComponent(location.hash) : ""));
         else if (s.role === "cotista" || s.role === "area") location.replace("portal.html");
       } catch (e) { location.replace("login.html"); }
     })();
@@ -98,8 +98,8 @@
   <script src="app/views/mercado.js?v=4"></script>
   <script src="app/views/auditoria.js?v=1"></script>
   <script src="app/copel-reader.js?v=3"></script>
-  <script src="app/boleto-reader.js?v=3"></script>
-  <script src="app/views/parametros.js?v=82"></script>
+  <script src="app/boleto-reader.js?v=4"></script>
+  <script src="app/views/parametros.js?v=83"></script>
   <script src="app/reports.js?v=38"></script>
   <script src="app/views/relatorios.js?v=3"></script>
   <script src="app/views/arquivo.js?v=2"></script>

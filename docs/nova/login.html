@@ -47,7 +47,8 @@
         button.disabled = true; button.textContent = "Validando…";
         try {
           const session = await window.UBY_AUTH.login(document.getElementById("email").value, document.getElementById("password").value);
-          location.replace(session && (session.role === "cotista" || session.role === "area") ? "portal.html" : "index.html#/comando");
+          const back = new URLSearchParams(location.search).get("voltar") || "";
+          location.replace(session && (session.role === "cotista" || session.role === "area") ? "portal.html" : `index.html${/^#\/[\w\/.-]{1,120}$/.test(back) ? back : "#/comando"}`);
         } catch (err) {
           error.textContent = err.message || "Não foi possível entrar.";
           error.classList.add("on");

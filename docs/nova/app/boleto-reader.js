@@ -137,8 +137,11 @@
     const { data } = await (await ocr).recognize(img);
     return data.text || "";
   }
+  async function sniffPdf(file) { try { return new TextDecoder().decode(await file.slice(0, 5).arrayBuffer()) === "%PDF-"; } catch (_) { return false; } }
   async function read(file, onStep) {
-    if (!isPdf(file)) return ocrImage(file, onStep);
+    const pdf = isPdf(file) || (!/^image\//.test(file.type || "") && await sniffPdf(file));
+    if (!pdf && !/^image\//.test(file.type || "") && !/\.(jpe?g|png|webp|heic|gif|bmp)$/i.test(file.name || "")) throw new Error(`arquivo ${file.type || "sem tipo"} não é PDF nem foto`);
+    if (!pdf) return ocrImage(file, onStep);
     onStep?.("Lendo o PDF…");
     const text = await global.UBY_COPEL.extractText(file);
     if (text.replace(/\s/g, "").length > 30) return text;

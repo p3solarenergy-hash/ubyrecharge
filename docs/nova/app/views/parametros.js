@@ -1919,8 +1919,11 @@
     if (!("caches" in window)) return [];
     try {
       const c = await caches.open(BQ_CACHE), out = [];
+      ui.bqTexts = [];
       for (const req of await c.keys()) {
         const r = await c.match(req); if (!r) continue;
+        if (req.url.endsWith("/compartilhado/ultimo")) { try { ui.bqLastShare = await r.json(); } catch (_) {} continue; }
+        if (r.headers.get("X-Somente-Texto")) { ui.bqTexts.push({ key: req.url, text: await r.text() }); continue; }
         const blob = await r.blob(), name = decodeURIComponent(r.headers.get("X-Nome") || "documento");
         out.push({ key: req.url, file: new File([blob], name, { type: blob.type || r.headers.get("Content-Type") || "" }), shared: decodeURIComponent(r.headers.get("X-Texto") || "") });
       }
@@ -1950,7 +1953,10 @@
   function bqPaint(target, w, data) {
     const box = target.querySelector("#bqList"); if (!box) return;
     const list = ui.bq || [];
-    if (!list.length) { box.innerHTML = `<div class="note">Nenhum documento na fila. Compartilhe um boleto pelo celular ou use <strong>＋ Escolher arquivos</strong>.</div>`; return; }
+    const ls = ui.bqLastShare, lastInfo = ls ? `<small style="display:block;margin-top:6px;color:var(--uby-muted)">Último compartilhamento recebido: ${esc(new Date(ls.at).toLocaleString("pt-BR"))} · ${ls.files?.length ? ls.files.map(f => `${esc(f.name || "sem nome")} (${esc(f.type || "tipo não informado")}, ${Math.round((f.size || 0) / 1024)} KB)`).join(", ") : "nenhum arquivo"}</small>` : "";
+    const texts = (ui.bqTexts || []).map(t => `<div class="note" style="margin-bottom:8px"><strong>Chegou só texto, sem arquivo.</strong> Provavelmente foi compartilhado o e-mail ou um link, não o anexo. Abra o anexo (o PDF ou a foto) e compartilhe ele.<br><small>${esc(t.text.slice(0, 160))}</small> <button class="btn ghost" type="button" data-bq-text-drop="${esc(t.key)}">Ok</button></div>`).join("");
+    const bindTexts = () => box.querySelectorAll("[data-bq-text-drop]").forEach(b => b.onclick = async () => { await bqForget(b.dataset.bqTextDrop); ui.bqTexts = (ui.bqTexts || []).filter(t => t.key !== b.dataset.bqTextDrop); bqPaint(target, w, data); });
+    if (!list.length) { box.innerHTML = `${texts}<div class="note">Nenhum documento na fila. Compartilhe um boleto pelo celular ou use <strong>＋ Escolher arquivos</strong>.${lastInfo}</div>`; bindTexts(); return; }
     const can = canWrite(w) && !busy ? "" : "disabled";
     const targets = bqTargets(w), bills = data.bills || [];
     box.innerHTML = list.map(x => {
@@ -1984,6 +1990,8 @@
             <button class="btn ghost" type="button" data-bq-drop="${x.id}">Descartar</button></div>
         </div></div>`;
     }).join("") + (list.some(x => x.state === "feito") ? `<button class="btn ghost" type="button" id="bqClear">Tirar os lançados da lista</button>` : "");
+    if (texts) box.insertAdjacentHTML("afterbegin", texts);
+    bindTexts();
     box.querySelectorAll("[data-bq]").forEach(card => {
       const x = list.find(i => i.id === Number(card.dataset.bq)); if (!x) return;
       card.querySelectorAll("[data-bqf]").forEach(el => el.onchange = () => {
