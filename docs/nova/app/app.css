@@ -648,6 +648,13 @@ html[data-theme="night"] .uby-logo .uby-logo-dark{display:block}
 @keyframes fx-sand{from{transform:translate3d(0,0,0)}to{transform:translate3d(-320px,-320px,0)}}
 html[data-theme="night"]{--fx-aura:.2;--fx-mist:.10;--fx-sand:.22}
 @media (prefers-reduced-motion:reduce){.fx-bg i,.fx-mist,.fx-sand{animation:none}}
+/* Modo leve (app/fx.js): navegador sem placa de vídeo. Sem fundo animado, sem desfoque, sem sombras/brilho animados. */
+html.fx-lite .fx-bg{display:none}
+html.fx-lite .topbar,html.fx-lite .tabbar,html.fx-lite .sx{backdrop-filter:none;-webkit-backdrop-filter:none}
+html.fx-lite .kpi:hover::after,html.fx-lite .btn:hover::after{opacity:0}
+html.fx-lite .fx-enter>*,html.fx-lite .fx-press,html.fx-lite .fx-ping,html.fx-lite .kpi:hover::after,html.fx-lite .btn:hover::after{animation:none!important}
+html.fx-lite .kpi,html.fx-lite .mini,html.fx-lite .btn,html.fx-lite .nav-item,html.fx-lite .hub-tabs a,html.fx-lite .seg button,html.fx-lite .cc-jump button{transition:none}
+html.fx-lite .kpi:hover,html.fx-lite .mini:hover,html.fx-lite .btn:hover,html.fx-lite .cc-jump button:hover,html.fx-lite .nav-item:hover,html.fx-lite .hub-tabs a:hover,html.fx-lite .seg button:hover{box-shadow:none;transform:none;text-shadow:none}
 /* ---------- Abertura animada do logo (app/splash.js): uma vez por sessão, até a plataforma ficar pronta.
    Começa idêntica à tela de abertura do Android (ícone grande no centro, mesmo fundo) e segue dali sem corte:
    o raio acende, o selo encolhe e sobe para o lugar, "uby", linha e RECHARGE surgem. ---------- */

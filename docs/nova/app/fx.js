@@ -8,7 +8,21 @@
 */
 (function () {
   "use strict";
-  const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Modo leve (usuário, 06/11/2026: "passar o mouse trava, tudo lento" — só no Chrome dele). O Chrome tinha
+  // perdido a placa de vídeo (desenhava com "Microsoft Basic Render Driver", 5 quadros/s): sem ela, o fundo
+  // animado com desfoque e os brilhos viram trabalho do processador. Detectado aqui, liga html.fx-lite.
+  const softwareRender = (() => {
+    try {
+      const gl = document.createElement("canvas").getContext("webgl");
+      if (!gl) return true;
+      const info = gl.getExtension("WEBGL_debug_renderer_info");
+      const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "") : "";
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      return /basic render|swiftshader|llvmpipe|software/i.test(name);
+    } catch (_) { return false; }
+  })();
+  if (softwareRender) document.documentElement.classList.add("fx-lite");
+  const reduced = () => softwareRender || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const PRESS = ".btn, .seg button, .hub-tabs a, .nav-item, .kpi, .cc-jump button, .mini, .link-btn";
 
   function ping(x, y) {
@@ -91,7 +105,7 @@
   }
 
   function background() {
-    if (document.querySelector(".fx-bg")) return;
+    if (softwareRender || document.querySelector(".fx-bg")) return;
     const bg = document.createElement("div");
     bg.className = "fx-bg";
     bg.setAttribute("aria-hidden", "true");
