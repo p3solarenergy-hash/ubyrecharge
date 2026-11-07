@@ -1160,7 +1160,11 @@
       const taxRate = own ? taxRateFor(mk) / 100 : 0;
       const taxCost = taxRate * Math.max(0, f.revenue - f.platform - f.management);
       const variablePct = (f.areaParticipation + f.platform + f.management + f.ubyRoyalty + f.taxes + taxCost) / f.revenue;
-      const fixedMonth = Number(f.matrizCost || 0) + Number(f.localExtraCosts || 0) + Number(f.matrizTaxCost || 0);
+      // Custo fixo é projeção: vale o previsto de agora (mês atual), não o que foi pago no mês de referência
+      // (usuário, 07/11/2026: internet do Aurora DC R$ 140 na projeção; desconto de pagamento só no relatório).
+      let fixedSrc = f;
+      if (mk !== curMk) { try { const fc = fv2Month(fvRow, curMk, ON()); if (fc && Number(fc.matrizCost || 0) + Number(fc.localExtraCosts || 0) > 0) fixedSrc = fc; } catch (_) {} }
+      const fixedMonth = Number(fixedSrc.matrizCost || 0) + Number(fixedSrc.localExtraCosts || 0) + Number(fixedSrc.matrizTaxCost || 0);
       const kwhMonth = f.energy * factor, revMonth = f.revenue * factor;
       const netMonth = revMonth * (1 - variablePct) - f.energyCost / f.energy * kwhMonth - fixedMonth;
       const profiles = core.customerProfiles(mine, asOf);
