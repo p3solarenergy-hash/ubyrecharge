@@ -1928,6 +1928,8 @@
       revenue: charges.reduce((s, c) => s + c.revenue, 0), energy: charges.reduce((s, c) => s + c.energyKWh, 0),
       acRevenue: charges.filter(c => chargerKind(c) === "ac").reduce((s, c) => s + c.revenue, 0),
       dcRevenue: charges.filter(c => chargerKind(c) === "dc").reduce((s, c) => s + c.revenue, 0),
+      // Recargas da Raio (operadora em paralelo com a Spott): taxa e gestão próprias no financeiro.
+      raioRevenue: charges.filter(c => /^raio$/i.test(String(c.paymentType || c.sourcePlatform || "").trim())).reduce((s, c) => s + c.revenue, 0),
       courtesy: { treatment: courtesy.treatment, energy: courtesy.energy, energyCost: courtesy.energyCost, commercialEnergy: courtesy.commercialEnergy, charges: courtesy.charges, revenue: courtesy.revenue },
       planning, matrixItems: fv2MatrixItems(row, mk, fixes), energyInvoice, areaAdjust,
       // Imposto da UBY sobre o recebido, já no carregador (usuário, 26/10/2026: "aparecer já no relatório e nas

@@ -177,6 +177,21 @@
         kwh: r => Number(w.parseNumber(w.readCell(r, c.energy))) || 0,
         brl: r => Number(w.parseNumber(w.readCell(r, c.totalValue))) || 0 };
     }
+    // Raio: relatório de fechamento (linhas por dia + aba Transações anexada pelo motor). Sem Local nas
+    // linhas do dia: é o carregador da Raio no Robert Koch (único com Raio, nov/2026). O arquivo vai
+    // inteiro em cada mês (o motor separa por data e não duplica); a conferência conta as Cargas.
+    if (layout.type === "raio") {
+      const c = layout.cols, end = (rows || []).findIndex(r => r && r[0] === "__ABA__");
+      return { platform: "Raio", headerRow: layout.headerRow, whole: true, stopAt: end >= 0 ? end : (rows || []).length,
+        routeAs: "UBY RECHARGE - ROBERT KOCH",
+        skip: r => !/^\d{2}\/\d{2}\/\d{4}$/.test(w.rowCellText(r, c.date)),
+        local: () => "RAIO | UBY RECHARGE - ROBERT KOCH",
+        date: r => w.parseDate(w.rowCellText(r, c.date) + " 12:00"),
+        id: r => w.rowCellText(r, c.date),
+        count: r => Math.max(1, Math.round(Number(w.parseNumber(w.readCell(r, c.count))) || 0)),
+        kwh: r => Number(w.parseNumber(w.readCell(r, c.energy))) || 0,
+        brl: r => Number(w.parseNumber(w.readCell(r, c.gross))) || 0 };
+    }
     const h = rows?.[0] || [], col = names => w.findColumnIndex(h, names);
     if (layout.type === "uby" && col(["Recarga(ID)"]) === 0 && col(["Estação", "Estacao"]) === 1 && col(["Início - Fim", "Inicio - Fim"]) === 12
       && col(["Energia(kWh)"]) === 14 && col(["Receita(R$)"]) === 18) {
@@ -193,17 +208,18 @@
   async function analyzeSpott(w, file, works, hist) {
     const rows = await w.rechargeRowsFromFileBuffer(await file.arrayBuffer(), /\.csv$/i.test(file.name));
     const rd = autoReader(w, rows);
-    if (!rd) return { file: file.name, error: "não reconheci como relatório da Spott nem da Move. Planilhas da Go Grid continuam na área \"Planilha de recargas\" abaixo." };
+    if (!rd) return { file: file.name, error: "não reconheci como relatório da Spott, da Move nem da Raio. Planilhas da Go Grid continuam na área \"Planilha de recargas\" abaixo." };
     const head = rows.slice(0, rd.headerRow + 1), byKey = new Map();
-    for (let i = rd.headerRow + 1; i < rows.length; i++) {
+    for (let i = rd.headerRow + 1; i < (rd.stopAt ?? rows.length); i++) {
       const r = rows[i];
-      if (!r || !w.rowHasData(r)) continue;
+      if (!r || !w.rowHasData(r) || rd.skip?.(r)) continue;
       const local = rd.local(r);
       const mk = w.monthKey(rd.date(r));
       const k = local + "\u0000" + mk;
       if (!byKey.has(k)) byKey.set(k, { local, month: mk, rows: [], ids: new Set(), starts: new Map(), charges: 0, energy: 0, revenue: 0, uEnergy: 0, uRevenue: 0 });
       const g = byKey.get(k);
-      g.rows.push(r); g.charges++;
+      const n = rd.count ? rd.count(r) : 1;
+      g.rows.push(r); g.charges += n; g.sessions = (g.sessions || 0) + n;
       const rowId = rd.id(r), kwh = rd.kwh(r), brl = rd.brl(r);
       // Move: início de cada Recarga(ID), para a conferência de fuso da busca pela API.
       if (rd.platform === "Move") g.starts.set(rowId, rd.date(r)?.getTime() || 0);
@@ -218,7 +234,7 @@
     });
     groups = groups.filter(g => !g.merged);
     if (!groups.length) return { file: file.name, error: "planilha sem recargas." };
-    const whole = groups.length === 1;
+    const whole = groups.length === 1 || !!rd.whole;
     await w.ensureSpreadsheetLibrary();
     const X = w.XLSX, base = file.name.replace(/\.(xlsx|xls|csv)$/i, "");
     return {
@@ -232,8 +248,8 @@
           part = new File([X.write(wb, { type: "array", bookType: "xlsx" })], `${base} (${tag}).xlsx`,
             { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         }
-        return { source: file.name, platform: rd.platform, local: g.local, month: g.month === "unknown" ? "" : g.month, charges: g.charges, unique: g.ids.size, uEnergy: g.uEnergy, uRevenue: g.uRevenue,
-          energy: g.energy, revenue: g.revenue, starts: g.starts, ...routeLocal(w, g.local, hist, works), part, status: "pronto", msg: "" };
+        return { source: file.name, platform: rd.platform, local: g.local, month: g.month === "unknown" ? "" : g.month, charges: g.charges, unique: rd.count ? g.sessions : g.ids.size, uEnergy: g.uEnergy, uRevenue: g.uRevenue,
+          energy: g.energy, revenue: g.revenue, starts: g.starts, ...routeLocal(w, rd.routeAs || g.local, hist, works), part, status: "pronto", msg: "" };
       })
     };
   }
@@ -327,10 +343,10 @@
         <td>${badge(g)}${g.msg ? `<br><small style="white-space:normal">${esc(g.msg)}</small>` : ""}</td>
         <td>${g.status === "pronto" ? `<button class="btn" data-auto-skip="${i}" title="Não importar esta linha">✕</button>` : ""}</td></tr>`).join("");
     return `<section class="section" style="margin-bottom:18px">
-      <div class="section-head"><div><p class="kicker">Automático · Spott e Move</p><h2>Importação automática (Spott e Move)</h2>
-        <p>Arraste de uma vez as listas de transações da Spott (um arquivo por local ou um com todos) e o relatório de recargas da Move (um arquivo com todas as estações), ou busque o mês da Move direto pela API. A plataforma separa por Local/Estação e mês, identifica a obra de cada um, mostra o resumo e importa tudo em "Consolidar" (sem duplicar recargas).</p></div></div>
+      <div class="section-head"><div><p class="kicker">Automático · Spott e Move</p><h2>Importação automática (Spott, Move e Raio)</h2>
+        <p>Arraste de uma vez as listas de transações da Spott (um arquivo por local ou um com todos) o relatório de recargas da Move (um arquivo com todas as estações) e o relatório de fechamento da Raio, ou busque o mês da Move direto pela API. A plataforma separa por Local/Estação e mês, identifica a obra de cada um, mostra o resumo e importa tudo em "Consolidar" (sem duplicar recargas).</p></div></div>
       <label id="autoDrop" style="display:grid;place-items:center;gap:6px;padding:26px 16px;border:2px dashed var(--uby-green);border-radius:12px;background:var(--uby-surface-soft);cursor:pointer;text-align:center;${a.running ? "opacity:.5;pointer-events:none" : ""}">
-        <span style="font-size:24px">⇪</span><strong>Arraste aqui os arquivos da Spott e da Move</strong><small>.xlsx, .xls ou .csv · pode soltar vários de uma vez</small>
+        <span style="font-size:24px">⇪</span><strong>Arraste aqui os arquivos da Spott, da Move e da Raio</strong><small>.xlsx, .xls ou .csv · pode soltar vários de uma vez</small>
         <input type="file" id="autoFile" accept=".xlsx,.xls,.csv" multiple hidden>
       </label>
       <div class="toolbar" style="margin-top:10px;gap:8px;flex-wrap:wrap;align-items:center">

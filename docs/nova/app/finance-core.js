@@ -221,7 +221,14 @@
     const courtesy = input.courtesy || { treatment: "operational", energy: 0, energyCost: 0, commercialEnergy: energy, charges: 0, revenue: 0 };
     const commercialEnergy = courtesy.treatment === "partner_absorbed" ? num(courtesy.commercialEnergy) : energy;
 
-    const platform = revenue * num(cfg.platformPct) / 100;
+    // Raio (desde nov/2026, junto com a Spott no Robert Koch): as recargas dela pagam a taxa da Raio
+    // (3% do bruto, cfg.raioPlatformPct), não a da Spott. Ainda sem split: o líquido inteiro cai na UBY
+    // (Pix D+1), a UBY paga a gestão da P3 (managementPct do bruto) e recolhe imposto sobre tudo que recebeu.
+    const raioRevenue = Math.min(Math.max(num(input.raioRevenue), 0), revenue);
+    const raioPct = cfg.raioPlatformPct === undefined || cfg.raioPlatformPct === null || cfg.raioPlatformPct === "" ? 3 : num(cfg.raioPlatformPct);
+    const spottRevenue = revenue - raioRevenue;
+    const raioPlatform = raioRevenue * raioPct / 100;
+    const platform = spottRevenue * num(cfg.platformPct) / 100 + raioPlatform;
     // Parceria: a Spott retém a plataforma antes de repassar; gestão e royalty incidem sobre o líquido.
     const feesOnNet = !!fixes.partnerNetBase && (model === "third_party_management" || model === "management_only");
     const ubyRoyalty = model === "third_party_management" ? (feesOnNet ? revenue - platform : revenue) * num(cfg.ubyRoyaltyPct) / 100 : 0;
@@ -262,8 +269,9 @@
     const totalRevenue = revenue + extraRevenue + marketingRevenue;
     // Carregador UBY: a Spott divide o líquido (ex.: 94,57% UBY / 5,43% P3), não o bruto.
     const spottNetSplit = !!fixes.spottSplit && (model === "uby" || model === "hybrid") && num(cfg.platformPct) > 0 && num(cfg.platformPct) < 100 && num(cfg.managementPct) > 0;
+    const raioManagement = (model === "uby" || model === "hybrid") ? raioRevenue * num(cfg.managementPct) / 100 : 0;
     const management = spottNetSplit
-      ? ((revenue - platform) * Math.round(num(cfg.managementPct) / (1 - num(cfg.platformPct) / 100) * 100) / 100 + (totalRevenue - revenue) * num(cfg.managementPct)) / 100
+      ? ((spottRevenue - (platform - raioPlatform)) * Math.round(num(cfg.managementPct) / (1 - num(cfg.platformPct) / 100) * 100) / 100 + (totalRevenue - revenue) * num(cfg.managementPct)) / 100 + raioManagement
       : (feesOnNet ? totalRevenue - platform : totalRevenue) * num(cfg.managementPct) / 100;
     const areaEligible = model === "uby" || model === "hybrid";
     const areaSharePct = cfg.ownerTransferMode === "net" ? num(cfg.ownerNetProfitSharePct) : num(cfg.ownerRevenueSharePct);
@@ -279,7 +287,9 @@
     const areaAtSource = receivedTax && receivedTax.areaAtSource ? areaParticipation : 0;
     // Imposto sobre o que entra na conta da UBY: com o split na origem, a parte da área nem passa pela UBY e fica
     // fora da base; antes do split (ex.: Aurora set/2026) a UBY recebeu tudo e recolhe sobre tudo.
-    const receivedBase = receivedTax ? Math.max(0, totalRevenue - platform - management - areaAtSource) : 0;
+    // A gestão da P3 sobre a Raio passa pela UBY (sem split ainda): fica na base.
+    const raioP3ViaUby = (model === "uby" || model === "hybrid") ? raioManagement : 0;
+    const receivedBase = receivedTax ? Math.max(0, totalRevenue - platform - (management - raioP3ViaUby) - areaAtSource) : 0;
     if (receivedTax) taxes = receivedBase * num(receivedTax.pct) / 100;
     const costs = energyCost + extraCosts + taxes;
     const preAreaNet = totalRevenue - management - platform - ubyRoyalty - costs;
@@ -323,7 +333,7 @@
     return {
       monthKey: input.monthKey || "", operationModel: model,
       revenue, chargingRevenue: revenue, energy, commercialEnergy, acRevenue, dcRevenue,
-      extraRevenue, marketingRevenue, totalRevenue, spottAdjust, receivedBase, areaAtSource, taxRateReceived: receivedTax ? num(receivedTax.pct) : 0,
+      extraRevenue, marketingRevenue, totalRevenue, spottAdjust, raioRevenue, raioPlatform, raioManagement, receivedBase, areaAtSource, taxRateReceived: receivedTax ? num(receivedTax.pct) : 0,
       management, platform, ubyRoyalty, feesOnNet, taxes, energyCost, energyComposition: comp, courtesyInvoiceExcluded,
       localExtraCosts, matrizCost, matrizTaxCost, matrizDedicatedCost, matrizCash, extraCosts, areaSharePct, areaParticipation, areaParticipationCalc,
       preAreaNet, operationNet, acNet, dcNet, unknownNet,
@@ -344,7 +354,7 @@
   }
 
   // Campos que somam entre meses/carregadores.
-  const ADDITIVE = ["revenue", "chargingRevenue", "energy", "commercialEnergy", "acRevenue", "dcRevenue", "extraRevenue", "marketingRevenue", "totalRevenue", "spottAdjust", "receivedBase", "areaAtSource",
+  const ADDITIVE = ["revenue", "chargingRevenue", "energy", "commercialEnergy", "acRevenue", "dcRevenue", "extraRevenue", "marketingRevenue", "totalRevenue", "spottAdjust", "raioRevenue", "raioPlatform", "raioManagement", "receivedBase", "areaAtSource",
     "management", "platform", "ubyRoyalty", "taxes", "energyCost", "courtesyInvoiceExcluded", "localExtraCosts", "matrizCost", "matrizTaxCost", "matrizDedicatedCost", "matrizCash", "extraCosts",
     "areaParticipation", "preAreaNet", "operationNet", "ubyNet", "p3SocietyProfit", "partnerShare", "p3Gross", "p3OperationalResult", "ownResult", "paybackBase",
     "saRetention", "ubyDistributable", "investorDistribution", "partnerInvestorDistribution", "finalDistribution", "ubyRetained", "totalOperatingCost",

@@ -2184,8 +2184,11 @@ function rechargeSheetRows(workbook) {
   const sheetName = preferred ? 'Recargas' : workbook.SheetNames[0];
   const ws = preferred || workbook.Sheets[sheetName];
   if (!ws) throw new Error('Nenhuma aba encontrada no arquivo.');
-  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+  let rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
   if (rows.length < 2) throw new Error('Planilha sem dados de recargas.');
+  // Mesmo anexo do leitor em segundo plano: aba "Transações" do relatório de fechamento da Raio.
+  const tx = /fechamento/i.test(String(rows[0]?.[0] || '')) && workbook.SheetNames.find(n => /^transa/i.test(n) && workbook.Sheets[n] !== ws);
+  if (tx) rows = rows.concat([['__ABA__', tx]], XLSX.utils.sheet_to_json(workbook.Sheets[tx], { header: 1, raw: false, defval: '' }));
   return { rows, sheetName };
 }
 
@@ -2260,6 +2263,35 @@ function detectRechargeLayout(rows = []) {
           vehicleModel: findColumnIndex(headers, ['Modelo', 'Modelo do Veiculo', 'Modelo do Veículo', 'Veiculo', 'Veículo']),
           status: findColumnIndex(headers, ['Status', 'Status da Recarga', 'Status da Carga']),
           failureReason: findColumnIndex(headers, ['Motivo', 'Motivo da Falha', 'Erro', 'Falha'])
+        }
+      };
+    }
+    // Raio (operadora em paralelo com a Spott no Robert Koch desde nov/2026): "Relatório de
+    // fechamento" com uma linha por DIA (Cargas, Energia, Bruto, Taxa, Líquido), sem motorista
+    // nem horário. Cada dia vira as recargas daquele dia (ver raioDailyCharges).
+    if (
+      hasHeader(headers, ['Data']) &&
+      hasHeader(headers, ['Cargas']) &&
+      hasHeader(headers, ['Energia (kWh)']) &&
+      hasHeader(headers, ['Bruto (R$)']) &&
+      hasHeader(headers, ['Líquido (R$)', 'Liquido (R$)'])
+    ) {
+      return {
+        type: 'raio',
+        platform: 'Raio',
+        headerRow: rowIndex,
+        allowMultiMonth: true,
+        cols: {
+          date: findColumnIndex(headers, ['Data']),
+          count: findColumnIndex(headers, ['Cargas']),
+          energy: findColumnIndex(headers, ['Energia (kWh)']),
+          minutes: findColumnIndex(headers, ['Minutos carregando']),
+          idleMinutes: findColumnIndex(headers, ['Minutos ociosos']),
+          gross: findColumnIndex(headers, ['Bruto (R$)']),
+          card: findColumnIndex(headers, ['Cartão (R$)', 'Cartao (R$)']),
+          rfid: findColumnIndex(headers, ['RFID (R$)']),
+          fee: findColumnIndex(headers, ['Taxa (R$)']),
+          net: findColumnIndex(headers, ['Líquido (R$)', 'Liquido (R$)'])
         }
       };
     }
@@ -2469,6 +2501,127 @@ function parseRechargeRow(row = [], layout = {}, file = {}) {
   };
 }
 
+// Raio (relatório de fechamento). Aba 1: uma linha por DIA (Cargas, Energia, minutos, Bruto, Taxa,
+// Líquido). Aba "Transações" (anexada após o marcador __ABA__): cada pagamento com hora, carregador,
+// conector, Local, gateway, status e valor — sem kWh. "Reembolsado" é a sobra do Pix (o cliente paga
+// R$ 60 e recebe a diferença na hora): não é faturamento e fica de fora.
+// Cada transação "Aprovado" com valor vira uma recarga; o kWh e os minutos do dia são rateados pelo
+// valor (mesmo preço por kWh). Se as transações do dia não somarem o Bruto do dia, o dia é dividido
+// pelas Cargas, às 12:00 + i min. kWh e R$ somam exatamente o relatório. Sem motorista: fora de
+// clientes. paymentType "Raio" grava a operadora no Supabase (a taxa de 3% sai daí, no financeiro).
+const RAIO_COUNTS_FROM = new Date(2026, 10, 1);
+function raioDailyCharges(rows = [], layout = {}, file = {}) {
+  const cols = layout.cols || {};
+  const required = requiredSpottLocalForWork(currentWorkId);
+  const workStation = canonicalStationNameForWork(currentWorkId, required || currentWorkName, currentWorkName);
+  // Rateio inteiro em unidades (centavos/milésimos) pelo maior resto: a soma bate exata.
+  const allocate = (total, weights, scale) => {
+    const units = Math.round(Number(total || 0) * scale);
+    let w = weights.map(x => Math.max(Number(x) || 0, 0));
+    if (!w.some(Boolean)) w = w.map(() => 1);
+    const sum = w.reduce((s, x) => s + x, 0);
+    const raw = w.map(x => units * x / sum);
+    const fl = raw.map(Math.floor);
+    let rest = units - fl.reduce((s, x) => s + x, 0);
+    raw.map((x, i) => ({ i, f: x - fl[i] })).sort((a, b) => b.f - a.f || a.i - b.i).forEach(({ i }) => { if (rest > 0) { fl[i]++; rest--; } });
+    return fl.map(x => x / scale);
+  };
+  const pad = n => String(n).padStart(2, '0');
+  const dayKeyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const brDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const fmtDur = x => `${pad(Math.floor(x / 60))}:${pad(Math.round(x % 60))}:00`;
+  // "11/9/2026, 3:14:12 PM" (mês/dia, 12h) ou "09/11/2026 15:14".
+  const parseTxDate = text => {
+    const m = String(text || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?$/i);
+    if (!m) return parseDate(text);
+    let h = +m[4];
+    if (m[7]) {
+      if (/pm/i.test(m[7]) && h < 12) h += 12;
+      if (/am/i.test(m[7]) && h === 12) h = 0;
+      return new Date(+m[3], +m[1] - 1, +m[2], h, +m[5], +(m[6] || 0));
+    }
+    return new Date(+m[3], +m[2] - 1, +m[1], h, +m[5], +(m[6] || 0));
+  };
+
+  const marker = rows.findIndex(r => r && r[0] === '__ABA__');
+  const dailyEnd = marker >= 0 ? marker : rows.length;
+  const days = new Map();
+  for (let i = (layout.headerRow || 0) + 1; i < dailyEnd; i++) {
+    const r = rows[i];
+    if (!r || !rowHasData(r)) continue;
+    const m = rowCellText(r, cols.date).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) continue; // linha "Total" e afins
+    const day = {
+      key: `${m[3]}-${m[2]}-${m[1]}`, date: new Date(+m[3], +m[2] - 1, +m[1]),
+      count: Math.max(0, Math.round(parseNumber(readCell(r, cols.count)))),
+      energy: parseNumber(readCell(r, cols.energy)), gross: parseNumber(readCell(r, cols.gross)),
+      minutes: parseNumber(readCell(r, cols.minutes)), idle: parseNumber(readCell(r, cols.idleMinutes)), tx: []
+    };
+    if (day.count || day.energy || day.gross) days.set(day.key, day);
+  }
+
+  if (marker >= 0) {
+    const head = rows[marker + 1] || [];
+    const c = {
+      date: findColumnIndex(head, ['Data']), charger: findColumnIndex(head, ['Carregador']), conn: findColumnIndex(head, ['Conector']),
+      local: findColumnIndex(head, ['Local']), client: findColumnIndex(head, ['Cliente']), email: findColumnIndex(head, ['Email', 'E-mail']),
+      gateway: findColumnIndex(head, ['Gateway']), status: findColumnIndex(head, ['Status']), value: findColumnIndex(head, ['Valor (R$)', 'Valor'])
+    };
+    const clean = v => (v && v !== '-' ? v : '');
+    for (let i = marker + 2; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || !rowHasData(r)) continue;
+      const value = parseNumber(readCell(r, c.value));
+      const status = rowCellText(r, c.status);
+      if (!(value > 0) || !/aprovad/i.test(status)) continue; // tentativas com erro / R$ 0
+      const date = parseTxDate(rowCellText(r, c.date));
+      if (!date || Number.isNaN(date.getTime())) continue;
+      const key = dayKeyOf(date);
+      if (!days.has(key)) days.set(key, { key, date: new Date(date.getFullYear(), date.getMonth(), date.getDate()), count: 0, energy: 0, gross: 0, minutes: 0, idle: 0, tx: [], txOnly: true });
+      days.get(key).tx.push({ date, value, charger: rowCellText(r, c.charger), conn: rowCellText(r, c.conn), local: rowCellText(r, c.local),
+        client: clean(rowCellText(r, c.client)), email: clean(rowCellText(r, c.email)), gateway: rowCellText(r, c.gateway) });
+    }
+  }
+
+  const out = [];
+  [...days.values()].sort((a, b) => a.key.localeCompare(b.key)).forEach(day => {
+    const tx = day.tx.sort((a, b) => a.date - b.date);
+    const txSum = tx.reduce((s, t) => s + t.value, 0);
+    const useTx = tx.length > 0 && (day.txOnly || Math.abs(txSum - day.gross) < 0.05);
+    const items = useTx ? tx : Array.from({ length: Math.max(day.count, 1) }, (_, k) => ({ date: new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), 12, k) }));
+    const weights = useTx ? items.map(t => t.value) : items.map(() => 1);
+    const brl = useTx ? items.map(t => t.value) : allocate(day.gross, weights, 100);
+    const kwh = allocate(day.energy, weights, 1000);
+    const mins = allocate(day.minutes, weights, 1);
+    const idle = allocate(day.idle, weights, 1);
+    items.forEach((t, k) => {
+      // A Raio começa a contar em nov/2026 (outubro já fechou): recargas anteriores (testes de 27/10)
+      // entram em 01/11, mesma hora (usuário, 09/11/2026). O id segue a data original.
+      const origDate = t.date;
+      const startDate = origDate < RAIO_COUNTS_FROM
+        ? new Date(RAIO_COUNTS_FROM.getFullYear(), RAIO_COUNTS_FROM.getMonth(), RAIO_COUNTS_FROM.getDate(), origDate.getHours(), origDate.getMinutes(), origDate.getSeconds())
+        : origDate;
+      const endDate = new Date(startDate.getTime() + Math.max(mins[k], 0) * 60000);
+      const station = t.local ? canonicalStationNameForWork(currentWorkId, t.local, currentWorkName) : workStation;
+      out.push({
+        workId: currentWorkId, workName: currentWorkName, _file: file.name, sourcePlatform: 'Raio',
+        id: useTx
+          ? `raio:${t.charger || 'carregador'}:${t.conn || '-'}:${dayKeyOf(origDate)}T${pad(origDate.getHours())}${pad(origDate.getMinutes())}${pad(origDate.getSeconds())}`
+          : `raio:${day.key}:${k + 1}`,
+        station, rawStation: `RAIO | ${station}`, connType: t.conn ? `Conector ${t.conn}` : '',
+        userName: t.client || '', userEmail: t.email || '', userPhone: '',
+        startStr: brDate(startDate), endStr: brDate(endDate), startDate, endDate,
+        duration: fmtDur(mins[k]), energyKWh: kwh[k], revenue: brl[k],
+        paymentType: 'Raio', paymentStatus: 'Pago',
+        idleTime: idle[k] ? fmtDur(idle[k]) : '', idleValue: 0,
+        voucher: '', rating: '', reviewComment: '', vehicleBrand: '', vehicleModel: '', failureReason: '',
+        rawStatus: useTx ? `Raio · ${t.gateway || 'Pix'}` : 'Raio · resumo diário'
+      });
+    });
+  });
+  return out;
+}
+
 function rechargeImportStationProfile(charges = []) {
   const profile = new Map();
   charges.forEach(charge => {
@@ -2484,7 +2637,8 @@ function rechargeImportStationProfile(charges = []) {
 
 function confirmRechargeStationMismatch(charges = [], layout = {}, file = {}) {
   const profile = rechargeImportStationProfile(charges);
-  const requiredLocal = requiredSpottLocalForWork(currentWorkId);
+  // O Local oficial é da Spott; a Raio não traz Local (a estação vem da própria obra).
+  const requiredLocal = layout.type === 'raio' ? '' : requiredSpottLocalForWork(currentWorkId);
   if (requiredLocal) {
     const invalidLocals = profile.filter(item => !hasExactRequiredSpottLocal(currentWorkId, item.station));
     if (invalidLocals.length || !profile.length) {
@@ -2542,7 +2696,9 @@ async function readFile(file) {
       const reviewCommentCol = findColumnIndex(headers, ['Comentário', 'Comentario', 'Comentários', 'Comentarios', 'Comentário da avaliação', 'Comentario da avaliacao'], -1);
       const selectedMonth = file.month || document.getElementById('importMonth')?.value || '';
       const importedCharges = [];
-      if (layout.type === 'gogrid' || layout.type === 'spott') {
+      if (layout.type === 'raio') {
+        importedCharges.push(...raioDailyCharges(rows, layout, file));
+      } else if (layout.type === 'gogrid' || layout.type === 'spott') {
         for (let i = layout.headerRow + 1; i < rows.length; i++) {
           const r = rows[i];
           if (!r || !rowHasData(r)) continue;
@@ -4104,6 +4260,9 @@ function parseRechargeRowsInWorker(arrayBuffer, isCsvFile) {
           const sheet = workbook.Sheets.Recargas || workbook.Sheets[workbook.SheetNames[0]];
           if (!sheet) throw new Error('Nenhuma aba encontrada no arquivo.');
           rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+          // Raio: o "Relatório de fechamento" traz as recargas na aba "Transações"; vai junto, após um marcador.
+          const tx = /fechamento/i.test(String(rows[0] && rows[0][0] || '')) && workbook.SheetNames.find(n => /^transa/i.test(n) && workbook.Sheets[n] !== sheet);
+          if (tx) rows = rows.concat([['__ABA__', tx]], XLSX.utils.sheet_to_json(workbook.Sheets[tx], { header: 1, raw: false, defval: '' }));
         }
         self.postMessage({ ok: true, rows });
       } catch (error) {
@@ -8725,6 +8884,7 @@ function rechargeSourcePlatform(charge = {}) {
   // Spott grava a coluna "Aplicativo" em paymentType ("Spott") e os arquivos
   // exportados pelo Spott se chamam "lista-de-transacoes".
   if (normalizeHeaderName(charge.paymentType) === 'spott' || /lista-de-transacoes/i.test(fileName)) return 'Spott';
+  if (normalizeHeaderName(charge.paymentType) === 'raio') return 'Raio';
   return '';
 }
 
