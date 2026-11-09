@@ -1845,6 +1845,11 @@
     if (!full) { try { loadFull(); } catch (_) {} }
     const out = CORE().energyInvoiceMonths(list, full ? dailyDelivered(row.charges) : {});
     out.partial = !full;
+    // Conta rateada com o local começou depois da operação (RK): os meses antes da 1ª fatura rateada seguem
+    // com a energia de antes (tarifa da competência), sem estimativa pela fatura nova.
+    const refs = out.invoices.map(i => i.ref).sort();
+    const firstShared = out.invoices.filter(i => i.shared).map(i => i.ref).sort()[0] || "";
+    out.keepBefore = firstShared && firstShared === refs[0] ? firstShared : "";
     FV2.energy.set(row.fv2Id, out);
     return out;
   }
@@ -1881,7 +1886,7 @@
     let energyInvoice = null;
     if (fixes.monthScope) {
       const e = fv2EnergyFor(row);
-      if (e) {
+      if (e && !(e.keepBefore && mk < e.keepBefore)) {
         energyInvoice = e.months[mk] || { cost: 0, total: 0, parts: [] };
         flags = flags.filter(f => f !== "fatura-copiada" && f !== "fatura-herdada").concat("energia-por-fatura");
         if (energyInvoice.estimatedCost > 0) flags.push("energia-estimada");
@@ -2401,7 +2406,7 @@
     }).filter(m => m.total !== 0 || m.revenue > 0);
     const sum = k => months.reduce((s, m) => s + n0(m[k]), 0);
     return { workId: row.workId, workName: row.workName, station: row.stationName || row.station, kind: row.kind,
-      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, paidInfo: cfg.paidInfo || {}, adjust: cfg.adjust || {}, splitAtSourceFrom: cfg.splitAtSourceFrom || "", showOccupancy: !!cfg.showOccupancy, showSessions: !!cfg.showSessions, showAvgTime: !!cfg.showAvgTime, showClients: !!cfg.showClients, showOccTime: !!cfg.showOccTime, showPeak: !!cfg.showPeak, showNewClients: !!cfg.showNewClients, showDaily: !!cfg.showDaily, energyByHost: !!cfg.energyByHost, configured: !!fv2AreaConfig(row) },
+      config: { reimburseEnergy: reimburse, payee: cfg.payee || row.workName, payeeEmail: cfg.payeeEmail || "", dueDay, paid: cfg.paid || {}, paidInfo: cfg.paidInfo || {}, adjust: cfg.adjust || {}, splitAtSourceFrom: cfg.splitAtSourceFrom || "", energyShared: (() => { try { return !!fv2EnergyFor(row)?.invoices?.some(i => i.shared); } catch (_) { return false; } })(), showOccupancy: !!cfg.showOccupancy, showSessions: !!cfg.showSessions, showAvgTime: !!cfg.showAvgTime, showClients: !!cfg.showClients, showOccTime: !!cfg.showOccTime, showPeak: !!cfg.showPeak, showNewClients: !!cfg.showNewClients, showDaily: !!cfg.showDaily, energyByHost: !!cfg.energyByHost, configured: !!fv2AreaConfig(row) },
       months, totals: { revenue: sum("revenue"), energy: sum("energy"), reimbursement: sum("reimbursement"), area: sum("area"), total: sum("total"),
         paid: months.filter(m => m.paidAt).reduce((s, m) => s + m.total, 0) } };
   }
@@ -2440,11 +2445,17 @@
     const seen = new Set();
     FV2.rows.forEach(row => {
       const list = fv2InvoiceList(row.workId, row.stationName || row.station, row.workName);
+      // Conta da UC dividida com o local: a parte do carregador é paga ao local no repasse à área (reembolso de
+      // energia); sem reembolso ativo, vira conta só da parte do carregador.
+      const sharedCalc = list.some(i => i.shared) ? new Map((CORE().energyInvoiceMonths(list, dailyDelivered(row.charges)).invoices || []).map(i => [i.id, i])) : null;
+      const reimbursed = !!fv2AreaConfig(row)?.reimburseEnergy;
       list.forEach(inv => {
         const key = `${row.workId}|${inv.id}`;
         if (seen.has(key)) return; seen.add(key);
+        if (inv.shared && reimbursed) return;
+        if (inv.shared) { const c = sharedCalc?.get(inv.id); inv = { ...inv, copelAmount: c ? c.copel : 0, leaseAmount: c ? c.lease : 0, leaseKWh: 0 }; }
         const lease = n0(inv.leaseAmount) > 0 ? Math.round(n0(inv.leaseAmount) * 100) / 100 : Math.round(n0(inv.leaseKWh) * n0(inv.leaseRate) * 100) / 100;
-        [["Copel", n0(inv.copelAmount), inv.dueDate, inv.paidAt], ["Arrendamento de energia", lease, inv.leaseDueDate || inv.dueDate, inv.leasePaidAt !== undefined ? inv.leasePaidAt : inv.paidAt]].forEach(([name, amount, due, paidAt]) => {
+        [[inv.shared ? "Copel (parte do carregador)" : "Copel", n0(inv.copelAmount), inv.dueDate, inv.paidAt], [inv.shared ? "Usina (parte do carregador)" : "Arrendamento de energia", lease, inv.leaseDueDate || inv.dueDate, inv.leasePaidAt !== undefined ? inv.leasePaidAt : inv.paidAt]].forEach(([name, amount, due, paidAt]) => {
           if (!(amount > 0) || !due) return;
           const overdue = !paidAt && new Date(`${due}T23:59:59`) < new Date();
           const mk = String(due).slice(0, 7);

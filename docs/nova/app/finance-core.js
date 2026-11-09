@@ -83,8 +83,10 @@
   function invoiceTotals(inv) {
     // Arrendamento: vale o valor lançado em R$; sem ele, kWh compensados × tarifa.
     const copel = pos(inv.copelAmount), leaseKWh = pos(inv.leaseKWh), leaseRate = pos(inv.leaseRate);
-    const lease = pos(inv.leaseAmount) > 0 ? Math.round(pos(inv.leaseAmount) * 100) / 100 : Math.round(leaseKWh * leaseRate * 100) / 100;
-    return { copel, lease, leaseKWh, leaseRate, total: copel + lease, kwh: pos(inv.kwh) };
+    // Conta dividida com o local: a parte da usina inclui o custo da UC da geradora (Copel da usina).
+    const ucGen = inv.shared ? Math.round(pos(inv.ucGenAmount) * 100) / 100 : 0;
+    const lease = (pos(inv.leaseAmount) > 0 ? Math.round(pos(inv.leaseAmount) * 100) / 100 : Math.round(leaseKWh * leaseRate * 100) / 100) + ucGen;
+    return { copel, lease, leaseKWh, leaseRate, ucGen, total: copel + lease, kwh: pos(inv.kwh) };
   }
   // Regra do usuário (09/10/2026): a fatura entra INTEIRA na competência dela (ref "AAAA-MM";
   // ex.: fatura Ago/2026 = custo de agosto), e é paga no vencimento (mês seguinte). O período de
@@ -100,11 +102,23 @@
       for (let d = inv.start; d < inv.end; d = addDays(d, 1)) days.push(d);
       const delivered = days.reduce((s, d) => s + pos(dailyKWh[d]), 0);
       inv.days = days.length; inv.deliveredKWh = delivered;
+      // Conta da UC dividida com o local (usuário, 09/11/2026 — RK com usina): fatura da Copel da UC (com os
+      // custos da própria UC) + fatura da usina, rateadas pelo consumo. Parte do carregador = medidor dele ou,
+      // sem medidor, kWh vendidos no período da leitura ÷ kWh total da UC.
+      if (inv.shared && inv.kwh > 0) {
+        const own = pos(inv.chargerMeterKWh) > 0 ? pos(inv.chargerMeterKWh) : delivered;
+        inv.ownKWh = own; inv.shareRatio = Math.min(1, own / inv.kwh);
+        inv.copelFull = inv.copel; inv.leaseFull = inv.lease; inv.totalFull = inv.total;
+        inv.copel = Math.round(inv.copel * inv.shareRatio * 100) / 100;
+        inv.lease = Math.round(inv.lease * inv.shareRatio * 100) / 100;
+        inv.total = inv.copel + inv.lease;
+      }
       inv.ratePerDelivered = delivered > 0 ? inv.total / delivered : 0;
-      inv.ratePerMetered = inv.kwh > 0 ? inv.total / inv.kwh : 0;
+      inv.ratePerMetered = inv.kwh > 0 ? (inv.shared ? inv.totalFull : inv.total) / inv.kwh : 0;
       // Medidor × vendido (usuário, 30/10/2026): a diferença custa o custo médio do kWh medido. Com medidor
       // próprio do carregador, separa o que ficou fora dele (consumo do local, cobrável) da perda do carregador.
-      inv.diffKWh = delivered > 0 ? inv.kwh - delivered : 0;
+      // Na conta dividida o medidor da Copel inclui o consumo do local: diferença não se aplica.
+      inv.diffKWh = delivered > 0 && !inv.shared ? inv.kwh - delivered : 0;
       inv.diffPct = delivered > 0 && inv.kwh > 0 ? inv.diffKWh / inv.kwh * 100 : 0;
       inv.diffCost = Math.round(inv.diffKWh * inv.ratePerMetered * 100) / 100;
       inv.chargerMeterKWh = pos(inv.chargerMeterKWh);
