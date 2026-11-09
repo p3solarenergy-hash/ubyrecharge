@@ -597,8 +597,10 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
           if (clash) { g.status = "erro"; g.msg = clash; log(`${g.platform} ${g.local} ${g.month} → ${clash}`, "bad"); continue; }
           // Sem novidade: a obra já tem exatamente estas recargas (quantidade, kWh e R$)
           // deste Local no mês. Não grava de novo (cada gravação guarda um backup da base).
+          // Raio: confere pela operadora (o motor grava o Local com o nome da obra, ex. "POSTO ROBERT KOCH").
           const k0 = localKey(w, g.local);
-          const have = (w.eval("allCharges") || []).filter(c => localKey(w, c.rawStation || c._sourceStation) === k0 && w.chargeMonthKey(c) === g.month);
+          const inGroup = c => g.platform === "Raio" ? /^raio$/i.test(String(c.paymentType || "").trim()) : localKey(w, c.rawStation || c._sourceStation) === k0;
+          const have = (w.eval("allCharges") || []).filter(c => inGroup(c) && w.chargeMonthKey(c) === g.month);
           const hk = have.reduce((t, c) => t + (Number(c.energyKWh) || 0), 0), hr = have.reduce((t, c) => t + (Number(c.revenue) || 0), 0);
           if (have.length === g.unique && Math.abs(hk - g.uEnergy) < 0.01 && Math.abs(hr - g.uRevenue) < 0.01) {
             g.status = "igual"; g.msg = `A obra já tem estas ${have.length} recargas (${fmt.kwh(hk)}, ${fmt.brl(hr)}). Nada a gravar.`;
@@ -612,9 +614,8 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
           let { msg, bad } = finished ? importOutcome(w) : { msg: "A gravação não terminou em 5 minutos. Confira a base antes de repetir.", bad: true };
           // Conferência: as recargas deste Local e mês precisam estar na obra de destino.
           if (!bad) {
-            const k = localKey(w, g.local);
             let found = 0;
-            try { found = (w.eval("allCharges") || []).filter(c => localKey(w, c.rawStation || c._sourceStation) === k && w.chargeMonthKey(c) === g.month).length; } catch (_) {}
+            try { found = (w.eval("allCharges") || []).filter(c => inGroup(c) && w.chargeMonthKey(c) === g.month).length; } catch (_) {}
             const dup = g.charges - g.unique, dupNote = dup ? ` A planilha repete ${dup} linha(s) idêntica(s) (mesmo horário, energia e valor); cada uma conta como uma recarga só.` : "";
             if (found < g.unique) { bad = true; msg = `Importação incompleta: a planilha tem ${g.unique} recargas distintas e a obra ficou com ${found} deste Local no mês. Recarregue a página (F5) e importe de novo; se continuar, me avise.${dupNote}`; }
             else msg = `✓ ${found} recargas de ${g.local} conferidas em ${label(g.workId)} (${g.month}).${dupNote} ${msg}`;
