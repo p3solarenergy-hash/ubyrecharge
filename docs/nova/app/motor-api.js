@@ -1888,7 +1888,19 @@
       const e = fv2EnergyFor(row);
       if (e && !(e.keepBefore && mk < e.keepBefore)) {
         energyInvoice = e.months[mk] || { cost: 0, total: 0, parts: [] };
+        // Mês em andamento com a fatura dele já lançada: a projeção é kWh vendidos até agora × custo médio por kWh
+        // da fatura (Copel + usina/arrendamento), não a fatura inteira — ela só vale inteira no fechamento
+        // (usuário, 09/11/2026).
+        if (mk === monthKey(new Date()) && energyInvoice.parts?.length) {
+          const del = energyInvoice.parts.reduce((s, p) => s + n0(p.deliveredKWh), 0);
+          const kwh = charges.reduce((s, c) => s + n0(c.energyKWh), 0);
+          if (del > 0) {
+            const copel = Math.round(n0(energyInvoice.copel) / del * kwh * 100) / 100, lease = Math.round(n0(energyInvoice.lease) / del * kwh * 100) / 100;
+            energyInvoice = { ...energyInvoice, copel, lease, total: copel + lease, cost: copel + lease, estimatedCost: 0, estimatedCopel: 0, estimatedLease: 0, projectedAvg: true, avgRate: (n0(energyInvoice.copel) + n0(energyInvoice.lease)) / del };
+          }
+        }
         flags = flags.filter(f => f !== "fatura-copiada" && f !== "fatura-herdada").concat("energia-por-fatura");
+        if (energyInvoice.projectedAvg) flags.push("energia-media-do-mes");
         if (energyInvoice.estimatedCost > 0) flags.push("energia-estimada");
         if (e.partial) flags.push("energia-parcial");
       }
