@@ -186,7 +186,8 @@
         routeAs: "UBY RECHARGE - ROBERT KOCH",
         skip: r => !/^\d{2}\/\d{2}\/\d{4}$/.test(w.rowCellText(r, c.date)),
         local: () => "RAIO | UBY RECHARGE - ROBERT KOCH",
-        date: r => w.parseDate(w.rowCellText(r, c.date) + " 12:00"),
+        // Mesma regra do motor: recarga da Raio antes de nov/2026 conta em 01/11 (outubro já fechou).
+        date: r => { const d = w.parseDate(w.rowCellText(r, c.date) + " 12:00"); let from = null; try { from = w.eval("RAIO_COUNTS_FROM"); } catch (_) {} return d && from && d < from ? new Date(from) : d; },
         id: r => w.rowCellText(r, c.date),
         count: r => Math.max(1, Math.round(Number(w.parseNumber(w.readCell(r, c.count))) || 0)),
         kwh: r => Number(w.parseNumber(w.readCell(r, c.energy))) || 0,
