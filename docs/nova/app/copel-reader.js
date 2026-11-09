@@ -103,6 +103,14 @@
       f.compensatedLines = credits.map(i => ({ period: (/(\d{2}\/\d{4})/.exec(i.desc) || [])[1] || "", kwh: Math.abs(i.qty) }));
     }
     f.uncompensatedKWh = Math.max(0, f.kwh - (f.compensatedKWh || 0));
+    // GD I (créditos do próprio local) × GD II (usina em outra UC, "OUC"): no RK só o GD II é do carregador
+    // (usuário, 09/11/2026). Valor do crédito GD II = soma das linhas TE + TUSD dele; kWh = linhas TE.
+    const gdKWh = re => { const l = injected.filter(i => re.test(i.desc)); const te = l.filter(i => /\bTE\b/i.test(i.desc)); return { kwh: Math.round((te.length ? te : l.filter(i => /TUS/i.test(i.desc))).reduce((s, i) => s + Math.abs(i.qty), 0) * 100) / 100, value: Math.round(l.reduce((s, i) => s + Math.abs(i.value), 0) * 100) / 100 }; };
+    const gd2 = gdKWh(/GD\s*II/i), gd1 = gdKWh(/GD\s*I(?!I)|GDI-I/i);
+    f.gd2KWh = gd2.kwh; f.gd2CreditValue = gd2.value; f.gd1KWh = gd1.kwh;
+    const fullItems = f.items.filter(i => /^kWh$/i.test(i.unit) && i.qty > 0 && /ENERGIA/i.test(i.desc) && !/INJ/i.test(i.desc));
+    f.fullRate = f.kwh > 0 ? Math.round(fullItems.reduce((s, i) => s + i.value, 0) / f.kwh * 1e6) / 1e6 : 0;
+    f.ucFixedAmount = Math.round(f.items.filter(i => !/^kWh$/i.test(i.unit) && i.value > 0).reduce((s, i) => s + i.value, 0) * 100) / 100;
     const expiring = /Saldo a Expirar Pr[oó]ximo M[eê]s:\s*Todos os Per[ií]odos\s+(\d+)/i.exec(t.replace(/\s+/g, " "));
     if (expiring) { f.creditExpiring = Number(expiring[1]); if (f.creditExpiring > 0) warnings.push(`${f.creditExpiring} kWh de crédito expiram no próximo mês.`); }
     // Conferência: a soma dos itens tem que dar o total da fatura.

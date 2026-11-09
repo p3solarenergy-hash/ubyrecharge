@@ -2296,7 +2296,7 @@
     const monthly = {};
     Object.keys(daily).forEach(d => { const mk = d.slice(0, 7); monthly[mk] = (monthly[mk] || 0) + daily[d]; });
     return JSON.parse(JSON.stringify({ workId: row.workId, station: row.stationName || row.station, workName: row.workName, stored: fv2InvoiceList(row.workId, row.stationName || row.station, row.workName),
-      invoices: res.invoices, months: res.months, deliveredByMonth: monthly, lastDelivery: Object.keys(daily).sort().pop() || "", fullHistory }));
+      invoices: res.invoices, months: res.months, deliveredByMonth: monthly, keepBefore: (() => { const refs = res.invoices.map(i => i.ref).sort(); const fs = res.invoices.filter(i => i.shared).map(i => i.ref).sort()[0] || ""; return fs && fs === refs[0] ? fs : ""; })(), lastDelivery: Object.keys(daily).sort().pop() || "", fullHistory }));
   }
   // Repasse à área (dono do local): participação sobre o faturamento e, quando o
   // ponto ainda usa a energia do local, o reembolso dos kWh vendidos × tarifa do mês.

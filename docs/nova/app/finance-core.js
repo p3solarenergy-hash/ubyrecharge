@@ -109,8 +109,20 @@
         const own = pos(inv.chargerMeterKWh) > 0 ? pos(inv.chargerMeterKWh) : delivered;
         inv.ownKWh = own; inv.shareRatio = Math.min(1, own / inv.kwh);
         inv.copelFull = inv.copel; inv.leaseFull = inv.lease; inv.totalFull = inv.total;
-        inv.copel = Math.round(inv.copel * inv.shareRatio * 100) / 100;
-        inv.lease = Math.round(inv.lease * inv.shareRatio * 100) / 100;
+        const gd2 = pos(inv.gd2KWh), full = pos(inv.fullRate);
+        if (gd2 > 0 && full > 0) {
+          // Só os créditos GD II (usina) são do carregador; GD I é do local (usuário, 09/11/2026). Por kWh coberto
+          // pelo GD II: usina + o que a Copel cobra a mais (envio e tributos); acima deles, kWh cheio. Custos fixos
+          // da UC pelo consumo; Copel da UC da usina pelos créditos GD II usados.
+          const gd2Rate = pos(inv.gd2CreditValue) / gd2, covered = Math.min(own, gd2), extra = Math.max(0, own - gd2);
+          const usinaRate = pos(inv.leaseAmount) > 0 ? pos(inv.leaseAmount) / gd2 : pos(inv.leaseRate);
+          inv.gd2Covered = covered; inv.gd2Rate = gd2Rate; inv.residualRate = Math.max(0, full - gd2Rate); inv.extraKWh = extra;
+          inv.copel = Math.round((covered * inv.residualRate + extra * full + pos(inv.ucFixedAmount) * inv.shareRatio) * 100) / 100;
+          inv.lease = Math.round((covered * usinaRate + pos(inv.ucGenAmount) * covered / gd2) * 100) / 100;
+        } else {
+          inv.copel = Math.round(inv.copel * inv.shareRatio * 100) / 100;
+          inv.lease = Math.round(inv.lease * inv.shareRatio * 100) / 100;
+        }
         inv.total = inv.copel + inv.lease;
       }
       inv.ratePerDelivered = delivered > 0 ? inv.total / delivered : 0;
