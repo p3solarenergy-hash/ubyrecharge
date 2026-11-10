@@ -2564,7 +2564,7 @@
       if (!Number.isFinite(total)) { alert("Informe um valor válido."); return; }
       const note = String(target.querySelector("[data-ar-adj-note]")?.value || "").trim();
       ui.arAdjust = "";
-      arSave(`Repasse ${mk} ajustado para ${fmt.brl(total)}`, cfg => ({ ...cfg, adjust: { ...cfg.adjust, [mk]: { total: Math.round(total * 100) / 100, note } } }));
+      arSave(`Repasse ${mk} ajustado para ${fmt.brl(total)}`, cfg => ({ ...cfg, adjust: { ...cfg.adjust, [mk]: { ...cfg.adjust[mk], total: Math.round(total * 100) / 100, note } } }));
     });
     target.querySelectorAll("[data-ar-adj-clear]").forEach(b => b.onclick = () => { const mk = b.dataset.arAdjClear; ui.arAdjust = ""; arSave(`Repasse ${mk} voltou ao calculado`, cfg => { const adjust = { ...cfg.adjust }; delete adjust[mk]; return { ...cfg, adjust }; }); });
     const arReport = mk => { const { c } = arCtx(); UBY.reports.area(c.workId, c.station, mk); };

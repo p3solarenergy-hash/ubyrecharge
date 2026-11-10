@@ -2330,7 +2330,13 @@
   // (diffMode "next") ou é zerada ("drop"). Pago = valor que fica no resultado do mês.
   // Área paga na origem: a Spott divide direto com o local a partir do mês marcado (ex.: Shopping Aurora,
   // out/2026). A UBY não paga esse repasse nem recolhe imposto sobre ele.
-  const areaAtSourceIn = (cfg, mk) => !!(cfg && /^\d{4}-\d{2}$/.test(cfg.splitAtSourceFrom || "") && mk >= cfg.splitAtSourceFrom);
+  const areaAtSourceIn = (cfg, mk) => !!(cfg && cfg.adjust?.[mk]?.receivedByUby !== true && /^\d{4}-\d{2}$/.test(cfg.splitAtSourceFrom || "") && mk >= cfg.splitAtSourceFrom);
+  // Acertos pontuais conservam a competência e podem vencer em outra data.
+  function areaPaymentDue(cfg, mk, dueDay) {
+    const date = cfg?.adjust?.[mk]?.dueDate;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date || "") && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date) return date;
+    return `${nextMonth(mk)}-${String(dueDay).padStart(2, "0")}`;
+  }
   function areaAdjustState(cfg, mk) {
     const adj = cfg?.adjust?.[mk];
     const own = adj && adj.total !== null && adj.total !== "" && Number.isFinite(Number(adj.total)) ? Math.round(Number(adj.total) * 100) / 100 : null;
@@ -2371,7 +2377,7 @@
       // Base calculada (% × faturamento); o ajuste manual, se houver, fica em total/adjustment.
       const areaCalc = n0(r.areaParticipationCalc ?? r.areaParticipation);
       const area = Math.round(areaCalc * 100) / 100;
-      const due = `${nextMonth(mk)}-${String(dueDay).padStart(2, "0")}`;
+      const due = areaPaymentDue(cfg, mk, dueDay);
       const paidAt = cfg.paid?.[mk] || "";
       // Total = soma dos valores exatos, arredondada uma vez (como nas prestações de contas já enviadas).
       const computedTotal = Math.round(((reimburse ? n0(r.energyCost) : 0) + areaCalc) * 100) / 100;
@@ -2443,7 +2449,7 @@
         if (!byMonth.has(mk)) byMonth.set(mk, []);
         byMonth.get(mk).push({ id: `area-${row.workId}-${m.key}`, kind: "area", workId: row.workId, competence: m.key, dueAmount: m.dueAmount, paidAmount: m.paidAmount,
           name: `Repasse à área · ${acc.config.payee} · ${m.label}`, category: "Repasse à área", supplier: acc.config.payee,
-          station: acc.station, workName: row.workName, due: m.due, dueDay: acc.config.dueDay, amount: m.total,
+          station: acc.station, workName: row.workName, due: m.due, dueDay: Number(m.due.slice(8, 10)), amount: m.total,
           status: m.paidAt ? "paid" : m.status === "vencido" ? "overdue" : "pending", statusLabel: m.paidAt ? "Pago" : m.status === "vencido" ? "Vencido" : "A pagar",
           paidAt: m.paidAt, source: `Repasse à área (${m.reimbursement ? "energia + " : ""}${fmtPctPlain(m.areaPct)} do faturamento)` });
       });
