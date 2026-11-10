@@ -159,6 +159,9 @@
   const $ = id => document.getElementById(id);
   const telas = ['vitrine','ident','beneficio','indisp','erro'];
   const codigo = new URLSearchParams(location.search).get('p') || '';
+  // Link pessoal das mensagens do WhatsApp (?c=código): conta o clique na tela "Envios WhatsApp".
+  const clique = new URLSearchParams(location.search).get('c') || '';
+  if (/^[0-9a-f]{8}$/.test(clique)) fetch(API.replace('clube-beneficio', 'wa-link'), {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({c: clique}), keepalive: true}).catch(() => {});
   let parceiro = '', logo = '', logoBg = '', offset = 0, timer = null;
   // Texto do benefício: cada linha digitada tenta caber inteira, diminuindo a letra até o mínimo;
   // só quebra a linha se nem assim couber. "R$ 1.300,00" nunca separa o R$ do valor.

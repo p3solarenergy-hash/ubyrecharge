@@ -28,6 +28,7 @@
       { id: "clientes", icon: "◎", label: "Clientes", type: "view", period: true },
       { id: "precos", icon: "⇅", label: "Estudos de preço", type: "view" },
       { id: "clube", icon: "✦", label: "Clube UBY", type: "view" },
+      { id: "envios", icon: "✉", label: "Envios WhatsApp", type: "view" },
       { id: "sessoes", icon: "✓", label: "Sessões importadas (consulta)", type: "classic", src: LEGACY + "recargas.html", tab: "detalhes" },
       { id: "recargas", icon: "⌁", label: "Recargas · tela original", type: "classic", src: LEGACY + "recargas.html", tab: "geral" }
     ] },
@@ -75,7 +76,7 @@
     ] },
     { label: "REDE DE RECARGAS", items: [
       { icon: "▤", label: "Carregadores e uso", tabs: [["unidades", "Unidades e carregadores"], ["uso", "Análise de uso"], ["comparar", "Comparar períodos"], ["locais", "Shopping Aurora (AC + DC)"], ["precos", "Estudos de preço"], ["sessoes", "Sessões importadas"], ["recargas", "Tela original"]] },
-      { icon: "◎", label: "Clientes e Clube", tabs: [["clientes", "Clientes"], ["clube", "Clube UBY"]] }
+      { icon: "◎", label: "Clientes e Clube", tabs: [["clientes", "Clientes"], ["clube", "Clube UBY"], ["envios", "Envios WhatsApp"]] }
     ] },
     { label: "FINANCEIRO", items: [
       { icon: "⇣", label: "Contas a pagar", tabs: [["#/parametros/contas", "Contas a pagar"], ["#/parametros/boleto", "Lançar boleto"], ["#/parametros/pagamentos", "Conciliação bancária"]] },
