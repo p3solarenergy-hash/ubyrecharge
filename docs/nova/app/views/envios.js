@@ -269,8 +269,11 @@
   }
 
   // ---------- desenho ----------
+  // A área das telas é a mesma para todas: fora de #/envios esta tela não pode se redesenhar
+  // (usuário, 11/11/2026: a cada atualização ela aparecia por cima da tela que ele estava vendo).
+  const naTela = () => /^#\/envios(\/|$|\?)/.test(location.hash);
   function paint() {
-    if (!target) return;
+    if (!target || !naTela()) return;
     if (!ui.estado) return;
     const sel = ui.estado.campanhas.length > 1 && ui.tab === "painel"
       ? `<label class="imp-field">Campanha <select class="select" id="waCamp">${ui.estado.campanhas.map(c => `<option value="${esc(c.campanha)}" ${c.campanha === ui.camp ? "selected" : ""}>${esc(c.titulo || c.campanha)}${c.campanha === ui.estado.config.campanha ? " (ativa)" : ""}</option>`).join("")}</select></label>` : "";
@@ -375,11 +378,12 @@
     clearInterval(timer);
     el.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Abrindo os envios do WhatsApp</h2><p>Lendo campanhas, fila e respostas.</p></div>`;
     try { await loadEstado(); }
-    catch (err) { el.innerHTML = `<div class="loading"><h2>Não foi possível abrir os envios</h2><p>${esc(err.message || err)}</p></div>`; return; }
+    catch (err) { if (naTela()) el.innerHTML = `<div class="loading"><h2>Não foi possível abrir os envios</h2><p>${esc(err.message || err)}</p></div>`; return; }
+    if (!naTela()) return;
     paint();
     // Atualiza os números sozinho a cada 2 min no Painel (sem mexer no que está sendo digitado).
     timer = setInterval(async () => {
-      if (!document.body.contains(el)) { clearInterval(timer); return; }
+      if (!document.body.contains(el) || !naTela()) { clearInterval(timer); return; }
       if (document.hidden || ui.busy || ui.tab !== "painel" || el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
       try { await loadEstado(); paint(); } catch (_) {}
     }, 120000);
