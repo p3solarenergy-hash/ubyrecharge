@@ -2,7 +2,7 @@
    Dados sempre vêm da rede (Supabase). Os arquivos da plataforma usam
    "rede primeiro": a versão nova entra na hora; o cache só serve se estiver
    sem internet, para o app abrir e avisar em vez de mostrar erro do navegador. */
-const CACHE = "uby-nova-v5";
+const CACHE = "uby-nova-v6";
 // Arquivos recebidos pelo "Compartilhar" do celular, até serem lançados (tela Lançar boleto).
 const SHARED = "uby-nova-compartilhado";
 // O endereço (github.io) é compartilhado com outros sites: só mexe nos caches deste app.
@@ -88,7 +88,10 @@ self.addEventListener("push", event => {
   }));
 });
 
-// Toque na notificação: abre a tela do aviso no app já aberto, ou abre o app.
+// Toque na notificação: se o app já está aberto, somente o traz para frente.
+// O processamento do WhatsApp já é feito no servidor; trocar a rota de quem
+// está trabalhando no painel para a tela de Envios é uma interrupção indevida.
+// A rota do aviso continua sendo usada apenas para abrir o app que estava fechado.
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   const scope = self.registration.scope;
@@ -97,6 +100,6 @@ self.addEventListener("notificationclick", event => {
   event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
     const open = list.find(c => c.url.startsWith(scope) && "focus" in c);
     if (!open) return self.clients.openWindow(url);
-    return open.focus().then(c => c.navigate(url)).catch(() => self.clients.openWindow(url));
+    return open.focus();
   }));
 });
