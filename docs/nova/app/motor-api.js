@@ -2423,6 +2423,10 @@
   // (diffMode "next") ou é zerada ("drop"). Pago = valor que fica no resultado do mês.
   // Área paga na origem: a Spott divide direto com o local a partir do mês marcado (ex.: Shopping Aurora,
   // out/2026). A UBY não paga esse repasse nem recolhe imposto sobre ele.
+  // Exceção por mês (adjust[mês].receivedByUby): o split não funcionou e a UBY recebeu tudo (Aurora, set e
+  // out/2026). O mês volta a ser conta a pagar da UBY, que recolhe o imposto sobre tudo e repassa a parte do
+  // local já sem esse imposto (adjust[mês].total = parte do local − imposto; dueDate = vencimento combinado).
+  const areaReceivedByUby = (cfg, mk) => !!cfg?.adjust?.[mk]?.receivedByUby;
   const areaAtSourceIn = (cfg, mk) => !!(cfg && cfg.adjust?.[mk]?.receivedByUby !== true && /^\d{4}-\d{2}$/.test(cfg.splitAtSourceFrom || "") && mk >= cfg.splitAtSourceFrom);
   // Acertos pontuais conservam a competência e podem vencer em outra data.
   function areaPaymentDue(cfg, mk, dueDay) {
@@ -2470,6 +2474,7 @@
       // Base calculada (% × faturamento); o ajuste manual, se houver, fica em total/adjustment.
       const areaCalc = n0(r.areaParticipationCalc ?? r.areaParticipation);
       const area = Math.round(areaCalc * 100) / 100;
+      const receivedByUby = areaReceivedByUby(cfg, mk);
       const due = areaPaymentDue(cfg, mk, dueDay);
       const paidAt = cfg.paid?.[mk] || "";
       // Total = soma dos valores exatos, arredondada uma vez (como nas prestações de contas já enviadas).
@@ -2513,7 +2518,9 @@
         reimbursement, reimbursementExact: reimburse ? n0(r.energyCost) : 0, areaExact: areaCalc, areaPct: n0(r.areaSharePct), areaMode: "gross", area, total, due, paidAt,
         computedTotal, own, dueAmount, adjusted: aa.own !== null, adjustment: Math.round((own - computedTotal) * 100) / 100, adjustNote: aa.note,
         carryIn: aa.carryIn, carryFrom: aa.carryFrom, carryFromLabel: aa.carryFrom ? monthLabel(aa.carryFrom) : "",
-        paidAmount: aa.paidAmount, paidDiff: aa.paidAmount !== null ? aa.diff : 0, paidDiffMode: aa.diffMode, status, atSource, occupancy, occHours, occPower,
+        paidAmount: aa.paidAmount, paidDiff: aa.paidAmount !== null ? aa.diff : 0, paidDiffMode: aa.diffMode, status, atSource,
+        // Recebido inteiro pela UBY: imposto retido = parte do local − valor a repassar.
+        receivedByUby, withheldTax: receivedByUby ? Math.round((computedTotal - own) * 100) / 100 : 0, withheldTaxPct: receivedByUby ? n0(cfg.adjust[mk].taxPct) || taxRateFor(mk) : 0, occupancy, occHours, occPower,
         sessions, busyHours, avgMinutes, occPoints, timeOccupancy, clients: monthClients.size, clientsToDate: seenClients.size,
         newClients, returningClients: monthClients.size - newClients, hourly, weekday, daily, periodDays };
     }).filter(m => m.total !== 0 || m.revenue > 0);
