@@ -647,8 +647,101 @@
         idleValue: metrics.idleValue, failed: metrics.failedCount, valid: metrics.clean.executed.length, shortOrZero: metrics.clean.shortOrZero.length },
       connectors, days: dailySeries(charges, history?.charges || charges), health: health(charges),
       monthly: histMonths.map(mk => { const c = (history?.charges || []).filter(ch => chargeMonthKey(ch) === mk); return { key: mk, label: monthLabel(mk), revenue: sumBy(c, x => x.revenue), energy: sumBy(c, x => x.energyKWh), sessions: c.length }; }),
-      sessions: charges.slice().sort((a, b) => (b.startDate || 0) - (a.startDate || 0)).map(sessionRow)
+      sessions: charges.slice().sort((a, b) => (b.startDate || 0) - (a.startDate || 0)).map(sessionRow),
+      breakdown: chargeBreakdown(charges)
     };
+  }
+
+  // Clientes, tarifas praticadas e meios de pagamento de um carregador (usuário, 11/11/2026: "por carregador o
+  // kWh das recargas de cada cliente, agora estamos com tarifas variáveis, qual meio de pagamento").
+  // R$ e kWh = soma de todas as linhas (faturamento = soma das planilhas); recargas contam só as válidas.
+  // Forma de pagamento: coluna "Forma de pagamento" da planilha nova da Spott (nov/2026), gateway da Raio,
+  // "Forma de Pagamento" da Go Grid. Importações anteriores não têm a coluna: ficam como "Não informado".
+  const PAY_LABEL = { CARTAO: "Cartão", CARTEIRA: "Carteira", APPLE_PAY: "Apple Pay", GOOGLE_PAY: "Google Pay", PIX: "Pix", WALLET: "Carteira", PAGBANK_CARD: "Cartão", RFID: "RFID" };
+  function paymentMethodOf(c) {
+    const raw = safeText(c.paymentMethod).trim() || (/^raio/i.test(safeText(c.rawStatus)) ? (safeText(c.rawStatus).split("·")[1] || "").trim() : "");
+    if (!raw || /resumo di/i.test(raw)) return "Não informado";
+    const key = raw.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, "_");
+    return PAY_LABEL[key] || (/stripe|card|cart/i.test(raw) ? "Cartão" : /pix/i.test(raw) ? "Pix" : raw);
+  }
+  const isPriced = c => isExecutedCharge(c) && Number(c.energyKWh) >= 1 && Number(c.revenue) > 0;
+  function chargeBreakdown(charges = []) {
+    const clientKey = c => safeText(c.userEmail).trim().toLowerCase() || safeText(c.userName).trim().toLowerCase();
+    const totals = { revenue: sumBy(charges, c => c.revenue), energy: sumBy(charges, c => c.energyKWh), sessions: charges.filter(isExecutedCharge).length,
+      lines: charges.length, unknownMethod: charges.filter(c => paymentMethodOf(c) === "Não informado").length };
+    const group = keyOf => {
+      const map = new Map();
+      charges.forEach(c => {
+        const k = keyOf(c) || "Não informado";
+        const g = map.get(k) || { label: k, sessions: 0, lines: 0, energy: 0, revenue: 0, clients: new Set() };
+        g.lines++; if (isExecutedCharge(c)) g.sessions++;
+        g.energy += Number(c.energyKWh || 0); g.revenue += Number(c.revenue || 0);
+        const ck = clientKey(c); if (ck) g.clients.add(ck);
+        map.set(k, g);
+      });
+      return [...map.values()].map(g => ({ ...g, clients: g.clients.size, perKwh: g.energy > 0 ? g.revenue / g.energy : 0,
+        shareRevenue: totals.revenue > 0 ? g.revenue / totals.revenue * 100 : 0, shareEnergy: totals.energy > 0 ? g.energy / totals.energy * 100 : 0 }))
+        .sort((a, b) => b.revenue - a.revenue);
+    };
+    const methods = group(paymentMethodOf);
+    const triggers = group(c => safeText(c.trigger).trim());
+    const operators = group(c => safeText(c.paymentType || c.sourcePlatform).trim());
+
+    // Tarifa praticada = R$ ÷ kWh de cada recarga (válida, ≥ 1 kWh e com valor), em faixas de R$ 0,01.
+    const priced = charges.filter(isPriced);
+    const pricedEnergy = sumBy(priced, c => c.energyKWh);
+    const tMap = new Map();
+    const byHour = Array.from({ length: 24 }, (_, h) => ({ hour: h, energy: 0, revenue: 0, sessions: 0 }));
+    const dayMap = new Map();
+    priced.forEach(c => {
+      const kwh = Number(c.energyKWh), rev = Number(c.revenue), p = rev / kwh, band = Math.round(p * 100) / 100;
+      const t = tMap.get(band) || { price: band, sessions: 0, energy: 0, revenue: 0, hours: Array(24).fill(0), coupons: {}, first: null, last: null };
+      t.sessions++; t.energy += kwh; t.revenue += rev;
+      const cp = safeText(c.voucher).trim(); if (cp && cp !== "-") t.coupons[cp] = (t.coupons[cp] || 0) + 1;
+      const d = new Date(c.startDate);
+      if (!Number.isNaN(d.getTime())) {
+        t.hours[d.getHours()]++; if (!t.first || d < t.first) t.first = d; if (!t.last || d > t.last) t.last = d;
+        const b = byHour[d.getHours()]; b.energy += kwh; b.revenue += rev; b.sessions++;
+        const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const x = dayMap.get(dk) || { date: dk, energy: 0, revenue: 0, sessions: 0, min: Infinity, max: 0 };
+        x.energy += kwh; x.revenue += rev; x.sessions++; x.min = Math.min(x.min, p); x.max = Math.max(x.max, p);
+        dayMap.set(dk, x);
+      }
+      tMap.set(band, t);
+    });
+    const tariffs = [...tMap.values()].sort((a, b) => b.energy - a.energy).map(t => ({
+      price: t.price, sessions: t.sessions, energy: t.energy, revenue: t.revenue, share: pricedEnergy > 0 ? t.energy / pricedEnergy * 100 : 0, hours: t.hours,
+      coupon: Object.entries(t.coupons).sort((a, b) => b[1] - a[1])[0]?.[0] || "", first: iso(t.first), last: iso(t.last) }));
+    const hourly = byHour.map(b => ({ hour: b.hour, sessions: b.sessions, energy: b.energy, perKwh: b.energy > 0 ? b.revenue / b.energy : null }));
+    const daily = [...dayMap.values()].sort((a, b) => a.date.localeCompare(b.date)).map(x => ({ date: x.date, sessions: x.sessions, perKwh: x.revenue / x.energy, min: x.min, max: x.max }));
+
+    // Clientes: kWh, R$ e tarifa média de cada um, com os meios de pagamento usados.
+    const cMap = new Map();
+    charges.forEach(c => {
+      const k = clientKey(c) || "__sem__";
+      const x = cMap.get(k) || { key: k, name: k === "__sem__" ? "Sem identificação (sem motorista na planilha)" : clientDisplayName(c), email: safeText(c.userEmail).trim(),
+        vehicle: "", sessions: 0, lines: 0, energy: 0, revenue: 0, pricedEnergy: 0, pricedRevenue: 0, methods: {}, operators: {}, coupons: {}, first: null, last: null, minP: Infinity, maxP: 0 };
+      x.lines++; if (isExecutedCharge(c)) x.sessions++;
+      x.energy += Number(c.energyKWh || 0); x.revenue += Number(c.revenue || 0);
+      const v = [c.vehicleBrand, c.vehicleModel].filter(Boolean).join(" ").trim(); if (v) x.vehicle = v;
+      const m = paymentMethodOf(c); x.methods[m] = (x.methods[m] || 0) + 1;
+      const op = safeText(c.paymentType || c.sourcePlatform).trim(); if (op) x.operators[op] = (x.operators[op] || 0) + 1;
+      const cp = safeText(c.voucher).trim(); if (cp && cp !== "-") x.coupons[cp] = (x.coupons[cp] || 0) + 1;
+      if (isPriced(c)) {
+        const p = Number(c.revenue) / Number(c.energyKWh);
+        x.pricedEnergy += Number(c.energyKWh); x.pricedRevenue += Number(c.revenue); x.minP = Math.min(x.minP, p); x.maxP = Math.max(x.maxP, p);
+      }
+      const d = new Date(c.startDate);
+      if (!Number.isNaN(d.getTime())) { if (!x.first || d < x.first) x.first = d; if (!x.last || d > x.last) x.last = d; }
+      cMap.set(k, x);
+    });
+    const customers = [...cMap.values()].map(x => ({ key: x.key, name: x.name, email: x.email, vehicle: x.vehicle, sessions: x.sessions, lines: x.lines,
+      energy: x.energy, revenue: x.revenue, avgKwh: x.sessions ? x.energy / x.sessions : 0, perKwh: x.pricedEnergy > 0 ? x.pricedRevenue / x.pricedEnergy : null,
+      minPerKwh: x.pricedEnergy > 0 ? x.minP : null, maxPerKwh: x.pricedEnergy > 0 ? x.maxP : null, shareEnergy: totals.energy > 0 ? x.energy / totals.energy * 100 : 0,
+      methods: Object.entries(x.methods).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label, n })),
+      operators: Object.keys(x.operators), coupons: Object.keys(x.coupons), first: iso(x.first), last: iso(x.last), anonymous: x.key === "__sem__" }))
+      .sort((a, b) => b.energy - a.energy);
+    return { totals, methods, triggers, operators, tariffs, hourly, daily, customers };
   }
 
   function sessionRow(charge) {
@@ -656,7 +749,7 @@
     return {
       id: charge.id, start: iso(charge.startDate), station: charge.station, connector: charge.connType, duration: charge.duration,
       energy: Number(charge.energyKWh || 0), revenue: Number(charge.revenue || 0), idleValue: Number(charge.idleValue || 0),
-      client: clientDisplayName(charge), payment: charge.paymentType || "", status: charge.rawStatus || charge.paymentStatus || "",
+      client: clientDisplayName(charge), payment: charge.paymentType || "", method: paymentMethodOf(charge), trigger: safeText(charge.trigger).trim(), status: charge.rawStatus || charge.paymentStatus || "",
       valid: isExecutedCharge(charge), issue: issue ? issue.label : "", courtesy: typeof isCourtesyCharge === "function" ? isCourtesyCharge(charge) : false,
       vehicle: [charge.vehicleBrand, charge.vehicleModel].filter(Boolean).join(" "), file: charge._file || ""
     };
