@@ -123,10 +123,10 @@
         </div>
 
         <div class="split" style="margin-bottom:16px">
-          <div><h3 style="margin:0 0 8px">Tarifas praticadas</h3>
+          <div><h3 style="margin:0 0 8px">Tarifas praticadas</h3>${top ? `<p class="source-line" style="margin:-4px 0 8px">Preço padrão = o mais usado (${pk(top.price)}). Abaixo dele é cupom: mostra o horário de uso. Acima é ociosidade: sem horário.</p>` : ""}
             <div class="table-wrap" style="max-height:340px"><table><thead><tr><th class="num">R$/kWh</th><th class="num">Recargas</th><th class="num">Energia</th><th class="num">% do kWh</th><th>Horário de uso</th><th>Cupom</th><th>Período</th></tr></thead>
             <tbody>${priced.map(x => `<tr><td class="num"><strong>${pk(x.price)}</strong></td><td class="num">${fmt.int(x.sessions)}</td><td class="num">${fmt.kwh(x.energy)}</td><td class="num">${fmt.pct1(x.share)}</td>
-              <td>${hourStrip(x.hours)}</td><td>${esc(x.coupon || "—")}</td><td><small>${fmt.date(x.first)} a ${fmt.date(x.last)}</small></td></tr>`).join("") || `<tr><td colspan="7" class="empty">Sem recargas válidas com valor.</td></tr>`}</tbody></table></div></div>
+              <td>${top && x.price > top.price + 0.005 ? `<small title="Acima do preço padrão (${pk(top.price)}): diferença de ociosidade, o horário não importa">ociosidade</small>` : hourStrip(x.hours)}</td><td>${esc(x.coupon || "—")}</td><td><small>${fmt.date(x.first)} a ${fmt.date(x.last)}</small></td></tr>`).join("") || `<tr><td colspan="7" class="empty">Sem recargas válidas com valor.</td></tr>`}</tbody></table></div></div>
           <div><h3 style="margin:0 0 8px">R$/kWh médio por hora do dia</h3><div class="chart-box" style="height:300px"><canvas id="chTariffHour"></canvas></div></div>
         </div>
 
