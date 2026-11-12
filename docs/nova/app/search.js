@@ -67,11 +67,11 @@
           `${b.supplier} ${b.category} ${b.station} ${brl(b.amount)} ${String(b.amount).replace(".", ",")} ${b.amount}`);
       });
     } catch (_) {}
-    // Clientes (todos com recarga): abre o cadastro já filtrado.
+    // Clientes (todos com recarga): abre a ficha do cliente.
     try {
-      (window.UBY.data("clientRanking", "", "", "", "")?.ranking || []).forEach(c => {
+      (window.UBY.data("customerDirectory")?.list || []).forEach(c => {
         if (!c.name && !c.email) return;
-        add("Clientes", c.name || c.email, `${c.sessions} recarga(s) · ${brl(c.revenue)}`, `#/clientes/cadastro/${encodeURIComponent(c.name || c.email)}`, `${c.email} ${c.phone}`);
+        add("Clientes", c.name || c.email, `${c.valid} recarga(s) · ${brl(c.revenue)}${c.last ? ` · última ${day(c.last)}` : ""}`, `#/clientes/todos/${encodeURIComponent(c.key)}`, `${c.email} ${c.phone}`);
       });
     } catch (_) {}
     return out;

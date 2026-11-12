@@ -1207,6 +1207,112 @@
     return JSON.parse(JSON.stringify(window.UBY_ANALYTICS_CORE.customerWatch(analyticsSessions("uby"))));
   }
 
+  // ---------------------------------------------------------------------
+  // Ficha do cliente: lista de TODOS os clientes (operação UBY, sem parceiros) e o
+  // detalhe de um deles. Vem das recargas importadas (robô/planilhas), não do cadastro.
+  // Datas e "dias sem carregar" contam a partir da última recarga importada da rede.
+  // ---------------------------------------------------------------------
+  function customerCharges() {
+    const out = [];
+    getUbyChargerRows(getGeneralUnitData()).filter(r => r.included && !isPartnerRow(r)).forEach(row => {
+      const site = abbreviatedStationLabel(row.station);
+      (row.charges || []).forEach(c => {
+        const d = c.startDate;
+        if (!(d instanceof Date) || Number.isNaN(d.getTime())) return;
+        const key = clientKeyFromCharge(c) || clientIdentityKey(c.userName || c.userEmail || "");
+        if (!key) return;
+        out.push({ key, c, site, t: d.getTime() });
+      });
+    });
+    return out;
+  }
+
+  function customerDirectory() {
+    const all = customerCharges();
+    const asOf = all.reduce((m, x) => isExecutedCharge(x.c) ? Math.max(m, x.t) : m, 0);
+    const map = new Map();
+    all.forEach(({ key, c, site, t }) => {
+      let u = map.get(key);
+      if (!u) { u = { key, name: c.userName || c.userEmail || "Cliente sem nome", email: c.userEmail || "", phone: c.userPhone || "", valid: 0, failed: 0, energy: 0, revenue: 0, first: 0, last: 0, kwh30: 0, kwhP30: 0, n30: 0, sites: {} }; map.set(key, u); }
+      const ok = isExecutedCharge(c);
+      if (ok) { u.valid += 1; u.sites[site] = (u.sites[site] || 0) + 1; if (!u.first || t < u.first) u.first = t; if (t > u.last) u.last = t; }
+      else u.failed += 1;
+      u.energy += Number(c.energyKWh || 0); u.revenue += Number(c.revenue || 0);
+      const age = asOf - t;
+      if (ok && age >= 0 && age < 30 * 86400000) { u.kwh30 += Number(c.energyKWh || 0); u.n30 += 1; }
+      else if (ok && age >= 30 * 86400000 && age < 60 * 86400000) u.kwhP30 += Number(c.energyKWh || 0);
+      if (!u.email && c.userEmail) u.email = c.userEmail;
+      if (!u.phone && c.userPhone) u.phone = c.userPhone;
+    });
+    const list = [...map.values()].filter(u => u.valid || u.revenue).map(u => ({ key: u.key, name: u.name, email: u.email, phone: u.phone, valid: u.valid, failed: u.failed,
+      energy: u.energy, revenue: u.revenue, first: u.first ? new Date(u.first).toISOString() : "", last: u.last ? new Date(u.last).toISOString() : "",
+      daysSince: u.last ? Math.floor((asOf - u.last) / 86400000) : null, n30: u.n30, kwh30: u.kwh30, kwhP30: u.kwhP30,
+      trendPct: u.kwhP30 > 0 ? (u.kwh30 / u.kwhP30 - 1) * 100 : null,
+      sites: Object.entries(u.sites).sort((a, b) => b[1] - a[1]).map(([s]) => s) }))
+      .sort((a, b) => b.revenue - a.revenue);
+    return { asOf: asOf ? new Date(asOf).toISOString() : "", list };
+  }
+
+  function customerProfile(key) {
+    const all = customerCharges();
+    const asOf = all.reduce((m, x) => isExecutedCharge(x.c) ? Math.max(m, x.t) : m, 0);
+    const mine = all.filter(x => x.key === key).sort((a, b) => b.t - a.t);
+    if (!mine.length) return null;
+    const DAY = 86400000, pad = n => String(n).padStart(2, "0");
+    const dayOf = t => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    const pick = f => (mine.find(x => x.c[f]) || {}).c?.[f] || "";
+    const sessions = mine.map(({ c, site, t }) => {
+      const energy = Number(c.energyKWh || 0), revenue = Number(c.revenue || 0);
+      return { start: new Date(t).toISOString(), day: dayOf(t), site, connector: c.connType || "", duration: c.duration || "", hours: durToHours(c.duration) || 0,
+        energy, revenue, perKwh: energy > 0 && revenue > 0 ? revenue / energy : null, valid: isExecutedCharge(c), method: paymentMethodOf(c), trigger: safeText(c.trigger).trim(),
+        app: c.paymentType || "", voucher: safeText(c.voucher).trim(), status: c.rawStatus || c.paymentStatus || "",
+        vehicle: [c.vehicleBrand, c.vehicleModel].filter(Boolean).join(" ") };
+    });
+    const valid = sessions.filter(s => s.valid);
+    const sum = (l, f) => l.reduce((s, x) => s + Number(x[f] || 0), 0);
+    const tOf = s => Date.parse(s.start);
+    const win = (from, to) => valid.filter(s => { const a = asOf - tOf(s); return a >= from * DAY && a < to * DAY; });
+    const period = (from, to) => { const l = win(from, to); return { n: l.length, kwh: sum(l, "energy"), revenue: sum(l, "revenue") }; };
+    // Uso diário dos últimos 90 dias (até a última recarga da rede).
+    const daily = [];
+    for (let i = 89; i >= 0; i--) { const day = dayOf(asOf - i * DAY); daily.push({ day, kwh: 0, revenue: 0, n: 0 }); }
+    const dIdx = new Map(daily.map((d, i) => [d.day, i]));
+    valid.forEach(s => { const i = dIdx.get(s.day); if (i !== undefined) { daily[i].kwh += s.energy; daily[i].revenue += s.revenue; daily[i].n += 1; } });
+    // Por mês, carregador, hora e dia da semana.
+    const monthly = {}, bySite = {}, hours = Array(24).fill(0), dows = Array(7).fill(0), methods = {}, vehicles = {};
+    valid.forEach(s => {
+      const mk = s.day.slice(0, 7);
+      const m = monthly[mk] || (monthly[mk] = { key: mk, label: monthLabel(mk), n: 0, kwh: 0, revenue: 0 });
+      m.n += 1; m.kwh += s.energy; m.revenue += s.revenue;
+      const b = bySite[s.site] || (bySite[s.site] = { site: s.site, n: 0, kwh: 0, revenue: 0, last: "" });
+      b.n += 1; b.kwh += s.energy; b.revenue += s.revenue; if (s.start > b.last) b.last = s.start;
+      const d = new Date(tOf(s)); hours[d.getHours()] += 1; dows[d.getDay()] += 1;
+      if (s.method) methods[s.method] = (methods[s.method] || 0) + 1;
+      if (s.vehicle) vehicles[s.vehicle] = (vehicles[s.vehicle] || 0) + 1;
+    });
+    const asc = valid.slice().sort((a, b) => tOf(a) - tOf(b));
+    const gaps = asc.slice(1).map((s, i) => (tOf(s) - tOf(asc[i])) / DAY).filter(g => g >= 0.04);
+    const median = l => { if (!l.length) return null; const x = l.slice().sort((a, b) => a - b), h = Math.floor(x.length / 2); return x.length % 2 ? x[h] : (x[h - 1] + x[h]) / 2; };
+    const last = asc.at(-1), first = asc[0];
+    const priced = valid.filter(s => s.perKwh !== null);
+    let watch = null;
+    try { const w = customerWatch(); watch = { alert: w.alerts.find(a => a.key === key) || null, key: w.keyClients.find(k => k.key === key) || null }; } catch (_) {}
+    const top = o => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label, n }));
+    return JSON.parse(JSON.stringify({
+      key, asOf: asOf ? new Date(asOf).toISOString() : "", name: pick("userName") || pick("userEmail") || "Cliente sem nome", email: pick("userEmail"), phone: pick("userPhone"),
+      totals: { valid: valid.length, failed: sessions.length - valid.length, energy: sum(valid, "energy"), revenue: sum(sessions, "revenue"), hours: sum(valid, "hours"),
+        ticket: valid.length ? sum(valid, "revenue") / valid.length : 0, kwhPerSession: valid.length ? sum(valid, "energy") / valid.length : 0,
+        perKwh: sum(priced, "energy") > 0 ? sum(priced, "revenue") / sum(priced, "energy") : null,
+        voucherShare: valid.length ? valid.filter(s => s.voucher).length / valid.length : 0 },
+      first: first ? first.start : "", last: last ? last.start : "", lastSite: last ? last.site : "",
+      daysSince: last ? Math.floor((asOf - tOf(last)) / DAY) : null,
+      interval: { median: median(gaps), avg: gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : null },
+      windows: { d7: period(0, 7), d30: period(0, 30), p30: period(30, 60), d90: period(0, 90) },
+      daily, monthly: Object.values(monthly).sort((a, b) => a.key.localeCompare(b.key)), bySite: Object.values(bySite).sort((a, b) => b.n - a.n),
+      hours, dows, methods: top(methods), vehicles: top(vehicles), sessions: sessions.slice(0, 300), sessionsTotal: sessions.length, watch
+    }));
+  }
+
   // Parâmetros de cada carregador próprio lidos do financeiro do último mês completo
   // (custo de energia por kWh, % variáveis, custos fixos), mais preço, perfil de carga e
   // reajustes detectados. As telas deixam editar os parâmetros só na simulação.
@@ -2933,7 +3039,7 @@
   window.UBY_MOTOR_API = { onHistoryUpdated, withUntil, alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
-    customerRegistry, clientIntelligence, clientRanking, customerWatch, compare, compareOptions, pricingBase, club, financeV2, financeV2Parity, financeV2Impact,
+    customerRegistry, clientIntelligence, clientRanking, customerWatch, customerDirectory, customerProfile, compare, compareOptions, pricingBase, club, financeV2, financeV2Parity, financeV2Impact,
     financeLegacy, investorDistributionLegacy, stationFinanceLegacy, destinationsLegacy };
   document.dispatchEvent(new CustomEvent("uby:motor-api-ready"));
 })();
