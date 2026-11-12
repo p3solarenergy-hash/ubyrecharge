@@ -92,6 +92,13 @@
   function clientsSection(b) {
     if (!b || !b.totals.lines) return "";
     const t = b.totals, priced = b.tariffs, top = priced[0];
+    // Acima do preço padrão (o mais usado) é ociosidade: varia muito, então vira uma linha só (usuário, 12/11/2026).
+    const isIdle = x => top && x.price > top.price + 0.005;
+    const idle = priced.filter(isIdle), minDate = a => a.filter(Boolean).sort()[0] || null;
+    const tariffRows = priced.filter(x => !isIdle(x));
+    if (idle.length) tariffRows.push({ idle: true, n: idle.length, sessions: idle.reduce((s, x) => s + x.sessions, 0), energy: idle.reduce((s, x) => s + x.energy, 0),
+      share: idle.reduce((s, x) => s + x.share, 0), min: Math.min(...idle.map(x => x.price)), max: Math.max(...idle.map(x => x.price)),
+      first: minDate(idle.map(x => x.first)), last: idle.map(x => x.last).filter(Boolean).sort().at(-1) || null });
     const pe = priced.reduce((s, x) => s + x.energy, 0);
     const avg = pe > 0 ? priced.reduce((s, x) => s + x.revenue, 0) / pe : null;
     const min = priced.length ? Math.min(...priced.map(x => x.price)) : null, max = priced.length ? Math.max(...priced.map(x => x.price)) : null;
@@ -123,10 +130,11 @@
         </div>
 
         <div class="split" style="margin-bottom:16px">
-          <div><h3 style="margin:0 0 8px">Tarifas praticadas</h3>${top ? `<p class="source-line" style="margin:-4px 0 8px">Preço padrão = o mais usado (${pk(top.price)}). Abaixo dele é cupom: mostra o horário de uso. Acima é ociosidade: sem horário.</p>` : ""}
+          <div><h3 style="margin:0 0 8px">Tarifas praticadas</h3>${top ? `<p class="source-line" style="margin:-4px 0 8px">Preço padrão = o mais usado (${pk(top.price)}). Abaixo dele é cupom: cada preço com o horário de uso. Acima é ociosidade: tudo somado numa linha só.</p>` : ""}
             <div class="table-wrap" style="max-height:340px"><table><thead><tr><th class="num">R$/kWh</th><th class="num">Recargas</th><th class="num">Energia</th><th class="num">% do kWh</th><th>Horário de uso</th><th>Cupom</th><th>Período</th></tr></thead>
-            <tbody>${priced.map(x => `<tr><td class="num"><strong>${pk(x.price)}</strong></td><td class="num">${fmt.int(x.sessions)}</td><td class="num">${fmt.kwh(x.energy)}</td><td class="num">${fmt.pct1(x.share)}</td>
-              <td>${top && x.price > top.price + 0.005 ? `<small title="Acima do preço padrão (${pk(top.price)}): diferença de ociosidade, o horário não importa">ociosidade</small>` : hourStrip(x.hours)}</td><td>${esc(x.coupon || "—")}</td><td><small>${fmt.date(x.first)} a ${fmt.date(x.last)}</small></td></tr>`).join("") || `<tr><td colspan="7" class="empty">Sem recargas válidas com valor.</td></tr>`}</tbody></table></div></div>
+            <tbody>${tariffRows.map(x => x.idle ? `<tr><td class="num"><strong>Com ociosidade</strong><small>${pk(x.min)} a ${pk(x.max)}</small></td><td class="num">${fmt.int(x.sessions)}</td><td class="num">${fmt.kwh(x.energy)}</td><td class="num">${fmt.pct1(x.share)}</td>
+              <td><small>${fmt.int(x.n)} preço(s) acima de ${pk(top.price)}</small></td><td>—</td><td><small>${fmt.date(x.first)} a ${fmt.date(x.last)}</small></td></tr>` : `<tr><td class="num"><strong>${pk(x.price)}</strong></td><td class="num">${fmt.int(x.sessions)}</td><td class="num">${fmt.kwh(x.energy)}</td><td class="num">${fmt.pct1(x.share)}</td>
+              <td>${hourStrip(x.hours)}</td><td>${esc(x.coupon || "—")}</td><td><small>${fmt.date(x.first)} a ${fmt.date(x.last)}</small></td></tr>`).join("") || `<tr><td colspan="7" class="empty">Sem recargas válidas com valor.</td></tr>`}</tbody></table></div></div>
           <div><h3 style="margin:0 0 8px">R$/kWh médio por hora do dia</h3><div class="chart-box" style="height:300px"><canvas id="chTariffHour"></canvas></div></div>
         </div>
 
