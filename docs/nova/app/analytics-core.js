@@ -343,7 +343,18 @@
     const cut = sameDays ? Math.min(daysA, daysB) : null;
     const cutTo = (p, days) => ({ ...p, days, toUsed: days > 0 ? addDays(p.from, days - 1) : p.from, partial: days < full(p) });
     const wa = cutTo(a, cut ?? daysA), wb = cutTo(b, cut ?? daysB);
-    const pick = w => valid.filter(s => s.day >= w.from && s.day <= w.toUsed && w.days > 0 && w.match(s));
+    // Dia de hoje ainda em andamento: com "mesmos dias", o último dia dos dois lados para no mesmo
+    // horário da última recarga importada (senão hoje às 8h30 é comparado com o dia inteiro do outro mês).
+    const nowD = new Date(o && o.now ? o.now : Date.now()), pad2 = n => String(n).padStart(2, "0");
+    const today = `${nowD.getFullYear()}-${pad2(nowD.getMonth() + 1)}-${pad2(nowD.getDate())}`;
+    const minuteOf = t => { const d = new Date(t); return d.getHours() * 60 + d.getMinutes(); };
+    let cutMinute = null;
+    if (sameDays && lastDay === today && (wa.toUsed === lastDay || wb.toUsed === lastDay)) {
+      const lastT = valid.reduce((m, s) => (s.day === lastDay && num(s.t) > m ? num(s.t) : m), 0);
+      if (lastT) cutMinute = minuteOf(lastT);
+    }
+    const inTime = (s, w) => cutMinute === null || s.day !== w.toUsed || !s.t || minuteOf(s.t) <= cutMinute;
+    const pick = w => valid.filter(s => s.day >= w.from && s.day <= w.toUsed && w.days > 0 && w.match(s) && inTime(s, w));
 
     function summarize(w, list) {
       const clients = new Map(), sites = new Map(), daily = Array(w.days).fill(0), activeDays = new Set();
@@ -404,7 +415,7 @@
 
     const strip = P => { const { clients, sites, ...rest } = P; return rest; };
     return {
-      lastDay, sameDays, a: strip(A), b: strip(B), deltas, bySite,
+      lastDay, sameDays, cutTime: cutMinute === null ? null : `${pad2(Math.floor(cutMinute / 60))}:${pad2(cutMinute % 60)}`, a: strip(A), b: strip(B), deltas, bySite,
       clients: {
         kept: group(moves.kept), lost: group(moves.lost), returned: group(moves.returned), fresh: group(moves.fresh),
         // Ponte do faturamento: B = A + mantidos (diferença) − perdidos + voltaram + novos.

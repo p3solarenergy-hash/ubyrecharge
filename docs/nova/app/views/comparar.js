@@ -102,7 +102,7 @@
           <button class="btn" data-preset="prev">Mês anterior × atual</button>
           <button class="btn" data-preset="samePeriod">Mesmo período nos dois</button>
         </div>
-        <p class="source-line" style="margin:8px 0 0">A: ${rangeText(r.a)} · B: ${rangeText(r.b)}${sameDays ? " · cortado no mesmo número de dias" : ""} · última recarga importada ${r.lastDay ? br(r.lastDay) : "—"}</p>
+        <p class="source-line" style="margin:8px 0 0">A: ${rangeText(r.a)} · B: ${rangeText(r.b)}${sameDays ? ` · cortado no mesmo número de dias${r.cutTime ? ` · último dia até ${r.cutTime} nos dois (hoje em andamento)` : ""}` : ""} · última recarga importada ${r.lastDay ? br(r.lastDay) : "—"}</p>
       </section>
 
       <div class="grid g4" style="margin:16px 0">
