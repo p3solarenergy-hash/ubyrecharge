@@ -7,7 +7,7 @@
   const ACTION = { before_upsert: "antes de uma importação/gravação", before_restore: "antes de uma restauração", before_clear: "antes de limpar a base", month_correction: "antes de corrigir mês", remove_file: "antes de remover planilha", undo_import: "antes de desfazer importação" };
   const ui = { tab: "recargas", work: "", busy: false, msg: "", err: "" };
   const cache = { history: new Map(), matrix: null, matrixErr: "", snaps: null, snapsErr: "" };
-  const readBridge = () => document.getElementById("motorFrame").contentWindow.UBY_SUPABASE;
+  const readBridge = () => window.UBY_SUPABASE;
 
   let framePromise = null;
   function writer() {

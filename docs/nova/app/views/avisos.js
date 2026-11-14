@@ -22,7 +22,7 @@
   function loadFlags() {
     if (flags.list || flags.loading) return;
     let sb = null;
-    try { sb = document.getElementById("motorFrame").contentWindow.UBY_SUPABASE?.client?.() || null; } catch (_) {}
+    try { sb = window.UBY_SUPABASE?.client?.() || null; } catch (_) {}
     if (!sb) return;
     flags.loading = true;
     sb.functions.invoke("uby-dados-publicos", { body: { action: "bandeira" } })

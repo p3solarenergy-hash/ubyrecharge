@@ -231,23 +231,17 @@
 
   function clone(value) { return value == null ? value : JSON.parse(JSON.stringify(value)); }
 
+  // Motor na janela principal (migração 13/11/2026): o núcleo das regras (app/core/nucleo-recargas.js)
+  // e a API (app/motor-api.js) já vêm carregados no index.html — nada de página antiga escondida.
+  // "Atualizar" depois da primeira carga recarrega a página: o núcleo relê tudo do banco do zero.
+  let motorBooted = false;
   function bootMotor() {
-    const frame = $("#motorFrame");
     setStatus("Carregando motor…", "warn");
-    // Ao recarregar, o documento antigo continua no quadro até o novo começar:
-    // nunca aceitar o motor antigo (ele é descartado e suas promessas não terminam).
-    let previous = null;
-    try { previous = frame.contentWindow && frame.contentWindow.UBY_MOTOR_API; } catch (_) {}
-    frame.src = LEGACY + "motor.html?t=" + Date.now();
-    return new Promise((resolve, reject) => {
-      const started = Date.now();
-      const timer = setInterval(() => {
-        let api = null;
-        try { api = frame.contentWindow && frame.contentWindow.UBY_MOTOR_API; } catch (_) {}
-        if (api && api !== previous) { clearInterval(timer); resolve(api); }
-        else if (Date.now() - started > 90000) { clearInterval(timer); reject(new Error("O motor não respondeu em 90 s.")); }
-      }, 250);
-    });
+    if (motorBooted) { location.reload(); return new Promise(() => {}); }
+    motorBooted = true;
+    if (!window.UBY_NUCLEO || !window.UBY_MOTOR_API) return Promise.reject(new Error("O motor não carregou (app/core)."));
+    window.UBY_NUCLEO.iniciar().catch(err => { console.error("[núcleo]", err); setStatus("Falha ao ler o banco: " + err.message, "err"); });
+    return Promise.resolve(window.UBY_MOTOR_API);
   }
 
   // Sem sessão no banco as leituras voltam vazias (sem erro) e a tela mostra só a cópia local do mês:
@@ -255,7 +249,7 @@
   async function checkCloudSession() {
     const old = document.getElementById("sessionBanner");
     try {
-      const sb = $("#motorFrame").contentWindow.UBY_SUPABASE?.client?.();
+      const sb = window.UBY_SUPABASE?.client?.();
       if (!sb) return;
       const { data, error } = await sb.auth.getUser();
       if (data?.user) { if (old) old.remove(); return; }
@@ -331,7 +325,7 @@
   // Contas já agendadas no banco (Contas a pagar · 📎 Agendar): o motor tira das vencidas nos avisos e no sino.
   async function loadBankScheduled() {
     try {
-      const mw = document.getElementById("motorFrame")?.contentWindow;
+      const mw = window;
       const r = await mw?.UBY_SUPABASE?.loadBankData?.();
       if (!mw) return;
       mw.__UBY_BANK_SCHEDULED = r?.payload?.scheduled || {};
@@ -659,7 +653,7 @@
     $("#logoutButton").onclick = () => {
       localStorage.removeItem("uby-auth-session-v1");
       localStorage.removeItem("uby-auth-profile-v1");
-      try { $("#motorFrame").contentWindow.UBY_SUPABASE?.signOut?.(); } catch (_) {}
+      try { window.UBY_SUPABASE?.signOut?.(); } catch (_) {}
       setTimeout(() => location.replace("login.html"), 300);
     };
     $("#refreshButton").onclick = () => { state.cache.clear(); state.full = false; state.api = null; state.status = null; obrasPromise = null; rerender(); connect(); };

@@ -1792,6 +1792,11 @@
         return { ...i, quotaValue: qv, investedAt: i.investedAt || (i.eligibleFrom ? `${i.eligibleFrom}-01` : ""), investment: Number(i.investment) || Math.round(Number(i.quotas || 0) * qv * 100) / 100 };
       })
     })));
+    // Foto do que está gravado: qualquer diferença na tela é alteração ainda não salva (a data de um cotista
+    // mudava só aqui, o relatório seguia com a data gravada e parecia que a mudança não tinha efeito).
+    if (!ui.policyBase || ui.policyBase.ref !== e) ui.policyBase = { ref: e, json: JSON.stringify(e) };
+    const unsaved = JSON.stringify(e) !== ui.policyBase.json;
+    const unsavedNote = unsaved ? `<div class="note" style="margin:10px 0;border-color:#e0a4a0;background:#fdf0ef;color:#8a2f2a"><strong>Alterações não salvas.</strong> Datas, valores e tipos alterados aqui só valem para relatórios, Financeiro e repasses depois de clicar em <strong>Salvar política e cotistas</strong>.</div>` : "";
     const inp = (k, label, type = "number", extra = "") => field(label, `<input class="select" data-pol="${k}" type="${type}" value="${esc(e[k] ?? "")}" ${extra} style="width:100%">`);
     const derived = w.applyInvestorOperationStart(e.investors.map(i => deriveInvestor(i, e.quotaValue)));
     // A ordem só é recalculada ao abrir/salvar: reordenar a cada edição fazia a linha "fugir" e o vínculo caía no cotista errado.
@@ -1808,7 +1813,7 @@
     const investedSum = derived.reduce((s, i) => s + Number(i.investment || 0), 0);
     const feePct = Number(e.founderPct ?? 20);
     const kindOf = i => i.founder ? "founder" : i.newQuota ? "new" : "round1";
-    return `
+    return `${unsavedNote}
       <section class="section"><div class="section-head"><div><p class="kicker">Política de distribuição</p><h2>Rodadas, valor da cota e fundo de reserva</h2><p>O valor padrão da cota vale para cotistas sem valor próprio. Cada cotista pode ter o valor da sua rodada (ex.: rodada 1 a R$ 80 mil, novas a R$ 100 mil). A distribuição por cota é igual para todas; o valor pago muda o investido, o retorno e o payback.</p></div></div>
         <div class="grid g4" style="gap:8px">
           ${inp("quotaValue", "Valor padrão da cota (R$)", "number", 'min="0" step="1000"')}${inp("distributionStartMonth", "Distribuição a partir de", "month")}
@@ -1847,7 +1852,8 @@
             <td>${d.waitingOperation ? `<strong>aguardando operação</strong><small>${esc(d.linkedStation)} ainda não iniciou</small>` : `<strong>${esc(d.eligibleFrom ? (UBY.state.api?.monthName?.(d.eligibleFrom) || d.eligibleFrom) : "—")}</strong>${d.operationFrom && d.operationFrom > d.baseEligibleFrom ? `<small>aguarda o início da operação (aporte: ${esc(UBY.state.api?.monthName?.(d.baseEligibleFrom) || d.baseEligibleFrom)})</small>` : (d.investedAt && d.investedAt.slice(8) !== "01" ? "<small>aporte após o dia 1º</small>" : "")}`}</td>
             <td><select class="select" data-inv="${k}|status">${["pendente", "aprovado", "pago"].map(s => `<option ${i.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></td>
             <td><button class="btn ghost" data-inv-del="${k}" type="button">✕</button></td></tr>`; }).join("")).join("") || `<tr><td colspan="11" class="empty">Nenhum cotista.</td></tr>`}</tbody></table></div>
-        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="pmPolSave" type="button" ${canWrite(w) && !busy ? "" : "disabled"}>Salvar política e cotistas</button><button class="btn" id="pmPolReset" type="button">Descartar</button></div>
+        ${unsavedNote}
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="pmPolSave" type="button" ${canWrite(w) && !busy ? "" : "disabled"}>Salvar política e cotistas${unsaved ? " ●" : ""}</button><button class="btn" id="pmPolReset" type="button">Descartar</button></div>
       </section>`;
   }
 

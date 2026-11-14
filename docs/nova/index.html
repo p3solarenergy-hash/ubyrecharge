@@ -64,13 +64,24 @@
     </main>
   </div>
 
-  <!-- Motor original de cálculo (recargas_app.js) em segundo plano. -->
-  <iframe id="motorFrame" title="Motor de cálculo" aria-hidden="true" tabindex="-1"></iframe>
+  <!-- Motor na janela principal: dados (Supabase), regras e API. Nada da pasta legado/. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app/core/config-supabase.js?v=1"></script>
+  <script src="app/core/config-clube.js?v=1"></script>
+  <script src="app/core/dados-fixos.js?v=1"></script>
+  <script src="app/core/dados.js?v=1"></script>
+  <script src="app/core/auth.js?v=1"></script>
+  <script src="app/core/motor-financeiro-base.js?v=1"></script>
+  <script src="app/core/cache.js?v=1"></script>
+  <script src="app/core/backup-local.js?v=1"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="app/config.js?v=1"></script>
   <script src="app/uby-logo.js?v=1"></script>
   <script src="app/analytics-core.js?v=5"></script>
+  <script src="app/finance-core.js?v=32"></script>
+  <script src="app/core/nucleo-recargas.js?v=1"></script>
+  <script src="app/motor-api.js?v=101"></script>
   <script src="app/bank.js?v=5"></script>
   <script src="app/fx.js?v=8"></script>
   <script src="app/scroll-keep.js?v=1"></script>

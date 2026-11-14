@@ -641,7 +641,7 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
   async function paintRobotPill() {
     const anchor = document.getElementById("dataStatus");
     let sb = null;
-    try { sb = document.getElementById("motorFrame")?.contentWindow?.UBY_SUPABASE_CLIENT; } catch (_) {}
+    try { sb = window.UBY_SUPABASE?.client?.(); } catch (_) {}
     if (!anchor || !sb) return false;
     const { data, error } = await sb.from("app_audit_log").select("created_at,resumo")
       .eq("acao", "importacao_automatica").order("created_at", { ascending: false }).limit(1);

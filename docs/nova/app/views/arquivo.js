@@ -4,7 +4,7 @@
   const { fmt, esc, kpi } = UBY;
   const TYPE = { fechamento: "Fechamento da rede", cotista: "Extrato do cotista", area: "Prestação de contas à área" };
   let docs = null, error = "", loading = false;
-  const bridge = () => document.getElementById("motorFrame").contentWindow.UBY_SUPABASE;
+  const bridge = () => window.UBY_SUPABASE;
 
   function load(target) {
     if (loading) return;

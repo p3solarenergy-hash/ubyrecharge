@@ -1,10 +1,8 @@
 /*
   NOVA PLATAFORMA — API do motor.
 
-  Este arquivo roda DENTRO da pagina original de recargas (legado/obra-ev/motor.html),
-  depois de recargas_app.js. Por ser um script classico no mesmo escopo global,
-  ele enxerga as mesmas funcoes e o mesmo estado do motor original e apenas
-  reorganiza os resultados em objetos simples para as telas novas.
+  Roda na janela principal sobre o núcleo das regras (app/core/nucleo-recargas.js,
+  window.UBY_NUCLEO) e reorganiza os resultados em objetos simples para as telas.
 
   Regra: nenhuma formula nova. Cada numero abaixo reaproveita as funcoes do motor
   (getUbyChargerRows, cleanOperationStats, occByInterval, stationOccupancyForMonths,
@@ -13,6 +11,148 @@
 */
 (function () {
   "use strict";
+
+  // MIGRAÇÃO (13/11/2026): roda na janela principal sobre o núcleo novo (app/core/nucleo-recargas.js).
+  // S = estado vivo do núcleo; as regras abaixo vêm do núcleo (antes: globais da página antiga).
+  const N = window.UBY_NUCLEO;
+  const S = N.state;
+  const getUbyChargerRows = (...a) => S.getUbyChargerRows(...a);
+  const clientKeyFromCharge = (...a) => S.clientKeyFromCharge(...a);
+  const {
+    abbreviatedStationLabel,
+    aggregateUbyFinanceRow,
+    applyInvestorOperationStart,
+    buildUbyMonthlySeries,
+    calendarDayCount,
+    canonicalStationNameForWork,
+    chargeDayKeyFromDate,
+    chargeMonthKey,
+    chargerKind,
+    cleanOperationStats,
+    clientDisplayName,
+    clientIdentityKey,
+    clientRecurrenceStats,
+    clubBenefitForPosition,
+    clubClientRows,
+    clubCompetitionMonths,
+    clubFormEndpointUrl,
+    clubParticipantKey,
+    clubParticipantKeys,
+    clubParticipantLookup,
+    clubParticipantsFromRows,
+    clubParticipantsStore,
+    clubWinnerNotice,
+    compareInvestorsByStart,
+    consolidateCustomerRegistryRows,
+    continuousOperationalRows,
+    countDetailedCharges,
+    couponControlIdentityKey,
+    couponControlRowsFromSheet,
+    courtesyFinanceBreakdown,
+    customerRegistryRowsFromCloud,
+    dailyOperationalRows,
+    dateOnly,
+    daysInMonth,
+    dcComparisonRowKey,
+    dcConnectorGroups,
+    defaultFinanceSettings,
+    durToHours,
+    enrichClubClientRows,
+    ensureAllOverviewSessionsLoaded,
+    ensureClubParticipantsAutoSync,
+    ensureMatrizCostsLoaded,
+    ensureSpreadsheetLibrary,
+    filterChargesByWindow,
+    filterGeneralUnitDataByMonth,
+    financeForCharges,
+    financePlanningContext,
+    financeSettingsForUbyRow,
+    financeUnitOutcome,
+    formatRechargeDuration,
+    generalAcDcStats,
+    generalFinanceByUnit,
+    getAllGeneralCharges,
+    getGeneralStationRows,
+    getGeneralUnitData,
+    getUbyOperationCharges,
+    hydrateCharge,
+    idleToMin,
+    isCourtesyCharge,
+    isCurrentMonthKey,
+    isExecutedCharge,
+    isFailedCharge,
+    isPlausibleMonthKey,
+    isSpottRecharge,
+    loadFinanceReportArchive,
+    loadMatrizCosts,
+    loadNetworkDistribution,
+    matrizAddMonths,
+    matrizApplies,
+    matrizCashAmount,
+    matrizCompetencyAmount,
+    matrizCostItemsForRow,
+    matrizCoverageMonths,
+    matrizEligibleRow,
+    matrizEligibleRows,
+    matrizMethodLabel,
+    matrizMonthOffset,
+    matrizMonthSequence,
+    matrizResolveTargetRow,
+    matrizRowsMatch,
+    matrizScopeKey,
+    matrizStationScope,
+    matrizTargetMatchesRow,
+    matrizWeight,
+    median,
+    mergeClubParticipants,
+    monthKey,
+    monthLabel,
+    monthlyClientCohorts,
+    monthlyEquivalentComparison,
+    networkFinanceSum,
+    networkHistoryCharges,
+    networkInvestorDistributionModel,
+    networkUnifiedReportModel,
+    newClientInsights,
+    normalizeFinanceRules,
+    normalizeNetworkInvestors,
+    normalizeOperationModel,
+    normalizePhone,
+    normalizeStationForCompare,
+    occByInterval,
+    occupationBand,
+    operationModelLabel,
+    operationStartForCharges,
+    parseCsvRows,
+    parseDate,
+    parseRatingValue,
+    pctChange,
+    periodWindow,
+    rangeRevenue,
+    readCustomerRegistryCloud,
+    recentCharges,
+    rechargeControlIssue,
+    recurringAbsentClients,
+    safeText,
+    scheduledPaymentApplies,
+    scheduledPaymentDueDate,
+    scheduledPaymentStatus,
+    scheduledPaymentTarget,
+    shiftToPreviousMonth,
+    stationAvailabilityFor,
+    stationAvailableHours,
+    stationOccupancyForMonths,
+    stationScheduleLabel,
+    summarizeUbyChargerRow,
+    summaryMetrics,
+    syncClubParticipantsFromSheet,
+    ubyNetworkProjectionForRow,
+    unitOccupancyMarkup,
+    usageSeries,
+    weekdayOccupancyRows,
+    workPowerById,
+    UBY_APP_VERSION
+  } = N;
 
   let readyPromise = null;
   let fullPromise = null;
@@ -28,11 +168,11 @@
   //    ninguém e custavam ~20 s a cada carga. Aqui viram "não desenhar".
   // ---------------------------------------------------------------------
   (function speedUp() {
-    const originalRows = window.getUbyChargerRows;
+    const originalRows = S.getUbyChargerRows;
     if (typeof originalRows === "function") {
       const memo = new WeakMap();
-      window.getUbyChargerRows = function (unitData = getGeneralUnitData()) {
-        const version = typeof rechargeRecordsVersion !== "undefined" ? rechargeRecordsVersion : 0;
+      S.getUbyChargerRows = function (unitData = getGeneralUnitData()) {
+        const version = typeof S.rechargeRecordsVersion !== "undefined" ? S.rechargeRecordsVersion : 0;
         const hit = unitData && typeof unitData === "object" ? memo.get(unitData) : null;
         if (hit && hit.version === version) return hit.rows.slice();
         const rows = originalRows.call(this, unitData);
@@ -40,16 +180,6 @@
         return rows.slice();
       };
     }
-    if (!/\/motor\.html$/.test(location.pathname)) return;
-    const skip = Object.getOwnPropertyNames(window).filter(name => {
-      if (!/^render[A-Z]/.test(name) || name === "renderFinanceOnly") return false;
-      try { return typeof window[name] === "function"; } catch (_) { return false; }
-    });
-    skip.forEach(name => {
-      const original = window[name];
-      window[name] = function () { return original.constructor.name === "AsyncFunction" ? Promise.resolve() : undefined; };
-    });
-    window.UBY_ENGINE_SKIPPED_RENDERS = skip.length;
   })();
 
   // ---------------------------------------------------------------------
@@ -62,7 +192,7 @@
   // ---------------------------------------------------------------------
   let lookupClientId = () => null;
   (function unifyClientIdentity() {
-    const baseKey = window.clientKeyFromCharge;
+    const baseKey = S.clientKeyFromCharge;
     if (typeof baseKey !== "function") return;
     let cache = null, building = false;
     const idsOf = c => {
@@ -72,13 +202,13 @@
     function index() {
       // Caminho rápido (chamado a cada recarga): getGeneralUnitData() relê o
       // localStorage, então só é chamado quando a versão das recargas muda.
-      const version = typeof rechargeRecordsVersion !== "undefined" ? rechargeRecordsVersion : 0;
-      const current = typeof generalUnitDataCache !== "undefined" ? generalUnitDataCache?.data : undefined;
+      const version = typeof S.rechargeRecordsVersion !== "undefined" ? S.rechargeRecordsVersion : 0;
+      const current = typeof S.generalUnitDataCache !== "undefined" ? S.generalUnitDataCache?.data : undefined;
       if (cache && cache.version === version && (current === undefined || current === cache.unitData)) return cache.map;
       building = true;
       try {
         const unitData = getGeneralUnitData();
-        if (cache && cache.version === rechargeRecordsVersion && cache.unitData === unitData) return cache.map;
+        if (cache && cache.version === S.rechargeRecordsVersion && cache.unitData === unitData) return cache.map;
         const parent = new Map(), count = new Map();
         const find = x => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
         getUbyChargerRows(unitData).forEach(r => (r.charges || []).forEach(c => {
@@ -92,11 +222,11 @@
         count.forEach((n, k) => { const root = find(k), cur = best.get(root); if (!cur || n > cur.n || (n === cur.n && k < cur.k)) best.set(root, { k, n }); });
         const map = new Map();
         parent.forEach((_, x) => { const b = best.get(find(x)); map.set(x, b ? b.k : x); });
-        cache = { version: rechargeRecordsVersion, unitData, map };
+        cache = { version: S.rechargeRecordsVersion, unitData, map };
         return map;
       } finally { building = false; }
     }
-    window.clientKeyFromCharge = function (charge = {}) {
+    S.clientKeyFromCharge = function (charge = {}) {
       const k = baseKey(charge);
       if (!k || building) return k;
       try { return index().get(k) || k; } catch (_) { return k; }
@@ -116,7 +246,7 @@
       document.addEventListener("uby:recharge-ready", finish, { once: true });
       // Seguranca: se o evento ja passou, verifica o estado periodicamente.
       const timer = setInterval(() => {
-        if (Object.keys(allRechargeRecords || {}).length) { clearInterval(timer); setTimeout(finish, 300); }
+        if (Object.keys(S.allRechargeRecords || {}).length) { clearInterval(timer); setTimeout(finish, 300); }
       }, 400);
       setTimeout(() => { clearInterval(timer); finish(); }, 60000);
     });
@@ -145,10 +275,10 @@
     const profile = window.UBY_AUTH?.current?.() || null;
     return {
       version: typeof UBY_APP_VERSION !== "undefined" ? UBY_APP_VERSION : "",
-      works: (cloudRechargeWorks || []).length,
-      records: Object.keys(allRechargeRecords || {}).length,
+      works: (S.cloudRechargeWorks || []).length,
+      records: Object.keys(S.allRechargeRecords || {}).length,
       charges: countDetailedCharges(),
-      fullHistory: !!overviewSessionsFullyHydrated,
+      fullHistory: !!S.overviewSessionsFullyHydrated,
       fromCache: !!window.UBY_OVERVIEW_FROM_CACHE,
       readOnly: window.UBY_READ_ONLY !== false,
       user: profile ? { label: profile.label, email: profile.email, role: profile.role } : null,
@@ -759,7 +889,7 @@
   // Obras (cadastro na nuvem) para o resumo executivo.
   // ---------------------------------------------------------------------
   function works() {
-    return (cloudRechargeWorks || []).map(work => ({
+    return (S.cloudRechargeWorks || []).map(work => ({
       id: work.id, nome: work.nome, cliente: work.cliente, local: work.local, status: work.statusExec || work.status || "",
       progresso: Number(work.pct || 0), potencia: Number(work.kw || 0), carregadores: work.carregadores || "", criticas: Number(work.crit || 0),
       updatedAt: work.updatedAt || ""
@@ -1577,12 +1707,12 @@
       return capacity(Math.max(dayStart.getTime(), bounds.start.getTime()), Math.min(dayEnd.getTime(), bounds.end.getTime()));
     };
 
-    // Para uma estação, o painel mensal usa a estação "aberta" (currentWorkId...).
-    const saved = { id: currentWorkId, name: currentWorkName, station: currentStationReportName };
+    // Para uma estação, o painel mensal usa a estação "aberta" (S.currentWorkId...).
+    const saved = { id: S.currentWorkId, name: S.currentWorkName, station: S.currentStationReportName };
     let weekday = [], kpis = null, days = [];
     try {
       if (kind === "station" && rows[0]) {
-        currentWorkId = String(rows[0].workId); currentWorkName = rows[0].workName || ""; currentStationReportName = rows[0].stationName || "";
+        S.currentWorkId = String(rows[0].workId); S.currentWorkName = rows[0].workName || ""; S.currentStationReportName = rows[0].stationName || "";
       }
       const wdCap = {};
       if (bounds) for (let c = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), bounds.start.getDate()), g = 0; c <= bounds.end && g < 400; c.setDate(c.getDate() + 1), g++)
@@ -1634,7 +1764,7 @@
         };
       }
     } finally {
-      currentWorkId = saved.id; currentWorkName = saved.name; currentStationReportName = saved.station;
+      S.currentWorkId = saved.id; S.currentWorkName = saved.name; S.currentStationReportName = saved.station;
     }
 
     const series = usageSeries(charges);
@@ -1864,7 +1994,7 @@
 
   function fv2Stamp() {
     let charges = 0, updated = "";
-    Object.values(allRechargeRecords || {}).forEach(r => {
+    Object.values(S.allRechargeRecords || {}).forEach(r => {
       charges += Array.isArray(r?.charges) ? r.charges.length : 0;
       const u = String(r?.updatedAt || r?.summary?.updatedAt || "");
       if (u > updated) updated = u;
@@ -1874,7 +2004,7 @@
     try { matrix = JSON.stringify((loadMatrizCosts() || []).map(i => [i.id, i.amount, i.paymentLedger || null])); } catch (_) {}
     let tax = "";
     try { const p = loadNetworkDistribution(); tax = JSON.stringify([p.taxRatePct, p.taxRateFrom, p.taxByMonth]); } catch (_) {}
-    return `${Object.keys(allRechargeRecords || {}).length}|${charges}|${updated}|${matrix}|${tax}|${window.UBY_RECORDS_VERSION || 0}`;
+    return `${Object.keys(S.allRechargeRecords || {}).length}|${charges}|${updated}|${matrix}|${tax}|${window.UBY_RECORDS_VERSION || 0}`;
   }
   function fv2Ensure() {
     const stamp = fv2Stamp();
@@ -1901,7 +2031,7 @@
   // Configuração da competência. Com monthScope: fatura e avulsos nunca herdam
   // de mês antigo, e mês anterior à primeira configuração não herda a mais recente.
   function fv2Settings(row, mk, fixes) {
-    const rec = allRechargeRecords[row.workId] || {};
+    const rec = S.allRechargeRecords[row.workId] || {};
     const root = rec.financialSettings || rec.summary?.financialSettings || {};
     const stationName = row.stationName || row.station || row.workName || "";
     const key = normalizeStationForCompare(canonicalStationNameForWork(row.workId, stationName, row.workName));
@@ -2017,7 +2147,7 @@
   // Faturas de energia por período de leitura do carregador (Parâmetros e custos ·
   // Faturas de energia). Ficam em financialSettings.chargers[estação].energyInvoices.
   function fv2InvoiceList(workId, stationName, workName) {
-    const rec = allRechargeRecords[workId] || {};
+    const rec = S.allRechargeRecords[workId] || {};
     const root = rec.financialSettings || rec.summary?.financialSettings || {};
     const key = normalizeStationForCompare(canonicalStationNameForWork(workId, stationName || workName || "", workName));
     const list = root?.chargers?.[key]?.energyInvoices;
@@ -2040,7 +2170,7 @@
     if (!list.length) { FV2.energy.set(row.fv2Id, null); return null; }
     // A divisão pela energia entregue precisa do histórico completo; enquanto
     // ele carrega, divide por dia (aproximado, marcado) e pede a carga completa.
-    const full = typeof overviewSessionsFullyHydrated !== "undefined" && !!overviewSessionsFullyHydrated;
+    const full = typeof S.overviewSessionsFullyHydrated !== "undefined" && !!S.overviewSessionsFullyHydrated;
     if (!full) { try { loadFull(); } catch (_) {} }
     const out = CORE().energyInvoiceMonths(list, full ? dailyDelivered(row.charges) : {});
     out.partial = !full;
@@ -2504,7 +2634,7 @@
     if (!row) return null;
     const list = Array.isArray(draft) ? draft : fv2InvoiceList(row.workId, row.stationName || row.station, row.workName);
     const daily = dailyDelivered(row.charges);
-    const fullHistory = typeof overviewSessionsFullyHydrated !== "undefined" && !!overviewSessionsFullyHydrated;
+    const fullHistory = typeof S.overviewSessionsFullyHydrated !== "undefined" && !!S.overviewSessionsFullyHydrated;
     const res = CORE().energyInvoiceMonths(list, daily);
     const monthly = {};
     Object.keys(daily).forEach(d => { const mk = d.slice(0, 7); monthly[mk] = (monthly[mk] || 0) + daily[d]; });
@@ -2515,7 +2645,7 @@
   // ponto ainda usa a energia do local, o reembolso dos kWh vendidos × tarifa do mês.
   // Configuração em financialSettings.chargers[estação].areaAccount.
   function fv2AreaConfig(row) {
-    const rec = allRechargeRecords[row.workId] || {};
+    const rec = S.allRechargeRecords[row.workId] || {};
     const root = rec.financialSettings || rec.summary?.financialSettings || {};
     const key = normalizeStationForCompare(canonicalStationNameForWork(row.workId, row.stationName || row.station || row.workName || "", row.workName));
     const c = root?.chargers?.[key]?.areaAccount;

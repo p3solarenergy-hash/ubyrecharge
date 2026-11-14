@@ -211,7 +211,7 @@
   const repTitle = c => `Clube UBY - usos ${rep.from.split("-").reverse().join("-")} a ${rep.to.split("-").reverse().join("-")}${rep.partner ? ` - ${String((c.partners.find(p => p.id === rep.partner) || {}).name || "").replace(/[\\/:*?"<>|]+/g, "-")}` : ""}`;
   // Planilha (.xlsx) com três abas: usos, por parceiro e por cliente.
   async function exportXlsx(c) {
-    const XLSX = await document.getElementById("motorFrame").contentWindow.ensureSpreadsheetLibrary();
+    const XLSX = await window.UBY_NUCLEO.ensureSpreadsheetLibrary();
     const list = repRows(c), s = repSummary(list);
     const dt = iso => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
     const wb = XLSX.utils.book_new();

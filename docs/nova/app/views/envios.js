@@ -33,7 +33,7 @@
   async function client() {
     for (let i = 0; i < 100; i++) {
       try {
-        const sb = document.getElementById("motorFrame")?.contentWindow?.UBY_SUPABASE?.client?.();
+        const sb = window.UBY_SUPABASE?.client?.();
         if (sb) return sb;
       } catch (_) {}
       await new Promise(r => setTimeout(r, 300));

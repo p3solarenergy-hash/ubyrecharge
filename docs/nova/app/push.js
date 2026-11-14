@@ -6,7 +6,7 @@
   const FN = "uby-push";
 
   const supported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-  const client = () => { try { return document.getElementById("motorFrame").contentWindow.UBY_SUPABASE?.client?.() || null; } catch (_) { return null; } };
+  const client = () => { try { return window.UBY_SUPABASE?.client?.() || null; } catch (_) { return null; } };
 
   async function call(action, extra) {
     const sb = client();
