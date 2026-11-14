@@ -233,11 +233,14 @@
 
   // Motor na janela principal (migração 13/11/2026): o núcleo das regras (app/core/nucleo-recargas.js)
   // e a API (app/motor-api.js) já vêm carregados no index.html — nada de página antiga escondida.
-  // "Atualizar" depois da primeira carga recarrega a página: o núcleo relê tudo do banco do zero.
+  // "Atualizar" depois da primeira carga relê tudo do banco sem recarregar a página (recarregar()).
   let motorBooted = false;
   function bootMotor() {
     setStatus("Carregando motor…", "warn");
-    if (motorBooted) { location.reload(); return new Promise(() => {}); }
+    if (motorBooted && window.UBY_MOTOR_API?.recarregar) {
+      window.UBY_MOTOR_API.recarregar().catch(err => { console.error("[núcleo]", err); setStatus("Falha ao ler o banco: " + err.message, "err"); });
+      return Promise.resolve(window.UBY_MOTOR_API);
+    }
     motorBooted = true;
     if (!window.UBY_NUCLEO || !window.UBY_MOTOR_API) return Promise.reject(new Error("O motor não carregou (app/core)."));
     window.UBY_NUCLEO.iniciar().catch(err => { console.error("[núcleo]", err); setStatus("Falha ao ler o banco: " + err.message, "err"); });

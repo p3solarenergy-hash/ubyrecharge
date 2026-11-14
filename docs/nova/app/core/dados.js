@@ -118,7 +118,16 @@
   // (relatórios, cadastro de clientes). Na moldura antiga ele era SOMENTE LEITURA; aqui também,
   // até cada tela de gravação ser trazida (fases 4 a 7) e conferida. Então nenhuma rota grava ainda.
   const GRAVACAO_PELA_ROTA = false;
+  // FASE 4: gravação EXPLÍCITA. Uma tela nova pede para gravar (comGravacao) e só durante essa
+  // gravação valem as tabelas do escopo dela — e só se a tela aberta for a dona do escopo.
+  // Sincronizações automáticas do motor continuam somente leitura.
+  let explicitScope = null;
   function writeScope() {
+    if (explicitScope) {
+      const hash = String(location.hash || "");
+      const hit = SCOPE_BY_ROUTE.find(([re, sc]) => sc === explicitScope && re.test(hash));
+      return hit ? explicitScope : null;
+    }
     if (!GRAVACAO_PELA_ROTA) return null;
     try {
       const hash = String(location.hash || "");
@@ -1553,7 +1562,26 @@
     return data;
   }
 
+  // Grava com o escopo da tela (ex.: "parametros"). Recusa se a tela aberta não for a dona do escopo.
+  const SCOPES_BY_NAME = { importacao: IMPORT_SCOPE, parametros: PARAMS_SCOPE, obras: OBRAS_SCOPE, backups: BACKUPS_SCOPE, clube: CLUB_SCOPE };
+  let gravacaoFila = Promise.resolve();
+  function comGravacao(nome, fn) {
+    const scope = SCOPES_BY_NAME[nome];
+    if (!scope) return Promise.reject(new Error(`Escopo de gravação desconhecido: ${nome}`));
+    const run = async () => {
+      const hash = String(location.hash || "");
+      if (!SCOPE_BY_ROUTE.some(([re, sc]) => sc === scope && re.test(hash))) throw new Error(`Gravação de ${nome} só pela própria tela. Nada foi gravado.`);
+      explicitScope = scope;
+      try { return await fn(); } finally { explicitScope = null; }
+    };
+    // Uma gravação por vez: o escopo explícito não pode valer para duas telas ao mesmo tempo.
+    const p = gravacaoFila.then(run, run);
+    gravacaoFila = p.catch(() => {});
+    return p;
+  }
+
   window.UBY_SUPABASE = {
+    comGravacao,
     listDocuments, documentHtml, publishDocument, revokeDocument, listMatrixHistory, restoreMatrixVersion, listPlatformSnapshots, platformSnapshot,
     _merge3: (base, local, cloud) => { const conflicts = []; const merged = merge3(base, local, cloud, "", conflicts); return { merged, conflicts }; },
     configured,

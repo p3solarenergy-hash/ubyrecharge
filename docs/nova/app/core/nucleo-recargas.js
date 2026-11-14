@@ -11,6 +11,8 @@
 */
 (function () {
 const NUCLEO_STATUS = { message: "", isError: false, at: 0 };
+// Competência aberta no editor de Parâmetros (vazia = a mais recente, como a página antiga).
+const NUCLEO_EDITOR = { month: "" };
 // Regras trocáveis em tempo de execução (ver TROCAVEIS em ferramentas/extrair-nucleo.js).
 let getUbyChargerRows = __base_getUbyChargerRows;
 let clientKeyFromCharge = __base_clientKeyFromCharge;
@@ -28,6 +30,14 @@ let monthlyClosings = {};
 let financialSettings = {};
 
 let stationAvailability = {};
+
+let financeSaveTimer = null;
+
+let financePendingSave = null;
+
+let financeSaveInFlight = Promise.resolve();
+
+let financeEditorCurrentSettings = null;
 
 let ubyOperationOverrides = {};
 
@@ -62,6 +72,8 @@ let fullRechargeWorkIds = new Set();
 let rechargeFullLoadPromises = new Map();
 
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
+
+const UBY_AREA_ACCOUNTING_KEY = 'uby-area-accounting-v1';
 
 const FINANCE_REPORTS_LOCAL_KEY = 'uby-finance-reports-v1';
 
@@ -562,6 +574,16 @@ function __base_clientKeyFromCharge(charge = {}) {
   return clientIdentityKey(charge.userName, charge.userEmail, charge.userPhone);
 }
 
+function serializeCharge(charge) {
+  return {
+    ...charge,
+    startIso: charge.startDate ? charge.startDate.toISOString() : '',
+    endIso: charge.endDate ? charge.endDate.toISOString() : '',
+    startDate: undefined,
+    endDate: undefined
+  };
+}
+
 function hydrateCharge(charge) {
   let startDate = charge.startIso ? new Date(charge.startIso) : parseDate(charge.startStr);
   let endDate = charge.endIso ? new Date(charge.endIso) : parseDate(charge.endStr);
@@ -726,6 +748,86 @@ function localRecord(workId = currentWorkId) {
 // planilha. Este registro vazio preserva horario e classificacao UBY sem
 // inventar recargas ou alterar o historico da obra.
 
+function rechargeMetadataSeed(workId) {
+  const id = String(workId || '').trim();
+  const workName = workNameById(id, id);
+  const updatedAt = new Date().toISOString();
+  return hydratedRechargeRecord({
+    workId: id,
+    workName,
+    files: [],
+    charges: [],
+    summary: {
+      workId: id,
+      workName,
+      charges: 0,
+      files: 0,
+      clients: 0,
+      energyKWh: 0,
+      revenue: 0,
+      updatedAt
+    },
+    updatedAt,
+    metadataOnly: true
+  }, id);
+}
+
+function rechargeSummary() {
+  const energy = allCharges.reduce((sum, charge) => sum + charge.energyKWh, 0);
+  const revenue = allCharges.reduce((sum, charge) => sum + charge.revenue, 0);
+  const dates = allCharges.map(charge => charge.startDate).filter(Boolean);
+  const clients = new Set(allCharges.map(charge => charge.userEmail || charge.userName).filter(Boolean)).size;
+  return {
+    workId: currentWorkId,
+    workName: currentWorkName,
+    charges: allCharges.length,
+    files: loadedFiles.length,
+    clients,
+    monthlyClosings,
+    financialSettings,
+    stationAvailability,
+    operationalPowerKw: workPowerById(currentWorkId),
+    ubyOperationOverrides,
+    ubyAreaAccounting: readUbyAreaAccounting(),
+    energyKWh: energy,
+    revenue,
+    firstDate: dates.length ? new Date(Math.min(...dates)).toISOString() : '',
+    lastDate: dates.length ? new Date(Math.max(...dates)).toISOString() : '',
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function buildRechargeRecord() {
+  // Fechamentos registram a auditoria do mês, mas não podem permanecer
+  // divergentes depois que uma importação complementar corrige a base.
+  reconcileMonthlyClosingsWithCharges();
+  const updatedAt = new Date().toISOString();
+  return {
+    workId: currentWorkId,
+    workName: currentWorkName,
+    files: loadedFiles.map(file => ({
+      fileKey: file.fileKey || fileSourceKey(file.month, file.name, file.station || ''),
+      name: file.name,
+      station: file.station || '',
+      size: file.size || 0,
+      lastModified: file.lastModified || 0,
+      month: file.month || '',
+      importMode: file.importMode || 'merge',
+      importedAt: file.importedAt || updatedAt,
+      rows: allCharges.filter(charge => (file.fileKey && charge._fileKey === file.fileKey) || (!file.fileKey && charge._file === file.name)).length
+    })),
+    charges: allCharges.map(serializeCharge),
+    monthlyClosings,
+    financialSettings,
+    stationAvailability,
+    operationalPowerKw: workPowerById(currentWorkId),
+    ubyOperationOverrides,
+    ubyAreaAccounting: readUbyAreaAccounting(),
+    summary: rechargeSummary(),
+    updatedAt
+  };
+}
+
 function compactRechargeRecord(record) {
   if (!record) return record;
   const summary = record.summary || {};
@@ -743,6 +845,48 @@ function compactRechargeRecord(record) {
       localCompact: true
     }
   };
+}
+
+function compactRechargeDb(db, preferredWorkId = '') {
+  return Object.fromEntries(Object.entries(db || {}).map(([workId, record]) => {
+    return [workId, workId === preferredWorkId ? compactRechargeRecord(record) : compactRechargeRecord(record)];
+  }));
+}
+
+function saveLocalRechargeBase(record = null, options = {}) {
+  const db = localRechargeDb();
+  if (!allCharges.length && !loadedFiles.length && !record) {
+    if (!options.allowDelete) return { mode: 'skipped-empty' };
+    delete db[currentWorkId];
+    writeJson(RECARGAS_LOCAL_KEY, db);
+    delete allRechargeRecords[currentWorkId];
+    syncGeneralRecordsFromLocal();
+    return { mode: 'deleted' };
+  }
+  const fullRecord = record || buildRechargeRecord();
+  window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`work:${currentWorkId}`, fullRecord).catch(() => {});
+  db[currentWorkId] = compactRechargeRecord(fullRecord);
+  const fullSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactRechargeDb(db, currentWorkId));
+  if (!fullSave.ok) return { mode: 'none', error: fullSave.error };
+  syncGeneralRecordsFromLocal();
+  return { mode: 'indexeddb', size: fullSave.size };
+}
+
+// Financial edits must survive immediately, even when the user changes an
+// obra or tab before the cloud synchronization finishes.
+
+function saveLocalRechargeRecordFor(workId, record) {
+  const targetWorkId = String(workId || record?.workId || currentWorkId || '');
+  if (!targetWorkId || !record) return { mode: 'skipped-empty' };
+  const fullRecord = { ...record, workId: targetWorkId };
+  const db = localRechargeDb();
+  window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`work:${targetWorkId}`, fullRecord).catch(() => {});
+  db[targetWorkId] = compactRechargeRecord(fullRecord);
+  const fullSave = tryWriteJson(RECARGAS_LOCAL_KEY, compactRechargeDb(db, targetWorkId));
+  if (!fullSave.ok) return { mode: 'none', error: fullSave.error };
+  allRechargeRecords[targetWorkId] = hydratedRechargeRecord(fullRecord, targetWorkId);
+  markRechargeRecordsDirty();
+  return { mode: 'indexeddb', size: fullSave.size };
 }
 
 function normalizeStationForCompare(value) {
@@ -1026,6 +1170,12 @@ async function loadRechargeBase(workId = currentWorkId, options = {}) {
     if (options.requireCloud) throw err;
     return initial;
   }
+}
+
+function shouldOpenFullRechargeWork(workId, stationName = '') {
+  const workName = workNameById(workId);
+  const text = normalizeStationForCompare(`${workId || ''} ${stationName || ''} ${workName || ''}`);
+  return String(workId) === 'malassise' || text.includes('robert koch') || text.includes('malassise');
 }
 
 function parseNumber(value) {
@@ -1439,6 +1589,12 @@ function getMonths() {
 
 // ── Formatadores ──────────────────────────────────────────
 
+function fmtBRL(v) {
+  return 'R$ ' + (+v).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function fmtKWh(v) { return (+v).toFixed(2).replace('.', ',') + ' kWh'; }
+
 function fmtPct(v)  { return (+v).toFixed(2).replace('.', ',') + '%'; }
 
 function buildMonthClosing(mk) {
@@ -1619,6 +1775,49 @@ function normalizeFinanceRules(settings = {}, kind = 'cost') {
   return normalized;
 }
 
+function financeLegacyValuesFromRules(rules = [], kind = 'cost') {
+  const catalogIds = new Set(financeRuleCatalog(kind).map(([id]) => String(id)));
+  return Object.fromEntries(rules
+    .filter(rule => catalogIds.has(String(rule.id)))
+    .map(rule => [rule.id, rule.enabled && ['fixed','one_off'].includes(rule.basis) ? Number(rule.value || 0) : 0]));
+}
+
+function financeRuleDisplayValue(rule) {
+  if (!rule) return 'Sem base anterior';
+  if (rule.displayRule) return safeText(rule.displayRule);
+  if (rule.enabled === false) return 'Nao utilizado';
+  const value = Number(rule.value || 0);
+  if (rule.basis === 'revenue_pct') return `${value.toFixed(2).replace('.', ',')}% do faturamento`;
+  if (rule.basis === 'per_kwh') return `${fmtBRL(value)}/kWh`;
+  if (rule.basis === 'per_charge') return `${fmtBRL(value)}/recarga`;
+  if (rule.basis === 'one_off') return `${fmtBRL(value)} no ciclo`;
+  return `${fmtBRL(value)}/mes`;
+}
+
+function financeVersionStateInfo(equal, hasPrevious, exact) {
+  if (!hasPrevious) return { label: 'Novo', className: 'new' };
+  if (!exact) return { label: 'Herdado', className: 'inherited' };
+  return equal
+    ? { label: 'Mantido', className: 'inherited' }
+    : { label: 'Alterado', className: 'changed' };
+}
+
+function formatFinanceSettingValue(value, format = '') {
+  if (format === 'model') return operationModelLabel(value);
+  if (format === 'transfer') return value === 'net' ? 'Lucro liquido' : 'Faturamento bruto';
+  if (format === 'pct') return fmtPct(Number(value || 0));
+  if (format === 'brl_kwh') return `${fmtBRL(Number(value || 0))}/kWh`;
+  if (format === 'brl') return fmtBRL(Number(value || 0));
+  return String(value ?? '-');
+}
+
+function financeSettingValuesEqual(current, previous) {
+  if (typeof current === 'number' || typeof previous === 'number') {
+    return Math.abs(Number(current || 0) - Number(previous || 0)) < 0.000001;
+  }
+  return String(current ?? '') === String(previous ?? '');
+}
+
 function financeChargerStorageKey(stationName = currentStationReportName) {
   const station = safeText(stationName).trim();
   return station ? normalizeStationForCompare(canonicalStationNameForWork(currentWorkId, station, currentWorkName)) : '';
@@ -1628,6 +1827,24 @@ function financeStoreForScope(root = financialSettings, stationName = currentSta
   const key = financeChargerStorageKey(stationName);
   if (!key) return root || {};
   return root?.chargers?.[key] || {};
+}
+
+function financeMonthResolution(mk, root = financialSettings, stationName = currentStationReportName) {
+  const base = root || {};
+  const key = financeChargerStorageKey(stationName);
+  const scoped = key ? (base?.chargers?.[key] || {}) : {};
+  return window.UBY_FINANCE_ENGINE.resolveMonthlySettings(defaultFinanceSettings(), base, scoped, mk);
+}
+
+function financeSettingsForMonth(mk, root = financialSettings, stationName = currentStationReportName) {
+  return financeMonthResolution(mk, root, stationName).settings;
+}
+
+function financeExactSettingsForMonth(mk, root = financialSettings, stationName = currentStationReportName) {
+  const base = root || {};
+  const key = financeChargerStorageKey(stationName);
+  const scoped = key ? (base?.chargers?.[key] || {}) : {};
+  return { ...(base?.[mk] || {}), ...(scoped?.[mk] || {}) };
 }
 
 function financeSettingsForUbyRow(row = {}, mk = '') {
@@ -1714,6 +1931,133 @@ async function loadFinanceReportArchive(force = false) {
 
 function yieldToBrowser() {
   return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+function persistFinancialSettingsFromInputs(mk = financeMonthKey(), inheritedFromOverride = '') {
+  if (!mk) return null;
+  const resolutionBeforeSave = financeMonthResolution(mk);
+  const exactBeforeSave = financeExactSettingsForMonth(mk);
+  const previousMeta = exactBeforeSave.periodMeta || {};
+  const now = new Date().toISOString();
+  const settings = currentFinanceSettingsFromInputs();
+  settings.periodMeta = {
+    ...previousMeta,
+    month: mk,
+    inheritedFrom: inheritedFromOverride || previousMeta.inheritedFrom || resolutionBeforeSave.previousMonth || '',
+    createdAt: previousMeta.createdAt || now,
+    updatedAt: now
+  };
+  const scopeKey = financeChargerStorageKey();
+  if (scopeKey) {
+    const chargers = { ...(financialSettings.chargers || {}) };
+    const scoped = { ...(chargers[scopeKey] || {}), [mk]: settings };
+    const latestMonth = window.UBY_FINANCE_ENGINE.monthKeys(scoped).at(-1) || mk;
+    if (!scoped.default || mk === latestMonth) scoped.default = settings;
+    chargers[scopeKey] = scoped;
+    financialSettings = { ...financialSettings, chargers };
+  } else {
+    const updated = { ...financialSettings, [mk]: settings };
+    const latestMonth = window.UBY_FINANCE_ENGINE.monthKeys(updated).at(-1) || mk;
+    if (!updated.default || mk === latestMonth) updated.default = settings;
+    financialSettings = updated;
+  }
+  financeEditorCurrentSettings = settings;
+  return settings;
+}
+
+function financeRecordWithCurrentSettings() {
+  const source = allRechargeRecords[currentWorkId] || localRecord();
+  const sourceHasFullCharges = Array.isArray(source?.charges) && source.charges.length > 0;
+  const sourceExpectedCharges = Number(source?.summary?.charges || 0);
+  if (currentStationReportName && sourceExpectedCharges > 0 && !sourceHasFullCharges) {
+    throw new Error('A base completa da obra ainda nao terminou de carregar. Aguarde e tente novamente.');
+  }
+  if (!currentStationReportName && (!source || (!sourceHasFullCharges && allCharges.length))) {
+    return buildRechargeRecord();
+  }
+  if (!source) return buildRechargeRecord();
+  const updatedAt = new Date().toISOString();
+  return {
+    ...source,
+    workId: currentWorkId,
+    workName: source.workName || currentWorkName,
+    financialSettings,
+    summary: {
+      ...(source.summary || {}),
+      workId: currentWorkId,
+      workName: source.summary?.workName || source.workName || currentWorkName,
+      financialSettings,
+      updatedAt
+    },
+    updatedAt,
+    localCompact: false
+  };
+}
+
+async function saveFinancialSettingsRecord(workId = currentWorkId, recordOverride = null) {
+  const targetWorkId = String(workId || currentWorkId || '');
+  const record = recordOverride || financeRecordWithCurrentSettings();
+  if (!targetWorkId || !record) return { mode: 'skipped-empty' };
+  record.workId = targetWorkId;
+  record.metadataType = 'financial_settings';
+  record.summary = {
+    ...(record.summary || {}),
+    workId: targetWorkId,
+    financialSettings: record.financialSettings || financialSettings,
+    updatedAt: record.updatedAt || new Date().toISOString()
+  };
+  const localSave = saveLocalRechargeRecordFor(targetWorkId, record);
+  if (window.UBY_SUPABASE?.saveRechargeMetadata) {
+    await window.UBY_SUPABASE.saveRechargeMetadata(targetWorkId, record);
+  }
+  return localSave;
+}
+
+function financeSaveSnapshot(monthKey = financeMonthKey()) {
+  const targetWorkId = String(currentWorkId || '');
+  if (!targetWorkId || !monthKey) return null;
+  persistFinancialSettingsFromInputs(monthKey);
+  const record = financeRecordWithCurrentSettings();
+  record.metadataType = 'financial_settings';
+  return {
+    workId: targetWorkId,
+    monthKey,
+    workName: currentWorkName,
+    stationName: currentStationReportName,
+    stationKey: financeChargerStorageKey(),
+    settings: JSON.parse(JSON.stringify(financeEditorCurrentSettings || {})),
+    record: JSON.parse(JSON.stringify(record))
+  };
+}
+
+function queueFinancialSettingsSave(snapshot) {
+  if (!snapshot?.workId || !snapshot?.record) return financeSaveInFlight;
+  financeSaveInFlight = financeSaveInFlight
+    .catch(() => null)
+    .then(() => saveFinancialSettingsRecord(snapshot.workId, snapshot.record));
+  return financeSaveInFlight;
+}
+
+async function commitPendingFinancialSettingsSave() {
+  if (financeSaveTimer) {
+    clearTimeout(financeSaveTimer);
+    financeSaveTimer = null;
+  }
+  const snapshot = financePendingSave;
+  financePendingSave = null;
+  if (!snapshot) return financeSaveInFlight;
+  try {
+    await queueFinancialSettingsSave(snapshot);
+    await syncEnergyPaymentsFromFinanceSnapshot(snapshot);
+    if (String(currentWorkId) === String(snapshot.workId)) {
+      setStorageState(`Financeiro de ${monthLabel(snapshot.monthKey)} salvo automaticamente para <strong>${snapshot.workName}</strong>.`);
+      renderFinanceMonthVersionState(financeEditorCurrentSettings);
+      renderGeneralFinance(getGeneralUnitData());
+    }
+  } catch (err) {
+    setStorageState(`Financeiro local salvo. Falha ao sincronizar: ${err.message}`, true);
+    throw err;
+  }
 }
 
 function previousMonthEnergyForFinance(mk = '', charges = allCharges) {
@@ -2322,9 +2666,21 @@ let matrizCostsLoadPromise = null;
 
 let matrizCostsSaveChain = Promise.resolve();
 
+let matrizEditingId = '';
+
 function matrizScopeKey(row = {}) { return `${String(row.workId || '')}::${String(row.key || normalizeStationForCompare(row.station || row.workName || ''))}`; }
 
 function matrizStationScope(row = {}) { return `${String(row.workId || '')}::${normalizeStationForCompare(row.station || row.stationName || row.workName || '')}`; }
+
+function matrizTargetIdentity(row = {}) {
+  return {
+    scope: matrizScopeKey(row),
+    workId: String(row.workId || ''),
+    station: safeText(row.station || row.stationName || row.workName || ''),
+    stationKey: normalizeStationForCompare(row.station || row.stationName || row.workName || ''),
+    workName: safeText(row.workName || '')
+  };
+}
 
 function matrizTargetCandidates(target = {}) {
   const raw = typeof target === 'string' ? { scope: target } : (target || {});
@@ -2393,6 +2749,84 @@ function matrizAddMonths(mk, amount = 0) {
   if (!/^\d{4}-\d{2}$/.test(String(mk || ''))) return '';
   const index = Number(mk.slice(0, 4)) * 12 + Number(mk.slice(5, 7)) - 1 + Number(amount || 0);
   return `${Math.floor(index / 12)}-${String(index % 12 + 1).padStart(2, '0')}`;
+}
+
+function energyPaymentId(workId, stationKey, competenceMonth, type) {
+  return `energy-${String(workId)}-${String(stationKey)}-${String(competenceMonth)}-${String(type)}`;
+}
+
+async function syncEnergyPaymentsFromFinanceSnapshot(snapshot = {}) {
+  const competenceMonth = String(snapshot.monthKey || '');
+  const stationKey = String(snapshot.stationKey || '');
+  const workId = String(snapshot.workId || '');
+  const settings = snapshot.settings || {};
+  if (!/^\d{4}-\d{2}$/.test(competenceMonth) || !workId || !stationKey) return;
+  // Carregador com Faturas de energia lançadas: os vencimentos da Copel e do arrendamento já vêm das
+  // faturas em Pagamentos. Gerar o programado aqui duplicava a conta (mesmo valor, mesmo mês).
+  const invoiceRoot = allRechargeRecords?.[workId]?.financialSettings || allRechargeRecords?.[workId]?.summary?.financialSettings || {};
+  const storedInvoices = invoiceRoot?.chargers?.[stationKey]?.energyInvoices;
+  if (Array.isArray(storedInvoices) && storedInvoices.length) return;
+  const paymentMonth = matrizAddMonths(competenceMonth, 1);
+  const target = {
+    scope: `${workId}::${stationKey}`,
+    workId,
+    station: safeText(snapshot.stationName || snapshot.workName || ''),
+    stationKey,
+    workName: safeText(snapshot.workName || ''),
+    startMonth: paymentMonth,
+    share: 100
+  };
+  const paymentSpecs = [
+    { type: 'copel', name: 'Energia Copel', supplier: 'Copel', amount: Math.max(0, Number(settings.energyCopelAmount || 0)), dueDay: Number(settings.energyCopelDueDay || 0) },
+    { type: 'lease', name: 'Arrendamento de energia', supplier: 'Arrendamento', amount: settings.energyBillingMode === 'copel_lease' ? Math.max(0, Number(settings.energyLeaseCreditedKWh || 0)) * Math.max(0, Number(settings.energyLeaseRatePerKWh || 0)) : 0, dueDay: Number(settings.energyLeaseDueDay || 10) }
+  ];
+  const current = await ensureMatrizCostsLoaded();
+  const next = [...current];
+  let changed = false;
+  paymentSpecs.forEach(spec => {
+    const index = next.findIndex(item => item.derivedEnergyPayment === true
+      && item.sourceCompetenceMonth === competenceMonth
+      && item.energyPaymentType === spec.type
+      && String(item.targets?.[0]?.workId || '') === workId
+      && String(item.targets?.[0]?.stationKey || '') === stationKey);
+    const existing = index >= 0 ? next[index] : null;
+    const wasPaid = existing?.paymentLedger?.[paymentMonth]?.status === 'paid';
+    if (wasPaid) return;
+    const valid = spec.amount > 0 && spec.dueDay >= 1 && spec.dueDay <= 31;
+    if (!valid) {
+      if (existing?.enabled) {
+        next[index] = { ...existing, enabled: false, updatedAt: new Date().toISOString() };
+        changed = true;
+      }
+      return;
+    }
+    const updated = matrizNormalizeCost({
+      ...(existing || {}),
+      id: existing?.id || energyPaymentId(workId, stationKey, competenceMonth, spec.type),
+      name: `${spec.name} — ${target.station || target.workName}`,
+      category: 'Energia',
+      supplier: spec.supplier,
+      amount: spec.amount,
+      dueDay: spec.dueDay,
+      scheduledPayment: true,
+      derivedEnergyPayment: true,
+      sourceCompetenceMonth: competenceMonth,
+      energyPaymentType: spec.type,
+      costKind: 'one_off',
+      installments: 1,
+      coverageMonths: 1,
+      startMonth: paymentMonth,
+      endMonth: paymentMonth,
+      allocation: 'equal',
+      targets: [target],
+      enabled: true,
+      notes: `Gerado automaticamente pela competência ${monthLabel(competenceMonth)}. Não entra novamente no DRE.`
+    });
+    if (index >= 0) next[index] = updated; else next.push(updated);
+    changed = true;
+  });
+  if (!changed) return;
+  saveMatrizCosts(next);
 }
 
 function matrizMethodLabel(method) { return ({ equal: 'Rateio igual', power: 'Por potencia', energy: 'Por kWh', revenue: 'Por faturamento', custom: 'Participacao definida' })[method] || 'Rateio igual'; }
@@ -2528,6 +2962,8 @@ function persistMatrizCosts() {
   return matrizCostsSaveChain;
 }
 
+function matrizSelectedTargets() { return [...(matrizInput('matrizCostTargets')?.selectedOptions || [])].map(option => option.value).filter(Boolean); }
+
 function matrizCoverageMonths(item = {}) {
   return Math.max(1, Number(item.coverageMonths || (item.costKind === 'installment' ? item.installments : 1)));
 }
@@ -2627,6 +3063,56 @@ function matrizRowForUnit(unit = {}, unitData = getGeneralUnitData(), mk = finan
   if (direct) return direct;
   const matched = candidates.find(row => matrizTargetMatchesRow({ workId: unit.workId, station }, row));
   return matched || (candidates.length === 1 ? candidates[0] : null);
+}
+
+function currentMatrizItems(mk = financeMonthKey()) {
+  const current = matrizRowForUnit({ workId: currentWorkId, stationName: currentStationReportName || '' }, getGeneralUnitData(), mk);
+  return current ? matrizCostItemsForRow(current, mk) : [];
+}
+
+function resetMatrizCostForm() {
+  matrizEditingId = '';
+  ['matrizNewName','matrizCostSupplier','matrizNewValue','matrizCostEndMonth','matrizCostDocument','matrizCostNotes','matrizCostCustomShares'].forEach(id => { const el = matrizInput(id); if (el) el.value = ''; });
+  const start = matrizInput('matrizCostStartMonth'); if (start) start.value = financeMonthKey() || getMonths().at(-1) || '';
+  const kind = matrizInput('matrizCostKind'); if (kind) kind.value = 'recurring';
+  const method = matrizInput('matrizCostMethod'); if (method) method.value = 'equal';
+  const installments = matrizInput('matrizCostInstallments'); if (installments) installments.value = 1;
+  const coverage = matrizInput('matrizCostCoverageMonths'); if (coverage) coverage.value = 1;
+  const due = matrizInput('matrizCostDueDay'); if (due) due.value = 1;
+  const button = matrizInput('matrizSaveButton'); if (button) button.textContent = 'Adicionar custo';
+}
+
+function addMatrizCost() {
+  const name = safeText(matrizInput('matrizNewName')?.value || '').trim();
+  const amount = Math.max(0, Number(matrizInput('matrizNewValue')?.value || 0));
+  if (!name || !amount) { setMatrizFeedback('Informe o nome e o valor de cada parcela ou competencia.', true); return; }
+  const targetRows = matrizEligibleRows(getGeneralUnitData(), financeMonthKey());
+  const allTargets = targetRows.map(matrizScopeKey);
+  const targetIds = matrizSelectedTargets().length ? matrizSelectedTargets() : allTargets;
+  if (!targetIds.length) { setMatrizFeedback('Selecione pelo menos um carregador de destino.', true); return; }
+  const list = loadMatrizCosts();
+  const previous = list.find(item => item.id === matrizEditingId);
+  const existingTargets = new Map((previous?.targets || []).map(target => [target.scope, target]));
+  const existingTargetForScope = scope => {
+    if (existingTargets.has(scope)) return existingTargets.get(scope);
+    const currentRow = matrizResolveTargetRow(scope, targetRows);
+    return (previous?.targets || []).find(target => {
+      const priorRow = matrizResolveTargetRow(target, targetRows);
+      return priorRow && currentRow && matrizRowsMatch(priorRow, currentRow);
+    });
+  };
+  const shares = safeText(matrizInput('matrizCostCustomShares')?.value || '').split(/[;,]/).map(value => Math.max(0, Number(value.trim().replace(',', '.')) || 0));
+  const startMonth = matrizInput('matrizCostStartMonth')?.value || financeMonthKey();
+  const cost = matrizNormalizeCost({ ...previous, id: previous?.id || `m${Date.now().toString(36)}`, name, amount,
+    category: matrizInput('matrizCostCategory')?.value || 'Outros custos', supplier: matrizInput('matrizCostSupplier')?.value || '', costKind: matrizInput('matrizCostKind')?.value || 'recurring', installments: matrizInput('matrizCostInstallments')?.value || 1, coverageMonths: matrizInput('matrizCostCoverageMonths')?.value || 1, startMonth, endMonth: matrizInput('matrizCostEndMonth')?.value || '', dueDay: matrizInput('matrizCostDueDay')?.value || 1, allocation: matrizInput('matrizCostMethod')?.value || 'equal', documentRef: matrizInput('matrizCostDocument')?.value || '', notes: matrizInput('matrizCostNotes')?.value || '', enabled: true,
+    targets: targetIds.map((scope, index) => {
+      const existing = existingTargetForScope(scope);
+      const row = matrizResolveTargetRow(scope, targetRows);
+      return { ...matrizTargetIdentity(row || { workId: String(scope).split('::')[0], key: String(scope).split('::')[1] || '' }), scope, startMonth: existing?.startMonth || startMonth, share: shares[index] || existing?.share || 0 };
+    }), updatedAt: new Date().toISOString() });
+  if (previous) Object.assign(previous, cost); else list.push(cost);
+  saveMatrizCosts(list); resetMatrizCostForm(); renderMatrizCosts(getGeneralUnitData());
+  setMatrizFeedback(`Custo ${name} salvo. O rateio fica gravado por competencia e destino.`, false);
 }
 
 function matrizMonthSequence(from, to) {
@@ -4571,6 +5057,43 @@ function clubWinnerNotice(rows = [], month = '') {
   return `RESULTADO CLUBE UBY - ${monthLabel(month || monthKey(new Date()))}\n\n${ranking}\n\nParabéns aos vencedores do mês! Os três primeiros colocados recebem 30% de desconto em alinhamento e balanceamento. Todos os participantes do Clube UBY têm 10% de desconto nos serviços da rede Muffatão Autocenter.\n\nCada R$ 1 gasto nas recargas UBY gera 1 ponto. O próximo ranking começa no primeiro dia do próximo mês.`;
 }
 
+async function toggleUbyOperation(workId, key, checked) {
+  syncGeneralRecordsFromLocal();
+  const db = localRechargeDb();
+  const record = allRechargeRecords[workId] || db[workId] || rechargeMetadataSeed(workId);
+  const overrides = { ...(record.ubyOperationOverrides || record.summary?.ubyOperationOverrides || {}) };
+  overrides[key] = !!checked;
+  record.ubyOperationOverrides = overrides;
+  record.summary = { ...(record.summary || {}), ubyOperationOverrides: overrides, updatedAt: new Date().toISOString() };
+  record.updatedAt = new Date().toISOString();
+  record.metadataType = 'uby_operation';
+  db[workId] = compactRechargeRecord(record);
+  writeJson(RECARGAS_LOCAL_KEY, db);
+  allRechargeRecords[workId] = record;
+  markRechargeRecordsDirty();
+
+  if (workId === currentWorkId) {
+    ubyOperationOverrides = overrides;
+    saveLocalRechargeBase(record);
+    try {
+      if (window.UBY_SUPABASE?.saveRechargeMetadata) {
+        await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
+      }
+    } catch (err) {
+      setStorageState(`Marcacao UBY salva neste navegador. Supabase pendente: ${err.message}`, true);
+    }
+  } else if (window.UBY_SUPABASE?.saveRechargeMetadata) {
+    try {
+      await window.UBY_SUPABASE.saveRechargeMetadata(workId, record);
+    } catch (err) {
+      setStorageState(`Marcacao UBY salva neste navegador. Supabase pendente: ${err.message}`, true);
+    }
+  }
+  renderUbyOperation();
+  renderGeral();
+  renderClub();
+}
+
 function summarizeUbyChargerRow(row, charges = row.charges || []) {
   const hydrated = (charges || []).map(hydrateCharge);
   const energy = hydrated.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
@@ -4589,6 +5112,15 @@ function summarizeUbyChargerRow(row, charges = row.charges || []) {
     lastDate: dates.length ? new Date(Math.max(...dates)) : null,
     acdc: generalAcDcStats(hydrated)
   };
+}
+
+function readUbyAreaAccounting() {
+  const local = readJson(UBY_AREA_ACCOUNTING_KEY, {});
+  Object.values(allRechargeRecords || {}).forEach(record => {
+    const cloud = record?.ubyAreaAccounting || record?.summary?.ubyAreaAccounting || {};
+    Object.assign(local, cloud);
+  });
+  return local;
 }
 
 function operationStartForCharges(charges = [], context = {}) {
@@ -5016,6 +5548,14 @@ async function __perf(label, fn) {
 }
 
 // ---- substitutos sem tela ----
+function setStorageState(message, isError = false) {
+  // Antes escrevia num elemento da página antiga; agora fica no estado do núcleo.
+  NUCLEO_STATUS.message = String(message || "").replace(/<[^>]*>/g, "");
+  NUCLEO_STATUS.isError = !!isError;
+  NUCLEO_STATUS.at = Date.now();
+  try { window.dispatchEvent(new CustomEvent("uby:nucleo-status", { detail: { ...NUCLEO_STATUS } })); } catch (_) {}
+}
+
 function getPower() {
   // Sem os campos de potência da página antiga: a potência vem do cadastro da obra
   // (era o que syncOperationalPowerInputs punha nesses campos).
@@ -5031,45 +5571,11 @@ function selectedPeriodMode() {
 }
 
 function financeMonthKey() {
-  return getMonths().at(-1) || '';
+  return NUCLEO_EDITOR.month || getMonths().at(-1) || '';
 }
 
-function selectedFinanceOnlyPeriod(sourceMonths = []) {
-  return { monthKey: '', isMonthView: false, label: 'Acumulado' };
-}
-
-async function syncClubParticipantsFromSheet(options = {}) {
-  const force = !!options.force;
-  if (clubParticipantsSyncPromise && !force) return clubParticipantsSyncPromise;
-  const endpoint = clubFormEndpointUrl();
-  clubParticipantsSyncPromise = (async () => {
-    let participants = [];
-    let source = 'Google Sheets';
-    if (endpoint) {
-      const payload = await fetchClubFormEndpoint(endpoint);
-      if (payload?.ok === false) throw new Error(payload.error || 'endpoint recusou a leitura');
-      participants = clubParticipantsFromEndpointPayload(payload);
-      source = payload?.source || 'Apps Script seguro';
-    } else {
-      const response = await fetch(`${CLUB_FORM_CSV_URL}&t=${Date.now()}`, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Google retornou ${response.status}`);
-      participants = clubParticipantsFromRows(parseCsvRows(await response.text()));
-    }
-    return mergeClubParticipants(participants, source);
-  })();
-  try {
-    return await clubParticipantsSyncPromise;
-  } finally {
-    clubParticipantsSyncPromise = null;
-  }
-}
-
-function setStorageState(message, isError = false) {
-  // Antes escrevia num elemento da página antiga; agora fica no estado do núcleo.
-  NUCLEO_STATUS.message = String(message || "").replace(/<[^>]*>/g, "");
-  NUCLEO_STATUS.isError = !!isError;
-  NUCLEO_STATUS.at = Date.now();
-  try { window.dispatchEvent(new CustomEvent("uby:nucleo-status", { detail: { ...NUCLEO_STATUS } })); } catch (_) {}
+function setMatrizFeedback(msg, isError) {
+  if (msg) setStorageState(msg, !!isError);
 }
 
 function saveNetworkDistribution(settings, options = {}) {
@@ -5080,10 +5586,6 @@ function saveNetworkDistribution(settings, options = {}) {
     setStorageState(`Salvo neste navegador; nuvem pendente: ${error?.message || 'erro de sincronização'}.`, true);
   });
   return networkDistributionState;
-}
-
-function setMatrizFeedback(msg, isError) {
-  if (msg) setStorageState(msg, !!isError);
 }
 
 function applyRechargeRecord(record, sourceLabel) {
@@ -5119,6 +5621,36 @@ function applyRechargeRecord(record, sourceLabel) {
   setStorageState(`Carregado de ${sourceLabel} para <strong>${targetName}</strong>: ${loadedFiles.length} arquivo(s), ${allCharges.length} recarga(s). Ultima atualizacao: ${updated}.${filterNote}`);
 }
 
+async function syncClubParticipantsFromSheet(options = {}) {
+  const force = !!options.force;
+  if (clubParticipantsSyncPromise && !force) return clubParticipantsSyncPromise;
+  const endpoint = clubFormEndpointUrl();
+  clubParticipantsSyncPromise = (async () => {
+    let participants = [];
+    let source = 'Google Sheets';
+    if (endpoint) {
+      const payload = await fetchClubFormEndpoint(endpoint);
+      if (payload?.ok === false) throw new Error(payload.error || 'endpoint recusou a leitura');
+      participants = clubParticipantsFromEndpointPayload(payload);
+      source = payload?.source || 'Apps Script seguro';
+    } else {
+      const response = await fetch(`${CLUB_FORM_CSV_URL}&t=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Google retornou ${response.status}`);
+      participants = clubParticipantsFromRows(parseCsvRows(await response.text()));
+    }
+    return mergeClubParticipants(participants, source);
+  })();
+  try {
+    return await clubParticipantsSyncPromise;
+  } finally {
+    clubParticipantsSyncPromise = null;
+  }
+}
+
+function selectedFinanceOnlyPeriod(sourceMonths = []) {
+  return { monthKey: '', isMonthView: false, label: 'Acumulado' };
+}
+
 async function initializeRechargePage() {
   await loadRechargeWorksFromCloud();
   await refreshGeneralRechargeBases();
@@ -5126,14 +5658,21 @@ async function initializeRechargePage() {
 }
 
 // ---- funções de tela da página antiga que as regras chamam: aqui não desenham nada ----
+function addScheduledPayment() {} // tela antiga: não desenhar
+function applyFinanceSettingsToInputs() {} // tela antiga: não desenhar
+function currentFinanceSettingsFromInputs() {} // tela antiga: não desenhar
 function initWorkSelector() {} // tela antiga: não desenhar
 function loadCustomerRegistry() {} // tela antiga: não desenhar
+function matrizInput() {} // tela antiga: não desenhar
 function mountUbyFinanceWorkspace() {} // tela antiga: não desenhar
 function openGeneralFinanceView() {} // tela antiga: não desenhar
+function openWorkReport() {} // tela antiga: não desenhar
 function renderClientsTable() {} // tela antiga: não desenhar
-function renderFinanceOnly() {} // tela antiga: não desenhar
+function renderClub() {} // tela antiga: não desenhar
+function renderFinanceMonthVersionState() {} // tela antiga: não desenhar
 function renderGeneralFinance() {} // tela antiga: não desenhar
 function renderGeneralFinanceOverview() {} // tela antiga: não desenhar
+function renderGeral() {} // tela antiga: não desenhar
 function renderKPIs() {} // tela antiga: não desenhar
 function renderMatrizCosts() {} // tela antiga: não desenhar
 function renderMatrizMonthlyDre() {} // tela antiga: não desenhar
@@ -5145,6 +5684,8 @@ function renderUbyDistribution() {} // tela antiga: não desenhar
 function renderUbyFinancialOverview() {} // tela antiga: não desenhar
 function renderUbyOperation() {} // tela antiga: não desenhar
 function renderVisibleOverviewViews() {} // tela antiga: não desenhar
+function saveOperationalPowerFromInputs() {} // tela antiga: não desenhar
+function saveStationLayoutConfiguration() {} // tela antiga: não desenhar
 function scheduleLiveOccupationRefresh() {} // tela antiga: não desenhar
 function showGeneralWhenCurrentWorkIsEmpty() {} // tela antiga: não desenhar
 function showTab() {} // tela antiga: não desenhar
@@ -5152,6 +5693,7 @@ function showTab() {} // tela antiga: não desenhar
 window.UBY_NUCLEO = {
   status: () => ({ ...NUCLEO_STATUS }),
   iniciar: initializeRechargePage,
+  setEditorMonth: mk => { NUCLEO_EDITOR.month = /^[0-9]{4}-[0-9]{2}$/.test(String(mk || "")) ? String(mk) : ""; },
   state: {
     get allCharges() { return allCharges; }, set allCharges(v) { allCharges = v; },
     get loadedFiles() { return loadedFiles; }, set loadedFiles(v) { loadedFiles = v; },
@@ -5160,6 +5702,10 @@ window.UBY_NUCLEO = {
     get monthlyClosings() { return monthlyClosings; }, set monthlyClosings(v) { monthlyClosings = v; },
     get financialSettings() { return financialSettings; }, set financialSettings(v) { financialSettings = v; },
     get stationAvailability() { return stationAvailability; }, set stationAvailability(v) { stationAvailability = v; },
+    get financeSaveTimer() { return financeSaveTimer; }, set financeSaveTimer(v) { financeSaveTimer = v; },
+    get financePendingSave() { return financePendingSave; }, set financePendingSave(v) { financePendingSave = v; },
+    get financeSaveInFlight() { return financeSaveInFlight; }, set financeSaveInFlight(v) { financeSaveInFlight = v; },
+    get financeEditorCurrentSettings() { return financeEditorCurrentSettings; }, set financeEditorCurrentSettings(v) { financeEditorCurrentSettings = v; },
     get ubyOperationOverrides() { return ubyOperationOverrides; }, set ubyOperationOverrides(v) { ubyOperationOverrides = v; },
     get rechargeRecordsVersion() { return rechargeRecordsVersion; }, set rechargeRecordsVersion(v) { rechargeRecordsVersion = v; },
     get generalUnitDataCache() { return generalUnitDataCache; }, set generalUnitDataCache(v) { generalUnitDataCache = v; },
@@ -5192,12 +5738,14 @@ window.UBY_NUCLEO = {
     get networkDistributionState() { return networkDistributionState; }, set networkDistributionState(v) { networkDistributionState = v; },
     get matrizCostsLoadPromise() { return matrizCostsLoadPromise; }, set matrizCostsLoadPromise(v) { matrizCostsLoadPromise = v; },
     get matrizCostsSaveChain() { return matrizCostsSaveChain; }, set matrizCostsSaveChain(v) { matrizCostsSaveChain = v; },
+    get matrizEditingId() { return matrizEditingId; }, set matrizEditingId(v) { matrizEditingId = v; },
     get overviewBackgroundRefresh() { return overviewBackgroundRefresh; }, set overviewBackgroundRefresh(v) { overviewBackgroundRefresh = v; },
     get getUbyChargerRows() { return getUbyChargerRows; }, set getUbyChargerRows(v) { getUbyChargerRows = v; },
     get clientKeyFromCharge() { return clientKeyFromCharge; }, set clientKeyFromCharge(v) { clientKeyFromCharge = v; }
   },
   __perf,
   abbreviatedStationLabel,
+  addMatrizCost,
   aggregateUbyFinanceRow,
   applyInvestorOperationStart,
   applyOverviewRecords,
@@ -5205,6 +5753,7 @@ window.UBY_NUCLEO = {
   applyStationReportFilter,
   availabilityForCurrentCharges,
   buildMonthClosing,
+  buildRechargeRecord,
   buildUbyMonthlySeries,
   calendarDayCount,
   canonicalClientName,
@@ -5238,6 +5787,8 @@ window.UBY_NUCLEO = {
   clubParticipantsStore,
   clubPersonTokens,
   clubWinnerNotice,
+  commitPendingFinancialSettingsSave,
+  compactRechargeDb,
   compactRechargeRecord,
   compareInvestorsByStart,
   completedWorkStatus,
@@ -5256,6 +5807,7 @@ window.UBY_NUCLEO = {
   couponLabelFromDiscountPct,
   courtesyFinanceBreakdown,
   courtesyIdentityCandidates,
+  currentMatrizItems,
   currentWork,
   currentWorkOperationStart,
   customerRegistryIdentityKeys,
@@ -5281,6 +5833,7 @@ window.UBY_NUCLEO = {
   durToHours,
   eachDateInRange,
   effectiveMonthStart,
+  energyPaymentId,
   enrichClubClientRows,
   ensureAllOverviewSessionsLoaded,
   ensureClubParticipantsAutoSync,
@@ -5300,21 +5853,33 @@ window.UBY_NUCLEO = {
   filterChargesByWindow,
   filterGeneralUnitDataByMonth,
   financeChargerStorageKey,
+  financeExactSettingsForMonth,
   financeFixedRuleTotal,
   financeForCharges,
+  financeLegacyValuesFromRules,
   financeMonthKey,
+  financeMonthResolution,
   financePlanningContext,
+  financeRecordWithCurrentSettings,
   financeReportTuple,
   financeRuleCatalog,
+  financeRuleDisplayValue,
   financeRuleField,
   financeRuleLegacyField,
+  financeSaveSnapshot,
+  financeSettingValuesEqual,
+  financeSettingsForMonth,
   financeSettingsForUbyRow,
   financeStoreForScope,
   financeUnitOutcome,
   financeVariableCostPerKWh,
+  financeVersionStateInfo,
   firstChargeByClient,
   firstClientDayMap,
+  fmtBRL,
+  fmtKWh,
   fmtPct,
+  formatFinanceSettingValue,
   formatRechargeDuration,
   generalAcDcStats,
   generalFinanceByUnit,
@@ -5378,8 +5943,10 @@ window.UBY_NUCLEO = {
   matrizRowsMatch,
   matrizScopeCandidates,
   matrizScopeKey,
+  matrizSelectedTargets,
   matrizStationScope,
   matrizTargetCandidates,
+  matrizTargetIdentity,
   matrizTargetMatchesRow,
   matrizWeight,
   median,
@@ -5428,29 +5995,38 @@ window.UBY_NUCLEO = {
   pctChange,
   periodBounds,
   periodWindow,
+  persistFinancialSettingsFromInputs,
   persistMatrizCosts,
   preferredRechargeVersion,
   previousMonthEnergyForFinance,
+  queueFinancialSettingsSave,
   rangeRevenue,
   readCustomerRegistryCloud,
   readJson,
   readLocalFinanceReports,
+  readUbyAreaAccounting,
   recentCharges,
   rechargeControlIssue,
   rechargeEligibleWork,
+  rechargeMetadataSeed,
   rechargePersonIdentity,
   rechargeRecordHasData,
   rechargeSourcePlatform,
+  rechargeSummary,
   rechargeUniqueKey,
   reconcileMonthlyClosingsWithCharges,
   recordHasFullRechargeDetails,
   recurringAbsentClients,
   refreshGeneralRechargeBases,
   reportEndForCharges,
+  resetMatrizCostForm,
   resolveChargeMonthKey,
   rowHasData,
   safeText,
   sameStationName,
+  saveFinancialSettingsRecord,
+  saveLocalRechargeBase,
+  saveLocalRechargeRecordFor,
   saveMatrizCosts,
   saveNetworkDistribution,
   scheduledPaymentApplies,
@@ -5461,9 +6037,11 @@ window.UBY_NUCLEO = {
   selectedPeriodMode,
   selectorChargesForWork,
   selectorWorksWithoutDuplicateStations,
+  serializeCharge,
   setMatrizFeedback,
   setStorageState,
   shiftToPreviousMonth,
+  shouldOpenFullRechargeWork,
   sortFinanceReports,
   stationAvailabilityFor,
   stationAvailabilityKey,
@@ -5479,10 +6057,12 @@ window.UBY_NUCLEO = {
   summarizeUbyChargerRow,
   summaryMetrics,
   syncClubParticipantsFromSheet,
+  syncEnergyPaymentsFromFinanceSnapshot,
   syncGeneralRecordsFromLocal,
   syncOperationalPowerInputs,
   targetOccupationMetrics,
   timeMinutes,
+  toggleUbyOperation,
   tryWriteJson,
   ubyFinanceMonthsForRow,
   ubyNetworkProjectionForRow,
@@ -5514,6 +6094,7 @@ window.UBY_NUCLEO = {
   __base_getUbyChargerRows,
   __base_clientKeyFromCharge,
   RECARGAS_LOCAL_KEY,
+  UBY_AREA_ACCOUNTING_KEY,
   FINANCE_REPORTS_LOCAL_KEY,
   XLSX_CDN_URL,
   CLUB_PARTICIPANTS_LOCAL_KEY,

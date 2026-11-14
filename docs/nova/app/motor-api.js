@@ -266,6 +266,20 @@
     return fullPromise;
   }
 
+  // "Atualizar" sem recarregar a página (antes: a página antiga escondida era refeita do zero).
+  // Zera o que o núcleo guardou da última leitura e relê tudo do banco: obras, bases, histórico
+  // completo e matriz — o mesmo que uma moldura nova fazia.
+  function recarregar() {
+    S.matrizCostsLoaded = false; S.matrizCostsLoadPromise = null;
+    S.overviewSessionsFullyHydrated = false; S.overviewSessionsHydrationPromise = null;
+    S.generalUnitDataCache = null; S.networkHistoryCache = null;
+    S.financeReportArchiveLoaded = false; S.financeReportArchivePromise = null;
+    S.fullRechargeWorkIds = new Set(); S.rechargeFullLoadPromises = new Map();
+    fullPromise = null;
+    readyPromise = N.iniciar().then(() => {});
+    return readyPromise;
+  }
+
   // Avisa a tela quando a conferência do histórico (aberto com o que estava no aparelho) termina.
   const historyListeners = [];
   window.addEventListener("uby:history-updated", e => historyListeners.splice(0).forEach(fn => { try { fn(e.detail || {}); } catch (_) {} }));
@@ -3166,7 +3180,7 @@
     return { list: out, total: out.reduce((s, p) => s + p.amount, 0) };
   }
 
-  window.UBY_MOTOR_API = { onHistoryUpdated, withUntil, alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
+  window.UBY_MOTOR_API = { recarregar, onHistoryUpdated, withUntil, alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, clientRanking, customerWatch, customerDirectory, customerProfile, compare, compareOptions, pricingBase, club, financeV2, financeV2Parity, financeV2Impact,

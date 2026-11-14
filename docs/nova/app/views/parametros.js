@@ -1,60 +1,71 @@
 /*
   Parâmetros e custos — tela nova de edição financeira.
-  Por baixo roda a plataforma original (recargas.html?nova_params=1) invisível,
-  com gravação liberada só para: parâmetros por carregador (obra_recargas_base,
-  update), matriz/pagamentos/cotas (uby_financial_matrix) e log de auditoria.
-  Toda conta e toda gravação são as funções originais; aqui só a interface.
+  Migração (13/11/2026): sem a plataforma original escondida. As contas vêm do núcleo
+  (window.UBY_NUCLEO) e as gravações do editor sem tela (app/core/edicao.js, window.UBY_EDICAO),
+  com as mesmas regras e o mesmo formato no banco. Gravação liberada só nesta tela, só para:
+  parâmetros por carregador (obra_recargas_base, update), matriz/pagamentos/cotas
+  (uby_financial_matrix), documentos financeiros e log de auditoria.
   Segurança: antes de gravar matriz/pagamentos/cotas, relê o bloco da nuvem —
   se a leitura falhar, nada é gravado (evita sobrescrever custos cadastrados).
 */
 (function () {
   "use strict";
   const { fmt, esc, kpi } = UBY;
-  const SRC = "legado/obra-ev/recargas.html?nova_params=1";
   const ui = { tab: "carregador", charger: "", month: "", edits: {}, rules: null, matrixMonth: "", editingCost: "", costForm: null, payMonth: new Date().toISOString().slice(0, 7), payForm: null, policyEdits: null, log: [] };
   let frame = null, readyPromise = null, busy = false, leftAt = 0;
   const STALE_MS = 20 * 60000;
 
-  // ---------- motor original oculto ----------
-  // Abrir a plataforma original custa ~7 s (ela baixa a base inteira). Por isso ela fica aberta depois da
-  // 1ª visita e só é refeita quando se volta a Parâmetros depois de 20 min fora (pega o que outra pessoa gravou).
+  // ---------- motor (núcleo) e editor ----------
+  // "w" continua sendo o motor para esta tela, mas agora é uma fachada sobre o núcleo da
+  // janela principal: as regras são as mesmas; as gravações passam pelo editor sem tela,
+  // que só grava com a tela Parâmetros aberta (UBY_SUPABASE.comGravacao("parametros")).
+  const E = () => window.UBY_EDICAO;
+  let lastWrite = Promise.resolve("");
+  const track = p => { lastWrite = p; return p; };
+  const SB_WRITES = new Set(["saveRechargeMetadata", "saveFinancialMatrix", "createFinanceDocument", "deleteFinanceDocument", "saveBankData", "publishDocument", "revokeDocument", "saveClubData"]);
+  const sbFacade = new Proxy({}, { get(_, k) {
+    const v = window.UBY_SUPABASE?.[k];
+    if (typeof v !== "function") return v;
+    return SB_WRITES.has(k) ? (...a) => E().gravar(() => v.apply(window.UBY_SUPABASE, a)) : v.bind(window.UBY_SUPABASE);
+  } });
+  const OVERRIDES = {
+    UBY_SUPABASE: () => sbFacade,
+    UBY_WRITE_SCOPE: () => (/^#\/parametros(\/|$)/.test(location.hash) ? "parametros" : ""),
+    XLSX: () => window.XLSX, Uint8Array: () => window.Uint8Array, confirm: () => window.confirm.bind(window),
+    getUbyChargerRows: () => (...a) => window.UBY_NUCLEO.state.getUbyChargerRows(...a),
+    saveMatrizCosts: () => (list, opts) => (opts && opts.remote === false ? window.UBY_NUCLEO.saveMatrizCosts(list, opts) : track(E().salvarMatriz(list))),
+    saveNetworkDistribution: () => (dist, opts) => (opts && opts.remote === false ? window.UBY_NUCLEO.saveNetworkDistribution(dist, opts) : track(E().salvarPolitica(dist))),
+    removeMatrizCost: () => id => track(E().desativarCusto(id)),
+    deleteMatrizCost: () => id => track(E().excluirCusto(id)),
+    setScheduledPaymentStatus: () => (id, mk, status) => track(E().situacaoPagamento(id, mk, status)),
+    toggleUbyOperation: () => (workId, key, on) => E().operacaoUby(workId, key, on)
+  };
+  const W = new Proxy({}, { get(_, k) {
+    if (Object.prototype.hasOwnProperty.call(OVERRIDES, k)) return OVERRIDES[k]();
+    const N = window.UBY_NUCLEO;
+    if (N && k in N) return N[k];
+    if (N && N.state && k in N.state) return N.state[k];
+    return undefined;
+  } });
   function engine() {
-    if (readyPromise && frame && document.body.contains(frame) && leftAt && Date.now() - leftAt > STALE_MS && !busy) { frame.remove(); frame = null; readyPromise = null; }
-    leftAt = 0;
-    if (readyPromise && frame && document.body.contains(frame)) return readyPromise;
-    frame = document.createElement("iframe");
-    frame.id = "paramsFrame";
-    frame.title = "Motor de parâmetros";
-    frame.setAttribute("aria-hidden", "true");
-    frame.tabIndex = -1;
-    frame.style.cssText = "position:absolute;width:1200px;height:900px;left:-99999px;top:0;border:0;visibility:hidden";
-    frame.src = SRC + "&t=" + Date.now();
-    document.body.appendChild(frame);
-    readyPromise = new Promise((resolve, reject) => {
-      const t0 = Date.now();
-      const timer = setInterval(async () => {
-        try {
-          const w = frame.contentWindow;
-          const recs = w.eval("Object.keys(allRechargeRecords || {}).length");
-          if (typeof w.renderFinanceiro === "function" && typeof w.addMatrizCost === "function" && recs > 0 && w.UBY_SUPABASE_CLIENT) {
-            clearInterval(timer);
-            try { await w.ensureMatrizCostsLoaded(); } catch (_) {}
-            resolve(w);
-            return;
-          }
-        } catch (_) {}
-        if (Date.now() - t0 > 120000) { clearInterval(timer); reject(new Error("A plataforma original não respondeu em 120 s.")); }
-      }, 500);
-    });
+    if (readyPromise) return readyPromise;
+    readyPromise = (async () => {
+      for (let i = 0; i < 240 && !(window.UBY_NUCLEO && window.UBY_EDICAO && UBY.state.api); i++) await new Promise(r => setTimeout(r, 500));
+      if (!window.UBY_EDICAO) throw new Error("O editor financeiro não carregou.");
+      await UBY.state.api.waitForReady();
+      try { await window.UBY_NUCLEO.ensureMatrizCostsLoaded(); } catch (_) {}
+      frame = true;
+      return W;
+    })();
     readyPromise.catch(() => { readyPromise = null; });
     return readyPromise;
   }
   window.addEventListener("hashchange", () => {
     if (!location.hash.startsWith("#/parametros")) { linkOpened = ""; if (!leftAt) leftAt = Date.now(); }
   });
-  // No computador, abre a cópia de gravação em segundo plano depois que a tela principal terminou de
-  // carregar: a 1ª visita a Contas a pagar / Parâmetros já encontra tudo pronto. No celular não (dados e bateria).
+  // Sem moldura não há o que pré-carregar: o motor já é o da janela principal.
   (function preloadEngine() {
+    return;
     const small = () => { try { return matchMedia("(max-width: 900px)").matches || !!navigator.connection?.saveData; } catch (_) { return true; } };
     let tries = 0;
     const wait = setInterval(() => {
@@ -81,10 +92,9 @@
     return remote;
   }
   async function awaitMatrixSave(w) {
-    await w.eval("matrizCostsSaveChain");
-    const fb = txt(w.document.getElementById("matrizFeedback")) || txt(w.document.getElementById("storageState"));
-    if (/pendente|erro|falha|bloquead|somente leitura/i.test(fb)) throw new Error(fb);
-    return fb;
+    const r = await lastWrite;
+    lastWrite = Promise.resolve("");
+    return typeof r === "string" && r ? r : await E().esperarMatriz();
   }
   // Impostos sobre o recebido: relê extrato e matriz na nuvem, recalcula as linhas automáticas (PIS/COFINS
   // mensal, IRPJ/CSLL trimestral) e só grava se algo mudou. force = linhas que voltam à projeção.
@@ -111,8 +121,7 @@
   function schedTargets(w) {
     const m = memoFor(w);
     if (m.targets) return m.targets;
-    w.renderScheduledPayments(w.getGeneralUnitData());
-    m.targets = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].filter(o => o.value).map(o => ({ value: o.value, text: o.text, station: o.dataset.station || "" }));
+    m.targets = E().alvosPagamento().map(o => ({ ...o, dataset: { station: o.station, workName: o.workName } }));
     return m.targets;
   }
   function chargers(w) {
@@ -141,80 +150,25 @@
     return hit ? hit.key : key;
   }
 
+  // Carregador aberto no editor (sem tela) e a competência escolhida.
+  let openedKey = "", curMk = "";
   async function openCharger(w, key, month) {
     const [workId, station] = key.split("|");
-    const wantStation = w.shouldOpenFullRechargeWork?.(workId, station) ? "" : station;
-    // Na primeira abertura a plataforma original já "está" na primeira obra (ex.: Robert Koch) sem ter
-    // carregado as configurações dela: o formulário vinha zerado (internet R$ 0 em vez de R$ 108,64) e
-    // "Salvar competência" gravaria os zeros. Configuração vazia → abre a obra de novo.
-    // As configurações de cada obra chegam depois da base de recargas: na primeira vez espera chegarem
-    // (até 15 s) e reabre a obra, para o formulário não ler o padrão vazio.
-    const recFs = () => w.eval(`(function(id){ const r = allRechargeRecords[id]; const fs = r && (r.financialSettings || (r.summary || {}).financialSettings); return fs ? Object.keys(fs).length : 0; })(${JSON.stringify(workId)})`);
-    w.__novaFsReady = w.__novaFsReady || {};
-    let first = false;
-    if (!w.__novaFsReady[workId]) {
-      for (let i = 0; i < 30 && !recFs(); i++) await new Promise(r => setTimeout(r, 500));
-      w.__novaFsReady[workId] = true; first = true;
-    }
-    const empty = w.eval("!financialSettings || !Object.keys(financialSettings).length");
-    if (first || empty || String(w.eval("currentWorkId")) !== workId || String(w.eval("currentStationReportName") || "") !== wantStation) {
-      await w.openWorkReport(workId, "mensal", station);
-    }
-    // openWorkReport volta antes das configurações da obra entrarem na tela original: espera.
-    if (recFs()) for (let i = 0; i < 30 && w.eval("!financialSettings || !Object.keys(financialSettings).length"); i++) await new Promise(r => setTimeout(r, 500));
-    w.renderFinanceiro(true);
-    const sel = w.document.getElementById("financeMonthSelector");
-    const months = [...(sel?.options || [])].map(o => o.value);
+    if (openedKey !== key || !E().atual()) { await E().abrir(workId, station); openedKey = key; }
+    const months = E().meses();
     const mk = months.includes(month) ? month : (months.at(-1) || "");
-    if (sel && mk) sel.value = mk;
-    w.renderFinanceiro(true);
+    curMk = mk;
     return { months, mk };
   }
+  const forgetOpened = () => { openedKey = ""; };
 
   function readForm(w) {
-    const d = w.document;
-    const labelOf = el => {
-      const l = el.closest("label");
-      if (!l) return "";
-      return [...l.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(" ").replace(/\s+/g, " ").trim();
-    };
-    const rows = [...d.querySelectorAll("tr[data-finance-setting-key]")].map(tr => ({
-      key: tr.dataset.financeSettingKey, id: tr.id || "", models: tr.classList.contains("finance-model-row") ? String(tr.dataset.models || "") : null,
-      group: txt(tr.querySelector(".setting-group")), name: txt(tr.querySelector(".setting-name")), rule: txt(tr.querySelector(".setting-rule")),
-      previous: txt(tr.querySelector("[data-finance-setting-previous]")), state: txt(tr.querySelector("[data-finance-setting-state]")),
-      controls: [...tr.querySelectorAll(".setting-value input:not([type=hidden]), .setting-value select")].map(el => ({
-        id: el.id, tag: el.tagName, type: el.type || "", value: el.value, min: el.min, max: el.max, step: el.step, placeholder: el.placeholder || "", label: labelOf(el),
-        leaseOnly: !!el.closest("[data-energy-lease-field]"),
-        options: el.tagName === "SELECT" ? [...el.options].map(o => ({ value: o.value, text: o.text })) : []
-      })).filter(c => c.id)
-    }));
-    const rules = kind => [...d.querySelectorAll(`tr[data-finance-rule-kind="${kind}"]`)].map(tr => ({
-      id: tr.dataset.ruleId, custom: tr.dataset.custom === "true",
-      label: tr.querySelector('[data-rule-field="label"]')?.value || "", enabled: !!tr.querySelector('[data-rule-field="enabled"]')?.checked,
-      basis: tr.querySelector('[data-rule-field="basis"]')?.value || "fixed", value: Number(tr.querySelector('[data-rule-field="value"]')?.value || 0),
-      scope: tr.querySelector('[data-rule-field="scope"]')?.value || "operational", previous: txt(tr.querySelector("[data-rule-previous]"))
-    }));
-    const summary = [...d.querySelectorAll("#financeCommandSummary .finance-command-metric")].map(m => ({ label: txt(m.querySelector("span")), value: txt(m.querySelector("strong")), sub: txt(m.querySelectorAll("span")[1]) }));
-    return {
-      rows, cost: rules("cost"), revenue: rules("revenue"), summary,
-      energySummary: txt(d.getElementById("financeEnergyCompositionSummary")),
-      versionSource: txt(d.getElementById("financeVersionSource")), versionHelp: txt(d.getElementById("financeVersionSourceHelp"))
-    };
+    const f = E().formulario(curMk, ui.edits, ui.rules);
+    return { rows: f.rows, cost: f.cost, revenue: f.revenue, summary: f.summary, energySummary: f.energySummary, versionSource: f.versionSource, versionHelp: f.versionHelp };
   }
 
-  // Aplica as edições da tela nos campos da plataforma original e recalcula (sem gravar).
-  function applyToEngine(w) {
-    const d = w.document;
-    Object.entries(ui.edits).forEach(([id, value]) => { const el = d.getElementById(id); if (el) el.value = value; });
-    if (ui.rules) {
-      w.renderFinanceRuleInputs("financeCostRuleRows", ui.rules.cost, "cost");
-      w.renderFinanceRuleInputs("financeRevenueRuleRows", ui.rules.revenue, "revenue");
-    }
-    w.updateFinanceModelVisibility(d.getElementById("financeOperationModel")?.value || "uby");
-    w.updateOwnerTransferModeVisibility(d.getElementById("ownerTransferMode")?.value || "gross");
-    try { w.updateEnergyCompositionSummary(); } catch (_) {}
-    w.renderFinanceiro(false);
-  }
+  // As edições da tela entram direto no cálculo do editor (formulario/salvarCompetencia): nada a aplicar.
+  function applyToEngine(w) {}
 
   // ---------- telas ----------
   function modelVisible(row, model, transfer) {
@@ -492,9 +446,7 @@
     const rules = { cost: form.cost.map(r => ({ ...r })), revenue: form.revenue.map(r => ({ ...r })) };
     mutate(rules);
     ui.edits = {}; ui.rules = rules;
-    applyToEngine(w);
-    w.scheduleFinancialSettingsSave();
-    await w.commitPendingFinancialSettingsSave();
+    await E().salvarCompetencia(curMk, ui.edits, ui.rules);
     ui.edits = {}; ui.rules = null;
     checkPending(w);
     return months.includes(month) ? month : "";
@@ -502,35 +454,11 @@
   const newRule = (label, basis, value) => ({ id: `custom-cost-${Date.now()}`, label, enabled: true, basis, value: Number(value), scope: "operational", custom: true });
   async function addScheduled(w, p, fallbackMonth) {
     await resyncMatrix(w);
-    w.renderScheduledPayments(w.getGeneralUnitData());
-    const set = (id, v) => { const el = w.document.getElementById(id); if (el) el.value = v ?? ""; };
-    set("scheduledPaymentTarget", p.target); set("scheduledPaymentName", p.name); set("scheduledPaymentSupplier", p.supplier); set("scheduledPaymentCategory", p.category);
-    set("scheduledPaymentAmount", p.amount); set("scheduledPaymentDueDay", p.dueDay || 11); set("scheduledPaymentStartMonth", p.startMonth || fallbackMonth); set("scheduledPaymentEndMonth", p.endMonth);
-    w.addScheduledPayment();
-    return await awaitMatrixSave(w);
+    return await E().salvarPagamento(p, fallbackMonth);
   }
   async function saveMatrixCost(w, f, mk, editingId) {
     await resyncMatrix(w);
-    const monthSel = w.document.getElementById("financeMonthSelector");
-    if (monthSel && [...monthSel.options].some(o => o.value === mk)) monthSel.value = mk;
-    w.renderMatrizCosts(w.getGeneralUnitData());
-    if (editingId) w.editMatrizCost(editingId); else w.resetMatrizCostForm();
-    const set = (id, v) => { const el = w.document.getElementById(id); if (el) el.value = v ?? ""; };
-    set("matrizNewName", f.name); set("matrizNewValue", f.amount); set("matrizCostCategory", f.category); set("matrizCostSupplier", f.supplier);
-    set("matrizCostKind", f.kind); set("matrizCostInstallments", f.kind === "installment" ? f.installments || 1 : 1);
-    // Sem isto o parcelado ficava com cobertura 1: todas as parcelas caíam no resultado do primeiro mês.
-    // A tela original desta página não tem o campo; o motor lê pelo id, então ele é criado oculto.
-    if (!w.document.getElementById("matrizCostCoverageMonths")) {
-      const hidden = w.document.createElement("input");
-      hidden.type = "hidden"; hidden.id = "matrizCostCoverageMonths";
-      w.document.body.appendChild(hidden);
-    }
-    set("matrizCostCoverageMonths", f.kind === "installment" ? Math.max(1, Math.round(Number(f.coverage) || Number(f.installments) || 1)) : 1); set("matrizCostStartMonth", f.startMonth || new Date().toISOString().slice(0, 7)); set("matrizCostEndMonth", f.endMonth);
-    set("matrizCostDueDay", f.dueDay || 1); set("matrizCostMethod", f.method); set("matrizCostCustomShares", f.shares); set("matrizCostDocument", f.documentRef); set("matrizCostNotes", f.notes);
-    const tsel = w.document.getElementById("matrizCostTargets");
-    if (tsel) [...tsel.options].forEach(o => { o.selected = f.targets.includes(o.value); });
-    w.addMatrizCost();
-    return await awaitMatrixSave(w);
+    return await E().salvarCustoMatriz(f, mk, editingId);
   }
 
   // ---------- checklist do fechamento ----------
@@ -1223,7 +1151,7 @@
   // ---------- operação: quem entra na UBY, potência, horários e cortesia ----------
   const DAYS = [["1", "Seg"], ["2", "Ter"], ["3", "Qua"], ["4", "Qui"], ["5", "Sex"], ["6", "Sáb"], ["0", "Dom"]];
   function checkPending(w) {
-    const st = txt(w.document.getElementById("storageState"));
+    const st = txt({ textContent: window.UBY_NUCLEO.status().message });
     if (/pendente/i.test(st)) throw new Error(`Não gravou na nuvem: ${st}`);
     return st;
   }
@@ -1559,7 +1487,10 @@
     await w.UBY_SUPABASE.saveRechargeMetadata(workId, { workId, workName, financialSettings: fs });
     // Mantém a cópia em memória da plataforma oculta igual à nuvem, para que um
     // "Salvar competência" depois não grave uma versão sem as faturas.
-    w.eval(`(function(fs, id){ const r = allRechargeRecords[id]; if (r) { r.financialSettings = fs; r.summary = { ...(r.summary || {}), financialSettings: fs }; } if (String(currentWorkId) === id) financialSettings = fs; })(${JSON.stringify(fs)}, ${JSON.stringify(String(workId))})`);
+    { const S = window.UBY_NUCLEO.state, r = S.allRechargeRecords[String(workId)];
+      if (r) { r.financialSettings = fs; r.summary = { ...(r.summary || {}), financialSettings: fs }; }
+      if (String(S.currentWorkId) === String(workId)) S.financialSettings = fs;
+      forgetOpened(); }
     return true;
   }
 
@@ -2483,7 +2414,7 @@
       const tx = (data.bank?.transactions || []).find(t => t.id === btn.dataset.bankNewSave); if (!tx) return;
       const f = { category: "Internet / dados", name: tx.description, supplier: tx.description, ...(ui.bankNewForm || {}) };
       target.querySelectorAll("[data-bn]").forEach(el => { f[el.dataset.bn] = el.value; });
-      const opt = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].find(o => o.value === f.target);
+      const opt = schedTargets(w).find(o => o.value === f.target);
       if (!opt || !String(f.name || "").trim()) { alert("Escolha o carregador e dê um nome à conta."); return; }
       const mk = tx.date.slice(0, 7), value = Math.round(-tx.amount * 100) / 100;
       ui.bankNew = ""; ui.bankNewForm = null;
@@ -2530,9 +2461,7 @@
         await resyncMatrix(w);
         await openCharger(w, c.key, mk);
         ui.edits = { financeEnergyCost: String(rate) }; ui.rules = null;
-        applyToEngine(w);
-        w.scheduleFinancialSettingsSave();
-        await w.commitPendingFinancialSettingsSave();
+        await E().salvarCompetencia(curMk, ui.edits, ui.rules);
         ui.edits = {}; ui.charger = c.key; ui.month = mk;
         let saved = "";
         if (ui.piFile) {
@@ -2727,14 +2656,12 @@
     target.querySelectorAll("[data-rule-add]").forEach(b => b.onclick = () => { ensureRules(); const kind = b.dataset.ruleAdd; ui.rules[kind].push({ id: `custom-${kind}-${Date.now()}`, label: kind === "revenue" ? "Nova receita" : "Novo custo", enabled: true, basis: "fixed", value: 0, scope: "operational", custom: true }); draw(target, w); });
     target.querySelectorAll("[data-rule-del]").forEach(b => b.onclick = () => { ensureRules(); const [kind, i] = b.dataset.ruleDel.split("|"); ui.rules[kind].splice(Number(i), 1); draw(target, w); });
     if ($("#pmSimulate")) $("#pmSimulate").onclick = () => draw(target, w);
-    if ($("#pmDiscard")) $("#pmDiscard").onclick = () => { ui.edits = {}; ui.rules = null; w.renderFinanceiro(true); draw(target, w); };
+    if ($("#pmDiscard")) $("#pmDiscard").onclick = () => { ui.edits = {}; ui.rules = null; draw(target, w); };
     if ($("#pmSave")) $("#pmSave").onclick = () => run(target, w, `Parâmetros ${data.chargers.find(x => x.key === ui.charger)?.station || ""} · ${ui.month}`, async () => {
       await resyncMatrix(w); // a gravação também atualiza os pagamentos de energia da matriz
-      applyToEngine(w);
-      w.scheduleFinancialSettingsSave();
-      await w.commitPendingFinancialSettingsSave();
+      const msg = await E().salvarCompetencia(curMk, ui.edits, ui.rules);
       ui.edits = {}; ui.rules = null;
-      return txt(w.document.getElementById("storageState")) || "competência salva";
+      return msg || "competência salva";
     });
     // --- matriz ---
     if ($("#pmMatrixMonth")) $("#pmMatrixMonth").onchange = e => { ui.matrixMonth = e.target.value; ui.costForm = null; draw(target, w); };
@@ -2803,8 +2730,7 @@
       if (!p.target || !String(p.name || "").trim() || !(Number(p.amount) > 0) || !/^\d{4}-\d{2}$/.test(p.startMonth || "") || (p.endMonth && !/^\d{4}-\d{2}$/.test(p.endMonth))) { log("Pagamento: informe carregador, nome, valor e mês de início.", "bad"); draw(target, w); return; }
       run(target, w, `Pagamento ${p.name}`, async () => {
         await resyncMatrix(w);
-        w.renderScheduledPayments(w.getGeneralUnitData());
-        const opt = [...(w.document.getElementById("scheduledPaymentTarget")?.options || [])].find(o => o.value === p.target);
+        const opt = schedTargets(w).find(o => o.value === p.target);
         const list = w.loadMatrizCosts();
         const idx = list.findIndex(c => c.id === id && c.scheduledPayment);
         if (idx < 0) throw new Error("Este pagamento não existe mais na nuvem (pode ter sido removido em outra aba). Nada foi gravado.");
@@ -2867,7 +2793,7 @@
       const [workId, station] = el.dataset.opPower.split("|");
       const kw = Number(el.value);
       if (!(kw >= 1 && kw <= 360)) { log("Potência: informe entre 1 e 360 kW.", "bad"); draw(target, w); return; }
-      run(target, w, `Potência do local · ${station}`, async () => { await w.openWorkReport(workId, "mensal", station); await w.saveOperationalPowerFromInputs(kw); checkPending(w); return `${kw} kW`; });
+      run(target, w, `Potência do local · ${station}`, async () => { const r = await E().salvarPotencia(workId, kw); forgetOpened(); return r; });
     });
     if ($("#pmOpSave")) $("#pmOpSave").onclick = () => {
       const [workId, station] = ui.opCharger.split("|");
@@ -2876,23 +2802,11 @@
       const closedDays = DAYS.filter(([v]) => !(f.openDays || []).includes(v)).map(([, l]) => l);
       if (closedDays.length && !confirm(`${station} vai ficar FECHADO em: ${closedDays.join(", ")}.\n\nNesses dias a ocupação fica zerada, mesmo com recarga. Confirma?`)) return;
       run(target, w, `Horários e cortesia · ${station}`, async () => {
-        try { w.openStationLayoutConfiguration(workId, station); } catch (_) { /* o modal pode não abrir na moldura invisível; os campos são preenchidos abaixo */ }
-        const d = w.document;
-        const set = (id, v) => { const el = d.getElementById(id); if (el) el.value = v ?? ""; };
-        set("stationLayoutWorkId", workId); set("stationLayoutSourceName", station);
-        set("stationLayoutPlantName", f.plantName); set("stationLayoutAcChargers", f.acChargers); set("stationLayoutAcPlugs", f.acPlugs);
-        set("stationLayoutDcChargers", f.dcChargers); set("stationLayoutDcPlugs", f.dcPlugs); set("stationLayoutOperationStart", f.operationStart);
-        const h24 = d.getElementById("stationLayoutOpen24h"); if (h24) h24.checked = f.open24h !== false;
-        set("stationLayoutOpenTime", f.openTime || "08:00"); set("stationLayoutCloseTime", f.closeTime || "22:00");
-        set("stationLayoutReferenceTariff", f.referenceTariffPerKwh); set("stationLayoutCourtesyTreatment", f.courtesyTreatment || "operational");
-        set("stationLayoutCourtesyResponsible", f.courtesyResponsible); set("stationLayoutCourtesyUsers", f.courtesyUsersText);
-        d.querySelectorAll(".station-open-day").forEach(i => { i.checked = (f.openDays || []).includes(String(i.value)); });
         const openSet = new Set((f.openDays || []).map(String));
-        w.__novaDayHours = Object.fromEntries(Object.entries(f.dayHours || {}).filter(([d]) => openSet.has(String(d)))
+        const dayHours = Object.fromEntries(Object.entries(f.dayHours || {}).filter(([d]) => openSet.has(String(d)))
           .map(([d, r]) => [d, r.open24h === true ? { open24h: true } : { open24h: false, openTime: r.openTime || "08:00", closeTime: r.closeTime || "22:00" }]));
-        try { await w.saveStationLayoutConfiguration(); } finally { delete w.__novaDayHours; }
-        try { d.getElementById("stationLayoutDialog")?.close(); } catch (_) {}
-        checkPending(w);
+        await E().salvarHorario(workId, station, f, dayHours);
+        forgetOpened();
         ui.opForm = null;
         return "configuração salva";
       });
