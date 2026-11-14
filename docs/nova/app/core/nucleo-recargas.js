@@ -10,7 +10,7 @@
   configurações financeiras, obra/estação corrente usadas por alguns cálculos).
 */
 (function () {
-const NUCLEO_STATUS = { message: "", isError: false, at: 0 };
+const NUCLEO_STATUS = { message: "", isError: false, at: 0, feedback: { msg: "", cls: "" } };
 // Competência aberta no editor de Parâmetros (vazia = a mais recente, como a página antiga).
 const NUCLEO_EDITOR = { month: "" };
 // Regras trocáveis em tempo de execução (ver TROCAVEIS em ferramentas/extrair-nucleo.js).
@@ -61,6 +61,8 @@ let rechargeLoadSequence = 0;
 
 let generalRefreshSequence = 0;
 
+let queuedRechargeImports = 0;
+
 let overviewInsightsTimers = { geral: null, uby: null };
 
 let overviewSessionsFullyHydrated = false;
@@ -73,6 +75,8 @@ let rechargeFullLoadPromises = new Map();
 
 const RECARGAS_LOCAL_KEY = 'uby-recargas-db-v1';
 
+const RECARGAS_IMPORT_UNDO_KEY = 'uby-recargas-import-undo-v1';
+
 const UBY_AREA_ACCOUNTING_KEY = 'uby-area-accounting-v1';
 
 const FINANCE_REPORTS_LOCAL_KEY = 'uby-finance-reports-v1';
@@ -80,6 +84,8 @@ const FINANCE_REPORTS_LOCAL_KEY = 'uby-finance-reports-v1';
 const XLSX_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 
 const CLUB_PARTICIPANTS_LOCAL_KEY = 'uby-club-participants-v1';
+
+const CUSTOMER_REGISTRY_LOCAL_KEY = 'uby-customer-registry-v1';
 
 const OVERVIEW_PAGE_SIZE = 1000;
 
@@ -152,6 +158,15 @@ const RECHARGE_STATION_BLOCKLIST_BY_WORK = {
 // Obras sincronizadas pela Spott: não há confirmação manual para exceções.
 // O CSV precisa conter somente o Local oficial da obra de destino. Assim uma
 // seleção equivocada nunca consegue gravar dados em outra base.
+
+const SPOTT_REQUIRED_LOCAL_BY_WORK = Object.freeze({
+  'posto-central-jk': 'UBY RECHARGE - CENTRAL JK',
+  malassise: 'UBY RECHARGE - ROBERT KOCH',
+  'ac-posto-central-jk': 'UBY RECHARGE - CENTRAL JK AC',
+  rio: 'RIO BEACH SPORTS EV'
+});
+// Obras/estações removidas do painel de recargas (não aparecem em nenhuma
+// visão nem entram nos totais). Não apaga dados no Supabase — é só filtro.
 
 const RECHARGE_WORK_BLOCKLIST_TERMS = ['go grid', 'gogrid'];
 
@@ -889,8 +904,78 @@ function saveLocalRechargeRecordFor(workId, record) {
   return { mode: 'indexeddb', size: fullSave.size };
 }
 
+async function saveRechargeBase(options = {}) {
+  if (currentStationReportName) {
+    setStorageState(`Visualizacao filtrada por estacao: <strong>${currentStationReportName}</strong>. A base completa nao foi sobrescrita.`, true);
+    return;
+  }
+  if (!allCharges.length && !loadedFiles.length) {
+    if (!options.allowEmpty) {
+      setStorageState(`Gravacao vazia bloqueada para <strong>${currentWorkName}</strong>. Use a exclusao confirmada para apagar uma base.`, true);
+      return;
+    }
+    const emptyRecord = buildRechargeRecord();
+    emptyRecord.mutationIntent = options.mutationIntent || 'explicit_empty_replace';
+    emptyRecord.summary = {
+      ...(emptyRecord.summary || {}),
+      clearedAt: new Date().toISOString(),
+      clearReason: emptyRecord.mutationIntent
+    };
+    emptyRecord.cloudSyncPending = true;
+    saveLocalRechargeBase(emptyRecord);
+    allRechargeRecords[currentWorkId] = hydratedRechargeRecord(emptyRecord, currentWorkId);
+    markRechargeRecordsDirty();
+    if (window.UBY_SUPABASE?.saveRechargeBase) {
+      await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, emptyRecord);
+      emptyRecord.cloudSyncPending = false;
+      emptyRecord.cloudSyncedAt = new Date().toISOString();
+      saveLocalRechargeBase(emptyRecord);
+      allRechargeRecords[currentWorkId] = hydratedRechargeRecord(emptyRecord, currentWorkId);
+      markRechargeRecordsDirty();
+    }
+    return;
+  }
+  const record = buildRechargeRecord();
+  record.partialDetails = false;
+  record.mutationIntent = options.mutationIntent || 'save';
+  record.cloudSyncPending = true;
+  const localSave = saveLocalRechargeBase(record);
+  allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
+  markRechargeRecordsDirty();
+  if (!record) return;
+  if (!window.UBY_SUPABASE?.saveRechargeBase) {
+    const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
+    setStorageState(`Salvo neste navegador para <strong>${currentWorkName}</strong>. Banco ainda nao carregado.${localMode}`);
+    return;
+  }
+  try {
+    const result = await window.UBY_SUPABASE.saveRechargeBase(currentWorkId, record);
+    record.cloudSyncPending = false;
+    record.cloudSyncedAt = new Date().toISOString();
+    fullRechargeWorkIds.add(String(currentWorkId));
+    saveLocalRechargeBase(record);
+    allRechargeRecords[currentWorkId] = hydratedRechargeRecord(record, currentWorkId);
+    markRechargeRecordsDirty();
+    const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
+    setStorageState(`Banco atualizado para <strong>${currentWorkName}</strong>: ${result.files} arquivo(s), ${result.charges} recarga(s).${localMode}`);
+  } catch (err) {
+    const localMode = localSave?.mode === 'compact' ? ' Cache local leve por limite do navegador.' : '';
+    setStorageState(`Salvo neste navegador para <strong>${currentWorkName}</strong>. Supabase pendente: ${err.message}.${localMode}`, true);
+  }
+}
+
 function normalizeStationForCompare(value) {
   return normalizeTextForInsight(safeText(value)).replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function requiredSpottLocalForWork(workId = '') {
+  return SPOTT_REQUIRED_LOCAL_BY_WORK[String(workId || '').trim()] || '';
+}
+
+function hasExactRequiredSpottLocal(workId = '', stationName = '') {
+  const required = requiredSpottLocalForWork(workId);
+  if (!required) return true;
+  return normalizeStationForCompare(stationName) === normalizeStationForCompare(required);
 }
 
 function sameStationName(a, b) {
@@ -1178,6 +1263,42 @@ function shouldOpenFullRechargeWork(workId, stationName = '') {
   return String(workId) === 'malassise' || text.includes('robert koch') || text.includes('malassise');
 }
 
+async function ensureCurrentWorkBaseReadyForImport() {
+  const targetWorkId = String(currentWorkId || '');
+  setFeedback('Carregando o historico completo antes de importar...', 'up-loading');
+  const record = await loadRechargeBase(targetWorkId, { requireCloud: true });
+  if (String(currentWorkId || '') !== targetWorkId) {
+    throw new Error('A obra selecionada mudou durante a leitura. Selecione novamente o arquivo.');
+  }
+  const fullRecord = allRechargeRecords[targetWorkId] || record;
+  if (!recordHasFullRechargeDetails(fullRecord) || !fullRechargeWorkIds.has(targetWorkId)) {
+    throw new Error('Nao foi possivel confirmar a base integral. A importacao foi bloqueada para preservar o acumulado.');
+  }
+  applyRechargeRecord(fullRecord, 'Supabase');
+  return fullRecord;
+}
+
+function storeImportUndo(label = 'última importação') {
+  tryWriteJson(RECARGAS_IMPORT_UNDO_KEY, {
+    workId: currentWorkId,
+    workName: currentWorkName,
+    label,
+    createdAt: new Date().toISOString(),
+    record: buildRechargeRecord()
+  });
+  updateCorrectionButtons();
+}
+
+function pruneLoadedFilesWithoutCharges() {
+  loadedFiles = loadedFiles.filter(fileItem => {
+    const fileMonth = fileItem?.month || '';
+    const fileKey = fileItem?.fileKey || fileSourceKey(fileMonth, fileItem?.name, fileItem?.station || '');
+    return allCharges.some(charge =>
+      ((charge._fileKey && charge._fileKey === fileKey) || (!charge._fileKey && charge._file === fileItem?.name)) && (!fileMonth || chargeMonthKey(charge) === fileMonth)
+    );
+  });
+}
+
 function parseNumber(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   const raw = String(value ?? '').trim();
@@ -1257,6 +1378,16 @@ function normalizeHeaderName(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+}
+
+function findColumnIndex(headers = [], names = [], fallbackIndex = -1) {
+  const wanted = names.map(normalizeHeaderName);
+  const found = headers.findIndex(header => wanted.includes(normalizeHeaderName(header)));
+  return found >= 0 ? found : fallbackIndex;
+}
+
+function readCell(row = [], index = -1) {
+  return index >= 0 ? row[index] : '';
 }
 
 function fileSourceKey(month = '', name = '', station = '') {
@@ -1405,6 +1536,164 @@ function excelSerialToDate(value) {
   return new Date(Math.round((n - 25569) * 86400 * 1000));
 }
 
+function dateToInputText(date) {
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+}
+
+function splitDateRange(value, fallbackEnd = '') {
+  if (value instanceof Date) return [dateToInputText(value), fallbackEnd instanceof Date ? dateToInputText(fallbackEnd) : String(fallbackEnd || '')];
+  if (typeof value === 'number') return [dateToInputText(excelSerialToDate(value)), fallbackEnd instanceof Date ? dateToInputText(fallbackEnd) : String(fallbackEnd || '')];
+  const raw = String(value || '').trim();
+  const parts = raw.split(/\s+(?:-|–|—)\s+/);
+  if (parts.length >= 2) return [parts[0].trim(), parts.slice(1).join(' - ').trim()];
+  return [raw, fallbackEnd instanceof Date ? dateToInputText(fallbackEnd) : String(fallbackEnd || '')];
+}
+
+function hasHeader(headers = [], names = []) {
+  const normalized = headers.map(normalizeHeaderName);
+  return names.some(name => normalized.includes(normalizeHeaderName(name)));
+}
+
+function rechargeSheetRows(workbook) {
+  const preferred = workbook.Sheets['Recargas'];
+  const sheetName = preferred ? 'Recargas' : workbook.SheetNames[0];
+  const ws = preferred || workbook.Sheets[sheetName];
+  if (!ws) throw new Error('Nenhuma aba encontrada no arquivo.');
+  let rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+  if (rows.length < 2) throw new Error('Planilha sem dados de recargas.');
+  // Mesmo anexo do leitor em segundo plano: aba "Transações" do relatório de fechamento da Raio.
+  const tx = /fechamento/i.test(String(rows[0]?.[0] || '')) && workbook.SheetNames.find(n => /^transa/i.test(n) && workbook.Sheets[n] !== ws);
+  if (tx) rows = rows.concat([['__ABA__', tx]], XLSX.utils.sheet_to_json(workbook.Sheets[tx], { header: 1, raw: false, defval: '' }));
+  return { rows, sheetName };
+}
+
+function detectRechargeLayout(rows = []) {
+  const scanRows = rows.slice(0, 12);
+  for (let rowIndex = 0; rowIndex < scanRows.length; rowIndex++) {
+    const headers = scanRows[rowIndex] || [];
+    if (
+      hasHeader(headers, ['Aplicativo']) &&
+      hasHeader(headers, ['Motorista']) &&
+      hasHeader(headers, ['E-mail do motorista']) &&
+      hasHeader(headers, ['Início da Transação', 'Inicio da Transacao'])
+    ) {
+      return {
+        type: 'spott',
+        platform: 'Spott',
+        headerRow: rowIndex,
+        allowMultiMonth: false,
+        cols: {
+          date: findColumnIndex(headers, ['Data']),
+          station: findColumnIndex(headers, ['Local']),
+          company: findColumnIndex(headers, ['Empresa']),
+          app: findColumnIndex(headers, ['Aplicativo']),
+          // Planilha nova da Spott (nov/2026): forma de pagamento (Carteira, Cartão, APPLE_PAY...) e acionamento (App, QR Code, Deep link).
+          method: findColumnIndex(headers, ['Forma de pagamento', 'Forma de Pagamento']),
+          trigger: findColumnIndex(headers, ['Acionamento']),
+          driver: findColumnIndex(headers, ['Motorista']),
+          email: findColumnIndex(headers, ['E-mail do motorista', 'Email do motorista', 'E-mail']),
+          charger: findColumnIndex(headers, ['Carregador']),
+          energy: findColumnIndex(headers, ['Energia']),
+          totalValue: findColumnIndex(headers, ['Valor']),
+          vehicle: findColumnIndex(headers, ['Veículo', 'Veiculo']),
+          startLocal: findColumnIndex(headers, ['Início da Transação', 'Inicio da Transacao']),
+          endCharge: findColumnIndex(headers, ['Fim do Carregamento']),
+          endLocal: findColumnIndex(headers, ['Fim da Transação', 'Fim da Transacao']),
+          voucher: findColumnIndex(headers, ['Cupom']),
+          sponsor: findColumnIndex(headers, ['Patrocinador']),
+          duration: findColumnIndex(headers, ['Duração', 'Duracao']),
+          status: findColumnIndex(headers, ['Recargas', 'Status']),
+          phone: findColumnIndex(headers, ['Telefone', 'Celular', 'Telefone celular', 'Phone', 'Mobile', 'WhatsApp', 'Whatsapp'])
+        }
+      };
+    }
+    if (
+      hasHeader(headers, ['E-mail']) &&
+      hasHeader(headers, ['Estacao', 'Estação']) &&
+      hasHeader(headers, ['ID da Transacao', 'ID da Transação']) &&
+      hasHeader(headers, ['Energia em kWh']) &&
+      hasHeader(headers, ['Inicio (Horario Local)', 'Início (Horário Local)'])
+    ) {
+      return {
+        type: 'gogrid',
+        platform: 'Go Grid',
+        headerRow: rowIndex,
+        allowMultiMonth: true,
+        cols: {
+          email: findColumnIndex(headers, ['E-mail']),
+          station: findColumnIndex(headers, ['Estacao', 'Estação']),
+          plug: findColumnIndex(headers, ['Plug']),
+          transactionId: findColumnIndex(headers, ['ID da Transacao', 'ID da Transação']),
+          energy: findColumnIndex(headers, ['Energia em kWh']),
+          totalValue: findColumnIndex(headers, ['Valor Total']),
+          energyValue: findColumnIndex(headers, ['Valor da Energia']),
+          paymentType: findColumnIndex(headers, ['Forma de Pagamento']),
+          phone: findColumnIndex(headers, ['Telefone', 'Celular', 'Telefone celular', 'Phone', 'Mobile', 'WhatsApp', 'Whatsapp']),
+          startLocal: findColumnIndex(headers, ['Inicio (Horario Local)', 'Início (Horário Local)']),
+          endLocal: findColumnIndex(headers, ['Fim (Horario Local)', 'Fim (Horário Local)']),
+          duration: findColumnIndex(headers, ['Duracao', 'Duração']),
+          couponValue: findColumnIndex(headers, ['Valor do Cupom']),
+          couponBenefit: findColumnIndex(headers, ['Beneficio do Cupom', 'Benefício do Cupom']),
+          idleValue: findColumnIndex(headers, ['Taxa de Ociosidade']),
+          socInitial: findColumnIndex(headers, ['SoC inicial']),
+          socFinal: findColumnIndex(headers, ['SoC final']),
+          vehicleBrand: findColumnIndex(headers, ['Marca', 'Marca do Veiculo', 'Marca do Veículo', 'Fabricante']),
+          vehicleModel: findColumnIndex(headers, ['Modelo', 'Modelo do Veiculo', 'Modelo do Veículo', 'Veiculo', 'Veículo']),
+          status: findColumnIndex(headers, ['Status', 'Status da Recarga', 'Status da Carga']),
+          failureReason: findColumnIndex(headers, ['Motivo', 'Motivo da Falha', 'Erro', 'Falha'])
+        }
+      };
+    }
+    // Raio (operadora em paralelo com a Spott no Robert Koch desde nov/2026): "Relatório de
+    // fechamento" com uma linha por DIA (Cargas, Energia, Bruto, Taxa, Líquido), sem motorista
+    // nem horário. Cada dia vira as recargas daquele dia (ver raioDailyCharges).
+    if (
+      hasHeader(headers, ['Data']) &&
+      hasHeader(headers, ['Cargas']) &&
+      hasHeader(headers, ['Energia (kWh)']) &&
+      hasHeader(headers, ['Bruto (R$)']) &&
+      hasHeader(headers, ['Líquido (R$)', 'Liquido (R$)'])
+    ) {
+      return {
+        type: 'raio',
+        platform: 'Raio',
+        headerRow: rowIndex,
+        allowMultiMonth: true,
+        cols: {
+          date: findColumnIndex(headers, ['Data']),
+          count: findColumnIndex(headers, ['Cargas']),
+          energy: findColumnIndex(headers, ['Energia (kWh)']),
+          minutes: findColumnIndex(headers, ['Minutos carregando']),
+          idleMinutes: findColumnIndex(headers, ['Minutos ociosos']),
+          gross: findColumnIndex(headers, ['Bruto (R$)']),
+          card: findColumnIndex(headers, ['Cartão (R$)', 'Cartao (R$)']),
+          rfid: findColumnIndex(headers, ['RFID (R$)']),
+          fee: findColumnIndex(headers, ['Taxa (R$)']),
+          net: findColumnIndex(headers, ['Líquido (R$)', 'Liquido (R$)'])
+        }
+      };
+    }
+  }
+  const headers = rows[0] || [];
+  return {
+    type: 'uby',
+    platform: 'Padrao UBY',
+    headerRow: 0,
+    allowMultiMonth: false,
+    cols: {
+      voucher: findColumnIndex(headers, ['Voucher utilizado', 'Voucher'], 26),
+      phone: findColumnIndex(headers, ['Telefone', 'Celular', 'Telefone celular', 'Phone', 'Mobile', 'WhatsApp', 'Whatsapp']),
+      rating: findColumnIndex(headers, ['AvaliaÃ§Ã£o', 'Avaliacao'], 27),
+      reviewComment: findColumnIndex(headers, ['ComentÃ¡rio', 'Comentario', 'ComentÃ¡rios', 'Comentarios', 'ComentÃ¡rio da avaliaÃ§Ã£o', 'Comentario da avaliacao'], -1),
+      vehicleBrand: findColumnIndex(headers, ['Marca', 'Marca do Veiculo', 'Marca do Veículo', 'Fabricante']),
+      vehicleModel: findColumnIndex(headers, ['Modelo', 'Modelo do Veiculo', 'Modelo do Veículo', 'Veiculo', 'Veículo']),
+      status: findColumnIndex(headers, ['Status', 'Status da Recarga', 'Status da Carga']),
+      failureReason: findColumnIndex(headers, ['Motivo', 'Motivo da Falha', 'Erro', 'Falha'])
+    }
+  };
+}
+
 function rowHasData(row = []) {
   return row.some(value => String(value ?? '').trim() !== '');
 }
@@ -1442,6 +1731,459 @@ function parseCsvRows(text = '') {
   if (row.some(cell => String(cell).trim() !== '')) rows.push(row);
   return rows;
 }
+
+function rowCellText(row = [], index = -1) {
+  return String(readCell(row, index) || '').trim();
+}
+
+function couponLabelFromGoGrid(row = [], cols = {}) {
+  const benefit = rowCellText(row, cols.couponBenefit);
+  const value = parseNumber(readCell(row, cols.couponValue));
+  if (benefit && benefit !== '---') return benefit;
+  return value > 0 ? 'Cupom' : '';
+}
+
+function normalizeGoGridStation(value = '') {
+  const raw = String(value || '').replace(/\s+-\s+/g, ' | ').replace(/\s+/g, ' ').trim();
+  if (normalizeHeaderName(raw).includes('postopratacambe')) return 'Go Grid | Posto Prata Cambe (DC)';
+  return raw;
+}
+
+function parseRechargeRow(row = [], layout = {}, file = {}) {
+  if (layout.type === 'spott') {
+    const cols = layout.cols || {};
+    const email = rowCellText(row, cols.email);
+    const driver = rowCellText(row, cols.driver);
+    const rawStation = rowCellText(row, cols.station);
+    const station = canonicalStationNameForWork(currentWorkId, rawStation, currentWorkName);
+    const charger = rowCellText(row, cols.charger);
+    const startStr = rowCellText(row, cols.startLocal);
+    const endStr = rowCellText(row, cols.endLocal) || rowCellText(row, cols.endCharge);
+    const startDate = parseDate(startStr);
+    const endDate = parseDate(endStr);
+    const energy = parseNumber(readCell(row, cols.energy));
+    const revenue = parseNumber(readCell(row, cols.totalValue));
+    const vehicle = rowCellText(row, cols.vehicle);
+    if (!station && !driver && !email && !startStr && !energy && !revenue) return null;
+    const vehicleParts = vehicle.split(/\s+/).filter(Boolean);
+    return {
+      workId:        currentWorkId,
+      workName:      currentWorkName,
+      _file:         file.name,
+      sourcePlatform:'Spott',
+      id:            [station, charger, email || driver, startStr].filter(Boolean).join('|'),
+      station,
+      rawStation,
+      connType:      charger,
+      userName:      driver || (email ? email.split('@')[0] : ''),
+      userEmail:     email,
+      userPhone:     rowCellText(row, cols.phone),
+      startStr,
+      endStr,
+      startDate,
+      endDate,
+      duration:      rowCellText(row, cols.duration),
+      energyKWh:     energy,
+      revenue,
+      paymentType:   rowCellText(row, cols.app),
+      paymentMethod: rowCellText(row, cols.method),
+      trigger:       rowCellText(row, cols.trigger),
+      paymentStatus: rowCellText(row, cols.status),
+      idleTime:      '',
+      idleValue:     0,
+      voucher:       normalizedCouponLabel(rowCellText(row, cols.voucher), { revenue }),
+      rating:        '',
+      reviewComment: '',
+      vehicleBrand:  vehicleParts[0] || '',
+      vehicleModel:  vehicleParts.slice(1).join(' '),
+      failureReason: '',
+      rawStatus:     rowCellText(row, cols.status)
+    };
+  }
+
+  if (layout.type === 'gogrid') {
+    const cols = layout.cols || {};
+    const id = rowCellText(row, cols.transactionId);
+    const email = rowCellText(row, cols.email);
+    const station = normalizeGoGridStation(rowCellText(row, cols.station));
+    const startStr = rowCellText(row, cols.startLocal);
+    const endStr = rowCellText(row, cols.endLocal);
+    const paymentType = rowCellText(row, cols.paymentType);
+    const startDate = parseDate(startStr);
+    const endDate = parseDate(endStr);
+    const energy = parseNumber(readCell(row, cols.energy));
+    const revenue = parseNumber(readCell(row, cols.totalValue) || readCell(row, cols.energyValue));
+    if (!id && !station && !email && !startStr && !energy && !revenue) return null;
+    return {
+      workId:        currentWorkId,
+      workName:      currentWorkName,
+      _file:         file.name,
+      sourcePlatform:'Go Grid',
+      id,
+      station,
+      connType:      rowCellText(row, cols.plug) ? `Plug ${rowCellText(row, cols.plug)}` : '',
+      userName:      email ? email.split('@')[0] : '',
+      userEmail:     email,
+      userPhone:     rowCellText(row, cols.phone),
+      startStr,
+      endStr,
+      startDate,
+      endDate,
+      duration:      rowCellText(row, cols.duration),
+      energyKWh:     energy,
+      revenue,
+      paymentType,
+      paymentMethod: paymentType,
+      paymentStatus: /andamento/i.test(paymentType) ? 'Carga em andamento' : (paymentType ? 'Pago' : ''),
+      idleTime:      '',
+      idleValue:     parseNumber(readCell(row, cols.idleValue)),
+      voucher:       normalizedCouponLabel(couponLabelFromGoGrid(row, cols), { revenue }),
+      rating:        '',
+      reviewComment: '',
+      socInitial:    rowCellText(row, cols.socInitial),
+      socFinal:      rowCellText(row, cols.socFinal),
+      vehicleBrand:  rowCellText(row, cols.vehicleBrand),
+      vehicleModel:  rowCellText(row, cols.vehicleModel),
+      failureReason: rowCellText(row, cols.failureReason),
+      rawStatus:     rowCellText(row, cols.status)
+    };
+  }
+
+  const cols = layout.cols || {};
+  const [startStr, endStr] = splitDateRange(row[12], row[13]);
+  const startDate = parseDate(startStr);
+  const endDate = parseDate(endStr);
+  return {
+    workId:        currentWorkId,
+    workName:      currentWorkName,
+    _file:         file.name,
+    id:            row[0],
+    station:       String(row[1] || '').trim(),
+    connType:      String(row[3] || '').trim(),
+    userName:      String(row[4] || '').trim(),
+    userEmail:     String(row[5] || '').trim(),
+    userPhone:     String(readCell(row, cols.phone) || '').trim(),
+    startStr, endStr,
+    startDate,
+    endDate,
+    duration:      String(row[13] || ''),
+    energyKWh:     parseNumber(row[14]),
+    revenue:       parseNumber(row[18]),
+    paymentType:   String(row[20] || '').trim(),
+    paymentStatus: String(row[21] || '').trim(),
+    idleTime:      String(row[24] || ''),
+    idleValue:     parseNumber(row[25]),
+    voucher:       normalizedCouponLabel(readCell(row, cols.voucher), { revenue: parseNumber(row[18]) }),
+    rating:        String(readCell(row, cols.rating) || '').trim(),
+    reviewComment: String(readCell(row, cols.reviewComment) || '').trim(),
+    vehicleBrand:  String(readCell(row, cols.vehicleBrand) || '').trim(),
+    vehicleModel:  String(readCell(row, cols.vehicleModel) || '').trim(),
+    failureReason: String(readCell(row, cols.failureReason) || '').trim(),
+    rawStatus:     String(readCell(row, cols.status) || '').trim()
+  };
+}
+
+// Raio (relatório de fechamento). Aba 1: uma linha por DIA (Cargas, Energia, minutos, Bruto, Taxa,
+// Líquido). Aba "Transações" (anexada após o marcador __ABA__): cada pagamento com hora, carregador,
+// conector, Local, gateway, status e valor — sem kWh. "Reembolsado" é a sobra do Pix (o cliente paga
+// R$ 60 e recebe a diferença na hora): não é faturamento e fica de fora.
+// Cada transação "Aprovado" com valor vira uma recarga; o kWh e os minutos do dia são rateados pelo
+// valor (mesmo preço por kWh). Se as transações do dia não somarem o Bruto do dia, o dia é dividido
+// pelas Cargas, às 12:00 + i min. kWh e R$ somam exatamente o relatório. Sem motorista: fora de
+// clientes. paymentType "Raio" grava a operadora no Supabase (a taxa de 3% sai daí, no financeiro).
+
+const RAIO_COUNTS_FROM = new Date(2026, 10, 1);
+
+function raioDailyCharges(rows = [], layout = {}, file = {}) {
+  const cols = layout.cols || {};
+  const required = requiredSpottLocalForWork(currentWorkId);
+  const workStation = canonicalStationNameForWork(currentWorkId, required || currentWorkName, currentWorkName);
+  // Rateio inteiro em unidades (centavos/milésimos) pelo maior resto: a soma bate exata.
+  const allocate = (total, weights, scale) => {
+    const units = Math.round(Number(total || 0) * scale);
+    let w = weights.map(x => Math.max(Number(x) || 0, 0));
+    if (!w.some(Boolean)) w = w.map(() => 1);
+    const sum = w.reduce((s, x) => s + x, 0);
+    const raw = w.map(x => units * x / sum);
+    const fl = raw.map(Math.floor);
+    let rest = units - fl.reduce((s, x) => s + x, 0);
+    raw.map((x, i) => ({ i, f: x - fl[i] })).sort((a, b) => b.f - a.f || a.i - b.i).forEach(({ i }) => { if (rest > 0) { fl[i]++; rest--; } });
+    return fl.map(x => x / scale);
+  };
+  const pad = n => String(n).padStart(2, '0');
+  const dayKeyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const brDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const fmtDur = x => `${pad(Math.floor(x / 60))}:${pad(Math.round(x % 60))}:00`;
+  // "11/9/2026, 3:14:12 PM" (mês/dia, 12h) ou "09/11/2026 15:14".
+  const parseTxDate = text => {
+    const m = String(text || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?$/i);
+    if (!m) return parseDate(text);
+    let h = +m[4];
+    if (m[7]) {
+      if (/pm/i.test(m[7]) && h < 12) h += 12;
+      if (/am/i.test(m[7]) && h === 12) h = 0;
+      return new Date(+m[3], +m[1] - 1, +m[2], h, +m[5], +(m[6] || 0));
+    }
+    return new Date(+m[3], +m[2] - 1, +m[1], h, +m[5], +(m[6] || 0));
+  };
+
+  const marker = rows.findIndex(r => r && r[0] === '__ABA__');
+  const dailyEnd = marker >= 0 ? marker : rows.length;
+  const days = new Map();
+  for (let i = (layout.headerRow || 0) + 1; i < dailyEnd; i++) {
+    const r = rows[i];
+    if (!r || !rowHasData(r)) continue;
+    const m = rowCellText(r, cols.date).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) continue; // linha "Total" e afins
+    const day = {
+      key: `${m[3]}-${m[2]}-${m[1]}`, date: new Date(+m[3], +m[2] - 1, +m[1]),
+      count: Math.max(0, Math.round(parseNumber(readCell(r, cols.count)))),
+      energy: parseNumber(readCell(r, cols.energy)), gross: parseNumber(readCell(r, cols.gross)),
+      minutes: parseNumber(readCell(r, cols.minutes)), idle: parseNumber(readCell(r, cols.idleMinutes)), tx: []
+    };
+    if (day.count || day.energy || day.gross) days.set(day.key, day);
+  }
+
+  if (marker >= 0) {
+    const head = rows[marker + 1] || [];
+    const c = {
+      date: findColumnIndex(head, ['Data']), charger: findColumnIndex(head, ['Carregador']), conn: findColumnIndex(head, ['Conector']),
+      local: findColumnIndex(head, ['Local']), client: findColumnIndex(head, ['Cliente']), email: findColumnIndex(head, ['Email', 'E-mail']),
+      gateway: findColumnIndex(head, ['Gateway']), status: findColumnIndex(head, ['Status']), value: findColumnIndex(head, ['Valor (R$)', 'Valor'])
+    };
+    const clean = v => (v && v !== '-' ? v : '');
+    for (let i = marker + 2; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || !rowHasData(r)) continue;
+      const value = parseNumber(readCell(r, c.value));
+      const status = rowCellText(r, c.status);
+      if (!(value > 0) || !/aprovad/i.test(status)) continue; // tentativas com erro / R$ 0
+      const date = parseTxDate(rowCellText(r, c.date));
+      if (!date || Number.isNaN(date.getTime())) continue;
+      const key = dayKeyOf(date);
+      if (!days.has(key)) days.set(key, { key, date: new Date(date.getFullYear(), date.getMonth(), date.getDate()), count: 0, energy: 0, gross: 0, minutes: 0, idle: 0, tx: [], txOnly: true });
+      days.get(key).tx.push({ date, value, charger: rowCellText(r, c.charger), conn: rowCellText(r, c.conn), local: rowCellText(r, c.local),
+        client: clean(rowCellText(r, c.client)), email: clean(rowCellText(r, c.email)), gateway: rowCellText(r, c.gateway) });
+    }
+  }
+
+  const out = [];
+  [...days.values()].sort((a, b) => a.key.localeCompare(b.key)).forEach(day => {
+    const tx = day.tx.sort((a, b) => a.date - b.date);
+    const txSum = tx.reduce((s, t) => s + t.value, 0);
+    const useTx = tx.length > 0 && (day.txOnly || Math.abs(txSum - day.gross) < 0.05);
+    const items = useTx ? tx : Array.from({ length: Math.max(day.count, 1) }, (_, k) => ({ date: new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), 12, k) }));
+    const weights = useTx ? items.map(t => t.value) : items.map(() => 1);
+    const brl = useTx ? items.map(t => t.value) : allocate(day.gross, weights, 100);
+    const kwh = allocate(day.energy, weights, 1000);
+    const mins = allocate(day.minutes, weights, 1);
+    const idle = allocate(day.idle, weights, 1);
+    items.forEach((t, k) => {
+      // A Raio começa a contar em nov/2026 (outubro já fechou): recargas anteriores (testes de 27/10)
+      // entram em 01/11, mesma hora (usuário, 09/11/2026). O id segue a data original.
+      const origDate = t.date;
+      const startDate = origDate < RAIO_COUNTS_FROM
+        ? new Date(RAIO_COUNTS_FROM.getFullYear(), RAIO_COUNTS_FROM.getMonth(), RAIO_COUNTS_FROM.getDate(), origDate.getHours(), origDate.getMinutes(), origDate.getSeconds())
+        : origDate;
+      const endDate = new Date(startDate.getTime() + Math.max(mins[k], 0) * 60000);
+      const station = t.local ? canonicalStationNameForWork(currentWorkId, t.local, currentWorkName) : workStation;
+      out.push({
+        workId: currentWorkId, workName: currentWorkName, _file: file.name, sourcePlatform: 'Raio',
+        id: useTx
+          ? `raio:${t.charger || 'carregador'}:${t.conn || '-'}:${dayKeyOf(origDate)}T${pad(origDate.getHours())}${pad(origDate.getMinutes())}${pad(origDate.getSeconds())}`
+          : `raio:${day.key}:${k + 1}`,
+        station, rawStation: `RAIO | ${station}`, connType: t.conn ? `Conector ${t.conn}` : '',
+        userName: t.client || '', userEmail: t.email || '', userPhone: '',
+        startStr: brDate(startDate), endStr: brDate(endDate), startDate, endDate,
+        duration: fmtDur(mins[k]), energyKWh: kwh[k], revenue: brl[k],
+        paymentType: 'Raio', paymentMethod: useTx ? (t.gateway || 'Pix') : '', paymentStatus: 'Pago',
+        idleTime: idle[k] ? fmtDur(idle[k]) : '', idleValue: 0,
+        voucher: '', rating: '', reviewComment: '', vehicleBrand: '', vehicleModel: '', failureReason: '',
+        rawStatus: useTx ? `Raio · ${t.gateway || 'Pix'}` : 'Raio · resumo diário'
+      });
+    });
+  });
+  return out;
+}
+
+function rechargeImportStationProfile(charges = []) {
+  const profile = new Map();
+  charges.forEach(charge => {
+    const station = safeText(charge.rawStation || charge.station || '').trim() || '(estacao nao informada)';
+    const current = profile.get(station) || { station, charges: 0, energy: 0, revenue: 0 };
+    current.charges += 1;
+    current.energy += Number(charge.energyKWh || 0);
+    current.revenue += Number(charge.revenue || 0);
+    profile.set(station, current);
+  });
+  return [...profile.values()].sort((a, b) => b.charges - a.charges);
+}
+
+function confirmRechargeStationMismatch(charges = [], layout = {}, file = {}) {
+  const profile = rechargeImportStationProfile(charges);
+  // O Local oficial é da Spott; a Raio não traz Local (a estação vem da própria obra).
+  const requiredLocal = layout.type === 'raio' ? '' : requiredSpottLocalForWork(currentWorkId);
+  if (requiredLocal) {
+    const invalidLocals = profile.filter(item => !hasExactRequiredSpottLocal(currentWorkId, item.station));
+    if (invalidLocals.length || !profile.length) {
+      const found = profile.length ? profile.map(item => item.station).join(', ') : 'Local ausente';
+      alert(
+        `Importação bloqueada: esta obra aceita somente o Local Spott "${requiredLocal}".\n\n` +
+        `Destino: ${currentWorkName}\nArquivo: ${file.name || '-'}\nLocal encontrado: ${found}\n\n` +
+        'Nenhuma recarga foi salva. Selecione a obra correspondente e exporte novamente na Spott.'
+      );
+      return false;
+    }
+  }
+  const targetDc = dcWorkIdentity(currentWorkId, currentWorkName);
+  const dcMismatch = profile.filter(item => {
+    const sourceDc = dcStationIdentity(item.station);
+    return (sourceDc || targetDc) && sourceDc !== targetDc;
+  });
+  if (dcMismatch.length) {
+    const found = dcMismatch.map(item => item.station).join(', ');
+    alert(
+      `Importação bloqueada: a planilha DC identifica ${found}, mas o destino selecionado é ${currentWorkName}.\n\n` +
+      'Central JK e Posto Robert Koch são bases independentes. Selecione a obra correspondente e tente novamente.'
+    );
+    return false;
+  }
+  const mismatches = profile.filter(item =>
+    stationBlockedForWork(currentWorkId, item.station) || !stationLooksRelatedToWork(item.station, currentWorkName)
+  );
+  if (!mismatches.length) return true;
+  const details = profile.map(item =>
+    `- ${item.station}: ${item.charges} recarga(s), ${fmtKWh(item.energy)}, ${fmtBRL(item.revenue)}`
+  ).join('\n');
+  return window.confirm(
+    `ATENCAO: a planilha nao corresponde integralmente ao destino selecionado.\n\n` +
+    `Arquivo: ${file.name || '-'}\nPlataforma: ${layout.platform || '-'}\nDestino: ${currentWorkName}\n\n` +
+    `Conteudo identificado:\n${details}\n\n` +
+    `Fora do padrao: ${mismatches.map(item => item.station).join(', ')}\n\n` +
+    `Deseja confirmar a importacao mesmo assim? Os dados destacados serao anexados a ${currentWorkName}.`
+  );
+}
+
+async function readFile(file) {
+  const queueNote = queuedRechargeImports > 1 ? ` (${queuedRechargeImports} arquivos na fila)` : '';
+  setFeedback(`⏳ Lendo planilha${queueNote}...`, 'up-loading');
+  const isCsvFile = /\.csv$/i.test(String(file?.name || ''));
+  try {
+      const buffer = await file.arrayBuffer();
+      const rows = await rechargeRowsFromFileBuffer(buffer, isCsvFile);
+      if (rows.length < 2) throw new Error('Planilha sem dados de recargas.');
+
+      const layout = detectRechargeLayout(rows);
+      const headers = rows[0] || [];
+      const voucherCol = findColumnIndex(headers, ['Voucher utilizado', 'Voucher'], 26);
+      const ratingCol = findColumnIndex(headers, ['Avaliação', 'Avaliacao'], 27);
+      const reviewCommentCol = findColumnIndex(headers, ['Comentário', 'Comentario', 'Comentários', 'Comentarios', 'Comentário da avaliação', 'Comentario da avaliacao'], -1);
+      const selectedMonth = file.month || document.getElementById('importMonth')?.value || '';
+      const importedCharges = [];
+      if (layout.type === 'raio') {
+        importedCharges.push(...raioDailyCharges(rows, layout, file));
+      } else if (layout.type === 'gogrid' || layout.type === 'spott') {
+        for (let i = layout.headerRow + 1; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || !rowHasData(r)) continue;
+          const charge = parseRechargeRow(r, layout, file);
+          if (charge) importedCharges.push(charge);
+          if (i % 250 === 0) await yieldToBrowser();
+        }
+      } else {
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r || r[0] == null) continue;
+        const charge = parseRechargeRow(r, layout, file);
+        if (charge) importedCharges.push(charge);
+        if (i % 250 === 0) await yieldToBrowser();
+      }
+      }
+      if (!importedCharges.length) throw new Error('Planilha sem linhas validas de recargas.');
+      markDistinctRepeatedRows(importedCharges);
+      const importControlIssues = importedCharges.filter(rechargeControlIssue);
+
+      const dateMonths = [...new Set(importedCharges.map(charge => monthKey(charge.startDate)).filter(k => k && k !== 'unknown'))];
+      const wrongMonths = dateMonths.filter(k => k !== selectedMonth);
+      if (selectedMonth && wrongMonths.length && !layout.allowMultiMonth) {
+        throw new Error(`O mes escolhido foi ${monthLabel(selectedMonth)}, mas a planilha tem recargas de ${dateMonths.map(monthLabel).join(', ')}. Escolha o mes correto antes de subir.`);
+      }
+
+      const importMode = file.importMode || document.getElementById('importMode')?.value || 'merge';
+      const sourceStation = rechargeImportStationProfile(importedCharges).map(item => item.station).join(' + ');
+      if (!confirmRechargeStationMismatch(importedCharges, layout, file)) {
+        throw new Error('Importacao cancelada: a estacao da planilha nao corresponde ao destino selecionado.');
+      }
+      const sourceKey = fileSourceKey(selectedMonth, file.name, sourceStation);
+      storeImportUndo(`${file.name} em ${monthLabel(selectedMonth)}`);
+      file.fileKey = sourceKey;
+      file.station = sourceStation;
+      const fileMonth = dateMonths.length === 1 ? (dateMonths[0] || selectedMonth) : '';
+      importedCharges.forEach(charge => {
+        charge._month = layout.allowMultiMonth ? monthKey(charge.startDate) : (selectedMonth || monthKey(charge.startDate));
+        charge._fileKey = sourceKey;
+        charge._sourceStation = sourceStation;
+      });
+      const importedMonths = new Set(importedCharges.map(chargeMonthKey).filter(Boolean));
+      let replacedCount = 0;
+      let duplicateCount = 0;
+      if (importMode === 'replace') {
+        replacedCount = allCharges.filter(charge => importedMonths.has(chargeMonthKey(charge))).length;
+        allCharges = allCharges.filter(charge => !importedMonths.has(chargeMonthKey(charge)));
+      } else {
+        const importedKeys = new Set(importedCharges.map(rechargeUniqueKey));
+        const before = allCharges.length;
+        allCharges = allCharges.filter(charge => {
+          const sameImportedMonth = importedMonths.has(chargeMonthKey(charge));
+          const sameFileMonth = sameImportedMonth && ((charge._fileKey && charge._fileKey === sourceKey) || (!charge._fileKey && charge._file === file.name));
+          const duplicateCharge = sameImportedMonth && importedKeys.has(rechargeUniqueKey(charge));
+          return !sameFileMonth && !duplicateCharge;
+        });
+        duplicateCount = before - allCharges.length;
+      }
+      allCharges = dedupeChargesByUniqueKey([...allCharges, ...importedCharges]);
+      importedMonths.forEach(mk => {
+        if (monthlyClosings?.[mk]?.source === 'manual') return;
+        const closing = buildMonthClosing(mk);
+        if (closing) monthlyClosings = { ...monthlyClosings, [mk]: closing };
+      });
+      loadedFiles = loadedFiles.filter(fileItem => {
+        const fileMonth = fileItem?.month || '';
+        const fileKey = fileItem?.fileKey || fileSourceKey(fileMonth, fileItem?.name, fileItem?.station || '');
+        const isCurrentFile = fileKey === sourceKey;
+        const stillHasCharges = allCharges.some(charge =>
+          ((charge._fileKey && charge._fileKey === fileKey) || (!charge._fileKey && charge._file === fileItem?.name)) && (!fileMonth || chargeMonthKey(charge) === fileMonth)
+        );
+        return isCurrentFile || stillHasCharges;
+      });
+
+      setFeedback('', '');
+      loadedFiles = loadedFiles.map(item => item === file || (item.fileKey && item.fileKey === sourceKey) ? { ...item, fileKey: sourceKey, station: sourceStation, month: fileMonth, importMode, importedAt: new Date().toISOString(), sourcePlatform: layout.platform } : item);
+      updateChips();
+      updateCorrectionButtons();
+      const controlNote = importControlIssues.length
+        ? ` <strong>${importControlIssues.length} sessão(ões) próxima(s) de zero foi(ram) sinalizada(s) para conferência.</strong>`
+        : '';
+      setStorageState(`Planilha importada para <strong>${currentWorkName}</strong>: ${importedCharges.length} recarga(s), ${fmtKWh(importedCharges.reduce((s,c)=>s+c.energyKWh,0))}, ${fmtBRL(importedCharges.reduce((s,c)=>s+c.revenue,0))}. Salvando no banco...${controlNote}`);
+      await yieldToBrowser();
+      await saveRechargeBase();
+      await renderAll();
+      if (importControlIssues.length) {
+        setFeedback(`${importControlIssues.length} sessão(ões) com até 0,25 kWh e R$ 1,00 foram sinalizadas como possível falha. Confira Análise operacional.`, 'up-error');
+      } else if (replacedCount > 0) {
+        setFeedback(`${replacedCount} recarga(s) do mês foram substituidas.`, 'up-loading');
+      } else if (duplicateCount > 0) {
+        setFeedback(`${duplicateCount} recarga(s) duplicada(s) foram atualizadas. As demais foram consolidadas no mês.`, 'up-loading');
+      }
+
+  } catch (err) {
+      setFeedback('❌ ' + err.message, 'up-error');
+      loadedFiles = loadedFiles.filter(f => f !== file);
+      updateChips();
+  }
+}
+
+// ── Helpers de data / tempo ────────────────────────────────
 
 function parseDate(s) {
   if (!s) return null;
@@ -1931,6 +2673,87 @@ async function loadFinanceReportArchive(force = false) {
 
 function yieldToBrowser() {
   return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+function parseRechargeRowsInWorker(arrayBuffer, isCsvFile) {
+  if (!window.Worker || !window.Blob || !window.URL?.createObjectURL) {
+    return Promise.reject(new Error('Processamento em segundo plano indisponivel.'));
+  }
+  const workerSource = `
+    function parseCsvRows(text) {
+      const rows = []; let row = []; let value = ''; let quoted = false;
+      const input = String(text || '').replace(/^\\uFEFF/, '');
+      for (let i = 0; i < input.length; i++) {
+        const char = input[i]; const next = input[i + 1];
+        if (char === '"') {
+          if (quoted && next === '"') { value += '"'; i++; }
+          else quoted = !quoted;
+        } else if (char === ',' && !quoted) { row.push(value); value = ''; }
+        else if ((char === '\\n' || char === '\\r') && !quoted) {
+          if (char === '\\r' && next === '\\n') i++;
+          row.push(value);
+          if (row.some(cell => String(cell).trim() !== '')) rows.push(row);
+          row = []; value = '';
+        } else value += char;
+      }
+      row.push(value);
+      if (row.some(cell => String(cell).trim() !== '')) rows.push(row);
+      return rows;
+    }
+    self.onmessage = event => {
+      try {
+        const { buffer, csv, xlsxUrl } = event.data;
+        let rows;
+        if (csv) rows = parseCsvRows(new TextDecoder('utf-8').decode(buffer));
+        else {
+          importScripts(xlsxUrl);
+          const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+          const sheet = workbook.Sheets.Recargas || workbook.Sheets[workbook.SheetNames[0]];
+          if (!sheet) throw new Error('Nenhuma aba encontrada no arquivo.');
+          rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+          // Raio: o "Relatório de fechamento" traz as recargas na aba "Transações"; vai junto, após um marcador.
+          const tx = /fechamento/i.test(String(rows[0] && rows[0][0] || '')) && workbook.SheetNames.find(n => /^transa/i.test(n) && workbook.Sheets[n] !== sheet);
+          if (tx) rows = rows.concat([['__ABA__', tx]], XLSX.utils.sheet_to_json(workbook.Sheets[tx], { header: 1, raw: false, defval: '' }));
+        }
+        self.postMessage({ ok: true, rows });
+      } catch (error) {
+        self.postMessage({ ok: false, error: error?.message || String(error) });
+      }
+    };
+  `;
+  return new Promise((resolve, reject) => {
+    const workerUrl = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
+    const worker = new Worker(workerUrl);
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      reject(new Error('A leitura da planilha excedeu o tempo esperado.'));
+    }, 90000);
+    const finish = (callback, value) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      callback(value);
+    };
+    worker.onmessage = event => {
+      if (event.data?.ok) finish(resolve, event.data.rows || []);
+      else finish(reject, new Error(event.data?.error || 'Falha ao processar a planilha.'));
+    };
+    worker.onerror = event => finish(reject, new Error(event.message || 'Falha no leitor em segundo plano.'));
+    const transferable = arrayBuffer.slice(0);
+    worker.postMessage({ buffer: transferable, csv: isCsvFile, xlsxUrl: XLSX_CDN_URL }, [transferable]);
+  });
+}
+
+async function rechargeRowsFromFileBuffer(arrayBuffer, isCsvFile) {
+  try {
+    return await parseRechargeRowsInWorker(arrayBuffer, isCsvFile);
+  } catch (workerError) {
+    if (isCsvFile) return parseCsvRows(new TextDecoder('utf-8').decode(arrayBuffer));
+    await ensureSpreadsheetLibrary();
+    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    return rechargeSheetRows(workbook).rows;
+  }
 }
 
 function persistFinancialSettingsFromInputs(mk = financeMonthKey(), inheritedFromOverride = '') {
@@ -4562,9 +5385,44 @@ function normalizePhone(value = '') {
   return safeText(value).replace(/\D+/g, '');
 }
 
+function customerRegistryStore() {
+  const data = readJson(CUSTOMER_REGISTRY_LOCAL_KEY, { rows: [], updatedAt: '', source: '' });
+  return { rows: Array.isArray(data?.rows) ? data.rows : [], updatedAt: data?.updatedAt || '', source: data?.source || '' };
+}
+
 function customerRegistryNumber(value = '') {
   const clean = safeText(value).trim().replace(/\s/g, '').replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '');
   return Number(clean) || 0;
+}
+
+function customerRegistryRow(row = [], headers = []) {
+  const email = headerValue(row, headers, ['Email', 'E-mail']).trim().toLowerCase();
+  const phoneRaw = headerValue(row, headers, ['Telefone', 'WhatsApp', 'Whatsapp']);
+  const local = headerValue(row, headers, ['Local', 'Estacao', 'Estação']).trim();
+  return {
+    name: headerValue(row, headers, ['Nome', 'Motorista']),
+    complement: headerValue(row, headers, ['Complemento']),
+    email,
+    cpf: headerValue(row, headers, ['CPF']).replace(/\D/g, ''),
+    phone: normalizePhone(phoneRaw),
+    phoneDisplay: phoneRaw,
+    // A exportacao da Spott nao traz uma coluna "Carregadores". O valor
+    // correto para esse relatorio e a quantidade de locais distintos onde o
+    // motorista aparece, calculada na consolidacao abaixo.
+    chargers: customerRegistryNumber(headerValue(row, headers, ['Carregadores'])),
+    transactions: customerRegistryNumber(headerValue(row, headers, ['Total de transacoes', 'Total de transações', 'Transacoes', 'Transações'])),
+    energy: customerRegistryNumber(headerValue(row, headers, ['Total de kWh', 'kWh'])),
+    chargeTime: headerValue(row, headers, ['Tempo total de recarga', 'Tempo de recarga']),
+    spent: customerRegistryNumber(headerValue(row, headers, ['Total gasto', 'Faturamento', 'Receita'])),
+    locations: local ? [local] : []
+  };
+}
+
+function customerRegistryRowsFromSheet(rows = []) {
+  const headerIndex = rows.findIndex(row => Array.isArray(row) && row.some(cell => ['nome','motorista'].includes(normalizeHeaderName(cell))));
+  const index = headerIndex >= 0 ? headerIndex : 0;
+  const headers = rows[index] || [];
+  return rows.slice(index + 1).filter(rowHasData).map(row => customerRegistryRow(row, headers)).filter(row => row.name || row.email || row.phone);
 }
 
 function customerRegistryIdentityKeys(row = {}) {
@@ -4638,6 +5496,34 @@ function consolidateCustomerRegistryRows(incoming = []) {
   }));
 }
 
+function mergeCustomerRegistry(incoming = [], source = 'importacao manual') {
+  const current = customerRegistryStore().rows;
+  const rows = [...current];
+  const added = [];
+  const retained = [];
+  consolidateCustomerRegistryRows(incoming).forEach(next => {
+    const keys = new Set(customerRegistryIdentityKeys(next));
+    const index = rows.findIndex(existing => customerRegistryIdentityKeys(existing).some(key => keys.has(key)));
+    // A base atual e historica: uma identidade que ja existe nao pode ter
+    // seus acumulados reimportados, substituidos ou somados. O arquivo novo
+    // so adiciona um cliente quando nao ha nenhuma identidade em comum.
+    if (index >= 0) retained.push(next);
+    else { rows.push(next); added.push(next); }
+  });
+  const payload = {
+    rows, updatedAt: new Date().toISOString(), source,
+    lastImport: { source, imported: consolidateCustomerRegistryRows(incoming).length, added: added.length, retained: retained.length }
+  };
+  writeJson(CUSTOMER_REGISTRY_LOCAL_KEY, payload);
+  return { payload, added, retained };
+}
+
+async function saveCustomerRegistryCloud(payload) {
+  if (!window.UBY_SUPABASE?.upsertRechargeCustomers) return false;
+  await window.UBY_SUPABASE.upsertRechargeCustomers(payload?.rows || []);
+  return true;
+}
+
 async function readCustomerRegistryCloud() {
   if (!window.UBY_SUPABASE?.loadRechargeCustomers) return null;
   const firstPage = await window.UBY_SUPABASE.loadRechargeCustomers({ limit: 500 });
@@ -4660,6 +5546,35 @@ function customerRegistryRowsFromCloud(cloudRows = []) {
     transactions: Number(row.transactions_count || 0), energy: Number(row.energy_kwh || 0),
     chargeTime: row.charge_time_text || '', spent: Number(row.total_spent || 0), source: row.source || 'banco online'
   }));
+}
+
+async function confirmCustomerRegistryCloud(expectedRows = []) {
+  const official = await readCustomerRegistryCloud();
+  if (!official) return null;
+  const cloudRows = official.rows;
+  // A chave tecnica pode ter sido criada por uma versao anterior usando
+  // telefone em vez de e-mail. Confirme pelo identificador persistido e por
+  // qualquer identidade real do motorista, sem exigir que ambas versoes
+  // tenham escolhido a mesma chave primaria.
+  const cloudKeys = new Set();
+  cloudRows.forEach(row => {
+    const persistedKey = String(row.customer_key || '').toLowerCase();
+    if (persistedKey) cloudKeys.add(persistedKey);
+    customerRegistryIdentityKeys({
+      email: row.email || '', phone: row.phone || '', name: row.name || '',
+      cpf: row.raw_data?.cpf || ''
+    }).forEach(key => cloudKeys.add(key));
+  });
+  const missing = consolidateCustomerRegistryRows(expectedRows)
+    .filter(row => {
+      const identities = customerRegistryIdentityKeys(row);
+      const persistedKey = String(
+        row.customerKey || row.customer_key || row.email || row.phone || ''
+      ).toLowerCase();
+      return ![persistedKey, ...identities].filter(Boolean).some(key => cloudKeys.has(key));
+    });
+  if (missing.length) throw new Error(`${missing.length} cliente(s) ainda nao foram confirmados na nuvem.`);
+  return official;
 }
 
 function clubParticipantKey(participant = {}) {
@@ -5548,12 +6463,10 @@ async function __perf(label, fn) {
 }
 
 // ---- substitutos sem tela ----
-function setStorageState(message, isError = false) {
-  // Antes escrevia num elemento da página antiga; agora fica no estado do núcleo.
-  NUCLEO_STATUS.message = String(message || "").replace(/<[^>]*>/g, "");
-  NUCLEO_STATUS.isError = !!isError;
-  NUCLEO_STATUS.at = Date.now();
-  try { window.dispatchEvent(new CustomEvent("uby:nucleo-status", { detail: { ...NUCLEO_STATUS } })); } catch (_) {}
+async function persistCorrection(message) {
+  pruneLoadedFilesWithoutCharges();
+  setStorageState(`${message} Salvando no banco...`);
+  await saveRechargeBase({ allowEmpty: true, mutationIntent: 'month_correction' });
 }
 
 function getPower() {
@@ -5570,22 +6483,12 @@ function selectedPeriodMode() {
   return 'mtd';
 }
 
-function financeMonthKey() {
-  return NUCLEO_EDITOR.month || getMonths().at(-1) || '';
-}
-
-function setMatrizFeedback(msg, isError) {
-  if (msg) setStorageState(msg, !!isError);
-}
-
-function saveNetworkDistribution(settings, options = {}) {
-  networkDistributionState = normalizeNetworkDistribution(settings);
-  try { localStorage.setItem(NETWORK_DISTRIBUTION_KEY, JSON.stringify(networkDistributionState)); } catch (_) {}
-  if (options.remote !== false) persistMatrizCosts().catch(error => {
-    console.warn('[network-distribution-save]', error);
-    setStorageState(`Salvo neste navegador; nuvem pendente: ${error?.message || 'erro de sincronização'}.`, true);
-  });
-  return networkDistributionState;
+function setStorageState(message, isError = false) {
+  // Antes escrevia num elemento da página antiga; agora fica no estado do núcleo.
+  NUCLEO_STATUS.message = String(message || "").replace(/<[^>]*>/g, "");
+  NUCLEO_STATUS.isError = !!isError;
+  NUCLEO_STATUS.at = Date.now();
+  try { window.dispatchEvent(new CustomEvent("uby:nucleo-status", { detail: { ...NUCLEO_STATUS } })); } catch (_) {}
 }
 
 function applyRechargeRecord(record, sourceLabel) {
@@ -5619,6 +6522,28 @@ function applyRechargeRecord(record, sourceLabel) {
   const updated = record.updatedAt ? new Date(record.updatedAt).toLocaleString('pt-BR') : 'agora';
   const filterNote = currentStationReportName ? ' Visualizacao filtrada por estacao; a base completa permanece preservada.' : stationMismatchMessage();
   setStorageState(`Carregado de ${sourceLabel} para <strong>${targetName}</strong>: ${loadedFiles.length} arquivo(s), ${allCharges.length} recarga(s). Ultima atualizacao: ${updated}.${filterNote}`);
+}
+
+function setFeedback(msg, cls) {
+  NUCLEO_STATUS.feedback = { msg: String(msg || ""), cls: String(cls || "") };
+}
+
+function financeMonthKey() {
+  return NUCLEO_EDITOR.month || getMonths().at(-1) || '';
+}
+
+function setMatrizFeedback(msg, isError) {
+  if (msg) setStorageState(msg, !!isError);
+}
+
+function saveNetworkDistribution(settings, options = {}) {
+  networkDistributionState = normalizeNetworkDistribution(settings);
+  try { localStorage.setItem(NETWORK_DISTRIBUTION_KEY, JSON.stringify(networkDistributionState)); } catch (_) {}
+  if (options.remote !== false) persistMatrizCosts().catch(error => {
+    console.warn('[network-distribution-save]', error);
+    setStorageState(`Salvo neste navegador; nuvem pendente: ${error?.message || 'erro de sincronização'}.`, true);
+  });
+  return networkDistributionState;
 }
 
 async function syncClubParticipantsFromSheet(options = {}) {
@@ -5660,13 +6585,17 @@ async function initializeRechargePage() {
 // ---- funções de tela da página antiga que as regras chamam: aqui não desenham nada ----
 function addScheduledPayment() {} // tela antiga: não desenhar
 function applyFinanceSettingsToInputs() {} // tela antiga: não desenhar
+function clearSelectedMonth() {} // tela antiga: não desenhar
 function currentFinanceSettingsFromInputs() {} // tela antiga: não desenhar
+function handleCustomerRegistryFiles() {} // tela antiga: não desenhar
+function handleFiles() {} // tela antiga: não desenhar
 function initWorkSelector() {} // tela antiga: não desenhar
 function loadCustomerRegistry() {} // tela antiga: não desenhar
 function matrizInput() {} // tela antiga: não desenhar
 function mountUbyFinanceWorkspace() {} // tela antiga: não desenhar
 function openGeneralFinanceView() {} // tela antiga: não desenhar
 function openWorkReport() {} // tela antiga: não desenhar
+function renderAll() {} // tela antiga: não desenhar
 function renderClientsTable() {} // tela antiga: não desenhar
 function renderClub() {} // tela antiga: não desenhar
 function renderFinanceMonthVersionState() {} // tela antiga: não desenhar
@@ -5689,6 +6618,9 @@ function saveStationLayoutConfiguration() {} // tela antiga: não desenhar
 function scheduleLiveOccupationRefresh() {} // tela antiga: não desenhar
 function showGeneralWhenCurrentWorkIsEmpty() {} // tela antiga: não desenhar
 function showTab() {} // tela antiga: não desenhar
+function undoLastImport() {} // tela antiga: não desenhar
+function updateChips() {} // tela antiga: não desenhar
+function updateCorrectionButtons() {} // tela antiga: não desenhar
 
 window.UBY_NUCLEO = {
   status: () => ({ ...NUCLEO_STATUS }),
@@ -5717,6 +6649,7 @@ window.UBY_NUCLEO = {
     get financeReportArchivePromise() { return financeReportArchivePromise; }, set financeReportArchivePromise(v) { financeReportArchivePromise = v; },
     get rechargeLoadSequence() { return rechargeLoadSequence; }, set rechargeLoadSequence(v) { rechargeLoadSequence = v; },
     get generalRefreshSequence() { return generalRefreshSequence; }, set generalRefreshSequence(v) { generalRefreshSequence = v; },
+    get queuedRechargeImports() { return queuedRechargeImports; }, set queuedRechargeImports(v) { queuedRechargeImports = v; },
     get overviewInsightsTimers() { return overviewInsightsTimers; }, set overviewInsightsTimers(v) { overviewInsightsTimers = v; },
     get uby() { return uby; }, set uby(v) { uby = v; },
     get overviewSessionsFullyHydrated() { return overviewSessionsFullyHydrated; }, set overviewSessionsFullyHydrated(v) { overviewSessionsFullyHydrated = v; },
@@ -5792,6 +6725,8 @@ window.UBY_NUCLEO = {
   compactRechargeRecord,
   compareInvestorsByStart,
   completedWorkStatus,
+  confirmCustomerRegistryCloud,
+  confirmRechargeStationMismatch,
   consolidateCustomerRegistryRows,
   continuousOperationalRows,
   countDetailedCharges,
@@ -5805,6 +6740,7 @@ window.UBY_NUCLEO = {
   couponDiscountPct,
   couponLabelForCharge,
   couponLabelFromDiscountPct,
+  couponLabelFromGoGrid,
   courtesyFinanceBreakdown,
   courtesyIdentityCandidates,
   currentMatrizItems,
@@ -5812,11 +6748,15 @@ window.UBY_NUCLEO = {
   currentWorkOperationStart,
   customerRegistryIdentityKeys,
   customerRegistryNumber,
+  customerRegistryRow,
   customerRegistryRowsFromCloud,
+  customerRegistryRowsFromSheet,
+  customerRegistryStore,
   dailyOperationalRows,
   dailySeriesBounds,
   dateKeyLocal,
   dateOnly,
+  dateToInputText,
   dayLabelFromDate,
   daysInMonth,
   dcComparisonRowKey,
@@ -5830,6 +6770,7 @@ window.UBY_NUCLEO = {
   defaultNetworkDistribution,
   defaultNetworkInvestors,
   defaultPhysicalLayout,
+  detectRechargeLayout,
   durToHours,
   eachDateInRange,
   effectiveMonthStart,
@@ -5837,6 +6778,7 @@ window.UBY_NUCLEO = {
   enrichClubClientRows,
   ensureAllOverviewSessionsLoaded,
   ensureClubParticipantsAutoSync,
+  ensureCurrentWorkBaseReadyForImport,
   ensureMatrizCostsLoaded,
   ensureSpreadsheetLibrary,
   escapeAttr,
@@ -5874,6 +6816,7 @@ window.UBY_NUCLEO = {
   financeUnitOutcome,
   financeVariableCostPerKWh,
   financeVersionStateInfo,
+  findColumnIndex,
   firstChargeByClient,
   firstClientDayMap,
   fmtBRL,
@@ -5889,6 +6832,8 @@ window.UBY_NUCLEO = {
   getMonths,
   getPower,
   getUbyOperationCharges,
+  hasExactRequiredSpottLocal,
+  hasHeader,
   headerValue,
   hydrateCharge,
   hydratedRechargeRecord,
@@ -5952,6 +6897,7 @@ window.UBY_NUCLEO = {
   median,
   mergeCloudRechargeRecords,
   mergeClubParticipants,
+  mergeCustomerRegistry,
   mergeFinanceReportArchive,
   mergeRechargeRecord,
   mergeUnifiedAuroraAcUbyRows,
@@ -5974,6 +6920,7 @@ window.UBY_NUCLEO = {
   normalizeCouponCode,
   normalizeDistributionLedger,
   normalizeFinanceRules,
+  normalizeGoGridStation,
   normalizeHeaderName,
   normalizeNetworkDistribution,
   normalizeNetworkInvestors,
@@ -5992,25 +6939,35 @@ window.UBY_NUCLEO = {
   parseDate,
   parseNumber,
   parseRatingValue,
+  parseRechargeRow,
+  parseRechargeRowsInWorker,
   pctChange,
   periodBounds,
   periodWindow,
+  persistCorrection,
   persistFinancialSettingsFromInputs,
   persistMatrizCosts,
   preferredRechargeVersion,
   previousMonthEnergyForFinance,
+  pruneLoadedFilesWithoutCharges,
   queueFinancialSettingsSave,
+  raioDailyCharges,
   rangeRevenue,
+  readCell,
   readCustomerRegistryCloud,
+  readFile,
   readJson,
   readLocalFinanceReports,
   readUbyAreaAccounting,
   recentCharges,
   rechargeControlIssue,
   rechargeEligibleWork,
+  rechargeImportStationProfile,
   rechargeMetadataSeed,
   rechargePersonIdentity,
   rechargeRecordHasData,
+  rechargeRowsFromFileBuffer,
+  rechargeSheetRows,
   rechargeSourcePlatform,
   rechargeSummary,
   rechargeUniqueKey,
@@ -6019,16 +6976,20 @@ window.UBY_NUCLEO = {
   recurringAbsentClients,
   refreshGeneralRechargeBases,
   reportEndForCharges,
+  requiredSpottLocalForWork,
   resetMatrizCostForm,
   resolveChargeMonthKey,
+  rowCellText,
   rowHasData,
   safeText,
   sameStationName,
+  saveCustomerRegistryCloud,
   saveFinancialSettingsRecord,
   saveLocalRechargeBase,
   saveLocalRechargeRecordFor,
   saveMatrizCosts,
   saveNetworkDistribution,
+  saveRechargeBase,
   scheduledPaymentApplies,
   scheduledPaymentDueDate,
   scheduledPaymentStatus,
@@ -6038,11 +6999,13 @@ window.UBY_NUCLEO = {
   selectorChargesForWork,
   selectorWorksWithoutDuplicateStations,
   serializeCharge,
+  setFeedback,
   setMatrizFeedback,
   setStorageState,
   shiftToPreviousMonth,
   shouldOpenFullRechargeWork,
   sortFinanceReports,
+  splitDateRange,
   stationAvailabilityFor,
   stationAvailabilityKey,
   stationAvailableHours,
@@ -6053,6 +7016,7 @@ window.UBY_NUCLEO = {
   stationScheduleLabel,
   stationUbyOperationKey,
   storageQuotaExceeded,
+  storeImportUndo,
   summarizeGeneralUnit,
   summarizeUbyChargerRow,
   summaryMetrics,
@@ -6094,10 +7058,12 @@ window.UBY_NUCLEO = {
   __base_getUbyChargerRows,
   __base_clientKeyFromCharge,
   RECARGAS_LOCAL_KEY,
+  RECARGAS_IMPORT_UNDO_KEY,
   UBY_AREA_ACCOUNTING_KEY,
   FINANCE_REPORTS_LOCAL_KEY,
   XLSX_CDN_URL,
   CLUB_PARTICIPANTS_LOCAL_KEY,
+  CUSTOMER_REGISTRY_LOCAL_KEY,
   OVERVIEW_PAGE_SIZE,
   CLUB_FORM_SHEET_ID,
   CLUB_FORM_GID,
@@ -6108,8 +7074,10 @@ window.UBY_NUCLEO = {
   FINANCE_RULE_BASIS,
   appData,
   RECHARGE_STATION_BLOCKLIST_BY_WORK,
+  SPOTT_REQUIRED_LOCAL_BY_WORK,
   RECHARGE_WORK_BLOCKLIST_TERMS,
   DEFAULT_STATION_PHYSICAL_LAYOUTS,
+  RAIO_COUNTS_FROM,
   MATRIZ_LEGACY_COSTS_KEY,
   MATRIZ_COSTS_KEY,
   NETWORK_DISTRIBUTION_KEY,

@@ -1,60 +1,69 @@
 /*
-  Importar planilhas — tela nova da plataforma. Por baixo usa o MESMO motor de
-  importação da plataforma atual (recargas.html), rodando invisível com a
-  liberação de gravação restrita à importação (ver supabase_bridge.js).
-  Nada de regra nova: leitura Spott/Move/Go Grid, duplicadas, histórico e
-  backup são os originais (handleFiles, handleCustomerRegistryFiles…).
+  Importar planilhas — tela nova da plataforma.
+  Migração (14/11/2026): sem a página antiga escondida. A importação roda no núcleo
+  (app/core/importacao.js, window.UBY_IMPORTACAO) com as mesmas regras: leitura
+  Spott/Move/Raio/Go Grid, duplicadas, conferência do Local, histórico, backup e
+  gravação atômica. Gravação liberada só nesta tela (escopo "importacao").
 */
 (function () {
   "use strict";
   const { fmt, esc } = UBY;
-  const SRC = "legado/obra-ev/recargas.html?nova_import=1";
   const ui = { work: "", month: new Date().toISOString().slice(0, 7), mode: "merge", log: [] };
   let frame = null, readyPromise = null;
 
+  // "w" é uma fachada sobre o núcleo (antes: a página antiga escondida). Leituras do estado da
+  // obra aberta vêm do módulo de importação; regras de leitura de planilha vêm do núcleo.
+  const I = () => window.UBY_IMPORTACAO;
+  let loadedWork = "", lastClients = "";
+  function ler(name) {
+    const N = window.UBY_NUCLEO;
+    if (name === "loadedFiles") return I().arquivos();
+    if (name === "allCharges") return I().recargas();
+    if (name === "allRechargeRecords") return N.state.allRechargeRecords;
+    if (name === "rechargeImportQueue") return Promise.resolve();
+    if (name === "queuedRechargeImports") return 0;
+    if (name in N) return N[name];
+    return N.state[name];
+  }
+  const W = new Proxy({}, { get(_, k) {
+    if (k === "eval") return ler;
+    if (k === "UBY_SUPABASE_CLIENT") return window.UBY_SUPABASE?.client?.() || null;
+    if (k === "UBY_WRITE_SCOPE") return /^#\/importar/.test(location.hash) ? "importacao" : "";
+    if (k === "XLSX") return window.XLSX;
+    const N = window.UBY_NUCLEO;
+    if (N && k in N) return N[k];
+    if (N && N.state && k in N.state) return N.state[k];
+    return undefined;
+  } });
   function engine() {
-    if (readyPromise && frame && document.body.contains(frame)) return readyPromise;
-    frame = document.createElement("iframe");
-    frame.id = "importFrame";
-    frame.title = "Motor de importação";
-    frame.setAttribute("aria-hidden", "true");
-    frame.tabIndex = -1;
-    frame.style.cssText = "position:absolute;width:1px;height:1px;left:-9999px;top:0;border:0;visibility:hidden";
-    frame.src = SRC + "&t=" + Date.now();
-    document.body.appendChild(frame);
-    readyPromise = new Promise((resolve, reject) => {
-      const t0 = Date.now();
-      const timer = setInterval(() => {
-        try {
-          const w = frame.contentWindow;
-          const sel = w.document.getElementById("workSelector");
-          if (typeof w.handleFiles === "function" && sel && sel.options.length && w.UBY_WRITE_SCOPE === "importacao") {
-            clearInterval(timer);
-            // Motor antigo em cache juntaria recargas distintas: não deixa importar com ele.
-            if (typeof w.markDistinctRepeatedRows !== "function") { reject(new Error("O motor de importação está desatualizado nesta aba. Recarregue a página (F5) antes de importar.")); return; }
-            resolve(w); return;
-          }
-          if (w.UBY_SUPABASE_CLIENT && w.UBY_WRITE_SCOPE !== "importacao") { clearInterval(timer); reject(new Error("A liberação de importação não ficou ativa. Recarregue a página.")); return; }
-        } catch (_) {}
-        if (Date.now() - t0 > 90000) { clearInterval(timer); reject(new Error("O motor de importação não respondeu em 90 s.")); }
-      }, 400);
-    });
+    if (readyPromise) return readyPromise;
+    readyPromise = (async () => {
+      for (let i = 0; i < 240 && !(window.UBY_IMPORTACAO && UBY.state.api); i++) await new Promise(r => setTimeout(r, 500));
+      if (!window.UBY_IMPORTACAO) throw new Error("O módulo de importação não carregou. Recarregue a página.");
+      await UBY.state.api.waitForReady();
+      frame = true;
+      return W;
+    })();
     readyPromise.catch(() => { readyPromise = null; });
     return readyPromise;
   }
 
-  // Ao sair da rota de importação, remove o motor que tem gravação liberada.
+  // Ao sair da rota de importação, a obra aberta é relida na próxima visita.
   window.addEventListener("hashchange", () => {
-    if (!location.hash.startsWith("#/importar") && frame) { frame.remove(); frame = null; readyPromise = null; }
+    if (!location.hash.startsWith("#/importar")) loadedWork = "";
   });
 
-  const text = (w, id) => (w.document.getElementById(id)?.innerText || "").trim();
-  // Uma obra pedida pela rota precisa ser carregada de novo no motor.
-  function w_loaded_reset() { try { if (frame?.contentWindow) frame.contentWindow.__novaWorkLoaded = false; } catch (_) {} }
+  // Avisos que a página antiga mostrava nos seus elementos: agora vêm do núcleo.
+  const text = (w, id) => {
+    if (id === "customerRegistryStatus") return lastClients;
+    const e = I().estado();
+    return String((id === "uploadFeedback" ? e.feedback : id === "storageState" ? e.storage : "") || "").replace(/<[^>]*>/g, "").trim();
+  };
+  // Uma obra pedida pela rota precisa ser carregada de novo.
+  function w_loaded_reset() { loadedWork = ""; }
 
   async function selectWork(w, id) {
-    const sel = w.document.getElementById("workSelector");
-    if (sel.value !== id) { sel.value = id; await sel.onchange?.(); }
+    if (I().atual() !== id || loadedWork !== id) { await I().abrir(id); loadedWork = id; }
   }
 
   function files(w) {
@@ -77,17 +86,8 @@
   // handleFiles() da plataforma original só enfileira a planilha e retorna na hora;
   // a leitura e a gravação no Supabase acontecem em rechargeImportQueue. Espera a
   // fila de verdade (inclui saveRechargeBase) antes de considerar a importação concluída.
-  async function waitQueue(w, ms = 300000) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < ms) {
-      try { await w.eval("rechargeImportQueue"); } catch (_) {}
-      await new Promise(r => setTimeout(r, 250));
-      let pending = 0;
-      try { pending = Number(w.eval("queuedRechargeImports")) || 0; } catch (_) {}
-      if (!pending) return true;
-    }
-    return false;
-  }
+  async function waitQueue(w, ms = 300000) { return true; } // a importação do núcleo só termina gravada
+
   // Avisos sobre a qualidade das recargas (sessões curtas, possível falha) não são
   // problema de importação: ficam na Análise operacional, não aqui.
   const rechargeNotes = t => String(t || "").split(/(?<=\.)\s+/).filter(x => !/(poss[ií]vel falha|an[aá]lise operacional)/i.test(x)).join(" ").trim();
@@ -99,18 +99,10 @@
   // Recarrega o motor da nova (mesmo efeito do F5 nos painéis) sem sair da tela.
   function refreshPanels() { document.getElementById("refreshButton")?.click(); }
 
-  // Aguarda o motor terminar (mensagem final no uploadFeedback, sem "carregando").
-  async function waitIdle(w, target, ms = 120000) {
-    const t0 = Date.now();
-    let last = "";
-    while (Date.now() - t0 < ms) {
-      await new Promise(r => setTimeout(r, 800));
-      const fb = text(w, "uploadFeedback");
-      if (fb !== last) { last = fb; paintStatus(target, w); }
-      const cls = w.document.getElementById("uploadFeedback")?.innerHTML || "";
-      if (fb && !/up-loading/.test(cls) && !/(carregando|lendo|processando|salvando|importando)/i.test(fb)) return fb;
-    }
-    return text(w, "uploadFeedback") || "Tempo esgotado aguardando o motor.";
+  // Mensagem final do núcleo depois de desfazer/excluir mês.
+  async function waitIdle(w, target) {
+    paintStatus(target, w);
+    return text(w, "uploadFeedback") || text(w, "storageState") || "concluído";
   }
 
   // ---- Importação automática Spott ----------------------------------------
@@ -305,7 +297,8 @@
   // para a barra do topo mostrar quando foi a última importação automática e se deu certo.
   async function logRun(w, robot) {
     try {
-      const sb = w.UBY_SUPABASE_CLIENT;
+      await I().gravar(async () => {
+      const sb = window.UBY_SUPABASE.client();
       if (!sb) return;
       const { data } = await sb.auth.getUser();
       const g = ui.auto.groups, bad = g.filter(x => !["ok", "igual"].includes(x.status)).length + ui.auto.errors.length;
@@ -314,6 +307,7 @@
         resumo: { origem: robot ? "robo" : "manual", em: new Date().toISOString(), ok: !bad, problemas: bad,
           locais: g.map(x => ({ local: x.local, mes: x.month, obra: x.workId, status: x.status, recargas: x.unique })) },
         usuario_id: data?.user?.id || null, usuario_email: data?.user?.email || null
+      });
       });
     } catch (err) { console.warn("Registro da importação automática não gravado:", err?.message || err); }
   }
@@ -376,14 +370,13 @@
     try { w = await engine(); }
     catch (err) { target.innerHTML = `<div class="loading"><h2>Não foi possível preparar a importação</h2><p>${esc(err.message)}</p><button class="btn" onclick="location.reload()">Tentar de novo</button></div>`; return; }
     if (!location.hash.startsWith("#/importar")) return;
-    const sel = w.document.getElementById("workSelector");
-    const works = [...sel.options].map(o => ({ id: o.value, label: o.textContent }));
+    const works = I().obras();
     ui.workNotFound = !!ui.work && !works.some(x => x.id === ui.work);
-    if (!ui.work || ui.workNotFound) ui.work = sel.value || works[0]?.id || "";
+    if (!ui.work || ui.workNotFound) ui.work = I().atual() || works[0]?.id || "";
     // Carrega a base completa da obra (mesmo passo de trocar a obra no original).
-    if (sel.value !== ui.work || !w.__novaWorkLoaded) {
+    if (loadedWork !== ui.work || I().atual() !== ui.work) {
       target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Carregando a base da obra</h2></div>`;
-      try { sel.value = ui.work; await sel.onchange?.(); w.__novaWorkLoaded = true; } catch (_) {}
+      try { await I().abrir(ui.work); loadedWork = ui.work; } catch (_) {}
     }
     if (!location.hash.startsWith("#/importar")) return;
     draw(target, w, works);
@@ -391,8 +384,8 @@
 
   function draw(target, w, works) {
     const list = files(w);
-    const undoVisible = w.document.getElementById("undoLastImportBtn")?.style.display !== "none";
-    const monthVisible = w.document.getElementById("clearSelectedMonthBtn")?.style.display !== "none";
+    const est = I().estado();
+    const undoVisible = est.undo, monthVisible = est.hasData;
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Entrada de dados</p><h1>Importar planilhas</h1>
         <p class="lead">Planilhas de recargas (Spott, Move, Go Grid) e cadastro de clientes, direto na plataforma nova. Mesmo motor de importação da plataforma atual: elimina duplicadas, guarda histórico e permite desfazer.</p></div>
@@ -420,7 +413,7 @@
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
             ${undoVisible ? `<button class="btn" id="impUndo">Desfazer última planilha</button>` : ""}
             ${monthVisible ? `<button class="btn" id="impClearMonth">Excluir mês selecionado</button>` : ""}
-            <a class="btn link-btn" href="#/importar-original">Histórico de backups e opções avançadas</a>
+            <a class="btn link-btn" href="#/backups">Histórico de backups e restauração</a>
             <button class="btn primary" id="impRefresh">Atualizar painéis</button>
           </div>
         </section>
@@ -455,13 +448,12 @@
       if (!arr.length) { $("#impStatus").innerHTML = `<div class="note">Arquivo não reconhecido. Envie .xlsx, .xls ou .csv.</div>`; return; }
       if (!ui.month) { $("#impStatus").innerHTML = `<div class="note">Escolha o mês da planilha.</div>`; return; }
       if (ui.mode === "replace" && !confirm(`Substituir o mês ${ui.month} completo desta obra pela planilha "${arr[0].name}"?\n\nO mês atual fica salvo no histórico de backups.`)) return;
-      w.document.getElementById("importMonth").value = ui.month;
-      w.document.getElementById("importMode").value = ui.mode;
       $("#impDrop").style.opacity = ".5";
       $("#impStatus").innerHTML = `<div class="note">Importando ${esc(arr.map(f => f.name).join(", "))}…</div>`;
       try {
-        await w.handleFiles(arr);
-        const finished = await waitQueue(w);
+        I().limparAviso();
+        await I().importar(arr, { month: ui.month, mode: ui.mode });
+        const finished = true;
         const { msg, bad } = finished ? importOutcome(w) : { msg: "A gravação ainda não terminou após 5 minutos. Confira a base antes de importar de novo.", bad: true };
         log(`${arr.map(f => f.name).join(", ")} → ${msg}`, bad ? "bad" : "ok");
         if (!bad) {
@@ -488,8 +480,8 @@
       if (!arr.length) return;
       $("#cliDrop").style.opacity = ".5";
       try {
-        await w.handleCustomerRegistryFiles(arr);
-        const st = text(w, "customerRegistryStatus") || "Importação de clientes concluída.";
+        lastClients = await I().clientes(arr);
+        const st = lastClients || "Importação de clientes concluída.";
         const badCli = /(pendente|nao executada|não executada|erro)/i.test(st);
         log(`Clientes: ${st}`, badCli ? "bad" : "ok");
         if (!badCli) refreshPanels();
@@ -503,9 +495,25 @@
     cdrop.ondrop = e => { e.preventDefault(); cdrop.style.borderColor = ""; runClients(e.dataTransfer.files); };
 
     const undo = $("#impUndo");
-    if (undo) undo.onclick = async () => { w.document.getElementById("undoLastImportBtn").click(); const r = await waitIdle(w, target, 60000); log(`Desfazer última planilha → ${r}`); refreshPanels(); draw(target, w, works); };
+    if (undo) undo.onclick = async () => {
+      const info = I().infoDesfazer();
+      if (!info) { alert("Não há importação recente para desfazer nesta obra."); return; }
+      const when = info.createdAt ? new Date(info.createdAt).toLocaleString("pt-BR") : "agora";
+      if (!confirm(`Desfazer a última importação de ${info.workName}? O estado voltará para antes de ${when}.`)) return;
+      try { await I().desfazer(); const r = await waitIdle(w, target); log(`Desfazer última planilha → ${r}`); refreshPanels(); }
+      catch (err) { log(`Desfazer última planilha → ${err.message}`, "bad"); }
+      draw(target, w, works);
+    };
     const clr = $("#impClearMonth");
-    if (clr) clr.onclick = async () => { w.document.getElementById("importMonth").value = ui.month; w.document.getElementById("clearSelectedMonthBtn").click(); const r = await waitIdle(w, target, 60000); log(`Excluir mês ${ui.month} → ${r}`); refreshPanels(); draw(target, w, works); };
+    if (clr) clr.onclick = async () => {
+      const mk = ui.month, n = I().recargasDoMes(mk), nome = works.find(x => x.id === ui.work)?.label || ui.work;
+      if (!mk) { alert("Escolha o mês que deseja excluir."); return; }
+      if (!n) { alert(`Não há recargas salvas em ${monthName(mk)} para esta obra.`); return; }
+      if (!confirm(`Excluir somente ${monthName(mk)} de ${nome}? Serão removidas ${n} recarga(s), mantendo os outros meses.`)) return;
+      try { await I().excluirMes(mk); const r = await waitIdle(w, target); log(`Excluir mês ${mk} → ${r}`); refreshPanels(); }
+      catch (err) { log(`Excluir mês ${mk} → ${err.message}`, "bad"); }
+      draw(target, w, works);
+    };
     $("#impRefresh").onclick = () => document.getElementById("refreshButton").click();
 
     // Importação automática Spott
@@ -588,11 +596,11 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
       a.running = true;
       let okCount = 0;
       for (const g of todo) {
-        if (!frame || !document.body.contains(frame)) break;
+        if (!location.hash.startsWith("#/importar")) break;
         g.status = "importando"; draw(target, w, works);
         try {
           await selectWork(w, g.workId);
-          ui.work = g.workId; w.__novaWorkLoaded = true;
+          ui.work = g.workId;
           const clash = g.api ? moveTimeClash(w, g) : "";
           if (clash) { g.status = "erro"; g.msg = clash; log(`${g.platform} ${g.local} ${g.month} → ${clash}`, "bad"); continue; }
           // Sem novidade: a obra já tem exatamente estas recargas (quantidade, kWh e R$)
@@ -606,11 +614,9 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
             g.status = "igual"; g.msg = `A obra já tem estas ${have.length} recargas (${fmt.kwh(hk)}, ${fmt.brl(hr)}). Nada a gravar.`;
             continue;
           }
-          w.document.getElementById("uploadFeedback").innerHTML = "";
-          w.document.getElementById("importMonth").value = g.month;
-          w.document.getElementById("importMode").value = "merge";
-          await w.handleFiles([g.part]);
-          const finished = await waitQueue(w);
+          I().limparAviso();
+          await I().importar([g.part], { month: g.month, mode: "merge" });
+          const finished = true;
           let { msg, bad } = finished ? importOutcome(w) : { msg: "A gravação não terminou em 5 minutos. Confira a base antes de repetir.", bad: true };
           // Conferência: as recargas deste Local e mês precisam estar na obra de destino.
           if (!bad) {
