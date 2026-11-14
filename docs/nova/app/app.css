@@ -57,7 +57,6 @@ p,small{color:var(--uby-muted)}
 .nav-item span{flex:1}
 .nav-item b{padding:2px 6px;border-radius:999px;font-size:8px;font-weight:850;letter-spacing:.05em}
 .nav-item b.new{color:var(--uby-green);background:var(--uby-green-soft)}
-.nav-item b.classic{color:#8a8f86;background:var(--uby-surface-soft)}
 .nav-item:hover,.nav-item.active{border-color:#cce0ce;color:var(--uby-forest);background:var(--uby-green-soft);box-shadow:inset 3px 0 0 var(--uby-green)}
 .nav-item.active i{color:var(--uby-green)}
 .sidebar-foot{display:grid;gap:8px;padding:12px 8px 0;border-top:1px solid var(--uby-line)}
@@ -96,12 +95,6 @@ html,body{overflow-x:hidden}
 .btn:hover{border-color:var(--uby-green)}
 
 .content{max-width:1880px;margin:0 auto;padding:26px 28px 56px}
-.classic-wrap{display:none;height:calc(100vh - 64px)}
-.classic-wrap.on{display:flex;flex-direction:column}
-.classic-bar{display:flex;align-items:center;gap:10px;padding:9px 28px;border-bottom:1px solid var(--uby-line);background:#fbfaea;font-size:11.5px;color:#6b6a3a}
-.classic-bar strong{color:var(--uby-forest)}
-.classic-bar a{margin-left:auto;font-weight:800;font-size:11px}
-#classicFrame{flex:1;width:100%;border:0;background:var(--uby-canvas)}
 #motorFrame{position:absolute;width:1px;height:1px;left:-9999px;top:0;border:0;visibility:hidden}
 
 /* Hero e seções */
@@ -272,7 +265,6 @@ tfoot td{font-weight:850;color:var(--uby-forest);background:var(--uby-surface-so
   .topbar{gap:10px}
   .top-actions{flex:none;gap:6px}
   .top-actions .select{max-width:150px}
-  .classic-bar{padding:9px 16px}
 }
 @media(max-width:620px){
   .g2,.g3,.g4,.g5,.g6,.daily-strip{grid-template-columns:1fr 1fr}
@@ -349,12 +341,11 @@ html[data-theme="night"] .nav-item{color:#AEB8C6}
 html[data-theme="night"] .nav-item i{color:#6F7E94}
 html[data-theme="night"] .nav-item:hover,html[data-theme="night"] .nav-item.active{border-color:rgba(0,255,133,.22);color:#F5F7FA;box-shadow:inset 3px 0 0 var(--uby-forest)}
 html[data-theme="night"] .nav-item.active i{color:var(--uby-forest)}
-html[data-theme="night"] .nav-item b.classic{color:#8A95A5}
 html[data-theme="night"] .brand .chip{border-color:rgba(255,214,0,.35);color:#FFD600}
 html[data-theme="night"] .topbar{background:rgba(10,22,40,.88)}
 html[data-theme="night"] .pill,html[data-theme="night"] .select,html[data-theme="night"] .btn,html[data-theme="night"] .kpi .v,html[data-theme="night"] .mini .v,
 html[data-theme="night"] .list-row strong,html[data-theme="night"] .callout strong,html[data-theme="night"] tfoot td,html[data-theme="night"] .cmp-banner strong,
-html[data-theme="night"] .flow-step .big,html[data-theme="night"] .classic-bar strong,html[data-theme="night"] .source-line b{color:#F5F7FA}
+html[data-theme="night"] .flow-step .big,html[data-theme="night"] .source-line b{color:#F5F7FA}
 html[data-theme="night"] .kpi.lead .v,html[data-theme="night"] .wk-occ{color:var(--uby-forest)}
 html[data-theme="night"] .kpi.lead{border-top-color:var(--uby-forest);background:linear-gradient(180deg,rgba(0,255,133,.06),transparent 70%),var(--uby-surface)}
 html[data-theme="night"] .kpi.warn .v{color:#FFB020}
@@ -363,7 +354,6 @@ html[data-theme="night"] .pill.err{border-color:rgba(255,107,107,.35)}
 html[data-theme="night"] .pill.ro{border-color:rgba(255,214,0,.35);color:#FFD600}
 html[data-theme="night"] .pill.ro .dot{background:#FFD600}
 html[data-theme="night"] .btn.primary,html[data-theme="night"] .seg button.on{color:#0A1628;background:var(--uby-forest);border-color:var(--uby-forest)}
-html[data-theme="night"] .classic-bar{background:#13243F;color:#FFE45C}
 html[data-theme="night"] .callout{background:rgba(255,214,0,.05)}
 html[data-theme="night"] .tag.ac,html[data-theme="night"] .badge.ac,html[data-theme="night"] .badge.occ-blue{background:rgba(0,229,255,.12)}
 html[data-theme="night"] .tag.partner,html[data-theme="night"] .badge.partner{background:rgba(183,156,255,.14)}
@@ -527,8 +517,6 @@ a.dt-name:hover strong{text-decoration:underline}
   .kpi.big .v{font-size:23px}
   .panel{padding:12px}
   /* Telas originais embutidas ocupam a área útil entre topo e abas */
-  .classic-wrap{height:calc(100dvh - 56px - var(--tabbar-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
-  .classic-bar{padding:7px 12px;font-size:10.5px;flex-wrap:wrap}
   #calcBadge{top:auto!important;bottom:calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom));right:12px!important}
   /* Grades fixas das telas viram coluna única */
   [style*="grid-template-columns:170px"],[style*="grid-template-columns:160px"]{grid-template-columns:1fr 30px!important}

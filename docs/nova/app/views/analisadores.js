@@ -17,8 +17,7 @@
       target.innerHTML = `<div class="loading"><div class="spinner"></div><h2>Lendo relatórios dos analisadores</h2></div>`;
       if (!loading) {
         loading = true;
-        // Lê a lista direto do texto da página (instantâneo); se a página mudar
-        // de formato, cai para a leitura antiga (abrir a página escondida).
+        // Lista dos analisadores: dados próprios da plataforma (app/data/analisadores.json).
         fetch("app/data/analisadores.json?v=1", { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error("Lista dos analisadores não encontrada."); return r.json(); })
           .then(d => { data = d; }).catch(err => { error = err.message; })
           .finally(() => { loading = false; if (location.hash.startsWith("#/analisadores")) render(target); });

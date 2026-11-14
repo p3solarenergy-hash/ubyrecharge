@@ -1,11 +1,8 @@
-/* NOVA PLATAFORMA UBY — moldura, rotas e conexão com o motor original. */
+/* NOVA PLATAFORMA UBY — moldura, rotas e conexão com o motor (app/core). */
 (function () {
   "use strict";
 
-  const LEGACY = "legado/obra-ev/";
-
-  // Camadas da plataforma nova. type 'view' = tela nova; 'classic' = tela
-  // original embutida (todas as funções preservadas) até ser migrada.
+  // Camadas da plataforma nova (todas as telas são type 'view').
   const GROUPS = [
     { label: "ENTRADA DE DADOS", items: [
       { id: "lancamentos", icon: "＋", label: "Central de lançamentos", type: "view" },
@@ -406,53 +403,9 @@
     return api.ready().then(() => wrapped);
   }
 
-  // Lê uma constante de dados (const NOME = [...] / {...}) direto do texto de uma
-  // página original, sem abrir a página: instantâneo e sem tempo de espera.
-  async function legacyConst(src, name) {
-    const text = await (await fetch(src, { cache: "no-cache" })).text();
-    const at = text.search(new RegExp(`(?:const|let|var)\\s+${name}\\s*=\\s*[\\[{]`));
-    if (at < 0) throw new Error(`${name} não encontrado em ${src}`);
-    let i = text.indexOf("=", at) + 1;
-    while (/\s/.test(text[i])) i += 1;
-    const start = i;
-    let depth = 0, quote = "";
-    for (; i < text.length; i += 1) {
-      const c = text[i];
-      if (quote) { if (c === "\\") i += 1; else if (c === quote) quote = ""; continue; }
-      if (c === "/" && text[i + 1] === "/") { i = text.indexOf("\n", i); if (i < 0) break; continue; }
-      if (c === "/" && text[i + 1] === "*") { i = text.indexOf("*/", i + 2) + 1; continue; }
-      if (c === "'" || c === '"' || c === "`") { quote = c; continue; }
-      if (c === "[" || c === "{") depth += 1;
-      else if (c === "]" || c === "}") { depth -= 1; if (depth === 0) break; }
-    }
-    const literal = text.slice(start, i + 1);
-    return JSON.parse(JSON.stringify(new Function(`"use strict"; return (${literal});`)()));
-  }
   async function sha1(text) {
     const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(text));
     return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
-  }
-
-  // Lê dados prontos de uma página original (abre invisível, executa `reader`
-  // no contexto dela, devolve uma cópia e fecha). Usado por Analisadores e Mercado.
-  function legacyRead(src, reader, settleMs = 1500) {
-    return new Promise((resolve, reject) => {
-      const frame = document.createElement("iframe");
-      frame.setAttribute("aria-hidden", "true");
-      frame.tabIndex = -1;
-      frame.style.cssText = "position:absolute;width:1200px;height:900px;left:-99999px;top:0;border:0;visibility:hidden";
-      frame.src = src;
-      const done = (fn, v) => { clearTimeout(timeout); frame.remove(); fn(v); };
-      const timeout = setTimeout(() => done(reject, new Error("A página original não respondeu em 45 s.")), 45000);
-      frame.onload = () => setTimeout(() => {
-        try { done(resolve, JSON.parse(JSON.stringify(reader(frame.contentWindow)))); } catch (err) { done(reject, err); }
-      }, settleMs);
-      document.body.appendChild(frame);
-    });
-  }
-
-  function openLegacy(src, label, group = "GESTÃO DE OBRAS", tab = "") {
-    location.hash = `#/abrir/${encodeURIComponent(src)}/${encodeURIComponent(tab)}/${encodeURIComponent(label)}/${encodeURIComponent(group)}`;
   }
 
   // ---------- rotas ----------
@@ -471,11 +424,6 @@
   function route() {
     const { id, params } = parseHash();
     let def = ROUTES[id] || ROUTES.comando;
-    // Página original específica (ex.: detalhe de uma obra). Só aceita páginas
-    // da pasta legado/, sem subir diretórios.
-    if (id === "abrir" && /^legado\/[\w\-./?=&%]+$/.test(params[0] || "") && !params[0].includes("..")) {
-      def = { id: "abrir", type: "classic", src: params[0], writes: /^legado\/obra-ev\/gestao_obra_ev_detalhe\.html/.test(params[0]) ? "obras" : false, tab: params[1] || "", label: params[2] || "Tela original", group: params[3] || "GESTÃO DE OBRAS" };
-    }
     // Atalho de menu (ex.: #/fin-pagar) leva para a tela de verdade.
     if (def.href && id === def.id) { location.replace(def.href); return; }
     state.route = def; state.params = params;
@@ -486,8 +434,6 @@
     $("#crumbGroup").textContent = `UBY Recharge / ${def.group.charAt(0) + def.group.slice(1).toLowerCase()}`;
     $("#crumbTitle").textContent = def.label;
     $("#periodWrap").hidden = !(def.type === "view" && def.period);
-    if (def.type === "classic") return openClassic(def);
-    $("#classicWrap").classList.remove("on");
     $("#view").hidden = false;
     window.UBY_SCROLL_KEEP?.reset();
     window.scrollTo({ top: 0 });
@@ -539,57 +485,12 @@
 
   function loadingMarkup() {
     return `<div class="loading"><div class="spinner"></div><h2>Conectando à base real</h2>
-      <p>O motor de cálculo original está lendo obras, sessões e resumos no Supabase. Na primeira abertura isso leva alguns segundos; depois o mês atual fica em cache.</p></div>`;
+      <p>O motor de cálculo está lendo obras, sessões e resumos no Supabase. Na primeira abertura isso leva alguns segundos; depois o mês atual fica em cache.</p></div>`;
   }
 
   function renderError(err) {
     $("#view").innerHTML = `<div class="loading"><h2>Não foi possível ler os dados</h2><p>${esc(err.message || err)}</p>
       <p>Confira a conexão com a internet e se o login ainda é válido.</p><div><a class="btn primary" href="login.html">Entrar novamente</a> <button class="btn" onclick="location.reload()">Tentar de novo</button></div></div>`;
-  }
-
-  // ---------- visão clássica ----------
-  let classicSrc = "";
-  function openClassic(def) {
-    $("#view").hidden = true;
-    $("#classicWrap").classList.add("on");
-    // Barra informa quando a tela grava na base real (importações e obras).
-    $("#classicWrap").querySelector(".classic-bar span").innerHTML = def.writes === "obras"
-      ? `<strong style="color:var(--uby-red)">Gravação ligada</strong> · <strong>${esc(def.label)}</strong> · cadastro, fases, tarefas, documentos e vínculos gravam na base real (a mesma da plataforma atual). Excluir obra fica bloqueado: use Arquivar.`
-      : def.writes
-      ? `<strong style="color:var(--uby-red)">Gravação ligada</strong> · <strong>${esc(def.label)}</strong> · importar, desfazer, corrigir mês e restaurar backup gravam na base real (a mesma da plataforma atual). Todas as outras telas continuam só leitura.`
-      : `Tela original · <strong>${esc(def.label)}</strong> · todas as funções e cálculos da plataforma, com as cores da nova. Gravações bloqueadas nesta versão local.`;
-    const frame = $("#classicFrame");
-    const src = def.src;
-    $("#classicOpen").href = src;
-    if (classicSrc !== src) {
-      classicSrc = src;
-      frame.src = src;
-      frame.onload = () => selectClassicTab(frame, state.route.tab);
-    } else {
-      selectClassicTab(frame, def.tab);
-    }
-  }
-
-  function selectClassicTab(frame, tab) {
-    if (!tab) return;
-    const win = frame.contentWindow;
-    const apply = () => {
-      try {
-        const btn = win.document.querySelector(`[onclick*="switchTab('${tab}'"]`);
-        if (typeof win.switchTab === "function" && btn) { win.document.getElementById("tabsBar").style.display = "flex"; win.switchTab(tab, btn); return true; }
-      } catch (err) { console.warn("aba clássica:", err.message); }
-      return false;
-    };
-    let tries = 0;
-    const onReady = () => setTimeout(apply, 50);
-    try { win.document.addEventListener("uby:recharge-ready", onReady, { once: true }); } catch (_) {}
-    const timer = setInterval(() => {
-      tries += 1;
-      let ready = false;
-      try { ready = win.document.readyState === "complete" && typeof win.switchTab === "function"; } catch (_) {}
-      if (ready && tries > 6) { clearInterval(timer); apply(); }
-      if (tries > 80) clearInterval(timer);
-    }, 250);
   }
 
   // ---------- início ----------
@@ -652,6 +553,6 @@
     return href ? `<a class="edit-link" href="${href}" title="Abrir o centro de custos deste carregador">${esc(label)}<span aria-hidden="true"> ↗</span></a>` : esc(label);
   };
 
-  window.UBY = { nav: NAV, routes: ROUTES, shortStation, start, checkCloudSession, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, openLegacy, obrasEdit, legacyRead, legacyConst, sha1, rerender, modelLabel, isUbyModel, stationHref, stationLink,
+  window.UBY = { nav: NAV, routes: ROUTES, shortStation, start, checkCloudSession, state, fmt, esc, delta, kpi, mini, chart, baseChartOptions, PALETTE, data, periodArg, obras, obrasEdit, sha1, rerender, modelLabel, isUbyModel, stationHref, stationLink,
     register: (id, view) => { VIEWS[id] = view; }, go: hash => { location.hash = hash; }, ROUTES };
 })();
