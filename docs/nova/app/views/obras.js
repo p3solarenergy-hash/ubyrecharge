@@ -194,8 +194,7 @@
     edit.busy = true; edit.err = ""; const box = target.querySelector("#obEditStatus"); if (box) box.innerHTML = statusLine();
     try {
       await UBY.obrasEdit();
-      const w = document.getElementById("obrasEditFrame").contentWindow;
-      const up = await w.UBY_SUPABASE.uploadDocumentFile(id, nome, docId, file);
+      const up = await window.UBY_SUPABASE.comGravacao("obras", () => window.UBY_SUPABASE.uploadDocumentFile(id, nome, docId, file));
       edit.busy = false;
       return save(target, id, "documentos", [{ set: ["documents", { id: docId }], value: { status: "done", link: up.link, fileName: up.fileName, storagePath: up.storagePath } }], { type: "document", title: "Documento anexado", after: up.fileName });
     } catch (err) { edit.busy = false; edit.err = err.message || String(err); render(target, ["obra", id, "documentos"]); }

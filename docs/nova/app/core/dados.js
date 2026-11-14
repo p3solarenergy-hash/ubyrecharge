@@ -1572,7 +1572,9 @@
       const hash = String(location.hash || "");
       if (!SCOPE_BY_ROUTE.some(([re, sc]) => sc === scope && re.test(hash))) throw new Error(`Gravação de ${nome} só pela própria tela. Nada foi gravado.`);
       explicitScope = scope;
-      try { return await fn(); } finally { explicitScope = null; }
+      // Regras antigas conferem a marca antes de abrir a conexão (ex.: requireWrite das obras).
+      window.UBY_WRITE_SCOPE = scope.name; window.UBY_READ_ONLY = false;
+      try { return await fn(); } finally { explicitScope = null; window.UBY_WRITE_SCOPE = ""; window.UBY_READ_ONLY = true; }
     };
     // Uma gravação por vez: o escopo explícito não pode valer para duas telas ao mesmo tempo.
     const p = gravacaoFila.then(run, run);
