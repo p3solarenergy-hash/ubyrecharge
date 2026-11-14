@@ -2,7 +2,6 @@
 (function () {
   "use strict";
   const { fmt, esc, kpi } = UBY;
-  const SRC = "legado/obra-ev/mercado.html";
   const ui = { tab: "p2026", uf: "PR", sort: "eletropostos", fUf: "PR", fSort: "plug", fq: "" };
   let data = null, error = null, loading = false;
   // Aba própria (não vem da página original): eletrificados por município, de app/data/frota-ev.json
@@ -49,14 +48,9 @@
   // enquanto a página original não mudar (mesma impressão digital); se mudar,
   // lê a página como antes.
   async function load() {
-    try {
-      const [snap, html] = await Promise.all([
-        fetch("app/data/mercado.json", { cache: "no-cache" }).then(r => (r.ok ? r.json() : null)),
-        fetch(SRC, { cache: "no-cache" }).then(r => r.text())
-      ]);
-      if (snap && snap.sourceHash && snap.sourceHash === await UBY.sha1(html) && snap.data?.pages?.length) return snap.data;
-    } catch (_) {}
-    return UBY.legacyRead(SRC, reader, 2500);
+    const snap = await fetch("app/data/mercado.json", { cache: "no-cache" }).then(r => (r.ok ? r.json() : null));
+    if (!snap?.data?.pages?.length) throw new Error("Dados do Mercado EV não encontrados.");
+    return snap.data;
   }
   UBY.mercadoReader = reader;
 
@@ -198,7 +192,7 @@
       ${page.insights.length ? `<div class="grid g3" style="margin-bottom:18px">${page.insights.map(x => `<div class="mini"><span class="k">${esc(x.icon)} ${esc(x.label)}</span><strong class="v">${esc(x.value)}</strong><span class="s">${esc(x.note)}</span></div>`).join("")}</div>` : ""}
       ${isState ? statesHtml() : `<div class="grid g2" style="gap:16px;margin-bottom:18px">${page.cards.map(cardHtml).join("")}</div>`}
       ${page.sources.map(s => `<p class="source-line">${esc(s)}</p>`).join("")}
-      <p class="source-line">Fonte: painel Mercado EV original (legado/obra-ev/mercado.html). Mesmos números da página original.</p>`}`;
+      <p class="source-line">Fonte: dados do Mercado EV (app/data/mercado.json), os mesmos do painel original.</p>`}`;
 
     if (isFrota && frota.data) {
       target.querySelector("#mkFUf").onchange = ev => { ui.fUf = ev.target.value; render(target); };

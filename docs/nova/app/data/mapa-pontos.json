@@ -1,0 +1,186 @@
+[
+ {
+  "id": "robert-koch",
+  "name": "Robert Koch",
+  "round": "1ª Rodada",
+  "lat": -23.323833,
+  "lon": -51.129822,
+  "note": "Coordenada fornecida"
+ },
+ {
+  "id": "posto-central",
+  "name": "Posto Central",
+  "round": "1ª Rodada",
+  "lat": -23.313407,
+  "lon": -51.170331,
+  "note": "Coordenada fornecida"
+ },
+ {
+  "id": "posto-malassise",
+  "name": "Posto Malassise",
+  "round": "1ª Rodada",
+  "lat": -23.299504,
+  "lon": -51.166243,
+  "note": "Coordenada fornecida"
+ },
+ {
+  "id": "shopping-aurora",
+  "name": "Shopping Aurora",
+  "round": "1ª e 2ª Rodadas",
+  "lat": -23.32884,
+  "lon": -51.177868,
+  "note": "Coordenada fornecida"
+ },
+ {
+  "id": "alphaville",
+  "name": "Alphaville",
+  "round": "2ª Rodada",
+  "lat": -23.350222,
+  "lon": -51.190333,
+  "note": "Coordenada fornecida"
+ },
+ {
+  "id": "rodoviaria",
+  "name": "Rodoviária",
+  "round": "2ª Rodada",
+  "lat": -23.31087,
+  "lon": -51.14868,
+  "note": "Coordenada fornecida"
+ },
+ {
+  "id": "posto-2800",
+  "name": "Posto 2800",
+  "round": "2ª Rodada",
+  "lat": -23.333828,
+  "lon": -51.167485,
+  "note": "Coordenada fornecida"
+ },
+ {
+  "id": "g3x-saul",
+  "name": "G3X — Saul Elkind",
+  "round": "2ª Rodada",
+  "lat": -23.257488,
+  "lon": -51.15466,
+  "note": "Coordenada fornecida"
+ },
+ {
+  "id": "ortec",
+  "name": "Ortec — Ibiporã",
+  "round": "Próximas Rodadas",
+  "lat": -23.2691,
+  "lon": -51.0479,
+  "note": "Av. Santos Dumont, 318 — Ibiporã/PR"
+ },
+ {
+  "id": "g3x-castelo",
+  "name": "G3X Castelo Branco — Ibiporã",
+  "round": "Próximas Rodadas",
+  "lat": -23.2699,
+  "lon": -51.0508,
+  "note": "R. Luís Carlos Zani, 395 — Ibiporã/PR"
+ },
+ {
+  "id": "g3x-maritacas",
+  "name": "G3X — Maritacas",
+  "round": "Próximas Rodadas",
+  "lat": -23.2892,
+  "lon": -51.132,
+  "note": "Av. das Maritacas, 1156 — Londrina/PR"
+ },
+ {
+  "id": "av-europa",
+  "name": "Posto — Avenida Europa",
+  "round": "Próximas Rodadas",
+  "lat": -23.3534,
+  "lon": -51.1385,
+  "note": "Av. Europa, 207 — Londrina/PR"
+ },
+ {
+  "id": "duim",
+  "name": "Duim — Londrina",
+  "round": "Próximas Rodadas",
+  "lat": -23.303127,
+  "lon": -51.178733,
+  "note": "Av. Maringá, 241 — Londrina/PR"
+ },
+ {
+  "id": "ecoeficiente",
+  "name": "Ecoeficiente — Arapongas",
+  "round": "Próximas Rodadas",
+  "lat": -23.4189,
+  "lon": -51.4246,
+  "note": "Av. Gaturamo, 556 — Arapongas/PR"
+ },
+ {
+  "id": "canada",
+  "name": "Posto Canadá — Maringá",
+  "round": "Próximas Rodadas",
+  "lat": -23.404485,
+  "lon": -51.95656,
+  "note": "Av. Mandacaru, 1180 — Maringá/PR"
+ },
+ {
+  "id": "londres",
+  "name": "Posto Londres — Maringá",
+  "round": "Próximas Rodadas",
+  "lat": -23.3928,
+  "lon": -51.9286,
+  "note": "Av. Kakogawa, 2161 — Maringá/PR"
+ },
+ {
+  "id": "dubai",
+  "name": "Posto Dubai — Maringá",
+  "round": "Próximas Rodadas",
+  "lat": -23.395254,
+  "lon": -51.938656,
+  "note": "Av. Dr. Alexandre Rasgulaeff, 4501 — Maringá/PR"
+ },
+ {
+  "id": "opala",
+  "name": "Posto Opala 29 — Rolândia",
+  "round": "Próximas Rodadas",
+  "lat": -23.3109,
+  "lon": -51.3674,
+  "note": "Av. Pres. Getúlio Vargas, 699 — Rolândia/PR"
+ },
+ {
+  "id": "prudente",
+  "name": "Presidente Prudente",
+  "round": "Frente de expansão",
+  "lat": -22.122517,
+  "lon": -51.388253,
+  "note": "Local exato ainda não definido"
+ },
+ {
+  "id": "marilia",
+  "name": "Marília",
+  "round": "Frente de expansão",
+  "lat": -22.21389,
+  "lon": -49.94583,
+  "note": "Local exato ainda não definido"
+ },
+ {
+  "id": "cascavel",
+  "name": "Cascavel",
+  "round": "Frente de expansão",
+  "lat": -24.95,
+  "lon": -53.48,
+  "note": "Local exato ainda não definido"
+ },
+ {
+  "id": "toledo",
+  "name": "Toledo",
+  "round": "Frente de expansão",
+  "lat": -24.713611,
+  "lon": -53.743056,
+  "note": "Local exato ainda não definido"
+ },
+ {
+  "id": "bauru",
+  "name": "Bauru",
+  "round": "Frente de expansão",
+  "lat": -22.316,
+  "lon": -49.061,
+  "note": "Local exato ainda não definido"
+ }
+]

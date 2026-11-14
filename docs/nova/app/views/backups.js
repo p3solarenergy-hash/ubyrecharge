@@ -9,32 +9,13 @@
   const cache = { history: new Map(), matrix: null, matrixErr: "", snaps: null, snapsErr: "" };
   const readBridge = () => window.UBY_SUPABASE;
 
-  let framePromise = null;
-  function writer() {
-    if (framePromise) return framePromise;
-    framePromise = new Promise((resolve, reject) => {
-      const frame = document.createElement("iframe");
-      frame.id = "backupsFrame";
-      frame.setAttribute("aria-hidden", "true");
-      frame.tabIndex = -1;
-      frame.style.cssText = "position:absolute;width:1px;height:1px;left:-9999px;top:0;border:0;visibility:hidden";
-      frame.src = "legado/obra-ev/backups-gravacao.html?nova_backups=1&t=" + Date.now();
-      document.body.appendChild(frame);
-      const t0 = Date.now();
-      const timer = setInterval(() => {
-        const w = frame.contentWindow;
-        if (w && w.UBY_SUPABASE?.client) {
-          clearInterval(timer);
-          w.UBY_SUPABASE.client();
-          if (w.UBY_WRITE_SCOPE !== "backups") { reject(new Error("Restauração não liberada nesta tela.")); return; }
-          resolve(w.UBY_SUPABASE);
-        } else if (Date.now() - t0 > 60000) { clearInterval(timer); reject(new Error("O quadro de restauração não respondeu.")); }
-      }, 200);
-    });
-    framePromise.catch(() => { framePromise = null; document.getElementById("backupsFrame")?.remove(); });
-    return framePromise;
-  }
-  window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/backups") && framePromise) { framePromise = null; document.getElementById("backupsFrame")?.remove(); } });
+  // Gravação sem página antiga (migração 14/11/2026): cada chamada à ponte roda dentro de
+  // UBY_SUPABASE.comGravacao("backups"), que só libera as tabelas do escopo com esta tela aberta.
+  const gravando = new Proxy({}, { get(_, k) {
+    const v = window.UBY_SUPABASE?.[k];
+    return typeof v === "function" ? (...a) => window.UBY_SUPABASE.comGravacao("backups", () => v.apply(window.UBY_SUPABASE, a)) : v;
+  } });
+  function writer() { return Promise.resolve(gravando); }
 
   const works = () => {
     const seen = new Map();

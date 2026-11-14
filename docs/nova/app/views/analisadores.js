@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   const { fmt, esc, kpi } = UBY;
-  const BASE = "legado/obra-ev/analisadores/";
+  const BASE = "documentos/analisadores/";
   const ui = { search: "" };
   let data = null, error = null, loading = false;
 
@@ -19,8 +19,7 @@
         loading = true;
         // Lê a lista direto do texto da página (instantâneo); se a página mudar
         // de formato, cai para a leitura antiga (abrir a página escondida).
-        UBY.legacyConst(BASE + "dashboard.html", "RELATORIOS")
-          .catch(() => UBY.legacyRead(BASE + "dashboard.html", w => w.eval("RELATORIOS"), 600))
+        fetch("app/data/analisadores.json?v=1", { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error("Lista dos analisadores não encontrada."); return r.json(); })
           .then(d => { data = d; }).catch(err => { error = err.message; })
           .finally(() => { loading = false; if (location.hash.startsWith("#/analisadores")) render(target); });
       }
@@ -65,7 +64,7 @@
           <div style="display:flex;flex-wrap:wrap;gap:6px">${link(r.arquivo, "Completo")}${link(r.arquivo_eletrico, "Elétrico")}${link(r.arquivo_carregador, "Carregador")}${link(r.arquivo_resumo, "Diagnóstico PDF")}</div>
         </article>`).join("") || `<div class="note">Nenhum relatório no filtro.</div>`}
       </div>
-      <p class="source-line">Fonte: página original dos analisadores (lista RELATORIOS). Relatórios completos em legado/obra-ev/analisadores/.</p>`;
+      <p class="source-line">Fonte: relatórios dos analisadores (app/data/analisadores.json). Relatórios completos em documentos/analisadores/.</p>`;
 
     const s = target.querySelector("#anSearch");
     s.oninput = () => { ui.search = s.value; clearTimeout(s._t); s._t = setTimeout(() => { render(target); const el = target.querySelector("#anSearch"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };

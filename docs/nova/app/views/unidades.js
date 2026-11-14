@@ -185,7 +185,6 @@
     }
     const m = d.metrics;
     const sessions = d.sessions.filter(s => ui.sessionFilter === "all" || (ui.sessionFilter === "valid" ? s.valid : !s.valid));
-    const classicHref = `legado/obra-ev/recargas.html?obra=${encodeURIComponent(d.workId)}&openReport=mensal&station=${encodeURIComponent(d.station)}`;
 
     // Página única do carregador (usuário, 20/10/2026: "a análise de uso pode aparecer já dentro do carregador"):
     // painel do mês, ritmo, calendário, semana, horários, pagamentos, ociosidade, diagnóstico e sessões.

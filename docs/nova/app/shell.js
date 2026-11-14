@@ -11,8 +11,7 @@
       { id: "lancamentos", icon: "＋", label: "Central de lançamentos", type: "view" },
       // Única área com gravação liberada: importações (ver supabase_bridge.js).
       { id: "importar", icon: "⇪", label: "Importar planilhas", type: "view" },
-      { id: "backups", icon: "⛁", label: "Backups e restauração", type: "view" },
-      { id: "importar-original", icon: "⟲", label: "Importação · opções avançadas (original)", type: "classic", src: LEGACY + "recargas.html?nova_import=1", tab: "detalhes", writes: true }
+      { id: "backups", icon: "⛁", label: "Backups e restauração", type: "view" }
     ] },
     { label: "VISÃO E ESTRUTURA", items: [
       { id: "avisos", icon: "🔔", label: "Avisos e contas a vencer", type: "view" },
@@ -28,16 +27,12 @@
       { id: "clientes", icon: "◎", label: "Clientes", type: "view", period: true },
       { id: "precos", icon: "⇅", label: "Estudos de preço", type: "view" },
       { id: "clube", icon: "✦", label: "Clube UBY", type: "view" },
-      { id: "envios", icon: "✉", label: "Envios WhatsApp", type: "view" },
-      { id: "sessoes", icon: "✓", label: "Sessões importadas (consulta)", type: "classic", src: LEGACY + "recargas.html", tab: "detalhes" },
-      { id: "recargas", icon: "⌁", label: "Recargas · tela original", type: "classic", src: LEGACY + "recargas.html", tab: "geral" }
+      { id: "envios", icon: "✉", label: "Envios WhatsApp", type: "view" }
     ] },
     { label: "GESTÃO DE OBRAS", items: [
       { id: "obras", icon: "⌑", label: "Obras, prazos e pendências", type: "view" },
-      { id: "obras-classico", icon: "✎", label: "Obras · cadastro e edição", type: "classic", src: LEGACY + "index.html", writes: "obras" },
       { id: "mapa", icon: "⌖", label: "Mapa de implantação", type: "view" },
-      { id: "mapa-classico", icon: "✎", label: "Mapa · vínculos (edição)", type: "classic", src: LEGACY + "mapa-implantacao.html", writes: "obras" },
-      { id: "engenharia", icon: "⚡", label: "Engenharia e concessionária", type: "classic", src: LEGACY + "engenharia.html", writes: "obras" },
+      { id: "engenharia", icon: "⚡", label: "Engenharia e concessionária", type: "view" },
       { id: "analisadores", icon: "∿", label: "Analisadores de energia", type: "view" },
       { id: "mercado", icon: "◌", label: "Mercado EV", type: "view" }
     ] },
@@ -54,9 +49,7 @@
       { id: "configuracao", icon: "⚙", label: "Configuração da rede", type: "view" },
       { id: "parametros", icon: "✎", label: "Parâmetros e custos", type: "view" },
       { id: "auditoria", icon: "✓", label: "Auditoria do motor financeiro", type: "view" },
-      { id: "operacao-uby", icon: "◆", label: "Relatórios antigos (consulta)", type: "classic", src: LEGACY + "recargas.html", tab: "uby" },
-      { id: "tarefas", icon: "☰", label: "Tarefas", type: "view" },
-      { id: "tarefas-classico", icon: "✎", label: "Tarefas · edição", type: "classic", src: "legado/tarefas/index.html", writes: "obras" }
+      { id: "tarefas", icon: "☰", label: "Tarefas", type: "view" }
     ] },
     // A P3 é prestadora de serviço da UBY: sempre depois da UBY.
     { label: "P3 · PRESTADORA", items: [
@@ -75,19 +68,19 @@
       { icon: "▦", label: "Comando da rede", tabs: [["comando", "Comando da rede"], ["resumo", "Resumo executivo"], ["modelo", "Modelo operacional"], ["avisos", "Avisos e contas a vencer"]] }
     ] },
     { label: "REDE DE RECARGAS", items: [
-      { icon: "▤", label: "Carregadores e uso", tabs: [["unidades", "Unidades e carregadores"], ["uso", "Análise de uso"], ["comparar", "Comparar períodos"], ["locais", "Shopping Aurora (AC + DC)"], ["precos", "Estudos de preço"], ["sessoes", "Sessões importadas"], ["recargas", "Tela original"]] },
+      { icon: "▤", label: "Carregadores e uso", tabs: [["unidades", "Unidades e carregadores"], ["uso", "Análise de uso"], ["comparar", "Comparar períodos"], ["locais", "Shopping Aurora (AC + DC)"], ["precos", "Estudos de preço"]] },
       { icon: "◎", label: "Clientes e Clube", tabs: [["clientes", "Clientes"], ["clube", "Clube UBY"], ["envios", "Envios WhatsApp"]] }
     ] },
     { label: "FINANCEIRO", items: [
       { icon: "⇣", label: "Contas a pagar", tabs: [["#/parametros/contas", "Contas a pagar"], ["#/parametros/boleto", "Lançar boleto"], ["#/parametros/pagamentos", "Conciliação bancária"]] },
       { icon: "R$", label: "Resultado e fechamento", tabs: [["financeiro", "Resultado"], ["#/parametros/fechamento", "Fechamento do mês"], ["relatorios", "Relatórios"], ["arquivo", "Documentos publicados"]] },
-      { icon: "✎", label: "Parâmetros e custos", tabs: [["#/parametros/carregador", "Por carregador"], ["#/parametros/matriz", "Custos centrais"], ["#/parametros/documentos", "Documentos"], ["#/parametros/cotas", "Cotas e impostos"], ["auditoria", "Auditoria do motor"], ["operacao-uby", "Relatórios antigos"]] }
+      { icon: "✎", label: "Parâmetros e custos", tabs: [["#/parametros/carregador", "Por carregador"], ["#/parametros/matriz", "Custos centrais"], ["#/parametros/documentos", "Documentos"], ["#/parametros/cotas", "Cotas e impostos"], ["auditoria", "Auditoria do motor"]] }
     ] },
     { label: "OBRAS", items: [
-      { icon: "⌑", label: "Obras e implantação", tabs: [["obras", "Obras e pendências"], ["tarefas", "Tarefas"], ["mapa", "Mapa de implantação"], ["engenharia", "Engenharia e concessionária"], ["analisadores", "Analisadores de energia"], ["mercado", "Mercado EV"], ["obras-classico", "Obras · edição"], ["mapa-classico", "Mapa · vínculos"], ["tarefas-classico", "Tarefas · edição"]] }
+      { icon: "⌑", label: "Obras e implantação", tabs: [["obras", "Obras e pendências"], ["tarefas", "Tarefas"], ["mapa", "Mapa de implantação"], ["engenharia", "Engenharia e concessionária"], ["analisadores", "Analisadores de energia"], ["mercado", "Mercado EV"]] }
     ] },
     { label: "DADOS", items: [
-      { icon: "⇪", label: "Importar e lançar", tabs: [["importar", "Importar planilhas"], ["lancamentos", "Central de lançamentos"], ["backups", "Backups e restauração"], ["importar-original", "Importação avançada"]] }
+      { icon: "⇪", label: "Importar e lançar", tabs: [["importar", "Importar planilhas"], ["lancamentos", "Central de lançamentos"], ["backups", "Backups e restauração"]] }
     ] },
     // A P3 é prestadora de serviço da UBY: sempre depois da UBY.
     { label: "P3 · PRESTADORA", items: [

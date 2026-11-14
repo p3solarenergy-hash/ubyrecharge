@@ -26,10 +26,10 @@
       { t: "Impostos sobre o recebido", d: "Alíquota sobre o que a UBY recebe (faturamento dos ativos próprios menos Spott, P3 e a parte da área, mais royalties) e valor exato de cada mês quando a guia sair. Sai do resultado antes do fundo de reserva e dos cotistas.", freq: "mensal", route: P("cotas"), where: "Parâmetros e custos · Cotas, impostos e rodadas" }
     ] },
     { title: "Gestão de obras", items: [
-      { t: "Obras, fases e tarefas", d: "Nova obra, avanço das fases, protocolos, responsáveis e prazos.", freq: "contínuo", route: "#/obras-classico", original: true, where: "Obras · tela original (migração em andamento)" },
-      { t: "Vínculos do mapa", d: "Ligar um ponto do mapa a uma obra ou criar obra a partir do ponto.", freq: "quando surgir um ponto", route: "#/mapa-classico", original: true, where: "Mapa · tela original (migração em andamento)" },
-      { t: "Concessionária e orçamentos", d: "Protocolos, pareceres de acesso, projetos e orçamentos de engenharia.", freq: "contínuo", route: "#/engenharia", original: true, where: "Engenharia · tela original (migração em andamento)" },
-      { t: "Tarefas da equipe", d: "Central compartilhada de tarefas e responsáveis.", freq: "contínuo", route: "#/tarefas-classico", original: true, where: "Tarefas · tela original (migração em andamento)" }
+      { t: "Obras, fases e tarefas", d: "Nova obra, avanço das fases, protocolos, responsáveis e prazos.", freq: "contínuo", route: "#/obras", where: "Obras · detalhe da obra" },
+      { t: "Vínculos do mapa", d: "Ligar um ponto do mapa a uma obra (a obra nova é criada em Obras).", freq: "quando surgir um ponto", route: "#/mapa", where: "Mapa de implantação · clique no ponto" },
+      { t: "Concessionária e orçamentos", d: "Protocolos, pareceres de acesso, projetos e orçamentos de engenharia.", freq: "contínuo", route: "#/engenharia", where: "Engenharia e concessionária · etapas no detalhe da obra" },
+      { t: "Tarefas da equipe", d: "Central compartilhada de tarefas e responsáveis.", freq: "contínuo", route: "#/tarefas", where: "Tarefas" }
     ] }
   ];
 

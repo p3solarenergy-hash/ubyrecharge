@@ -2,8 +2,8 @@
   Clube UBY — ranking mensal (R$ 1 = 1 ponto), participantes, parceiros e cupons.
   A base do Clube fica na nuvem (uby_financial_matrix, linha "club-uby"): vale em
   qualquer computador/celular. Participantes do formulário vêm do Google Forms.
-  Gravação: página mínima oculta (legado/obra-ev/clube-gravacao.html), liberada
-  só na rota #/clube e só para a linha do Clube (ver supabase_bridge.js).
+  Gravação: UBY_SUPABASE.comGravacao("clube"), liberada só na rota #/clube e só para
+  a linha do Clube e os usos dos parceiros (ver app/core/dados.js).
 */
 (function () {
   "use strict";
@@ -54,29 +54,14 @@
   const addDay = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
   const rep = { from: `${spMonth()}-01`, to: spDay(), partner: "", status: "CONFIRMADO", q: "", rows: null, key: "", error: "", loading: false };
 
-  // ---------- gravação (quadro oculto) ----------
-  let frame = null, ready = null;
-  function writer() {
-    if (ready && frame && document.body.contains(frame)) return ready;
-    frame = document.createElement("iframe");
-    frame.id = "clubFrame"; frame.title = "Gravação do Clube"; frame.setAttribute("aria-hidden", "true"); frame.tabIndex = -1;
-    frame.style.cssText = "position:absolute;width:10px;height:10px;left:-99999px;top:0;border:0;visibility:hidden";
-    frame.src = "legado/obra-ev/clube-gravacao.html?t=" + Date.now();
-    document.body.appendChild(frame);
-    ready = new Promise((resolve, reject) => {
-      const t0 = Date.now();
-      const timer = setInterval(() => {
-        try {
-          const w = frame.contentWindow;
-          if (w.UBY_SUPABASE && w.supabase) { w.UBY_SUPABASE.client(); if (w.UBY_WRITE_SCOPE === "clube") { clearInterval(timer); resolve(w); return; } }
-        } catch (_) {}
-        if (Date.now() - t0 > 30000) { clearInterval(timer); reject(new Error("A gravação do Clube não ficou disponível. Recarregue a página.")); }
-      }, 300);
-    });
-    ready.catch(() => { ready = null; });
-    return ready;
-  }
-  window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/clube") && frame) { frame.remove(); frame = null; ready = null; } });
+  // ---------- gravação ----------
+  // Gravação sem página antiga (migração 14/11/2026): cada chamada à ponte roda dentro de
+  // UBY_SUPABASE.comGravacao("clube"), que só libera as tabelas do escopo com esta tela aberta.
+  const gravando = new Proxy({}, { get(_, k) {
+    const v = window.UBY_SUPABASE?.[k];
+    return typeof v === "function" ? (...a) => window.UBY_SUPABASE.comGravacao("clube", () => v.apply(window.UBY_SUPABASE, a)) : v;
+  } });
+  function writer() { return Promise.resolve({ UBY_SUPABASE: gravando }); }
 
   async function save(label, mutate, summary) {
     if (ui.busy) return;

@@ -7,7 +7,6 @@
   const ui = { search: "", stage: "all" };
   let snap = null, error = null, loading = false;
 
-  const detailSrc = id => `legado/obra-ev/gestao_obra_ev_detalhe.html?obra=${encodeURIComponent(id)}`;
   const tone = pct => pct >= 70 ? "ok" : pct >= 40 ? "warn" : "bad";
   const barColor = pct => pct >= 70 ? "var(--uby-green)" : pct >= 40 ? "var(--uby-amber)" : "var(--uby-red)";
   const dayBadge = d => d === null || d === undefined || d === 999 ? '<span class="badge neutral">sem prazo</span>'
@@ -251,7 +250,7 @@
             <div class="table-wrap" style="max-height:420px"><table><thead><tr><th>Fase</th><th>Item</th><th>Situação</th><th>Protocolo / previsão</th></tr></thead>
               <tbody>${o.critical.map(c => `<tr><td>${esc(c.phase)}</td><td style="white-space:normal"><strong>${esc(c.title)}</strong></td><td><span class="badge ${c.status === "Em andamento" ? "warn" : "bad"}">${esc(c.status)}</span></td><td>${esc(c.protocol || "—")}${c.forecastDate ? `<small>prev. ${fmt.date(c.forecastDate + "T12:00:00")}</small>` : ""}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">Nenhuma pendência crítica.</td></tr>`}</tbody></table></div>
             ${o.analysis ? `<h3 style="margin:14px 0 8px">Análise de carga vinculada</h3><div class="list">
-              <div class="list-row"><span>${esc(o.analysis.title)}</span>${o.analysis.url && o.analysis.url !== "#" && !/^(file|blob):/.test(o.analysis.url) ? `<a class="btn link-btn" href="legado/obra-ev/${esc(o.analysis.url)}" target="_blank" rel="noopener">Abrir ↗</a>` : ""}</div>
+              <div class="list-row"><span>${esc(o.analysis.title)}</span>${o.analysis.url && o.analysis.url !== "#" && !/^(file|blob):/.test(o.analysis.url) ? `<a class="btn link-btn" href="documentos/${esc(o.analysis.url)}" target="_blank" rel="noopener">Abrir ↗</a>` : ""}</div>
               <div class="list-row"><span>Pico ${esc(o.analysis.peak)} · consumo ${esc(o.analysis.consumption)} · EV ${esc(o.analysis.ev)}</span><small>${esc(o.analysis.status)}</small></div>
               <div class="list-row" style="display:block;white-space:normal"><small style="color:var(--uby-muted)">Concessionária: ${esc(o.analysis.utility)}<br>Ação: ${esc(o.analysis.action)}</small></div></div>` : ""}
           </section>
@@ -327,13 +326,12 @@
     target.innerHTML = `
       <p style="margin:0 0 12px"><a href="#/obras" style="font-weight:800;font-size:12px">← Obras</a></p>
       <div class="hero"><div><p class="eyebrow">Obra · ${esc(o.stage)}</p><h1>${esc(o.nome)}</h1><p class="lead">${esc(o.cliente)} · ${esc(o.local)}</p></div>
-        <div class="callout"><strong>${esc(o.status)} · ${s.pct}% concluída</strong><small>Edite aqui mesmo: dados, tarefas, pendências e documentos gravam direto na base. <span id="obEditStatus">${statusLine()}</span><br><a href="#" id="openLegacyObra">abrir a tela original</a>${o.sheetUrl ? ` · <a href="${esc(o.sheetUrl)}" target="_blank" rel="noopener">planilha da obra ↗</a>` : ""}</small></div></div>
+        <div class="callout"><strong>${esc(o.status)} · ${s.pct}% concluída</strong><small>Edite aqui mesmo: dados, tarefas, pendências e documentos gravam direto na base. <span id="obEditStatus">${statusLine()}</span>${o.sheetUrl ? `<br><a href="${esc(o.sheetUrl)}" target="_blank" rel="noopener">planilha da obra ↗</a>` : ""}</small></div></div>
       ${hasGap ? `<div class="note" style="margin-bottom:12px"><strong>Estrutura padrão incompleta:</strong> faltam ${esc(gapText(gap))}. ${edit.err ? `<span class="badge bad">${esc(edit.err)}</span> ` : ""}${edit.busy ? statusLine() : `<button class="btn primary" id="obComplete" type="button">Completar estrutura agora</button>`}</div>` : ""}
       <div class="toolbar"><div class="seg" id="obraTabs">${OBRA_TABS.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
       ${body}`;
     target.querySelectorAll("#obraTabs button").forEach(b => b.onclick = () => UBY.go(`#/obras/obra/${encodeURIComponent(id)}/${b.dataset.tab}`));
     const cbtn = target.querySelector("#obComplete"); if (cbtn) cbtn.onclick = () => completeStructure(target, [id], tab, ["obra", id, tab]);
-    target.querySelector("#openLegacyObra").onclick = e => { e.preventDefault(); UBY.openLegacy(detailSrc(id), `Obra · ${o.nome}`); };
     bindEdit(target, id, tab, o);
   }
 
@@ -352,7 +350,7 @@
     };
     const arch = q("#obArchive");
     if (arch) arch.onclick = () => {
-      if (!confirm(`Arquivar a obra "${o.nome}"? Ela sai do painel (nada é apagado e pode ser reativada pela tela original).`)) return;
+      if (!confirm(`Arquivar a obra "${o.nome}"? Ela sai do painel (nada é apagado: recargas e histórico ficam preservados).`)) return;
       edit.showForm = false;
       save(target, id, tab, [{ set: ["archived"], value: true }, { set: ["project", "statusExec"], value: "Arquivada" }], { type: "status", title: "Obra arquivada", after: "Arquivada" });
     };

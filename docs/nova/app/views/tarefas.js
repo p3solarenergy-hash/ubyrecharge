@@ -22,12 +22,60 @@
       .finally(() => { loading = false; if (location.hash.startsWith("#/tarefas")) render(target); });
   }
 
+  // ---------- edição (antes só na página antiga legado/tarefas/index.html; mesmas regras) ----------
+  // Relê a lista inteira do banco antes de gravar; se a leitura falhar, nada é gravado (a página
+  // antiga avisava "as tarefas ainda nao foram lidas da base").
+  const busy = { on: false, msg: "", bad: false };
+  async function rawFromCloud() {
+    let local = [];
+    try { local = JSON.parse(localStorage.getItem("uby-tarefas-v1")) || []; } catch (_) {}
+    const cloud = await window.UBY_STORE.loadTasks(local);
+    if (cloud === local || !Array.isArray(cloud)) throw new Error("As tarefas não foram lidas do banco agora. Nada foi gravado; tente de novo.");
+    return cloud;
+  }
+  async function salvar(target, label, mutate) {
+    if (busy.on) return;
+    busy.on = true; busy.msg = `${label}…`; busy.bad = false; render(target);
+    try {
+      await window.UBY_SUPABASE.comGravacao("obras", async () => {
+        const raw = await rawFromCloud();
+        const next = await mutate(raw);
+        localStorage.setItem("uby-tarefas-v1", JSON.stringify(next));
+        await window.UBY_STORE.saveTasks(next);
+      });
+      busy.msg = `${label}: gravado.`;
+      const r = await UBY.obras(true); tasks = r.api.allTasks();
+    } catch (err) { busy.msg = `${label}: ${err.message}`; busy.bad = true; }
+    busy.on = false;
+    if (location.hash.startsWith("#/tarefas")) render(target);
+  }
+  const novaTarefa = f => raw => {
+    const status = f.status || "Pendente", now = new Date().toISOString();
+    return [{ id: "task-" + Date.now(), title: f.title, project: f.project, owner: f.owner || "Sem responsavel", due: f.due || "", priority: f.priority || "Alta", status, note: f.note || "", createdAt: now, ...(status === "Concluida" ? { completedAt: now } : {}) }, ...raw];
+  };
+  const mudarSituacao = (id, status) => raw => raw.map(t => {
+    if (t.id !== id) return t;
+    const n = { ...t, status };
+    if (status === "Concluida" && t.status !== "Concluida") n.completedAt = new Date().toISOString();
+    if (status !== "Concluida") delete n.completedAt;
+    return n;
+  });
+  const excluir = id => async raw => { await window.UBY_STORE.deleteTask(id); return raw.filter(t => t.id !== id); };
+  // Obras/áreas para o campo "Obra / área" (mesma lista da página antiga).
+  function projetos() {
+    const base = ["Administrativo", "Comercial", "Operacao", "Compras", "Concessionaria"];
+    try { (JSON.parse(localStorage.getItem("uby-obras-dashboard-v1")) || []).forEach(o => base.push(o.nome)); } catch (_) {}
+    return [...new Set(base)];
+  }
+
   function card(t) {
     const urgent = t.status !== "Concluida" && daysTo(t) < 0 ? "border-left:3px solid var(--uby-red)" : t.status !== "Concluida" && daysTo(t) === 0 ? "border-left:3px solid var(--uby-amber)" : "";
     return `<div class="mini" style="margin-bottom:8px;${urgent}"><strong style="display:block;font-size:12.5px;color:var(--uby-ink)">${esc(t.title)}</strong>
       <span class="s">${esc(t.project)} · ${esc(t.owner)}</span>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px"><span class="badge ${prioBadge(t.priority)}">${esc(t.priority === "Media" ? "Média" : t.priority)}</span><span class="badge ${dueBadge(t)}">${esc(t.status === "Concluida" && t.completedAt ? `concluída ${fmt.date(t.completedAt)}` : dueText(t))}</span></div>
-      ${t.note ? `<span class="s" style="margin-top:6px;white-space:normal">${esc(t.note)}</span>` : ""}</div>`;
+      ${t.note ? `<span class="s" style="margin-top:6px;white-space:normal">${esc(t.note)}</span>` : ""}
+      <div style="display:flex;gap:6px;margin-top:8px"><select class="select" data-tk-status="${esc(t.id)}" style="flex:1;min-width:0" ${busy.on ? "disabled" : ""}>${STATUSES.map(s => `<option value="${s}" ${s === t.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}</select>
+        <button class="btn" data-tk-del="${esc(t.id)}" title="Excluir tarefa" ${busy.on ? "disabled" : ""}>✕</button></div></div>`;
   }
 
   function render(target) {
@@ -59,7 +107,19 @@
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Gestão e governança · operational_tasks</p><h1>Tarefas</h1>
         <p class="lead">Central compartilhada de tarefas da equipe: prazos, responsáveis, prioridade e dependências externas.</p></div>
-        <div class="callout"><strong>Editar tarefas</strong><small>Para criar, mudar a situação ou excluir: <a href="#/tarefas-classico">Tarefas · edição ✎</a> (grava na base real)</small></div></div>
+        <div class="callout"><strong>Grava na base real</strong><small>Crie, mude a situação ou exclua aqui mesmo. Antes de cada gravação a lista é relida do banco.</small></div></div>
+      ${busy.msg ? `<div class="note" style="margin-bottom:12px;${busy.bad ? "border-color:var(--uby-red)" : ""}">${esc(busy.msg)}</div>` : ""}
+      <section class="section"><details ${ui.newOpen ? "open" : ""} id="tkNewBox"><summary style="cursor:pointer;font-weight:800">＋ Nova tarefa</summary>
+        <div class="imp-fields" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">
+          <label class="imp-field"><span class="k">Tarefa</span><input class="select" id="tkNTitle" placeholder="Ex.: Cobrar protocolo da concessionária"></label>
+          <label class="imp-field"><span class="k">Obra / área</span><select class="select" id="tkNProject">${projetos().map(p => `<option>${esc(p)}</option>`).join("")}</select></label>
+          <label class="imp-field"><span class="k">Responsável</span><input class="select" id="tkNOwner" placeholder="Nome ou equipe"></label>
+          <label class="imp-field"><span class="k">Prazo</span><input class="select" type="date" id="tkNDue"></label>
+          <label class="imp-field"><span class="k">Prioridade</span><select class="select" id="tkNPriority"><option value="Alta">Alta</option><option value="Media">Média</option><option value="Baixa">Baixa</option></select></label>
+          <label class="imp-field"><span class="k">Situação</span><select class="select" id="tkNStatus">${STATUSES.map(s => `<option value="${s}">${STATUS_LABEL[s]}</option>`).join("")}</select></label>
+          <label class="imp-field" style="grid-column:1/-1"><span class="k">Observação</span><textarea class="select" id="tkNNote" rows="2" placeholder="Contexto, próxima ação, protocolo ou dependência"></textarea></label>
+        </div>
+        <button class="btn primary" id="tkNSave" style="margin-top:10px" ${busy.on ? "disabled" : ""}>Criar tarefa</button></details></section>
       <section class="section"><div class="grid g5">
         ${kpi("Abertas", fmt.int(open.length), `${tasks.length} no total`, "", "lead")}
         ${kpi("Atrasadas", fmt.int(late.length), "vencidas e não concluídas", "", late.length ? "bad" : "")}
@@ -105,6 +165,24 @@
     target.querySelectorAll("[data-owner]").forEach(b => b.onclick = () => { ui.owner = ui.owner === b.dataset.owner ? "" : b.dataset.owner; rerun(); });
     const clr = target.querySelector("#tkClearOwner"); if (clr) clr.onclick = e => { e.preventDefault(); ui.owner = ""; rerun(); };
     const sd = target.querySelector("#tkShowDone"); if (sd) sd.onclick = e => { e.preventDefault(); ui.showDone = !ui.showDone; rerun(); };
+    const nb = target.querySelector("#tkNewBox"); if (nb) nb.ontoggle = () => { ui.newOpen = nb.open; };
+    const ns = target.querySelector("#tkNSave");
+    if (ns) ns.onclick = () => {
+      const v = id => (target.querySelector(id)?.value || "").trim();
+      const f = { title: v("#tkNTitle"), project: v("#tkNProject"), owner: v("#tkNOwner"), due: v("#tkNDue"), priority: v("#tkNPriority"), status: v("#tkNStatus"), note: v("#tkNNote") };
+      if (!f.title) { alert("Informe a tarefa."); return; }
+      ui.newOpen = false;
+      salvar(target, `Nova tarefa "${f.title}"`, novaTarefa(f));
+    };
+    target.querySelectorAll("[data-tk-status]").forEach(el => el.onchange = () => {
+      const t = tasks.find(x => x.id === el.dataset.tkStatus);
+      salvar(target, `Situação de "${t?.title || "tarefa"}" → ${STATUS_LABEL[el.value]}`, mudarSituacao(el.dataset.tkStatus, el.value));
+    });
+    target.querySelectorAll("[data-tk-del]").forEach(el => el.onclick = () => {
+      const t = tasks.find(x => x.id === el.dataset.tkDel);
+      if (!confirm(`Excluir a tarefa "${t?.title || ""}"?`)) return;
+      salvar(target, `Excluir "${t?.title || "tarefa"}"`, excluir(el.dataset.tkDel));
+    });
   }
 
   UBY.register("tarefas", { render });

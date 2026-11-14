@@ -2,19 +2,41 @@
 (function () {
   "use strict";
   const { fmt, esc } = UBY;
-  const LEGACY_MAP = "legado/obra-ev/mapa-implantacao.html";
   const MAP_KEY = "uby-mapa-implantacao-v1";
   const STATUS_OVERRIDES = { malassise: "Concluida" };
   const ROUNDS = ["1ª Rodada", "1ª e 2ª Rodadas", "2ª Rodada", "Próximas Rodadas", "Frente de expansão"];
   let points = null, leafletReady = null, selectedId = "", error = null;
 
-  // Lê a lista POINTS da própria tela original, para não manter duas cópias.
+  // Pontos do mapa (antes lidos de dentro da página antiga; agora dado próprio da plataforma).
   async function loadPoints() {
-    const html = await (await fetch(LEGACY_MAP, { cache: "no-store" })).text();
-    const match = html.match(/const POINTS=(\[[\s\S]*?\])\.map\(/);
-    if (!match) throw new Error("Lista de pontos não encontrada na tela original do mapa.");
-    const rows = new Function(`"use strict";return ${match[1]};`)();
-    return rows.map(([id, name, round, lat, lon, note]) => ({ id, name, round, lat, lon, note }));
+    const res = await fetch("app/data/mapa-pontos.json?v=1", { cache: "no-store" });
+    if (!res.ok) throw new Error("Lista de pontos do mapa não encontrada.");
+    return res.json();
+  }
+
+  // Vínculo ponto ↔ obra (antes só no mapa original): grava o local do mapa na própria obra
+  // (project.mapLocation) pela edição de obras; tirar o vínculo apaga esse local da obra anterior.
+  const bind = { busy: false, msg: "", bad: false };
+  async function saveBinding(target, point, workId, works) {
+    const prev = links(works)[point.id];
+    bind.busy = true; bind.msg = "Gravando o vínculo…"; bind.bad = false; draw(target, works);
+    try {
+      await window.UBY_SUPABASE.comGravacao("obras", async () => {
+        const api = window.UBY_OBRAS_API;
+        if (prev && String(prev.id) !== String(workId)) await api.editObra(prev.id, [{ set: ["project", "mapLocation"], value: null }], { title: "Vínculo do mapa removido", detail: point.name });
+        if (workId) await api.editObra(workId, [{ set: ["project", "mapLocation"], value: { pointId: point.id, name: point.name, lat: point.lat, lon: point.lon, linkedAt: new Date().toISOString() } }], { title: "Vinculada ao ponto do mapa", detail: point.name });
+      });
+      let local = {}; try { local = JSON.parse(localStorage.getItem(MAP_KEY) || "{}"); } catch (_) {}
+      if (workId) local[point.id] = workId; else delete local[point.id];
+      try { localStorage.setItem(MAP_KEY, JSON.stringify(local)); } catch (_) {}
+      bind.msg = workId ? "Vínculo gravado." : "Vínculo removido.";
+      const r = await UBY.obras(true);
+      bind.busy = false;
+      draw(target, r.data.works);
+      return;
+    } catch (err) { bind.msg = `Não gravou: ${err.message}`; bind.bad = true; }
+    bind.busy = false;
+    draw(target, works);
   }
 
   function loadLeaflet() {
@@ -47,7 +69,7 @@
         .finally(() => { if (location.hash.startsWith("#/mapa") && !location.hash.startsWith("#/mapa-")) render(target); });
       return;
     }
-    if (error) { target.innerHTML = `<div class="loading"><h2>Não foi possível montar o mapa</h2><p>${esc(error)}</p><a class="btn" href="#/mapa-classico">Abrir mapa original</a></div>`; return; }
+    if (error) { target.innerHTML = `<div class="loading"><h2>Não foi possível montar o mapa</h2><p>${esc(error)}</p></div>`; return; }
     UBY.obras().then(({ data }) => draw(target, data.works));
   }
 
@@ -66,7 +88,7 @@
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Gestão de obras</p><h1>Mapa de implantação</h1>
         <p class="lead">Rodadas de implantação, próximas áreas e frentes de expansão, com a situação da obra vinculada e o desempenho de quem já opera.</p></div>
-        <div class="callout"><strong>${points.length} pontos · ${linked.length} vinculados a obras · ${done.length} em operação</strong><small>Vincular um ponto a uma obra ou criar obra a partir do ponto: <a href="#/mapa-classico">mapa original (edição)</a>.</small></div></div>
+        <div class="callout"><strong>${points.length} pontos · ${linked.length} vinculados a obras · ${done.length} em operação</strong><small>Clique num ponto para ver a obra e vincular ou trocar o vínculo.</small></div></div>
       <div class="split" style="grid-template-columns:minmax(0,1.6fr) minmax(280px,.8fr);margin-bottom:18px">
         <section class="section" style="padding:0;overflow:hidden;margin:0"><div id="ubyMap" style="height:620px"></div></section>
         <section class="section" style="margin:0">
@@ -76,7 +98,12 @@
               ${!isDone(selWork) ? `<div class="list-row"><span>Avanço</span><strong>${selWork.pct}%</strong></div><div class="list-row"><span>Pendências críticas</span><strong>${selWork.crit}</strong></div>` : ""}
               ${selPerf ? `<div class="list-row"><span>Faturamento ${esc(monthName)}</span><strong>${fmt.brl(selPerf.revenue)}</strong></div><div class="list-row"><span>Ocupação</span><strong>${fmt.pct1(selPerf.occupancy)}</strong></div>` : ""}</div>
               <p style="margin:10px 0 0"><a class="btn link-btn" href="#/obras/obra/${encodeURIComponent(selWork.id)}">Abrir obra →</a></p>`
-            : `<div class="note">Ainda sem obra vinculada. O vínculo é feito no mapa original.</div>`}
+            : `<div class="note">Ainda sem obra vinculada.</div>`}
+            <div style="margin-top:12px"><label class="imp-field"><span class="k">${selWork ? "Trocar ou remover o vínculo" : "Vincular a uma obra"}</span>
+              <select class="select" id="mapBindWork" ${bind.busy ? "disabled" : ""}><option value="">Sem vínculo por enquanto</option>${works.slice().sort((a, b) => a.nome.localeCompare(b.nome)).map(w => `<option value="${esc(w.id)}" ${selWork && String(selWork.id) === String(w.id) ? "selected" : ""}>${esc(w.nome)} — ${esc(workStatus(w))}</option>`).join("")}</select></label>
+              <button class="btn primary" id="mapBindSave" style="margin-top:6px" ${bind.busy ? "disabled" : ""}>Gravar vínculo</button>
+              ${bind.msg ? `<small style="display:block;margin-top:6px;color:${bind.bad ? "var(--uby-red)" : "var(--uby-muted)"}">${esc(bind.msg)}</small>` : ""}
+              <small style="display:block;margin-top:6px;color:var(--uby-muted)">Obra nova para este ponto: crie em <a href="#/obras">Obras</a> (“Nova obra”) e depois vincule aqui.</small></div>
             <p style="margin:10px 0 0"><a href="#" id="mapClear" style="font-size:11px">ver legenda</a></p>`
           : `<p class="kicker">Legenda</p><h2>Clique num ponto</h2>
             <div class="list" style="margin-top:10px">${[["#187457", "Obra vinculada e em operação"], ["#3d6f8e", "Obra vinculada em andamento"], ["#173c30", "1ª Rodada"], ["#77637d", "1ª e 2ª Rodadas"], ["#b98527", "Próximas Rodadas"], ["#8a9690", "Frente de expansão (local a definir)"]].map(([c, l]) => `<div class="list-row"><span style="display:flex;align-items:center;gap:8px"><i style="width:12px;height:12px;border-radius:50%;background:${c};display:inline-block"></i>${l}</span></div>`).join("")}</div>`}
@@ -91,7 +118,14 @@
       </section>`;
 
     target.querySelectorAll("tr[data-point]").forEach(tr => tr.onclick = () => { selectedId = tr.dataset.point; draw(target, works); window.UBY_SCROLL_KEEP?.reset(); window.scrollTo({ top: 0, behavior: "smooth" }); });
-    const clr = target.querySelector("#mapClear"); if (clr) clr.onclick = e => { e.preventDefault(); selectedId = ""; draw(target, works); };
+    const clr = target.querySelector("#mapClear"); if (clr) clr.onclick = e => { e.preventDefault(); selectedId = ""; bind.msg = ""; draw(target, works); };
+    const bs = target.querySelector("#mapBindSave");
+    if (bs && sel) bs.onclick = () => {
+      const workId = target.querySelector("#mapBindWork").value;
+      const nome = works.find(w => String(w.id) === String(workId))?.nome;
+      if (!confirm(workId ? `Vincular o ponto "${sel.name}" à obra "${nome}"?` : `Remover o vínculo do ponto "${sel.name}"?`)) return;
+      saveBinding(target, sel, workId, works);
+    };
     const map = L.map(target.querySelector("#ubyMap"), { zoomControl: true });
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(map);
     points.forEach(p => {
