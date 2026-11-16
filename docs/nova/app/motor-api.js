@@ -190,14 +190,27 @@
   // telefone formam um só cliente; a chave do grupo é a chave original mais
   // usada nele. Vale para todo o motor (clientKeyFromCharge é global).
   // ---------------------------------------------------------------------
+  // Raio × Spott (16/11/2026): a Raio grava o celular sem o 9 ("(43) 8861-7800") e a Spott não
+  // traz celular na recarga, só no cadastro (recharge_customers). O telefone casa por DDD + 8
+  // dígitos finais, e o cadastro entra como ponte telefone ↔ e-mail ↔ nome: quem pagou pela
+  // Raio e pela Spott vira um cliente só.
   let lookupClientId = () => null;
+  let registryBridge = [];
+  let dropClientIndex = () => {};
+  const phoneId = value => {
+    let d = normalizePhone(value);
+    if ((d.length === 12 || d.length === 13) && d.startsWith("55")) d = d.slice(2);
+    if (d.length >= 10) d = d.slice(0, 2) + d.slice(-8);
+    return d.length >= 8 ? `phone:${d}` : "";
+  };
   (function unifyClientIdentity() {
     const baseKey = S.clientKeyFromCharge;
     if (typeof baseKey !== "function") return;
     let cache = null, building = false;
+    dropClientIndex = () => { cache = null; };
     const idsOf = c => {
-      const e = safeText(c.userEmail).trim().toLowerCase(), p = normalizePhone(c.userPhone);
-      return [baseKey(c), e && `email:${e}`, p && `phone:${p}`].filter(Boolean);
+      const e = safeText(c.userEmail).trim().toLowerCase(), p = phoneId(c.userPhone);
+      return [baseKey(c), e && `email:${e}`, p].filter(Boolean);
     };
     function index() {
       // Caminho rápido (chamado a cada recarga): getGeneralUnitData() relê o
@@ -218,6 +231,11 @@
           count.set(ids[0], (count.get(ids[0]) || 0) + 1);
           ids.slice(1).forEach(i => { const a = find(ids[0]), b = find(i); if (a !== b) parent.set(b, a); });
         }));
+        // Cadastro como ponte: só liga ids que já existem nas recargas (não cria cliente).
+        registryBridge.forEach(ids => {
+          const known = ids.filter(i => parent.has(i));
+          known.slice(1).forEach(i => { const a = find(known[0]), b = find(i); if (a !== b) parent.set(b, a); });
+        });
         const best = new Map();
         count.forEach((n, k) => { const root = find(k), cur = best.get(root); if (!cur || n > cur.n || (n === cur.n && k < cur.k)) best.set(root, { k, n }); });
         const map = new Map();
@@ -261,6 +279,7 @@
       await waitForReady();
       await ensureAllOverviewSessionsLoaded();
       try { await ensureMatrizCostsLoaded(); } catch (err) { console.warn("[motor-api] matriz:", err.message); }
+      await loadRegistryBridge();
       return status();
     })();
     return fullPromise;
@@ -1112,6 +1131,22 @@
   // Clientes — cadastro oficial (recharge_customers), inteligência calculada
   // sobre as sessões da operação UBY e Clube UBY.
   // ---------------------------------------------------------------------
+  // Ponte do cadastro para a identidade do cliente (ver unifyClientIdentity).
+  function setRegistryBridge(rows = []) {
+    registryBridge = rows.map(r => {
+      const e = String(r.email || "").trim().toLowerCase();
+      return [clientIdentityKey(r.name, r.email, r.phone), e && `email:${e}`, phoneId(r.phone)].filter(Boolean);
+    }).filter(ids => ids.length > 1);
+    dropClientIndex();
+  }
+  let registryBridgePromise = null;
+  function loadRegistryBridge() {
+    if (!registryBridgePromise) registryBridgePromise = readCustomerRegistryCloud()
+      .then(official => { if (official) setRegistryBridge(customerRegistryRowsFromCloud(official.rows)); })
+      .catch(err => console.warn("[motor-api] ponte do cadastro:", err.message));
+    return registryBridgePromise;
+  }
+
   async function customerRegistry() {
     // Leitura direta: não usa loadCustomerRegistry(), que tenta sincronizar a
     // cópia local de volta para a nuvem.
@@ -1122,6 +1157,7 @@
     // antigos. Aqui: 1 linha por pessoa e os números vêm das recargas importadas
     // (operação UBY, sem parceiros): R$ e kWh = soma das linhas; recargas = válidas.
     const raw = customerRegistryRowsFromCloud(official.rows);
+    setRegistryBridge(raw);
     const stats = {};
     getUbyChargerRows(getGeneralUnitData()).filter(r => r.included && !isPartnerRow(r)).forEach(r => (r.charges || []).forEach(c => {
       const k = clientKeyFromCharge(c); if (!k) return;
@@ -1134,8 +1170,8 @@
       if (!s.phone && c.userPhone) s.phone = c.userPhone;
     }));
     const keyOfRow = r => {
-      const e = String(r.email || "").trim().toLowerCase(), p = normalizePhone(r.phone);
-      const ids = [clientIdentityKey(r.name, r.email, r.phone), e && `email:${e}`, p && `phone:${p}`].filter(Boolean);
+      const e = String(r.email || "").trim().toLowerCase(), p = phoneId(r.phone);
+      const ids = [clientIdentityKey(r.name, r.email, r.phone), e && `email:${e}`, p].filter(Boolean);
       for (const id of ids) { const k = lookupClientId(id); if (k) return k; }
       return null;
     };

@@ -1413,6 +1413,11 @@ function rechargeUniqueKey(charge = {}) {
   const startMinute = startDate && !Number.isNaN(startDate.getTime())
     ? String(Math.floor(startDate.getTime() / 60000))
     : '';
+  // Raio: a transação tem identificador próprio (carregador + início ao segundo). Nome e conector
+  // vêm ou não conforme a versão do relatório (16/11/2026: a mesma recarga entrou 2x, sem e com
+  // nome); a chave não pode depender deles. O conector sai da chave pelo mesmo motivo.
+  const raioTx = safeText(charge.id).trim().match(/^raio:([^:]+):[^:]*:(\d{4}-\d{2}-\d{2}T\d{6})$/);
+  if (raioTx) return `raio|${workId}|${raioTx[1].toLowerCase()}|${raioTx[2]}`;
   const person = rechargePersonIdentity(charge);
   // Linha repetida na MESMA planilha, mas com fim/energia/valor diferentes, é outra
   // recarga (ver markDistinctRepeatedRows). As demais mantêm a chave de sempre.
@@ -1501,6 +1506,7 @@ function preferredRechargeVersion(current = {}, candidate = {}) {
   const candidateEndMs = candidateEnd && !Number.isNaN(candidateEnd.getTime()) ? candidateEnd.getTime() : 0;
   if (candidateEndMs !== currentEndMs) return candidateEndMs > currentEndMs ? candidate : current;
   const detailScore = charge => [
+    charge.userName,
     charge.userEmail,
     charge.userPhone,
     charge.vehicleBrand,
@@ -1949,6 +1955,7 @@ function raioDailyCharges(rows = [], layout = {}, file = {}) {
     const c = {
       date: findColumnIndex(head, ['Data']), charger: findColumnIndex(head, ['Carregador']), conn: findColumnIndex(head, ['Conector']),
       local: findColumnIndex(head, ['Local']), client: findColumnIndex(head, ['Cliente']), email: findColumnIndex(head, ['Email', 'E-mail']),
+      phone: findColumnIndex(head, ['Telefone', 'Celular']),
       gateway: findColumnIndex(head, ['Gateway']), status: findColumnIndex(head, ['Status']), value: findColumnIndex(head, ['Valor (R$)', 'Valor'])
     };
     const clean = v => (v && v !== '-' ? v : '');
@@ -1963,7 +1970,8 @@ function raioDailyCharges(rows = [], layout = {}, file = {}) {
       const key = dayKeyOf(date);
       if (!days.has(key)) days.set(key, { key, date: new Date(date.getFullYear(), date.getMonth(), date.getDate()), count: 0, energy: 0, gross: 0, minutes: 0, idle: 0, tx: [], txOnly: true });
       days.get(key).tx.push({ date, value, charger: rowCellText(r, c.charger), conn: rowCellText(r, c.conn), local: rowCellText(r, c.local),
-        client: clean(rowCellText(r, c.client)), email: clean(rowCellText(r, c.email)), gateway: rowCellText(r, c.gateway) });
+        client: clean(rowCellText(r, c.client)), email: clean(rowCellText(r, c.email)),
+        phone: c.phone >= 0 ? clean(rowCellText(r, c.phone)) : '', gateway: rowCellText(r, c.gateway) });
     }
   }
 
@@ -1993,7 +2001,7 @@ function raioDailyCharges(rows = [], layout = {}, file = {}) {
           ? `raio:${t.charger || 'carregador'}:${t.conn || '-'}:${dayKeyOf(origDate)}T${pad(origDate.getHours())}${pad(origDate.getMinutes())}${pad(origDate.getSeconds())}`
           : `raio:${day.key}:${k + 1}`,
         station, rawStation: `RAIO | ${station}`, connType: t.conn ? `Conector ${t.conn}` : '',
-        userName: t.client || '', userEmail: t.email || '', userPhone: '',
+        userName: t.client || '', userEmail: t.email || '', userPhone: t.phone || '',
         startStr: brDate(startDate), endStr: brDate(endDate), startDate, endDate,
         duration: fmtDur(mins[k]), energyKWh: kwh[k], revenue: brl[k],
         paymentType: 'Raio', paymentMethod: useTx ? (t.gateway || 'Pix') : '', paymentStatus: 'Pago',
