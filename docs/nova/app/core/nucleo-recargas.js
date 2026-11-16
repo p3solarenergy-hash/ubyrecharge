@@ -2158,7 +2158,7 @@ async function readFile(file) {
       });
 
       setFeedback('', '');
-      loadedFiles = loadedFiles.map(item => item === file || (item.fileKey && item.fileKey === sourceKey) ? { ...item, fileKey: sourceKey, station: sourceStation, month: fileMonth, importMode, importedAt: new Date().toISOString(), sourcePlatform: layout.platform } : item);
+      loadedFiles = loadedFiles.map(item => item === file || (item.fileKey && item.fileKey === sourceKey) ? { ...item, name: item.name, size: item.size || 0, lastModified: item.lastModified || 0, fileKey: sourceKey, station: sourceStation, month: fileMonth, importMode, importedAt: new Date().toISOString(), sourcePlatform: layout.platform } : item);
       updateChips();
       updateCorrectionButtons();
       const controlNote = importControlIssues.length
@@ -6503,9 +6503,13 @@ function applyRechargeRecord(record, sourceLabel) {
   stationAvailability = record?.stationAvailability || record?.summary?.stationAvailability || {};
   syncOperationalPowerInputs(currentWorkId);
   ubyOperationOverrides = record?.ubyOperationOverrides || record?.summary?.ubyOperationOverrides || {};
-  loadedFiles = (record?.files || []).filter(file => file && file.name).map(file => ({
+  // Registro sem nome (gravado quando o File perdia o nome ao ser copiado, 15/11/2026):
+  // o nome volta pelas recargas da mesma planilha; sem isso o mês sumia da lista e a
+  // trava da gravação bloqueava a próxima importação ("deixaria sem planilha").
+  const fileNameFromCharges = key => (allCharges.find(charge => charge._fileKey === key && charge._file) || {})._file || String(key || '').split('|')[1] || 'planilha';
+  loadedFiles = (record?.files || []).filter(file => file && (file.name || file.fileKey)).map(file => ({
     fileKey: file.fileKey || fileSourceKey(file.month, file.name, file.station || ''),
-    name: file.name,
+    name: file.name || fileNameFromCharges(file.fileKey),
     station: file.station || '',
     size: file.size || 0,
     lastModified: file.lastModified || 0,
