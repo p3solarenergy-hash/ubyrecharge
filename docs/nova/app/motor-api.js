@@ -196,6 +196,7 @@
   // Raio e pela Spott vira um cliente só.
   let lookupClientId = () => null;
   let registryBridge = [];
+  let registryNames = new Map(); // celular (phoneId) → nome do cadastro de clientes
   let dropClientIndex = () => {};
   const phoneId = value => {
     let d = normalizePhone(value);
@@ -1133,6 +1134,11 @@
   // ---------------------------------------------------------------------
   // Ponte do cadastro para a identidade do cliente (ver unifyClientIdentity).
   function setRegistryBridge(rows = []) {
+    registryNames = new Map();
+    rows.forEach(r => {
+      const p = phoneId(r.phone), n = String(r.name || "").trim();
+      if (p && /[a-zA-ZÀ-ÿ]{2,}/.test(n) && !registryNames.has(p)) registryNames.set(p, n);
+    });
     registryBridge = rows.map(r => {
       const e = String(r.email || "").trim().toLowerCase();
       return [clientIdentityKey(r.name, r.email, r.phone), e && `email:${e}`, phoneId(r.phone)].filter(Boolean);
@@ -1575,17 +1581,22 @@
     const mk = monthsList.includes(monthKey) ? monthKey : monthsList.at(-1) || "";
     const monthCharges = mk ? charges.filter(c => chargeMonthKey(c) === mk) : [];
     const participants = clubParticipantsStore().rows;
-    const accumulated = enrichClubClientRows(clubClientRows(charges), participants);
+    // Quem só pagou pela Raio sem nome: o cadastro de clientes dá o nome pelo celular.
+    const named = list => list.map(r => (r.named === false && registryNames.get(phoneId(r.phone)))
+      ? { ...r, name: registryNames.get(phoneId(r.phone)), named: true } : r);
+    const clubRows = list => enrichClubClientRows(named(clubClientRows(list)), participants);
+    const accumulated = clubRows(charges);
     const accByKey = new Map();
     accumulated.forEach(row => clubParticipantKeys(row).forEach(key => accByKey.set(key, row)));
-    const rows = enrichClubClientRows(clubClientRows(monthCharges), participants).map((row, index) => {
+    const monthRows = clubRows(monthCharges);
+    const rows = monthRows.map((row, index) => {
       const acc = clubParticipantKeys(row).map(key => accByKey.get(key)).find(Boolean);
       return { position: index + 1, name: row.name, email: row.email, phone: row.phone, points: row.points, revenue: row.revenue, energy: row.energy,
         sessions: row.count, registered: !!row.registered, lastDate: iso(row.lastDate), accumulatedPoints: acc?.points || row.points,
         benefit: clubBenefitForPosition(index + 1) };
     });
     const rankKeys = new Map();
-    enrichClubClientRows(clubClientRows(monthCharges), participants).forEach(row => clubParticipantKeys(row).forEach(k => rankKeys.set(k, row)));
+    monthRows.forEach(row => clubParticipantKeys(row).forEach(k => rankKeys.set(k, row)));
     const store = clubParticipantsStore();
     return {
       monthKey: mk, label: mk ? monthLabel(mk) : "—", months: monthsList.map(k => ({ key: k, label: monthLabel(k) })),
@@ -1598,7 +1609,7 @@
         withVehicle: participants.filter(p => p.vehicleBrand || p.vehicleModel || p.vehiclePlate).length,
         matched: participants.filter(p => clubParticipantKeys(p).some(k => rankKeys.has(k))).length
       },
-      notice: clubWinnerNotice(enrichClubClientRows(clubClientRows(monthCharges), participants), mk)
+      notice: clubWinnerNotice(monthRows, mk)
     };
   }
 

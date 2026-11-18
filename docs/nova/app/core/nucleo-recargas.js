@@ -5914,24 +5914,44 @@ function ensureClubParticipantsAutoSync(force = false) {
   syncClubParticipantsFromSheet({ silent: true }).catch(() => {});
 }
 
+// Nome que identifica alguém de verdade: vazio, "." ou o rótulo provisório não servem
+// (a Raio grava recargas sem nome e às vezes só um ponto).
+function clubRealName(value = '') {
+  const text = safeText(value).trim();
+  if (!text || text === 'Cliente sem nome') return '';
+  return /[a-zA-ZÀ-ÿ]{2,}/.test(text) ? text : '';
+}
+
+function clubUnnamedLabel(phone = '') {
+  const digits = normalizePhone(phone);
+  return digits ? `Sem nome · cel. final ${digits.slice(-4)}` : 'Cliente sem nome';
+}
+
 function clubClientRows(charges = []) {
   const byClient = new Map();
   const identityIndex = new Map();
   charges.forEach(charge => {
+    const realName = clubRealName(charge.userName);
     const identity = {
-      name: charge.userName || charge.userEmail || 'Cliente sem nome',
+      name: realName,
       email: charge.userEmail || '',
       phone: charge.userPhone || ''
     };
-    const keys = clubParticipantKeys(identity);
+    // 18/11/2026: o rótulo "Cliente sem nome" entrava como chave e juntava todas as
+    // recargas sem nome (as da Raio) num cliente só. Agora a chave vem da identidade
+    // unificada (Raio × Spott pelo celular/cadastro) e, sem nome, e-mail nem celular,
+    // a recarga não tem a quem pontuar e fica fora do ranking.
+    if (!realName && !normalizeClubEmail(identity.email) && !normalizePhone(identity.phone)) return;
+    const unified = clientKeyFromCharge(charge);
+    const keys = [unified ? `client:${unified}` : '', ...clubParticipantKeys(identity)].filter(Boolean);
     const key = keys.map(item => identityIndex.get(item)).find(Boolean)
-      || keys[0]
-      || clientKeyFromCharge(charge);
+      || keys[0];
     if (!key) return;
     if (!byClient.has(key)) {
       byClient.set(key, {
         key,
-        name: identity.name,
+        name: realName || identity.email || clubUnnamedLabel(identity.phone),
+        named: !!realName,
         email: normalizeClubEmail(identity.email) || identity.email,
         phone: charge.userPhone || '',
         revenue: 0,
@@ -5945,15 +5965,20 @@ function clubClientRows(charges = []) {
     if (!row.phone && charge.userPhone) row.phone = charge.userPhone;
     if (!row.email && charge.userEmail) row.email = normalizeClubEmail(charge.userEmail) || charge.userEmail;
     const currentNameTokens = clubPersonTokens(row.name);
-    const nextNameTokens = clubPersonTokens(charge.userName);
-    if (
-      charge.userName &&
-      canonicalClubPersonName(row.name) === canonicalClubPersonName(charge.userName) &&
+    const nextNameTokens = clubPersonTokens(realName);
+    if (realName && !row.named) {
+      row.name = realName;
+      row.named = true;
+    } else if (realName && currentNameTokens.length === 1 && nextNameTokens.length > 1) {
+      // Raio traz só o primeiro nome ("Fabio"); a Spott, o completo.
+      row.name = realName;
+    } else if (
+      realName &&
+      canonicalClubPersonName(row.name) === canonicalClubPersonName(realName) &&
       nextNameTokens.length < currentNameTokens.length
     ) {
-      row.name = charge.userName;
+      row.name = realName;
     }
-    if ((!row.name || row.name === 'Cliente sem nome') && (charge.userName || charge.userEmail)) row.name = charge.userName || charge.userEmail;
     row.revenue += Number(charge.revenue || 0);
     row.energy += Number(charge.energyKWh || 0);
     row.count += 1;
