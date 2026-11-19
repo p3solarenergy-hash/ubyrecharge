@@ -4,6 +4,8 @@
   const { fmt, esc, kpi } = UBY;
   const ui = { filter: "uby", search: "", sessionFilter: "all", clientSearch: "", clientLimit: 200 };
   const kindLabel = k => ({ dc: "DC", ac: "AC" }[k] || "—");
+  const perKwFmt = v => v == null || !Number.isFinite(v) ? "—" : `${fmt.brl(v)}/kW`;
+  const normSt = s => String(s || "").trim().toUpperCase();
   const originOf = s => !s.included ? { cls: "neutral", label: "Fora da operação UBY" } : s.model === "third_party_management" ? { cls: "partner", label: "Parceiro" } : { cls: s.kind, label: `${kindLabel(s.kind)} próprio` };
 
   function monthArg() { const p = UBY.periodArg(); return p === undefined ? UBY.state.months.at(-1) || "" : p; }
@@ -22,6 +24,11 @@
     });
     const tot = rows.reduce((a, s) => ({ revenue: a.revenue + s.revenue, energy: a.energy + s.energy, sessions: a.sessions + s.sessions, failures: a.failures + s.failures }), { revenue: 0, energy: 0, sessions: 0, failures: 0 });
     const periodLabel = month ? UBY.state.api.monthName(month) : "Acumulado";
+    // Faturamento por kW instalado (R$/kW/mês) de cada ponto próprio; parceiros e fora da operação ficam "—".
+    let kw = null;
+    try { kw = UBY.data("revenuePerKw", month); } catch (_) {}
+    const kwOf = s => (kw?.chargers || []).find(c => String(c.workId) === String(s.workId) && normSt(c.station) === normSt(s.station)) || null;
+    const kwMax = Math.max(...(kw?.chargers || []).map(c => c.perKw || 0), 1);
 
     target.innerHTML = `
       <div class="hero"><div><p class="eyebrow">Rede de recargas</p><h1>Unidades e carregadores</h1>
@@ -34,7 +41,7 @@
         <input class="search" id="unitSearch" placeholder="Buscar estação ou obra" value="${esc(ui.search)}">
       </div>
 
-      <div class="grid g5" style="margin-bottom:16px">
+      <div class="grid g6" style="margin-bottom:16px">
         ${(() => { const capOf = r => Number.isFinite(Number(r.maxKWh)) ? Number(r.maxKWh) : (Number(r.power) || 0) * (Number(r.hours) || 0);
           const cap = rows.reduce((s, r) => s + capOf(r), 0); const used = rows.reduce((s, r) => s + (Number(r.occupancy) || 0) / 100 * capOf(r), 0);
           return kpi("Ocupação média", cap > 0 ? fmt.pct(used / cap * 100) : "—", "ponderada pela potência e horário de cada estação", "", "lead big"); })()}
@@ -42,18 +49,20 @@
         ${kpi("Recargas", fmt.int(tot.sessions), "todas as tentativas registradas")}
         ${kpi("Energia", fmt.kwh0(tot.energy), "", "", "warn")}
         ${kpi("Falhas", fmt.int(tot.failures), "com status de falha", "", tot.failures ? "bad" : "")}
+        ${kpi("Faturamento por kW", perKwFmt(kw?.network?.perKw), kw ? `por mês · rede UBY · ${fmt.int(kw.network.power)} kW${kw.live ? " · mês pelo ritmo" : ""}` : "", "", "lead")}
       </div>
 
       <section class="section" style="padding:0;overflow:hidden">
         <div class="table-wrap" style="border:0;border-radius:0"><table>
-          <thead><tr><th>Estação</th><th>Origem</th><th class="num">Faturamento</th><th class="num">Recargas</th><th class="num">Válidas</th><th class="num">Energia</th><th class="num">Clientes</th><th class="num">Ticket</th><th>Ocupação</th><th class="num">Disponib.</th><th class="num">Falhas</th><th>Última recarga</th></tr></thead>
+          <thead><tr><th>Estação</th><th>Origem</th><th class="num">Faturamento</th><th class="num">Recargas</th><th class="num">Válidas</th><th class="num">Energia</th><th class="num">Clientes</th><th class="num">Ticket</th><th>Ocupação</th><th class="num" title="Faturamento ÷ kW instalados, por mês de operação (potência de cada mês; mês em andamento pelo ritmo)">R$/kW/mês</th><th class="num">Disponib.</th><th class="num">Falhas</th><th>Última recarga</th></tr></thead>
           <tbody>${rows.map(s => { const o = originOf(s); return `<tr class="clickable" data-unit="${esc(s.workId)}" data-station="${esc(s.station)}">
             <td><strong>${esc(s.station)}</strong><small>${esc(s.workName)}${s.power ? ` · ${fmt.int(s.power)} kW` : ""}</small></td>
             <td><span class="badge ${o.cls}">${o.label}</span></td>
             <td class="num">${fmt.brl(s.revenue)}</td><td class="num">${fmt.int(s.sessions)}</td><td class="num">${fmt.int(s.valid)}</td><td class="num">${fmt.kwh0(s.energy)}</td>
             <td class="num">${fmt.int(s.clients)}</td><td class="num">${fmt.brl(s.avgTicket)}</td>
             <td><div style="display:flex;align-items:center;gap:8px;min-width:130px"><div class="bar ${s.bandClass}" style="flex:1"><span style="width:${Math.min(s.occupancy, 100)}%"></span></div><strong>${fmt.pct1(s.occupancy)}</strong></div></td>
-            <td class="num">${s.sessions ? fmt.pct1(s.availability) : "—"}</td><td class="num">${s.failures ? `<span class="badge bad">${s.failures}</span>` : "0"}</td><td>${fmt.date(s.lastDate)}</td></tr>`; }).join("") || `<tr><td colspan="12" class="empty">Nenhuma estação neste filtro.</td></tr>`}</tbody>
+            <td class="num">${(() => { const k = kwOf(s); return k && k.perKw != null ? `<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div class="bar" style="width:48px"><span style="width:${Math.min(k.perKw / kwMax * 100, 100)}%"></span></div><strong>${fmt.brl0(k.perKw)}</strong></div>` : "—"; })()}</td>
+            <td class="num">${s.sessions ? fmt.pct1(s.availability) : "—"}</td><td class="num">${s.failures ? `<span class="badge bad">${s.failures}</span>` : "0"}</td><td>${fmt.date(s.lastDate)}</td></tr>`; }).join("") || `<tr><td colspan="13" class="empty">Nenhuma estação neste filtro.</td></tr>`}</tbody>
         </table></div>
       </section>`;
 
@@ -192,25 +201,28 @@
     const parts = UBY.usageParts;
     const u = parts ? UBY.data("usage", { kind: "station", workId: d.workId, station: d.station, monthKey: month }) : null;
     const hasUse = !!(u && u.kpis);
+    let kw = null;
+    try { kw = UBY.data("stationRevenuePerKw", d.workId, d.station, month); } catch (_) {}
+    const anyIdle = d.sessions.some(s => Number(s.idleValue) > 0);
     const cmpHref = compareHref(d.workId, d.station, month);
-    const jump = [["secResumo", "Resumo"], ["secRitmo", "Ritmo e histórico"], ...(u ? [["secCal", "Calendário"], ["secSemana", "Dia da semana"], ["secHorarios", "Horários e pagamentos"], ["secOcio", "Ociosidade e avaliações"], ["secTecnico", "Diagnóstico"]] : []), ...(d.breakdown?.totals.lines ? [["secClientes", "Clientes e pagamentos"]] : []), ["secSessoes", "Sessões"]];
+    const jump = [["secResumo", "Resumo"], ["secRitmo", "Ritmo e histórico"], ...(u ? [["secCal", "Calendário"], ["secSemana", "Dia da semana"], ["secHorarios", "Horários e pagamentos"], ["secOcio", u.idleCount ? "Ociosidade e avaliações" : "Avaliações"], ["secTecnico", "Diagnóstico"]] : []), ...(d.breakdown?.totals.lines ? [["secClientes", "Clientes e pagamentos"]] : []), ["secSessoes", "Sessões"]];
 
     target.innerHTML = `
       <p style="margin:0 0 12px"><a href="#/unidades" style="font-weight:800;font-size:12px">← Unidades e carregadores</a></p>
       <div class="hero"><div><p class="eyebrow">Unidade operacional · ${esc(d.workName)}</p><h1>${esc(d.station)}</h1>
         <p class="lead">${d.power ? `${fmt.int(d.power)} kW · ` : ""}${esc(d.schedule || "disponibilidade padrão")}</p></div>
-        <div class="callout"><strong>${esc(periodLabel)} · ocupação ${fmt.pct(d.occupancy)} (${esc(d.band)})</strong><small>${fmt.n1(d.hours)} h disponíveis no período. <a href="#/financeiro/estacao">Financeiro da estação</a> · <a href="#/parametros/carregador/${encodeURIComponent(`${d.workId}|${d.station}`)}">Editar valores</a> · <a href="#/parametros/operacao/${encodeURIComponent(`${d.workId}|${d.station}`)}">Horários e potência</a></small>
+        <div class="callout"><strong>${esc(periodLabel)} · ocupação ${fmt.pct(d.occupancy)} (${esc(d.band)})</strong><small>${fmt.n1(d.hours)} h disponíveis no período. ${/aurora/i.test(d.station) ? `<a href="#/locais">Shopping Aurora AC + DC juntos</a> · ` : ""}<a href="#/financeiro/estacao">Financeiro da estação</a> · <a href="#/parametros/carregador/${encodeURIComponent(`${d.workId}|${d.station}`)}">Editar valores</a> · <a href="#/parametros/operacao/${encodeURIComponent(`${d.workId}|${d.station}`)}">Horários e potência</a></small>
           <p style="margin:10px 0 0"><a class="btn primary link-btn" href="#/importar/${encodeURIComponent(d.workId)}/${month || new Date().toISOString().slice(0, 7)}/${encodeURIComponent(location.hash)}/${encodeURIComponent(d.station)}">⇪ Importar planilha desta estação</a></p></div></div>
 
       <nav class="unit-jump" aria-label="Partes desta página">${jump.map(([id, l]) => `<a href="#${id}" data-jump="${id}">${l}</a>`).join("")}<span class="spacer"></span><a class="btn primary link-btn" href="${cmpHref}">⇄ Comparar períodos</a></nav>
 
-      <div id="secResumo">${hasUse ? parts.kpiBlock(u.kpis, `${d.station}`) : `
+      <div id="secResumo">${hasUse ? parts.kpiBlock(u.kpis, `${d.station}`, kw) : `
       <div class="grid g6" style="margin-bottom:18px">
         ${kpi("Ocupação", fmt.pct(d.occupancy), `${esc(d.band)} · ${fmt.n1(d.hours)} h disponíveis`, "", "lead big")}
         ${kpi("Faturamento", fmt.brl(m.revenue), `R$/kWh ${fmt.brl(m.revenuePerKwh)}`, "", "lead big")}
         ${kpi("Recargas", fmt.int(m.sessions), `${fmt.int(m.valid)} válidas · tempo médio ${esc(m.avgDuration)}`)}
         ${kpi("Energia", fmt.kwh(m.energy), `${fmt.n1(m.avgKwh)} kWh/recarga válida`, "", "warn")}
-        ${kpi("Clientes", fmt.int(m.clients), `ticket ${fmt.brl(m.avgTicket)} · ociosidade ${fmt.brl(m.idleValue)}`)}
+        ${kpi("Clientes", fmt.int(m.clients), `ticket ${fmt.brl(m.avgTicket)}${m.idleValue > 0 ? ` · ociosidade ${fmt.brl(m.idleValue)}` : ""}`)}
         ${kpi("Falhas", fmt.int(m.failed), `${fmt.int(m.shortOrZero)} curtas/zeradas`, "", m.failed ? "bad" : "")}
       </div>
       `}</div>
@@ -219,8 +231,8 @@
       <div class="split" id="secRitmo" style="margin-bottom:18px">
         <section class="section"><div class="section-head"><div><p class="kicker">Ritmo</p><h2>Série diária</h2></div></div><div class="chart-box"><canvas id="chUnitDaily"></canvas></div></section>
         <section class="section"><div class="section-head"><div><p class="kicker">Histórico</p><h2>Mês a mês</h2></div></div>
-          <div class="table-wrap" style="max-height:260px"><table><thead><tr><th>Mês</th><th class="num">Faturamento</th><th class="num">Recargas</th><th class="num">Energia</th></tr></thead>
-          <tbody>${d.monthly.slice().reverse().map(x => `<tr><td>${esc(x.label)}</td><td class="num">${fmt.brl(x.revenue)}</td><td class="num">${fmt.int(x.sessions)}</td><td class="num">${fmt.kwh(x.energy)}</td></tr>`).join("")}</tbody></table></div>
+          <div class="table-wrap" style="max-height:260px"><table><thead><tr><th>Mês</th><th class="num">Faturamento</th>${kw ? '<th class="num">R$/kW</th>' : ""}<th class="num">Recargas</th><th class="num">Energia</th></tr></thead>
+          <tbody>${d.monthly.slice().reverse().map(x => `<tr><td>${esc(x.label)}</td><td class="num">${fmt.brl(x.revenue)}</td>${kw ? `<td class="num">${perKwFmt(kw.monthly?.[x.key])}</td>` : ""}<td class="num">${fmt.int(x.sessions)}</td><td class="num">${fmt.kwh(x.energy)}</td></tr>`).join("")}</tbody></table></div>
           ${d.connectors.length ? `<h3 style="margin:14px 0 8px">Conectores DC</h3><div class="list">${d.connectors.map(c => `<div class="list-row"><span>${esc(c.label)} <small>· ${c.sessions} sessões · ${fmt.kwh0(c.energy)}${c.failures ? ` · ${c.failures} falhas` : ""}${(c.platforms || []).length > 1 ? ` · ${c.platforms.map(p => `${esc(p.platform)} ${p.sessions}`).join(" · ")}` : ""}</small>${(c.names || []).length > 1 ? `<small style="display:block;color:var(--uby-muted)" title="${esc(c.names.join(" | "))}">mesma pistola com ${c.names.length} nomes nas planilhas</small>` : ""}</span><strong>${fmt.brl(c.revenue)}</strong></div>`).join("")}</div>` : ""}
         </section>
       </div>
@@ -233,10 +245,10 @@
         <div class="section-head"><div><p class="kicker">Auditoria</p><h2>Sessões brutas (${d.sessions.length})</h2><p>Todas as linhas importadas, inclusive falhas e sessões curtas, com o motivo de exclusão das médias.</p></div>
           <div class="seg" id="sessFilter">${[["all", "Todas"], ["valid", "Válidas"], ["invalid", "Fora da regra"]].map(([v, l]) => `<button data-v="${v}" class="${ui.sessionFilter === v ? "on" : ""}">${l}</button>`).join("")}</div></div>
         <div class="table-wrap" style="max-height:520px"><table>
-          <thead><tr><th>Início</th><th>Cliente</th><th>Conector</th><th>Duração</th><th class="num">Energia</th><th class="num">Valor</th><th class="num">Ociosidade</th><th class="num">R$/kWh</th><th>Pagamento</th><th>Situação</th></tr></thead>
+          <thead><tr><th>Início</th><th>Cliente</th><th>Conector</th><th>Duração</th><th class="num">Energia</th><th class="num">Valor</th>${anyIdle ? '<th class="num">Ociosidade</th>' : ""}<th class="num">R$/kWh</th><th>Pagamento</th><th>Situação</th></tr></thead>
           <tbody>${sessions.slice(0, 600).map(s => `<tr><td>${fmt.dt(s.start)}</td><td>${esc(s.client)}${s.vehicle ? `<small>${esc(s.vehicle)}</small>` : ""}</td><td>${esc(s.connector || "—")}</td><td>${esc(s.duration || "—")}</td>
-            <td class="num">${fmt.kwh(s.energy)}</td><td class="num">${fmt.brl(s.revenue)}</td><td class="num">${s.idleValue ? fmt.brl(s.idleValue) : ""}</td><td class="num">${s.energy >= 1 && s.revenue > 0 ? pk(s.revenue / s.energy) : ""}</td><td>${esc(s.method && s.method !== "Não informado" ? s.method : s.payment || "—")}${s.method && s.method !== "Não informado" && s.payment ? `<small>${esc([s.payment, s.trigger].filter(Boolean).join(" · "))}</small>` : ""}</td>
-            <td>${s.valid ? '<span class="badge ok">válida</span>' : `<span class="badge ${s.issue ? "bad" : "warn"}" title="${esc(s.issue)}">${esc(s.issue ? s.issue.slice(0, 38) : "curta/zerada")}</span>`}${s.courtesy ? ' <span class="badge neutral">cortesia</span>' : ""}</td></tr>`).join("") || `<tr><td colspan="10" class="empty">Nenhuma sessão neste filtro.</td></tr>`}</tbody>
+            <td class="num">${fmt.kwh(s.energy)}</td><td class="num">${fmt.brl(s.revenue)}</td>${anyIdle ? `<td class="num">${s.idleValue ? fmt.brl(s.idleValue) : ""}</td>` : ""}<td class="num">${s.energy >= 1 && s.revenue > 0 ? pk(s.revenue / s.energy) : ""}</td><td>${esc(s.method && s.method !== "Não informado" ? s.method : s.payment || "—")}${s.method && s.method !== "Não informado" && s.payment ? `<small>${esc([s.payment, s.trigger].filter(Boolean).join(" · "))}</small>` : ""}</td>
+            <td>${s.valid ? '<span class="badge ok">válida</span>' : `<span class="badge ${s.issue ? "bad" : "warn"}" title="${esc(s.issue)}">${esc(s.issue ? s.issue.slice(0, 38) : "curta/zerada")}</span>`}${s.courtesy ? ' <span class="badge neutral">cortesia</span>' : ""}</td></tr>`).join("") || `<tr><td colspan="${anyIdle ? 10 : 9}" class="empty">Nenhuma sessão neste filtro.</td></tr>`}</tbody>
         </table></div>
         ${sessions.length > 600 ? `<p class="source-line">Exibindo as 600 mais recentes de ${sessions.length}. A lista completa está no relatório clássico.</p>` : ""}
       </section>`;

@@ -587,10 +587,25 @@
     const rows = getUbyChargerRows(getGeneralUnitData());
     const dates = rows.flatMap(row => row.charges || []).map(c => c.startDate).filter(d => d instanceof Date && !Number.isNaN(d.getTime()));
     const bounds = dates.length ? { first: iso(new Date(Math.min(...dates))), last: iso(new Date(Math.max(...dates))) } : null;
-    const start = parse(range.start, false), end = parse(range.end, true);
+    const start = parse(range.start, false);
+    let end = parse(range.end, true);
     if (!start || !end || end < start) return { bounds, groups: [], range: null };
-    const span = end.getTime() - start.getTime() + 1;
-    const prevStart = new Date(start.getTime() - span), prevEnd = new Date(start.getTime() - 1);
+    // Período em andamento: corta no último dia com dado, para comparar só os dias já decorridos.
+    const lastDate = dates.length ? new Date(Math.max(...dates)) : null;
+    const lastDay = lastDate ? new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate(), 23, 59, 59, 999) : null;
+    if (lastDay && end > lastDay && lastDay >= start) end = lastDay;
+    // Período anterior = mesma unidade de calendário recuada (mês, semana, dia), com o mesmo número de dias decorridos.
+    const days = Math.round((end.getTime() - start.getTime() + 1) / 86400000);
+    let prevStart, prevEnd;
+    if (range.unit === "mes") {
+      prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+      const prevMonthLast = new Date(start.getFullYear(), start.getMonth(), 0).getDate();
+      prevEnd = new Date(prevStart.getFullYear(), prevStart.getMonth(), Math.min(start.getDate() + days - 1, prevMonthLast), 23, 59, 59, 999);
+    } else {
+      const back = range.unit === "semana" ? 7 : range.unit === "dia" ? 1 : days;
+      prevStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() - back);
+      prevEnd = new Date(prevStart.getFullYear(), prevStart.getMonth(), prevStart.getDate() + days - 1, 23, 59, 59, 999);
+    }
     const monthKey = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}`;
     const inRange = (c, a, b) => c.startDate instanceof Date && c.startDate >= a && c.startDate <= b;
 
@@ -616,7 +631,7 @@
       return { id: g.id, label: g.label, note: g.note, units: list, revenue: sum("revenue"), energy: sum("energy"), sessions: sum("sessions"),
         failures: sum("failures"), prevRevenue: sum("prevRevenue"), prevEnergy: sum("prevEnergy"), prevSessions: sum("prevSessions") };
     }).filter(g => g.units.length);
-    return { bounds, groups, range: { start: iso(start), end: iso(end), prevStart: iso(prevStart), prevEnd: iso(prevEnd) } };
+    return { bounds, groups, range: { start: iso(start), end: iso(end), prevStart: iso(prevStart), prevEnd: iso(prevEnd), cut: end < parse(range.end, true) } };
   }
 
   // ---------------------------------------------------------------------
@@ -1846,7 +1861,8 @@
     const series = usageSeries(charges);
     const payments = {};
     charges.forEach(c => { const k = c.paymentType || "Não informado"; (payments[k] ||= { label: k, count: 0, revenue: 0 }); payments[k].count++; payments[k].revenue += Number(c.revenue || 0); });
-    const idle = charges.map(c => ({ c, min: idleToMin(c.idleTime) })).filter(x => x.min >= 1).sort((a, b) => b.min - a.min)
+    // Ociosidade só quando houve cobrança (usuário, 19/11/2026).
+    const idle = charges.map(c => ({ c, min: idleToMin(c.idleTime) })).filter(x => x.min >= 1 && Number(x.c.idleValue || 0) > 0).sort((a, b) => b.min - a.min)
       .map(({ c, min }) => ({ start: iso(c.startDate), client: clientDisplayName(c), station: abbreviatedStationLabel(c.station), energy: Number(c.energyKWh || 0),
         revenue: Number(c.revenue || 0), idleMin: min, idleValue: Number(c.idleValue || 0) }));
     const rated = charges.map(c => ({ value: parseRatingValue(c.rating), comment: safeText(c.reviewComment).trim(), start: iso(c.startDate), client: clientDisplayName(c) }))
@@ -3054,9 +3070,12 @@
   // conjunta, só leitura. Soma as mesmas contas oficiais de cada estação
   // (stationFinance e métricas de recarga); nenhuma outra visão muda.
   // ---------------------------------------------------------------------
-  const PLACES_JOINED = ["shopping aurora"];
   const placeKey = name => normalizeStationForCompare(String(name || "").replace(/^\s*uby\s+recharge\s*-?\s*/i, ""))
     .split(/\s+/).filter(t => t && t !== "ac" && t !== "dc").join(" ");
+  // Só o Shopping Aurora é visto junto (AC + DC) — usuário, 19/11/2026: "JK não deve juntar, é pra ver
+  // por ponto; deixa só o Aurora pré-junto". Os demais pontos ficam na página de cada carregador.
+  // Parceiros não entram (isPartnerRow, regra de 06/10/2026).
+  const PLACES_JOINED = ["shopping aurora"];
   function places() {
     const groups = new Map();
     getUbyChargerRows(getGeneralUnitData()).filter(r => r.included && !isPartnerRow(r)).forEach(r => {
@@ -3065,13 +3084,78 @@
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(r);
     });
-    // Só os locais pedidos para a visão conjunta (por enquanto, o Shopping Aurora).
     return [...groups.entries()].filter(([key, list]) => list.length > 1 && PLACES_JOINED.includes(key)).map(([key, list]) => ({
       key,
       label: String(list[0].station || "").replace(/^\s*UBY\s+RECHARGE\s*-?\s*/i, "").replace(/\s+(AC|DC)\s*$/i, "").trim(),
       members: list.map(r => ({ workId: String(r.workId), station: r.station, workName: r.workName || "", kind: String(r.kind || "").toUpperCase() }))
         .sort((a, b) => a.kind.localeCompare(b.kind))
-    }));
+    })).sort((a, b) => b.members.length - a.members.length || a.label.localeCompare(b.label, "pt-BR"));
+  }
+
+  // "Agora" das telas de período = fim do último dia com recarga importada (planilhas chegam com atraso).
+  function importedNow() {
+    const okD = d => d instanceof Date && !Number.isNaN(d.getTime());
+    const clock = new Date();
+    const last = getUbyChargerRows(getGeneralUnitData()).flatMap(r => r.charges || []).reduce((a, c) => okD(c.startDate) && (!a || c.startDate > a) ? c.startDate : a, null);
+    return last ? new Date(Math.min(clock.getTime(), new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1).getTime())) : clock;
+  }
+
+  // Faturamento por kW instalado (R$/kW/mês) — usuário, 16/11 e 19/11/2026.
+  // Faturamento oficial do mês (stationFinance) ÷ kW·mês efetivos: cada mês usa a potência que
+  // valia nele (JK 60 kW até 18/11/2026, 75 kW depois) e só conta a parte do mês em que o carregador
+  // já operava (1ª recarga) e, no mês em andamento, os dias já importados — assim o começo do mês e
+  // o mês de estreia não derrubam a métrica. Acumulado = soma do faturamento ÷ soma dos kW·mês.
+  function revenuePerKwOf(members, monthKeys, now = importedNow()) {
+    const okD = d => d instanceof Date && !Number.isNaN(d.getTime());
+    let revenue = 0, kwMonths = 0, partial = false;
+    members.forEach(m => {
+      const first = (m.charges || []).filter(c => okD(c.startDate)).reduce((a, c) => !a || c.startDate < a ? c.startDate : a, null);
+      if (!first) return;
+      const firstDay = new Date(first.getFullYear(), first.getMonth(), first.getDate());
+      const s = stationFinance(m.workId, m.station, monthKeys.at(-1) || "");
+      (s?.monthly || []).filter(x => monthKeys.includes(x.key)).forEach(x => {
+        const [y, mo] = x.key.split("-").map(Number);
+        const a = new Date(Math.max(new Date(y, mo - 1, 1).getTime(), firstDay.getTime())), b = new Date(Math.min(new Date(y, mo, 1).getTime(), now.getTime()));
+        if (!(b > a)) return;
+        const frac = (b - a) / (new Date(y, mo, 1) - new Date(y, mo - 1, 1));
+        if (frac < 0.999) partial = true;
+        revenue += n0(x.totalRevenue);
+        kwMonths += n0(workPowerById(String(m.workId), x.key)) * frac;
+      });
+    });
+    return { revenue, kwMonths, perKw: kwMonths > 0 ? revenue / kwMonths : null, partial };
+  }
+  function revenuePerKw(monthKey) {
+    const rows = getUbyChargerRows(getGeneralUnitData()).filter(r => r.included && !isPartnerRow(r));
+    const all = [...new Set(rows.flatMap(r => (r.charges || []).map(chargeMonthKey)))].filter(k => k !== "unknown" && isPlausibleMonthKey(k)).sort();
+    const mk = monthKey === "" ? "" : (all.includes(monthKey) ? monthKey : all.at(-1) || "");
+    const keys = mk ? [mk] : all;
+    const now = importedNow();
+    const byRow = r => ({ workId: String(r.workId), station: r.station, charges: r.charges || [] });
+    const powerOf = r => n0(workPowerById(String(r.workId), mk || undefined));
+    // Por ponto (cada carregador) e, à parte, os locais vistos juntos (Shopping Aurora).
+    const chargers = rows.map(r => ({ workId: String(r.workId), station: r.station, kind: String(r.kind || "").toUpperCase(),
+      label: String(r.station || "").replace(/^\s*UBY\s+RECHARGE\s*-?\s*/i, "").trim(), power: powerOf(r), ...revenuePerKwOf([byRow(r)], keys, now) }))
+      .filter(c => c.kwMonths > 0).sort((a, b) => (b.perKw ?? -1) - (a.perKw ?? -1));
+    const placeList = places().map(p => {
+      const ms = p.members.map(m => rows.find(r => String(r.workId) === m.workId && normalizeStationForCompare(r.station) === normalizeStationForCompare(m.station))).filter(Boolean);
+      return { key: p.key, label: p.label, kinds: p.members.map(m => m.kind), power: ms.reduce((s, r) => s + powerOf(r), 0), ...revenuePerKwOf(ms.map(byRow), keys, now) };
+    });
+    return { monthKey: mk, label: mk ? monthLabel(mk) : "Acumulado", live: !!mk && isCurrentMonthKey(mk),
+      network: { ...revenuePerKwOf(rows.map(byRow), keys, now), power: rows.reduce((s, r) => s + powerOf(r), 0) }, chargers, places: placeList };
+  }
+  // R$/kW/mês de um carregador: no período e mês a mês (página do carregador).
+  function stationRevenuePerKw(workId, station, monthKey) {
+    const row = getUbyChargerRows(getGeneralUnitData()).find(r => r.included && !isPartnerRow(r) && String(r.workId) === String(workId) && normalizeStationForCompare(r.station) === normalizeStationForCompare(station));
+    if (!row) return null;
+    const m = { workId: String(row.workId), station: row.station, charges: row.charges || [] };
+    const all = [...new Set(m.charges.map(chargeMonthKey))].filter(k => k !== "unknown" && isPlausibleMonthKey(k)).sort();
+    const mk = monthKey === "" ? "" : (all.includes(monthKey) ? monthKey : all.at(-1) || "");
+    const now = importedNow();
+    const net = revenuePerKw(mk);
+    return { ...revenuePerKwOf([m], mk ? [mk] : all, now), network: net.network.perKw, label: net.label, live: net.live,
+      rank: net.chargers.findIndex(c => c.workId === m.workId && normalizeStationForCompare(c.station) === normalizeStationForCompare(m.station)) + 1, of: net.chargers.length,
+      monthly: Object.fromEntries(all.map(k => [k, revenuePerKwOf([m], [k], now).perKw])) };
   }
   function placeView(key, monthKey) {
     const all = places();
@@ -3138,10 +3222,12 @@
     const ymdOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     // "Agora" = fim do último dia com recarga importada na rede (planilhas chegam com atraso);
     // assim o dia ainda sem importação não aparece zerado nem derruba a projeção.
-    const clock = new Date();
-    const lastImported = getUbyChargerRows(getGeneralUnitData()).flatMap(r => r.charges || []).reduce((a, c) => okD(c.startDate) && (!a || c.startDate > a) ? c.startDate : a, null);
-    const now = lastImported ? new Date(Math.min(clock.getTime(), new Date(lastImported.getFullYear(), lastImported.getMonth(), lastImported.getDate() + 1).getTime())) : clock;
+    const now = importedNow();
     const live = !!mk && isCurrentMonthKey(mk);
+    // R$/kW/mês de cada carregador, do local e mês a mês (mesma conta de revenuePerKw).
+    const kwMembers = members.map(m => ({ workId: m.workId, station: m.station, charges: m.charges }));
+    const perKw = { members: kwMembers.map(m => revenuePerKwOf([m], periodMonths, now)), total: revenuePerKwOf(kwMembers, periodMonths, now),
+      monthly: Object.fromEntries(months.map(k => [k, revenuePerKwOf(kwMembers, [k], now).perKw])) };
     const inMk = c => okD(c.startDate) && chargeMonthKey(c) === mk;
     const memberInfo = members.map(m => ({ workId: m.workId, kind: m.kind, power: n0(workPowerById(m.workId, mk || undefined)), config: stationAvailabilityFor(m.workId, m.station, m.workName),
       first: m.charges.filter(c => okD(c.startDate)).reduce((a, c) => !a || c.startDate < a ? c.startDate : a, null) }));
@@ -3219,7 +3305,7 @@
 
     return {
       places: all.map(p => ({ key: p.key, label: p.label, members: p.members })),
-      live, compare, projection, daily, hourly, weekday: weekday.map(w => ({ ...w, days: w.days.size })), health,
+      live, compare, projection, daily, hourly, perKw, weekday: weekday.map(w => ({ ...w, days: w.days.size })), health,
       clients: { list: clientList.slice(0, 60), total: clientList.length, newCount: clientList.filter(c => c.isNew).length, both: clientList.filter(c => c.both).length,
         recurring: clientList.filter(c => c.recurring).length, idle: clientList.reduce((a, c2) => a + c2.idle, 0), idleClients: clientList.filter(c2 => c2.idle > 0).length,
         perKwh: (() => { const e = clientList.reduce((a, c2) => a + c2.energy, 0); return e > 0 ? clientList.reduce((a, c2) => a + c2.revenue, 0) / e : 0; })(), top5Share: clientList.length ? clientList.slice(0, 5).reduce((s, c) => s + c.revenue, 0) / Math.max(clientList.reduce((s, c) => s + c.revenue, 0), 0.01) * 100 : 0 },
@@ -3263,7 +3349,7 @@
     return { list: out, total: out.reduce((s, p) => s + p.amount, 0) };
   }
 
-  window.UBY_MOTOR_API = { recarregar, onHistoryUpdated, withUntil, alerts, paidBills, allBills, places, placeView, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
+  window.UBY_MOTOR_API = { recarregar, onHistoryUpdated, withUntil, alerts, paidBills, allBills, places, placeView, revenuePerKw, stationRevenuePerKw, waitForReady, energyInvoices, areaAccount, clubData, clubParseSheet, clubSyncForm, loadFull, status, months, monthName, command, companyResults, dayTracking, stations, stationDetail, works, usage, networkConfig,
     financeStations, stationFinance, destinations, financeReports,
     finance, financeMonths, investorDistribution, matrix, payments, financeDocuments, openFinanceDocument,
     customerRegistry, clientIntelligence, clientRanking, customerWatch, customerDirectory, customerProfile, compare, compareOptions, pricingBase, club, financeV2, financeV2Parity, financeV2Impact,

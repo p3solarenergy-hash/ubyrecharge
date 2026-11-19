@@ -70,9 +70,10 @@
     if (!box) return;
     const probe = UBY.data("companyResults", {});
     const rg = companyRange(probe.bounds);
-    const res = UBY.data("companyResults", { start: rg.start, end: rg.end });
+    const res = UBY.data("companyResults", { start: rg.start, end: rg.end, unit: co.mode });
     const key = co.sort === "energy" ? "energy" : "revenue";
     const dd = (cur, prev) => delta(cur, prev, { hasBase: true, label: "vs período anterior" });
+    const curLabel = res.range?.cut ? ` · até ${new Date(res.range.end).toLocaleDateString("pt-BR")}` : "";
     const prevLabel = res.range ? `${new Date(res.range.prevStart).toLocaleDateString("pt-BR")} a ${new Date(res.range.prevEnd).toLocaleDateString("pt-BR")}` : "—";
     const withOp = res.groups.flatMap(g => g.units.map(u => ({ ...u, op: g.id })));
     const opBadge = id => `<span class="badge ${OP_BADGE[id][0]}">${OP_BADGE[id][1]}</span>`;
@@ -110,7 +111,7 @@
     box.innerHTML = `
       <div class="section-head"><div><p class="kicker">Por carregador e por operação</p><h2>Resultado em barras</h2>
           <p>Faturamento e energia de cada carregador ou de cada operação (UBY, parceiros, só gestão P3), em qualquer recorte. Mesma soma do motor original.</p></div>
-        <div class="meta"><strong>${esc(rg.label)}</strong><br>comparado a ${esc(prevLabel)}</div></div>
+        <div class="meta"><strong>${esc(rg.label)}${esc(curLabel)}</strong><br>comparado a ${esc(prevLabel)}</div></div>
       <div class="toolbar" style="margin-bottom:12px">
         <div class="seg" id="coView">${[["carregador", "Por carregador"], ["operacao", "Por operação"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${co.view === v ? "on" : ""}">${l}</button>`).join("")}</div>
         <div class="seg" id="coMode">${[["dia", "Dia"], ["semana", "Semana"], ["mes", "Mês"], ["personalizado", "Personalizado"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${co.mode === v ? "on" : ""}">${l}</button>`).join("")}</div>
@@ -287,6 +288,15 @@
           ${kpi("Clientes únicos", fmt.int(n.clients), "e-mail ou nome da sessão")}
           ${kpi("Projeção do mês", fmt.brl(n.projectedRevenue), n.projectionMonth ? `${esc(UBY.state.api.monthName(n.projectionMonth))} · ${n.projectionUnits} unidade(s)` : "sem base para projetar")}
         </div>
+        ${(() => { // Faturamento por kW instalado (R$/kW/mês), só operação própria; detalhe por carregador em Unidades.
+          let kw = null;
+          try { kw = UBY.data("revenuePerKw", UBY.periodArg() === undefined ? UBY.state.months.at(-1) || "" : UBY.periodArg()); } catch (_) { return ""; }
+          if (!kw || kw.network.perKw == null) return "";
+          const best = kw.chargers.find(p => p.perKw != null), worst = kw.chargers.filter(p => p.perKw != null).at(-1);
+          return `<a href="#/unidades" class="list-row" style="margin-top:12px;gap:12px;text-decoration:none;color:inherit;flex-wrap:wrap">
+            <span><strong>Faturamento por kW instalado</strong> <small>${esc(kw.label)} · ${fmt.int(kw.network.power)} kW próprios${kw.live ? " · mês pelo ritmo" : ""}</small></span>
+            <span><strong style="font-size:18px">${fmt.brl(kw.network.perKw)}/kW</strong><small> por mês</small>${best && worst && best !== worst ? ` <small>· melhor ${esc(best.label)} ${fmt.brl(best.perKw)} · menor ${esc(worst.label)} ${fmt.brl(worst.perKw)}</small>` : ""} <small>→ por carregador</small></span></a>`;
+        })()}
       </section>
 
       <div class="split cmd-split" style="margin-bottom:18px">

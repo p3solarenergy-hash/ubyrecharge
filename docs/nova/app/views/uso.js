@@ -3,11 +3,13 @@
 (function () {
   "use strict";
   const { fmt, esc, kpi, delta } = UBY;
-  const ui = { kind: "uby", station: "", calMode: "rev" };
+  const ui = { kind: "uby", station: "" };
+  const perKwFmt = v => v == null || !Number.isFinite(v) ? "—" : `${fmt.brl(v)}/kW`;
 
   function monthArg() { const p = UBY.periodArg(); return p === undefined ? UBY.state.months.at(-1) || "" : p; }
 
-  function kpiBlock(k, label) {
+  // kw (opcional, página do carregador): R$/kW/mês do carregador e da rede.
+  function kpiBlock(k, label, kw) {
     const has = k.comparison.hasPrevious;
     const d = (cur, prev, inverse = false) => delta(cur, prev, { hasBase: has, inverse, label: k.comparison.label });
     return `
@@ -19,13 +21,15 @@
           ${kpi("Faturamento", fmt.brl(k.revenue), `${fmt.int(k.sessions)} recarga(s)`, d(k.revenue, k.prev.revenue), "lead big")}
           ${kpi("Energia", fmt.kwh(k.energy), `${fmt.int(k.clients)} cliente(s)`, d(k.energy, k.prev.energy), "warn")}
           ${kpi("Projeção do mês", fmt.brl(k.projection), `${fmt.kwh0(k.projectionEnergy)} no ritmo atual`, d(k.projection, k.prev.projection))}
-          ${kpi("Ociosidade", fmt.brl(k.idleValue), "valor parado após recarga", d(k.idleValue, k.prev.idleValue, true))}
+          ${kw ? kpi("Faturamento por kW", perKwFmt(kw.perKw), `por mês · rede ${perKwFmt(kw.network)}${kw.rank ? ` · ${kw.rank}º de ${kw.of}` : ""}`, "", (kw.perKw || 0) >= (kw.network || 0) ? "" : "warn")
+            : kpi("Clientes", fmt.int(k.clients), "no período")}
           ${kpi("Falhas", fmt.int(k.failed), k.sessions ? `${fmt.pct1(k.failed / k.sessions * 100)} das tentativas` : "", d(k.failed, k.prev.failedCount, true), k.failed ? "bad" : "")}
         </div>
         <div class="grid g6">
           ${kpi("Ticket médio", fmt.brl(k.avgTicket), `${fmt.n1(k.avgKwh)} kWh/sessão válida`, d(k.avgTicket, k.prev.avgTicket))}
           ${kpi("R$/kWh médio", fmt.brl(k.revPerKwh), "receita ÷ energia", d(k.revPerKwh, k.prev.revenuePerKwh))}
-          ${kpi("Sessão válida média", `${fmt.n1(k.avgKwh)} kWh`, `${fmt.int(k.validSessions)} executada(s)`, d(k.avgKwh, k.prev.avgKwh))}
+          ${k.idleValue > 0 ? kpi("Ociosidade cobrada", fmt.brl(k.idleValue), "valor parado após recarga", d(k.idleValue, k.prev.idleValue, true))
+            : kpi("Sessão válida média", `${fmt.n1(k.avgKwh)} kWh`, `${fmt.int(k.validSessions)} executada(s)`, d(k.avgKwh, k.prev.avgKwh))}
           ${kpi("Tempo médio", fmt.hours(k.avgDuration), "sessões válidas com duração", d(k.avgDuration, k.prev.avgDuration))}
           ${kpi("Faturamento por dia", fmt.brl(k.avgRevenueDay), `${k.calendarDays} dia(s), inclui dias sem venda`, d(k.avgRevenueDay, k.prev.avgRevenueDay))}
           ${kpi("Recargas por dia", fmt.n1(k.avgSessionsDay), `${fmt.int(k.sessions)} em ${k.calendarDays} dia(s)`, d(k.avgSessionsDay, k.prev.avgSessionsDay))}
@@ -37,9 +41,9 @@
   // (mesma regra da ocupação por dia da semana, calculada no motor).
   function calendar(days) {
     if (!days.length) return `<div class="note">Sem dias no período.</div>`;
-    const byOcc = ui.calMode === "occ";
-    const metric = d => byOcc ? (d.occ || 0) : d.revenue;
-    const max = Math.max(...days.map(metric), byOcc ? 0.1 : 1);
+    // Cor só por faturamento (usuário, 19/11/2026: "uma opção já serve"); a ocupação segue na barra de cada dia.
+    const metric = d => d.revenue;
+    const max = Math.max(...days.map(metric), 1);
     const best = days.reduce((b, d) => (metric(d) > metric(b) ? d : b), days[0]);
     const maxOcc = Math.max(...days.map(d => d.occ || 0), 1);
     const pad = new Date(days[0].date).getDay();
@@ -63,8 +67,8 @@
     const bestRev = days.reduce((b, d) => (d.revenue > (b?.revenue ?? -1) ? d : b), null);
     const bestOcc = withOcc.reduce((b, d) => (d.occ > (b?.occ ?? -1) ? d : b), null);
     const avgOcc = withOcc.length ? withOcc.reduce((s, d) => s + d.occ, 0) / withOcc.length : 0;
-    return `<div class="cal-legend"><span class="cal-scale"></span><span>menos → mais ${ui.calMode === "occ" ? "ocupação" : "faturamento"}</span>
-      <span>· contorno amarelo = ${ui.calMode === "occ" ? "maior ocupação" : "melhor faturamento"}</span>
+    return `<div class="cal-legend"><span class="cal-scale"></span><span>menos → mais faturamento</span>
+      <span>· contorno amarelo = melhor faturamento</span>
       ${bestRev ? `<span>· melhor faturamento: <b>${esc(bestRev.label)}</b> ${fmt.brl(bestRev.revenue)}</span>` : ""}
       ${bestOcc ? `<span>· maior ocupação: <b>${esc(bestOcc.label)}</b> ${fmt.pct1(bestOcc.occ)}</span>` : ""}
       ${withOcc.length ? `<span>· média simples dos dias: <b>${fmt.pct1(avgOcc)}</b></span>` : ""}</div>`;
@@ -102,8 +106,7 @@
         </div>
       </section>`}
 
-      <section class="section" id="secCal"><div class="section-head"><div><p class="kicker">Calendário</p><h2>Faturamento e ocupação por dia</h2><p>Cada dia mostra faturamento, recargas, energia e a ocupação do dia (energia ÷ potência × horas disponíveis do dia). Passe o mouse para ver o detalhe.</p></div>
-          <div class="seg" id="calMode">${[["rev", "Cor por faturamento"], ["occ", "Cor por ocupação"]].map(([v, l]) => `<button data-v="${v}" class="${ui.calMode === v ? "on" : ""}">${l}</button>`).join("")}</div></div>
+      <section class="section" id="secCal"><div class="section-head"><div><p class="kicker">Calendário</p><h2>Faturamento por dia</h2><p>Cor pelo faturamento do dia. Cada dia mostra também recargas, energia e a ocupação do dia (energia ÷ potência × horas disponíveis do dia). Passe o mouse para ver o detalhe.</p></div></div>
         ${calendar(u.days)}${calendarSummary(u.days)}</section>
 
       <section class="section" id="secSemana"><div class="section-head"><div><p class="kicker">Dinâmica semanal</p><h2>Ocupação por dia da semana</h2><p>Horas disponíveis de cada dia, recortadas ao período; hoje conta só as horas já passadas.</p></div></div>
@@ -128,11 +131,11 @@
             <tbody>${u.coupons.map(c => `<tr><td><strong>${esc(c.coupon)}</strong></td><td class="num">${c.count}</td><td class="num">${fmt.pct1(c.count / couponTotal * 100)}</td><td class="num">${fmt.brl(c.revenue)}</td><td class="num">${fmt.brl(c.count ? c.revenue / c.count : 0)}</td><td class="num">${c.discount ? fmt.brl(c.discount) : "—"}</td></tr>`).join("")}</tbody></table></div></section>
       </div>
 
-      <div class="split" id="secOcio" style="margin-bottom:18px">
-        <section class="section"><div class="section-head"><div><p class="kicker">Ociosidade</p><h2>Carros parados após a recarga (${u.idleCount})</h2><p>Sessões com 1 minuto ou mais de ociosidade, da maior para a menor.</p></div></div>
+      <div class="${u.idleCount ? "split" : ""}" id="secOcio" style="margin-bottom:18px">
+        ${u.idleCount ? `<section class="section"><div class="section-head"><div><p class="kicker">Ociosidade cobrada</p><h2>Carros parados após a recarga (${u.idleCount})</h2><p>Só sessões em que a ociosidade foi cobrada, da maior para a menor.</p></div></div>
           <div class="table-wrap" style="max-height:360px"><table><thead><tr><th>Início</th><th>Cliente</th><th>Estação</th><th class="num">Energia</th><th class="num">Valor</th><th class="num">Parado</th><th class="num">Ociosidade (R$)</th></tr></thead>
             <tbody>${u.idle.map(i => `<tr><td>${fmt.dt(i.start)}</td><td>${esc(i.client)}</td><td>${esc(i.station)}</td><td class="num">${fmt.kwh(i.energy)}</td><td class="num">${fmt.brl(i.revenue)}</td><td class="num"><span class="badge ${i.idleMin >= 30 ? "bad" : "warn"}">${fmt.hours(i.idleMin / 60)}</span></td><td class="num">${fmt.brl(i.idleValue)}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">Nenhum alerta relevante.</td></tr>`}</tbody></table></div>
-        </section>
+        </section>` : ""}
         <section class="section"><div class="section-head"><div><p class="kicker">Qualidade percebida</p><h2>Avaliações</h2></div></div>
           <div class="grid g3" style="margin-bottom:10px">${kpi("Média", `${fmt.n1(u.reviews.avg)} ★`, `${u.reviews.rated} avaliação(ões)`, "", "lead")}${kpi("Comentários", fmt.int(u.reviews.comments), "preenchidos")}${kpi("Cobertura", fmt.pct1(u.reviews.coverage), "recargas avaliadas")}</div>
           <div class="list">${u.reviews.dist.map(r => `<div class="list-row"><span>${"★".repeat(r.stars)}</span><strong>${r.count}</strong></div>`).join("")}</div>
@@ -152,7 +155,6 @@
       </section>`;
   }
   function bind(target, u, rerender) {
-    target.querySelectorAll("#calMode button").forEach(b => b.onclick = () => { ui.calMode = b.dataset.v; rerender(); });
     UBY.chart("chStay", { type: "bar", data: { labels: u.stay.labels, datasets: [{ label: "Sessões", data: u.stay.values, backgroundColor: "#3d6f8e", borderRadius: 4 }] },
       options: UBY.baseChartOptions({ plugins: { legend: { display: false } } }) });
   }

@@ -1,5 +1,6 @@
-/* Locais com AC + DC no mesmo lugar (ex.: Shopping Aurora): os carregadores lado a lado e juntos.
-   Só leitura: soma as mesmas contas de cada estação (motor oficial). As outras telas não mudam. */
+/* Shopping Aurora (AC + DC): os carregadores lado a lado e juntos. Só o Aurora é visto junto
+   (usuário, 19/11/2026); cada ponto tem o próprio painel na página do carregador, e o R$/kW de todos
+   fica em Unidades e carregadores. Só leitura: as mesmas contas de cada estação (motor oficial). */
 (function () {
   "use strict";
   const { fmt, esc, kpi } = UBY;
@@ -9,6 +10,7 @@
   const signed = v => `<span style="color:${v >= 0 ? "var(--uby-green)" : "var(--uby-red)"}">${fmt.brl(v)}</span>`;
   const perKwh = v => v == null || !Number.isFinite(v) ? "—" : `${fmt.brl(v)}/kWh`;
   const pctOf = (a, b) => b > 0 ? a / b * 100 : 0;
+  const perKwFmt = v => v == null || !Number.isFinite(v) ? "—" : `${fmt.brl(v)}/kW`;
   const night = () => document.documentElement.dataset.theme === "night";
   // Cores fixas por carregador (o tema night troca pelas equivalentes nos gráficos).
   const CHART = ["#187457", "#3d6f8e", "#b98527"];
@@ -108,18 +110,18 @@
             <a href="#/comando" style="font-size:12px">Resultado do dia da rede →</a></div></div>
         <div class="grid g4">
           ${kpi("Faturamento do dia", fmt.brl(tot("revenue")), `${fmt.int(tot("valid"))} recarga(s) · ${fmt.kwh(tot("energy"))}`, dd(tot("revenue"), tot("prevRevenue")), "lead")}
-          ${kpi("Ocupação do dia", fmt.pct1(occ), "energia ÷ capacidade dos dois", dd(occ, prevOcc))}
-          ${units.map((u, i) => kpi(`${v.members[i].kind} · ${short(v.members[i].station)}`, `<span style="color:${colors[i]}">${fmt.brl(u?.revenue || 0)}</span>`,
+          ${kpi("Ocupação do dia", fmt.pct1(occ), v.members.length > 1 ? "energia ÷ capacidade dos carregadores" : "energia ÷ capacidade", dd(occ, prevOcc))}
+          ${v.members.length > 1 ? units.map((u, i) => kpi(`${v.members[i].kind} · ${short(v.members[i].station)}`, `<span style="color:${colors[i]}">${fmt.brl(u?.revenue || 0)}</span>`,
             u ? `${fmt.int(u.valid)} recarga(s) · ${fmt.kwh(u.energy)} · ocupação ${fmt.pct1(u.occupancy)}${u.lastStart ? ` · última às ${hhmm(u.lastStart)}` : ""}${u.failures ? ` · <span style="color:var(--uby-red)">${u.failures} falha(s)</span>` : ""}` : "sem recarga no dia",
-            u ? dd(u.revenue, u.prevRevenue) : "")).join("")}
+            u ? dd(u.revenue, u.prevRevenue) : "")).join("") : kpi("Recargas do dia", fmt.int(tot("valid")), fmt.kwh(tot("energy")), dd(tot("valid"), tot("prevValid")))}
         </div>
-        <div class="dt-card dt-total" style="margin-top:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>${esc(v.place.label)} · hora a hora · AC + DC ${fmt.brl(tot("revenue"))} · ${fmt.int(tot("valid"))} recarga(s) · ${fmt.kwh(tot("energy"))}</strong>
+        <div class="dt-card dt-total" style="margin-top:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>${esc(v.place.label)} · hora a hora${v.members.length > 1 ? ` · ${v.members.map(m => esc(m.kind)).join(" + ")}` : ""} ${fmt.brl(tot("revenue"))} · ${fmt.int(tot("valid"))} recarga(s) · ${fmt.kwh(tot("energy"))}</strong>
           <small class="dt-legend"><i class="dt-lg-rev"></i>Faturamento somado <i class="dt-lg-occ"></i>Em uso na hora</small></div>
           ${wave(joined, Math.max(...joined.map(h => h.revenue), 0), nowHour, 120)}</div>
-        <div class="grid g${Math.max(Math.min(units.length, 4), 1)}" style="margin-top:12px">${units.map((u, i) => `<div class="dt-card ${u && u.sessions ? "" : "dt-idle"}">
+        ${v.members.length > 1 ? `<div class="grid g${Math.max(Math.min(units.length, 4), 1)}" style="margin-top:12px">${units.map((u, i) => `<div class="dt-card ${u && u.sessions ? "" : "dt-idle"}">
           <div style="display:flex;justify-content:space-between;gap:8px"><strong><span style="color:${colors[i]}">●</span> ${esc(v.members[i].kind)} · ${short(v.members[i].station)}</strong><strong style="color:${colors[i]}">${fmt.brl(u?.revenue || 0)}</strong></div>
           ${wave(u?.hourly || Array.from({ length: 24 }, () => ({ revenue: 0, energy: 0, use: 0 })), scale, nowHour, 64)}
-          <small>${u ? `${fmt.int(u.valid)} recarga(s) · ${fmt.kwh(u.energy)}${u.lastStart ? ` · última às ${hhmm(u.lastStart)}` : ""}` : "sem recarga no dia"}</small></div>`).join("")}</div>
+          <small>${u ? `${fmt.int(u.valid)} recarga(s) · ${fmt.kwh(u.energy)}${u.lastStart ? ` · última às ${hhmm(u.lastStart)}` : ""}` : "sem recarga no dia"}</small></div>`).join("")}</div>` : ""}
       </section>`;
   }
 
@@ -127,15 +129,18 @@
     if (!ui.place) ui.place = (UBY.data("places").find(p => /aurora/i.test(p.label)) || {}).key || "";
     const v = UBY.data("placeView", ui.place, monthArg());
     if (!v.place) {
-      target.innerHTML = `<div class="hero"><div><p class="eyebrow">Rede de recargas</p><h1>Locais AC + DC</h1></div></div><div class="note">Nenhum local com mais de um carregador na operação UBY.</div>`;
+      target.innerHTML = `<div class="hero"><div><p class="eyebrow">Rede de recargas</p><h1>Painel por local</h1></div></div><div class="note">Nenhum local com operação própria UBY.</div>`;
       return;
     }
     ui.place = v.place.key;
     const colors = INLINE();
+    const multi = v.members.length > 1, kinds = v.members.map(m => esc(m.kind)).join(" + ");
+    const kw = UBY.data("revenuePerKw", monthArg());
+    const pk = v.perKw || { members: [], total: {}, monthly: {} };
     const health = v.health || v.members.map(() => ({ attempts: 0, failures: 0, rate: 0 }));
-    const cols = [...v.members.map((m, i) => ({ i, head: `<span style="color:${colors[i]}">●</span> ${UBY.stationLink(m.workId, m.station, m.kind || m.station)}<small>${short(m.station)}</small>`, ops: m.ops, fin: m.fin, clients: m.clients, health: health[i] })),
-      { head: `<strong>Juntos</strong><small>${esc(v.place.label)}</small>`, ops: v.total.ops, fin: v.total.fin, clients: v.total.ops.clients, total: true,
-        health: (() => { const a = health.reduce((s, h) => s + h.attempts, 0), fl = health.reduce((s, h) => s + h.failures, 0); return { attempts: a, failures: fl, rate: pctOf(fl, a) }; })() }];
+    const cols = [...v.members.map((m, i) => ({ i, perKw: pk.members[i]?.perKw, head: `<span style="color:${colors[i]}">●</span> ${UBY.stationLink(m.workId, m.station, m.kind || m.station)}<small>${short(m.station)}</small>`, ops: m.ops, fin: m.fin, clients: m.clients, health: health[i] })),
+      ...(multi ? [{ head: `<strong>Juntos</strong><small>${esc(v.place.label)}</small>`, ops: v.total.ops, fin: v.total.fin, clients: v.total.ops.clients, total: true, perKw: pk.total.perKw,
+        health: (() => { const a = health.reduce((s, h) => s + h.attempts, 0), fl = health.reduce((s, h) => s + h.failures, 0); return { attempts: a, failures: fl, rate: pctOf(fl, a) }; })() }] : [])];
     const t = v.total, o = t.ops, f = t.fin, cmp = v.compare, pj = v.projection;
     const line = (label, fn) => `<tr><td>${label}</td>${cols.map(c => `<td class="num"${c.total ? ' style="font-weight:800"' : ""}>${fn(c)}</td>`).join("")}</tr>`;
     const group = label => `<tr><th colspan="${cols.length + 1}" style="position:static">${label}</th></tr>`;
@@ -146,7 +151,7 @@
     // Para onde vai o faturamento dos dois juntos.
     const fc = FLOW();
     const flow = [
-      { label: "Área (Shopping)", value: f.areaParticipation, color: fc[0] },
+      { label: "Área (local)", value: f.areaParticipation, color: fc[0] },
       { label: "Gestão P3", value: f.management, color: fc[1] },
       { label: "App / plataforma", value: f.platform, color: fc[2] },
       { label: "Energia", value: f.energyCost, color: fc[3] },
@@ -160,41 +165,43 @@
     const weekBest = v.weekday.slice().sort((a, b) => b.members.reduce((s, x) => s + x.revenue, 0) - a.members.reduce((s, x) => s + x.revenue, 0))[0];
 
     target.innerHTML = `
-      <div class="hero"><div><p class="eyebrow">Rede de recargas · ${esc(v.label)}</p><h1>${esc(v.place.label)} · AC + DC</h1>
-        <p class="lead">Carregadores no mesmo local, que se complementam: cada um individualmente e os dois juntos, com as mesmas contas das outras telas.</p></div>
+      <div class="hero"><div><p class="eyebrow">Rede de recargas · ${esc(v.label)}</p><h1>${esc(v.place.label)}${multi ? ` · ${kinds}` : ""}</h1>
+        <p class="lead">${multi ? "Carregadores no mesmo local, que se complementam: cada um individualmente e juntos" : `Painel do local (${kinds || "carregador"})`}, com as mesmas contas das outras telas.</p></div>
         <div class="callout"><strong>${v.live ? "Mês em andamento" : "Só leitura"}</strong><small>${v.live && pj ? `${fmt.n1(pj.elapsedDays)} de ${pj.days} dias. No ritmo atual o mês fecha em ${fmt.brl(pj.revenue)} e ${fmt.int(pj.sessions)} recargas.` : "Os números de cada carregador continuam iguais em todas as outras telas."} Para editar custos, clique no carregador (↗).</small></div></div>
-      ${v.places.length > 1 ? `<div class="toolbar"><div class="seg" id="placeTabs">${v.places.map(p => `<button data-place="${esc(p.key)}" class="${p.key === v.place.key ? "on" : ""}">${esc(p.label)} (${p.members.map(m => esc(m.kind)).join(" + ")})</button>`).join("")}</div></div>` : ""}
+      ${v.places.length > 1 ? `<div class="toolbar"><div class="seg" id="placeTabs" style="flex-wrap:wrap">${v.places.map(p => `<button data-place="${esc(p.key)}" class="${p.key === v.place.key ? "on" : ""}">${esc(p.label)} (${p.members.map(m => esc(m.kind)).join(" + ")})</button>`).join("")}</div></div>` : ""}
 
-      <section class="section"><div class="section-head"><div><p class="kicker">${esc(v.place.label)} · juntos</p><h2>${v.members.map(m => esc(m.kind)).join(" + ")} no mesmo local</h2>${cmp ? `<p>Setas: comparação com ${esc(cmp.label)}${v.live ? " (mesmos dias do mês anterior)" : ""}.</p>` : ""}</div>
+
+      <section class="section"><div class="section-head"><div><p class="kicker">${esc(v.place.label)} · juntos</p><h2>${multi ? `${kinds} no mesmo local` : esc(v.place.label)}</h2>${cmp ? `<p>Setas: comparação com ${esc(cmp.label)}${v.live ? " (mesmos dias do mês anterior)" : ""}.</p>` : ""}</div>
           <div class="meta">${fmt.int(o.power)} kW instalados<br>${v.monthKey ? esc(v.label) : `acumulado de ${v.months.length} mês(es)`}</div></div>
         <div class="grid g6">
           ${kpi("Faturamento", fmt.brl(f.totalRevenue), pj ? `projeção do mês ${fmt.brl(pj.revenue)}` : `${fmt.brl(o.revenuePerKwh)}/kWh médio`, dd(o.revenue, cmp?.revenue), "lead big")}
-          ${kpi("Ocupação", fmt.pct1(o.occupancy), "energia ÷ capacidade dos dois", "", "lead big")}
+          ${kpi("Ocupação", fmt.pct1(o.occupancy), multi ? "energia ÷ capacidade dos carregadores" : "energia ÷ capacidade", "", "lead big")}
+          ${kpi("Faturamento por kW", perKwFmt(pk.total.perKw), `por mês · rede ${perKwFmt(kw.network.perKw)}`, "", (pk.total.perKw || 0) >= (kw.network.perKw || 0) ? "" : "warn")}
           ${kpi("Recargas", fmt.int(o.sessions), `${fmt.kwh0(o.energy)} entregues`, dd(o.sessions, cmp?.sessions))}
-          ${kpi("Clientes", fmt.int(o.clients), `${fmt.int(c.newCount)} novo(s) no local · ${fmt.int(t.sharedClients)} usaram os dois`, dd(o.clients, cmp?.clients))}
+          ${kpi("Clientes", fmt.int(o.clients), `${fmt.int(c.newCount)} novo(s) no local${multi ? ` · ${fmt.int(t.sharedClients)} usaram mais de um` : ""}`, dd(o.clients, cmp?.clients))}
           ${kpi("Resultado", signed(f.operationNet), `margem ${fmt.pct1(pctOf(f.operationNet, f.totalRevenue))}`, "", f.operationNet >= 0 ? "" : "bad")}
-          ${kpi("% do investido", f.investment ? fmt.pct(pctOf(f.operationNet, f.investment)) : "—", f.investment ? `investimento ${fmt.brl(f.investment)}` : "sem investimento cadastrado")}
         </div>
       </section>
 
       ${todayStrip(v)}
 
       <div class="split" style="margin-bottom:18px">
-        <section class="section"><div class="section-head"><div><p class="kicker">Complementares</p><h2>Quanto cada um responde</h2><p>Participação de cada carregador no período.</p></div></div>
+        ${multi ? `<section class="section"><div class="section-head"><div><p class="kicker">Complementares</p><h2>Quanto cada um responde</h2><p>Participação de cada carregador no período.</p></div></div>
           ${shareRow("Faturamento", v.members.map(m => m.fin.totalRevenue), fmt.brl, colors)}
           ${shareRow("Energia entregue", v.members.map(m => m.ops.energy), fmt.kwh0, colors)}
           ${shareRow("Recargas", v.members.map(m => m.ops.sessions), fmt.int, colors)}
           ${shareRow("Clientes", v.members.map(m => m.clients), fmt.int, colors)}
           ${shareRow("Potência instalada", v.members.map(m => m.ops.power), x => `${fmt.int(x)} kW`, colors)}
-        </section>
-        <section class="section"><div class="section-head"><div><p class="kicker">Destino</p><h2>Para onde vai o faturamento</h2><p>${fmt.brl(f.totalRevenue)} dos dois juntos no período.</p></div></div>
+        </section>` : `<section class="section"><div class="section-head"><div><p class="kicker">Mês a mês</p><h2>Faturamento por kW instalado</h2><p>R$/kW de cada mês de operação; a linha tracejada é a rede no período escolhido.</p></div></div>
+          <div class="chart-box"><canvas id="chPlaceKw"></canvas></div></section>`}
+        <section class="section"><div class="section-head"><div><p class="kicker">Destino</p><h2>Para onde vai o faturamento</h2><p>${fmt.brl(f.totalRevenue)}${multi ? " dos carregadores juntos" : ""} no período.</p></div></div>
           ${stackBar(flow, flow.reduce((s, x) => s + x.value, 0))}
           <div class="list" style="margin-top:12px">${flow.filter(x => x.value > 0 || x.label === "Resultado").map(x => `<div class="list-row"><span><span style="color:${x.color}">■</span> ${esc(x.label)}</span><span><strong>${fmt.brl(x.value)}</strong> <small>${fmt.pct1(pctOf(x.value, f.totalRevenue))}</small></span></div>`).join("")}
             ${f.operationNet < 0 ? `<div class="list-row"><span style="color:var(--uby-red)">Prejuízo do período</span><strong>${signed(f.operationNet)}</strong></div>` : ""}</div>
         </section>
       </div>
 
-      ${(v.daily || []).length ? `<section class="section"><div class="section-head"><div><p class="kicker">Dia a dia · ${esc(v.label)}</p><h2>Faturamento de cada carregador e ocupação juntos</h2><p>Curvas: faturamento do dia de cada carregador. Tracejado: ocupação dos dois juntos (energia ÷ capacidade no horário de cada um).</p></div>
+      ${(v.daily || []).length ? `<section class="section"><div class="section-head"><div><p class="kicker">Dia a dia · ${esc(v.label)}</p><h2>${multi ? "Faturamento de cada carregador e ocupação juntos" : "Faturamento e ocupação"}</h2><p>${multi ? "Curvas: faturamento do dia de cada carregador. Tracejado: ocupação dos carregadores juntos (energia ÷ capacidade no horário de cada um)." : "Curva: faturamento do dia. Tracejado: ocupação (energia ÷ capacidade no horário do carregador)."}</p></div>
           <div class="meta">melhor dia ${bestDay && bestDay.revenue ? `${String(bestDay.day).padStart(2, "0")} · ${fmt.brl(bestDay.revenue)}` : "—"}<br>média ${fmt.brl(v.daily.reduce((s, d) => s + d.revenue, 0) / Math.max(v.daily.length, 1))}/dia</div></div>
         <div class="chart-box" style="height:280px"><canvas id="chPlaceDaily"></canvas></div></section>` : ""}
 
@@ -221,7 +228,7 @@
           ${line("Tempo médio", c2 => esc(c2.ops.avgDuration || "—"))}
           ${line("Ticket médio", c2 => fmt.brl(c2.ops.avgTicket))}
           ${line("Preço médio", c2 => perKwh(c2.ops.revenuePerKwh))}
-          ${line("Faturamento por kW instalado", c2 => c2.ops.power ? fmt.brl(c2.fin.totalRevenue / c2.ops.power) : "—")}
+          ${line("Faturamento por kW instalado <small>por mês</small>", c2 => perKwFmt(c2.perKw))}
           ${line("Potência", c2 => `${fmt.int(c2.ops.power)} kW`)}
           ${line("Tentativas com falha", c2 => `${fmt.int(c2.health.failures)} <small>${fmt.pct1(c2.health.rate)}</small>`)}
           ${line("Participação no faturamento", c2 => fmt.pct1(pctOf(c2.fin.totalRevenue, f.totalRevenue)))}
@@ -242,36 +249,36 @@
           ${line("Investimento", c2 => c2.fin.investment ? fmt.brl(c2.fin.investment) : "—")}
           ${line("% do investido", c2 => c2.fin.investment ? fmt.pct(pctOf(c2.fin.operationNet, c2.fin.investment)) : "—")}
           </tbody></table></div></section>
-        <section class="section"><div class="section-head"><div><p class="kicker">Evolução</p><h2>Faturamento de cada um e resultado juntos</h2></div></div>
+        <section class="section"><div class="section-head"><div><p class="kicker">Evolução</p><h2>${multi ? "Faturamento de cada um e resultado juntos" : "Faturamento e resultado"}</h2></div></div>
           <div class="chart-box"><canvas id="chPlace"></canvas></div></section>
       </div>
 
-      <section class="section"><div class="section-head"><div><p class="kicker">Clientes do local · ${esc(v.label)}</p><h2>Quem carrega no ${esc(v.place.label)}</h2><p>Recargas válidas em cada carregador. R$/kWh acima da média do local fica destacado: costuma ser ociosidade (carro parado depois de carregar). "Novo" = primeira recarga no local neste período.</p></div>
+      <section class="section"><div class="section-head"><div><p class="kicker">Clientes do local · ${esc(v.label)}</p><h2>Quem carrega no ${esc(v.place.label)}</h2><p>Recargas válidas em cada carregador. ${c.idle > 0 ? "R$/kWh acima da média do local fica destacado: costuma ser ociosidade cobrada (carro parado depois de carregar)." : ""} "Novo" = primeira recarga no local neste período.</p></div>
           <div class="meta"><a href="#/clientes/ranking">Ranking completo →</a></div></div>
         <div class="grid g6" style="margin-bottom:12px">
           ${kpi("Clientes no período", fmt.int(c.total), `${fmt.int(c.recurring)} voltaram mais de uma vez`, "", "lead")}
           ${kpi("R$/kWh médio do local", perKwh(c.perKwh), "faturamento ÷ energia de todos os clientes")}
-          ${kpi("Ociosidade cobrada", fmt.brl(c.idle || 0), c.idleClients ? `${fmt.int(c.idleClients)} cliente(s) pagaram` : "ninguém pagou no período", "", c.idle > 0 ? "warn" : "")}
+          ${c.idle > 0 ? kpi("Ociosidade cobrada", fmt.brl(c.idle), `${fmt.int(c.idleClients)} cliente(s) pagaram`, "", "warn") : kpi("Recorrentes", fmt.pct1(pctOf(c.recurring, c.total)), "dos clientes voltaram")}
           ${kpi("Novos no local", fmt.int(c.newCount), "primeira recarga aqui")}
-          ${kpi("Usaram AC e DC", fmt.int(c.both), "complementaridade")}
+          ${multi ? kpi("Usaram mais de um", fmt.int(c.both), "complementaridade") : kpi("Faturamento por cliente", fmt.brl(c.total ? f.totalRevenue / c.total : 0), "no período")}
           ${kpi("Peso dos 5 maiores", fmt.pct1(c.top5Share), "do faturamento do local")}
         </div>
-        <div class="table-wrap" style="max-height:520px"><table><thead><tr><th>#</th><th>Cliente</th>${v.members.map((m, i) => `<th class="num"><span style="color:${colors[i]}">●</span> ${esc(m.kind)}</th>`).join("")}<th class="num">Recargas</th><th class="num">Energia</th><th class="num">kWh/recarga</th><th class="num">Tempo médio</th><th class="num">R$/kWh</th><th class="num">Ociosidade</th><th class="num">Faturamento</th><th>Última</th></tr></thead>
-          <tbody>${c.list.map((x, i) => `<tr><td>${i + 1}</td><td><strong>${who(x.name)}</strong> ${x.isNew ? '<span class="badge ok">novo</span>' : ""}${x.both ? ' <span class="badge neutral">AC + DC</span>' : ""}</td>
+        <div class="table-wrap" style="max-height:520px"><table><thead><tr><th>#</th><th>Cliente</th>${v.members.map((m, i) => `<th class="num"><span style="color:${colors[i]}">●</span> ${esc(m.kind)}</th>`).join("")}<th class="num">Recargas</th><th class="num">Energia</th><th class="num">kWh/recarga</th><th class="num">Tempo médio</th><th class="num">R$/kWh</th>${c.idle > 0 ? '<th class="num">Ociosidade</th>' : ""}<th class="num">Faturamento</th><th>Última</th></tr></thead>
+          <tbody>${c.list.map((x, i) => `<tr><td>${i + 1}</td><td><strong>${who(x.name)}</strong> ${x.isNew ? '<span class="badge ok">novo</span>' : ""}${x.both ? ` <span class="badge neutral">${kinds}</span>` : ""}</td>
             ${x.per.map(n => `<td class="num">${n || "—"}</td>`).join("")}<td class="num"><strong>${fmt.int(x.sessions)}</strong></td><td class="num">${fmt.kwh(x.energy)}</td>
             <td class="num">${x.sessions ? `${fmt.n1(x.energy / x.sessions)} kWh` : "—"}</td><td class="num">${hm(x.avgHours)}</td>
             <td class="num"${x.perKwh > c.perKwh * 1.15 ? ' style="color:var(--uby-amber,#b98527);font-weight:800" title="Acima da média do local: pode ser ociosidade"' : ""}>${x.energy > 0 ? fmt.brl(x.perKwh) : "—"}</td>
-            <td class="num">${x.idle > 0 ? `<strong style="color:var(--uby-amber,#b98527)">${fmt.brl(x.idle)}</strong><small>${fmt.int(x.idleCount)}×</small>` : "—"}</td>
-            <td class="num"><strong>${fmt.brl(x.revenue)}</strong></td><td>${fmt.dt(x.last)}</td></tr>`).join("") || `<tr><td colspan="${v.members.length + 10}" class="empty">Sem clientes no período.</td></tr>`}</tbody></table></div>
+            ${c.idle > 0 ? `<td class="num">${x.idle > 0 ? `<strong style="color:var(--uby-amber,#b98527)">${fmt.brl(x.idle)}</strong><small>${fmt.int(x.idleCount)}×</small>` : "—"}</td>` : ""}
+            <td class="num"><strong>${fmt.brl(x.revenue)}</strong></td><td>${fmt.dt(x.last)}</td></tr>`).join("") || `<tr><td colspan="${v.members.length + (c.idle > 0 ? 10 : 9)}" class="empty">Sem clientes no período.</td></tr>`}</tbody></table></div>
         ${c.total > c.list.length ? `<p class="meta" style="margin-top:8px">Mostrando os ${c.list.length} maiores de ${c.total}.</p>` : ""}
       </section>
 
-      <section class="section"><div class="section-head"><div><p class="kicker">Mês a mês</p><h2>${esc(v.place.label)} juntos</h2><p>Clientes contados uma vez só quando usaram os dois carregadores no mês.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Competência</th>${v.members.map(m => `<th class="num">Faturamento ${esc(m.kind)}</th>`).join("")}<th class="num">Faturamento juntos</th><th class="num">Recargas</th><th class="num">Clientes</th><th class="num">Energia</th><th class="num">Resultado</th><th class="num">Margem</th></tr></thead>
+      <section class="section"><div class="section-head"><div><p class="kicker">Mês a mês</p><h2>${esc(v.place.label)}${multi ? " juntos" : ""}</h2><p>${multi ? "Clientes contados uma vez só quando usaram mais de um carregador no mês. " : ""}R$/kW: faturamento do mês ÷ kW instalados naquele mês.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Competência</th>${multi ? v.members.map(m => `<th class="num">Faturamento ${esc(m.kind)}</th>`).join("") : ""}<th class="num">Faturamento${multi ? " juntos" : ""}</th><th class="num">R$/kW</th><th class="num">Recargas</th><th class="num">Clientes</th><th class="num">Energia</th><th class="num">Resultado</th><th class="num">Margem</th></tr></thead>
           <tbody>${v.monthly.slice().reverse().map(m => `<tr${m.key === v.monthKey ? ' style="background:var(--uby-green-soft)"' : ""}><td><strong>${esc(m.label)}</strong></td>
-            ${m.members.map(x => `<td class="num">${fmt.brl(x.revenue)}<small>${fmt.int(x.sessions)} recargas</small></td>`).join("")}
-            <td class="num"><strong>${fmt.brl(m.revenue)}</strong></td><td class="num">${fmt.int(m.sessions)}</td><td class="num">${fmt.int(m.clients)}</td><td class="num">${fmt.kwh0(m.energy)}</td>
-            <td class="num">${signed(m.result)}</td><td class="num">${fmt.pct1(pctOf(m.result, m.revenue))}</td></tr>`).join("") || `<tr><td colspan="${v.members.length + 7}" class="empty">Sem recargas.</td></tr>`}</tbody></table></div>
+            ${multi ? m.members.map(x => `<td class="num">${fmt.brl(x.revenue)}<small>${fmt.int(x.sessions)} recargas</small></td>`).join("") : ""}
+            <td class="num"><strong>${fmt.brl(m.revenue)}</strong></td><td class="num">${perKwFmt(pk.monthly[m.key])}</td><td class="num">${fmt.int(m.sessions)}</td><td class="num">${fmt.int(m.clients)}</td><td class="num">${fmt.kwh0(m.energy)}</td>
+            <td class="num">${signed(m.result)}</td><td class="num">${fmt.pct1(pctOf(m.result, m.revenue))}</td></tr>`).join("") || `<tr><td colspan="${(multi ? v.members.length : 0) + 8}" class="empty">Sem recargas.</td></tr>`}</tbody></table></div>
       </section>`;
 
     target.querySelectorAll("#placeTabs button").forEach(b => b.onclick = () => { ui.place = b.dataset.place; render(target); });
@@ -285,21 +292,25 @@
     const lineOpts = (extra = {}) => ({ ...base, ...extra, scales: { ...(base.scales || {}), y: { ...(base.scales?.y || {}), beginAtZero: true }, ...(extra.scales || {}) } });
     UBY.chart("chPlace", { type: "line", data: { labels: v.monthly.map(m => m.label), datasets: [
       ...v.members.map((m, i) => curve(`Faturamento ${m.kind}`, v.monthly.map(x => x.members[i].revenue), CHART[i % CHART.length], { pointRadius: 3 })),
-      curve("Faturamento AC + DC", v.monthly.map(x => x.revenue), "#77637d", { fill: false, borderWidth: 3, pointRadius: 3 }),
-      curve("Resultado juntos", v.monthly.map(x => x.result), "#b98527", { fill: false, borderDash: [5, 4], pointRadius: 3 })
+      ...(multi ? [curve(`Faturamento ${kinds}`, v.monthly.map(x => x.revenue), "#77637d", { fill: false, borderWidth: 3, pointRadius: 3 })] : []),
+      curve(multi ? "Resultado juntos" : "Resultado", v.monthly.map(x => x.result), "#b98527", { fill: false, borderDash: [5, 4], pointRadius: 3 })
     ] }, options: lineOpts() });
     if ((v.daily || []).length) UBY.chart("chPlaceDaily", { type: "line", data: { labels: v.daily.map(d => String(d.day).padStart(2, "0")), datasets: [
       ...v.members.map((m, i) => curve(`Faturamento ${m.kind}`, v.daily.map(d => d.members[i].revenue), CHART[i % CHART.length], { yAxisID: "y", sessions: v.daily.map(d => d.members[i].sessions) })),
-      curve("Faturamento AC + DC", v.daily.map(d => Math.round(d.revenue * 100) / 100), "#77637d", { yAxisID: "y", fill: false, borderWidth: 3, sessions: v.daily.map(d => d.sessions) }),
-      curve("Ocupação juntos (%)", v.daily.map(d => Math.round(d.occ * 10) / 10), "#b98527", { yAxisID: "y1", fill: false, borderDash: [4, 3], borderWidth: 1.6 })
+      ...(multi ? [curve(`Faturamento ${kinds}`, v.daily.map(d => Math.round(d.revenue * 100) / 100), "#77637d", { yAxisID: "y", fill: false, borderWidth: 3, sessions: v.daily.map(d => d.sessions) })] : []),
+      curve(multi ? "Ocupação juntos (%)" : "Ocupação (%)", v.daily.map(d => Math.round(d.occ * 10) / 10), "#b98527", { yAxisID: "y1", fill: false, borderDash: [4, 3], borderWidth: 1.6 })
     ] }, options: lineOpts({ plugins: { ...(base.plugins || {}), tooltip: { ...(base.plugins?.tooltip || {}), callbacks: { label: ctx => ctx.dataset.sessions ? `${ctx.dataset.label}: ${fmt.brl(ctx.parsed.y)} · ${fmt.int(ctx.dataset.sessions[ctx.dataIndex] || 0)} recarga(s)` : `${ctx.dataset.label}: ${fmt.pct1(ctx.parsed.y)}` } } }, scales: { y1: { position: "right", beginAtZero: true, grid: { display: false }, border: { display: false }, ticks: { callback: x => `${x}%`, font: { size: 10 } } } } }) });
+    if (!multi) UBY.chart("chPlaceKw", { type: "line", data: { labels: v.monthly.map(m => m.label), datasets: [
+      curve("R$/kW no mês", v.monthly.map(m => pk.monthly[m.key] == null ? null : Math.round(pk.monthly[m.key] * 100) / 100), CHART[0], { pointRadius: 3 }),
+      curve(`Rede · ${kw.label}`, v.monthly.map(() => kw.network.perKw == null ? null : Math.round(kw.network.perKw * 100) / 100), "#b98527", { fill: false, borderDash: [5, 4], pointRadius: 0 })
+    ] }, options: lineOpts() });
     UBY.chart("chPlaceHour", { type: "line", data: { labels: v.hourly.map(h => `${h.hour}h`), datasets:
       [...v.members.map((m, i) => curve(m.kind, v.hourly.map(h => h.members[i].sessions), CHART[i % CHART.length])),
-        curve("AC + DC", v.hourly.map(h => h.members.reduce((s, x) => s + x.sessions, 0)), "#77637d", { fill: false, borderWidth: 3 })] },
+        ...(multi ? [curve(kinds, v.hourly.map(h => h.members.reduce((s, x) => s + x.sessions, 0)), "#77637d", { fill: false, borderWidth: 3 })] : [])] },
       options: lineOpts({ scales: { y: { ...(base.scales?.y || {}), beginAtZero: true, ticks: { ...(base.scales?.y?.ticks || {}), precision: 0 } } } }) });
     UBY.chart("chPlaceWeek", { type: "line", data: { labels: v.weekday.map(w => w.label), datasets:
       [...v.members.map((m, i) => curve(m.kind, v.weekday.map(w => Math.round(w.members[i].revenue * 100) / 100), CHART[i % CHART.length], { sessions: v.weekday.map(w => w.members[i].sessions), pointRadius: 3 })),
-        curve("AC + DC", v.weekday.map(w => Math.round(w.members.reduce((s, x) => s + x.revenue, 0) * 100) / 100), "#77637d", { sessions: v.weekday.map(w => w.members.reduce((s, x) => s + x.sessions, 0)), fill: false, borderWidth: 3, pointRadius: 3 })] },
+        ...(multi ? [curve(kinds, v.weekday.map(w => Math.round(w.members.reduce((s, x) => s + x.revenue, 0) * 100) / 100), "#77637d", { sessions: v.weekday.map(w => w.members.reduce((s, x) => s + x.sessions, 0)), fill: false, borderWidth: 3, pointRadius: 3 })] : [])] },
       options: lineOpts({ plugins: { ...(base.plugins || {}), tooltip: { ...(base.plugins?.tooltip || {}), callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt.brl(ctx.parsed.y)} · ${ctx.dataset.sessions[ctx.dataIndex]} recarga(s)` } } } }) });
   }
 
