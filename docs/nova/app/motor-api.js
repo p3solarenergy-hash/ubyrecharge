@@ -2757,11 +2757,13 @@
     // 1ª recarga de cada cliente neste ponto (para "novos clientes" do mês na prestação de contas).
     const firstMonthOf = new Map();
     (row.charges || []).filter(c => isExecutedCharge(c)).forEach(c => { const k = clientKeyFromCharge(c), mk0 = chargeMonthKey(c); if (k && mk0 !== "unknown" && (!firstMonthOf.has(k) || mk0 < firstMonthOf.get(k))) firstMonthOf.set(k, mk0); });
-    // Carregadores do ponto = nomes distintos no conector das recargas, sem o nº do conector
-    // (ex.: "…AURORA DC 3 - 1" → "…AURORA DC 3"), para a ocupação por tempo.
-    // Nome que SUBSTITUI outro (troca de equipamento: JK "DC 60kW" → "…CENTRAL JK 80 KW" em 19/11/2026)
-    // não é carregador a mais: conta o máximo de nomes em uso ao mesmo tempo (1ª a última recarga de cada um).
-    const occPoints = (() => {
+    // Carregadores do ponto, para a ocupação por tempo. Vale o cadastro do local (Parâmetros → conectores:
+    // carregadores AC + DC), porque a Spott renomeia conectores (19/11/2026: "DC 60kW - 1" → "ROBERT KOCH
+    // DC 60kW - 1", "…SHOPPING AURORA DC 1" → "AURORA DC 1", JK 60 kW → "JK DC 80kW"). Sem cadastro: nomes
+    // de conector sem o nº (ex.: "…AURORA DC 3 - 1" → "…AURORA DC 3"), contando só os em uso ao mesmo tempo
+    // (nome que SUBSTITUI outro não é carregador a mais).
+    const occConfigured = Math.round(n0(occAvail?.acChargers) + n0(occAvail?.dcChargers));
+    const occPoints = occConfigured > 0 ? occConfigured : (() => {
       const spans = new Map();
       (row.charges || []).forEach(c => {
         const name = String(c.connType || "").trim().replace(/\s*-\s*\d+$/, "");
