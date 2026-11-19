@@ -351,7 +351,9 @@
   }
 
   // saveOperationalPowerFromInputs sem tela.
-  async function salvarPotencia(workId, value) {
+  // `desde` (opcional, 'AAAA-MM-DD'): a nova potência vale desse dia em diante e o que veio antes
+  // mantém a potência anterior (operationalPowerHistory). Sem `desde`, troca a potência de todo o histórico.
+  async function salvarPotencia(workId, value, desde = "") {
     const candidate = Number(value);
     if (!Number.isFinite(candidate) || candidate < 1 || candidate > 360) throw new Error("Informe uma potência operacional entre 1 e 360 kW.");
     const power = Math.round(candidate * 10) / 10;
@@ -364,13 +366,23 @@
     } finally { repor(antes); }
     const source = S.allRechargeRecords[workId] || N.localRecord(workId) || N.rechargeMetadataSeed(workId);
     const updatedAt = new Date().toISOString();
-    const record = { ...source, operationalPowerKw: power, summary: { ...(source.summary || {}), operationalPowerKw: power, updatedAt }, updatedAt };
+    const from = /^\d{4}-\d{2}-\d{2}$/.test(String(desde || "")) ? String(desde) : "";
+    let history = N.workPowerHistory(String(workId));
+    if (from) {
+      const before = Number(N.workPowerById(String(workId), new Date(new Date(`${from}T00:00:00`).getTime() - 1))) || Number(N.workPowerById(String(workId))) || power;
+      history = history.filter(e => e.from < from);
+      history.push({ from, kw: power, beforeKw: history.length ? 0 : before });
+    } else {
+      history = [];
+    }
+    const record = { ...source, operationalPowerKw: power, operationalPowerHistory: history,
+      summary: { ...(source.summary || {}), operationalPowerKw: power, operationalPowerHistory: history, updatedAt }, updatedAt };
     S.allRechargeRecords[workId] = N.hydratedRechargeRecord(record, workId);
     const db = N.localRechargeDb(); db[workId] = N.compactRechargeRecord(record); N.writeJson(N.RECARGAS_LOCAL_KEY, db);
     window.UBY_RECHARGE_RUNTIME?.cacheSet?.(`work:${workId}`, record).catch(() => {});
     N.markRechargeRecordsDirty();
     await gravar(() => window.UBY_SUPABASE.saveRechargeMetadata(workId, { ...record, metadataType: "operational_power" }));
-    return `${power} kW`;
+    return from ? `${power} kW a partir de ${from.split("-").reverse().join("/")}` : `${power} kW`;
   }
 
   // toggleUbyOperation (regra sem tela): só precisa da permissão de gravar.

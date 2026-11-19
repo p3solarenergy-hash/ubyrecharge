@@ -1172,20 +1172,31 @@
     const head = embedded ? `<div class="toolbar">
         <label><input type="checkbox" data-op-toggle="${esc(`${sel.workId}|${sel.key}|${sel.station}`)}" ${sel.included ? "checked" : ""} ${can}> Na operação UBY (resultado, rateio da matriz e cotistas)</label>
         <label>Potência do local <input class="select" type="number" min="1" max="360" step="0.1" data-op-power="${esc(`${sel.workId}|${sel.station}`)}" value="${esc(w.workPowerById(sel.workId))}" style="width:90px" ${can}> kW</label>
+        <label>a partir de <input class="select" type="date" data-op-power-from="${esc(`${sel.workId}|${sel.station}`)}" value="${esc(powerFromDefault())}" ${can}></label>${powerHistoryNote(sel.workId)}
         <span class="spacer"></span><small>${esc(sel.ruleSource || "")} · a potência vale para o local inteiro</small></div>` : "";
     if (embedded) return head + cfgBlock();
     return `
       <section class="section"><div class="section-head"><div><p class="kicker">Operação UBY</p><h2>Carregadores, inclusão e potência do local</h2>
-          <p>Marque quem entra na operação UBY (resultado, rateio da matriz e cotistas). A potência é do local inteiro (ex.: 2 × 7 kW = 14 kW) e vale para ocupação e rateio por potência.</p></div></div>
+          <p>Marque quem entra na operação UBY (resultado, rateio da matriz e cotistas). A potência é do local inteiro (ex.: 2 × 7 kW = 14 kW) e vale para ocupação e rateio por potência. Ao trocar, informe a data: os dias antes dela continuam com a potência anterior (limpe a data para trocar o histórico todo).</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Carregador</th><th>Tipo</th><th>Regra atual</th><th>Na operação UBY</th><th class="num">Potência do local</th><th></th></tr></thead>
           <tbody>${rows.map(r => `<tr class="${r.included ? "" : "muted"}"><td><strong>${esc(r.station)}</strong><small>${esc(r.workName)}</small></td>
             <td><span class="badge ${r.kind === "ac" ? "ac" : "dc"}">${esc(String(r.kind || "").toUpperCase() || "—")}</span></td><td><small>${esc(r.ruleSource || "")}</small></td>
             <td><input type="checkbox" data-op-toggle="${esc(`${r.workId}|${r.key}|${r.station}`)}" ${r.included ? "checked" : ""} ${can}></td>
-            <td class="num"><input class="select" type="number" min="1" max="360" step="0.1" data-op-power="${esc(`${r.workId}|${r.station}`)}" value="${esc(w.workPowerById(r.workId))}" style="width:90px" ${can}> kW</td>
+            <td class="num"><input class="select" type="number" min="1" max="360" step="0.1" data-op-power="${esc(`${r.workId}|${r.station}`)}" value="${esc(w.workPowerById(r.workId))}" style="width:90px" ${can}> kW
+              <br><small>a partir de</small> <input class="select" type="date" data-op-power-from="${esc(`${r.workId}|${r.station}`)}" value="${esc(powerFromDefault())}" ${can}>${powerHistoryNote(r.workId)}</td>
             <td><button class="btn ghost" data-op-cfg="${esc(key(r))}" type="button">${ui.opCharger === key(r) ? "Editando ▾" : "Horários e cortesia"}</button></td></tr>`).join("")}</tbody></table></div>
         <p class="source-line">${works.length} local(is). A potência é salva por local: alterar num carregador altera todos do mesmo local.</p>
       </section>
       ${sel ? cfgBlock() : ""}`;
+    function powerFromDefault() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+    function powerHistoryNote(workId) {
+      const h = typeof w.workPowerHistory === "function" ? w.workPowerHistory(String(workId)) : [];
+      if (!h.length) return "";
+      const br = iso => iso.split("-").reverse().join("/");
+      const parts = h.map((e, i) => `${e.kw} kW desde ${br(e.from)}`);
+      if (h[0].beforeKw) parts.unshift(`${h[0].beforeKw} kW até a véspera de ${br(h[0].from)}`);
+      return `<br><small>${esc(parts.join(" · "))}</small>`;
+    }
     function cfgBlock() {
       return `<section class="section"><div class="section-head"><div><p class="kicker">Configuração do carregador</p><h2>${esc(sel.station)}</h2><p>${esc(sel.workName)} · horários de funcionamento (base da ocupação), início da operação, conectores e cortesias.</p></div></div>
         <div class="grid g4" style="gap:8px">
@@ -2793,7 +2804,10 @@
       const [workId, station] = el.dataset.opPower.split("|");
       const kw = Number(el.value);
       if (!(kw >= 1 && kw <= 360)) { log("Potência: informe entre 1 e 360 kW.", "bad"); draw(target, w); return; }
-      run(target, w, `Potência do local · ${station}`, async () => { const r = await E().salvarPotencia(workId, kw); forgetOpened(); return r; });
+      const fromEl = [...target.querySelectorAll("[data-op-power-from]")].find(x => x.dataset.opPowerFrom === el.dataset.opPower);
+      const desde = fromEl ? String(fromEl.value || "") : "";
+      if (!desde && !confirm(`Sem data: ${kw} kW passa a valer para TODO o histórico de ${station} (ocupação dos meses anteriores muda). Continuar?`)) { draw(target, w); return; }
+      run(target, w, `Potência do local · ${station}`, async () => { const r = await E().salvarPotencia(workId, kw, desde); forgetOpened(); return r; });
     });
     if ($("#pmOpSave")) $("#pmOpSave").onclick = () => {
       const [workId, station] = ui.opCharger.split("|");

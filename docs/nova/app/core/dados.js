@@ -762,6 +762,8 @@
       matrizCosts: payload?.matrizCosts || incomingSummary.matrizCosts || from.matrizCosts || [],
       stationAvailability: payload?.stationAvailability || incomingSummary.stationAvailability || from.stationAvailability || {},
       operationalPowerKw: Number(payload?.operationalPowerKw || incomingSummary.operationalPowerKw || from.operationalPowerKw || 0),
+      operationalPowerHistory: Array.isArray(payload?.operationalPowerHistory) ? payload.operationalPowerHistory
+        : Array.isArray(incomingSummary.operationalPowerHistory) ? incomingSummary.operationalPowerHistory : (from.operationalPowerHistory || []),
       ubyOperationOverrides: payload?.ubyOperationOverrides || incomingSummary.ubyOperationOverrides || from.ubyOperationOverrides || {},
       ubyAreaAccounting: payload?.ubyAreaAccounting || incomingSummary.ubyAreaAccounting || from.ubyAreaAccounting || {},
       updatedAt: new Date().toISOString()

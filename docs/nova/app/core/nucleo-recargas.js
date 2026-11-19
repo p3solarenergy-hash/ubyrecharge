@@ -460,13 +460,63 @@ function workNameById(workId, fallback = '') {
   return work?.nome || fallback || workId || 'Unidade';
 }
 
-function workPowerById(workId) {
+// Potência com vigência (usuário, 19/11/2026: JK trocou o 60 kW por um 80 kW limitado a 75 kW
+// "a partir da última recarga"). operationalPowerHistory = [{ from: 'AAAA-MM-DD', kw }]: cada
+// troca vale do dia `from` (00:00, horário local) em diante; antes da 1ª troca vale `beforeKw`
+// da 1ª entrada. Sem histórico, tudo segue igual (um número só, operationalPowerKw).
+function workPowerHistory(workId) {
+  const record = allRechargeRecords[workId] || localRecord(workId) || {};
+  const list = record.operationalPowerHistory || record.summary?.operationalPowerHistory;
+  return Array.isArray(list)
+    ? list.filter(e => /^\d{4}-\d{2}-\d{2}$/.test(String(e?.from || '')) && Number(e.kw) >= 1 && Number(e.kw) <= 360)
+      .map(e => ({ from: e.from, kw: Number(e.kw), beforeKw: Number(e.beforeKw || 0) || 0 }))
+      .sort((a, b) => a.from.localeCompare(b.from))
+    : [];
+}
+
+function powerChangeDate(from) {
+  const [y, m, d] = from.split('-').map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
+// Potência média no intervalo [start, end), ponderada pelo tempo de cada vigência.
+function powerOverRange(history, current, start, end) {
+  if (!(start instanceof Date) || !(end instanceof Date) || !(end > start)) return null;
+  const segments = [];
+  let kw = history[0].beforeKw || current;
+  let cursor = new Date(-8.64e15);
+  history.forEach(entry => { const at = powerChangeDate(entry.from); segments.push({ a: cursor, b: at, kw }); cursor = at; kw = entry.kw; });
+  segments.push({ a: cursor, b: new Date(8.64e15), kw });
+  let weighted = 0;
+  segments.forEach(s => {
+    const a = Math.max(s.a.getTime(), start.getTime()), b = Math.min(s.b.getTime(), end.getTime());
+    if (b > a) weighted += (b - a) * s.kw;
+  });
+  return weighted / (end.getTime() - start.getTime());
+}
+
+// `when` (opcional): mês 'AAAA-MM', um Date, ou { start, end }. Sem `when` = potência atual.
+function workPowerById(workId, when) {
   const work = workOptions().find(item => item.id === workId);
   const record = allRechargeRecords[workId] || localRecord(workId) || {};
   const operationalPower = Number(record.operationalPowerKw || record.summary?.operationalPowerKw || 0);
-  if (operationalPower >= 1 && operationalPower <= 360) return operationalPower;
   const power = Number(work?.kw || 0);
-  return power > 0 ? power : 7;
+  const current = operationalPower >= 1 && operationalPower <= 360 ? operationalPower : (power > 0 ? power : 7);
+  if (when === undefined || when === null || when === '') return current;
+  const history = workPowerHistory(workId);
+  if (!history.length) return current;
+  let start = null, end = null;
+  if (typeof when === 'string' && /^\d{4}-\d{2}$/.test(when)) {
+    const [y, m] = when.split('-').map(Number);
+    start = new Date(y, m - 1, 1); end = new Date(y, m, 1);
+  } else if (when instanceof Date) {
+    start = when; end = new Date(when.getTime() + 1);
+  } else if (when && typeof when === 'object') {
+    start = when.start instanceof Date ? when.start : (when.start ? new Date(when.start) : null);
+    end = when.end instanceof Date ? when.end : (when.end ? new Date(when.end) : null);
+  }
+  const avg = powerOverRange(history, current, start, end);
+  return Number.isFinite(avg) && avg > 0 ? Math.round(avg * 1000) / 1000 : current;
 }
 
 function selectorChargesForWork(workId = '') {
@@ -802,6 +852,7 @@ function rechargeSummary() {
     financialSettings,
     stationAvailability,
     operationalPowerKw: workPowerById(currentWorkId),
+    operationalPowerHistory: workPowerHistory(currentWorkId),
     ubyOperationOverrides,
     ubyAreaAccounting: readUbyAreaAccounting(),
     energyKWh: energy,
@@ -836,6 +887,7 @@ function buildRechargeRecord() {
     financialSettings,
     stationAvailability,
     operationalPowerKw: workPowerById(currentWorkId),
+    operationalPowerHistory: workPowerHistory(currentWorkId),
     ubyOperationOverrides,
     ubyAreaAccounting: readUbyAreaAccounting(),
     summary: rechargeSummary(),
@@ -2356,8 +2408,8 @@ function buildMonthClosing(mk) {
   const dates = charges.map(c => c.startDate).filter(Boolean).sort((a, b) => a - b);
   const files = [...new Set(charges.map(c => c._file).filter(Boolean))];
   const stations = [...new Set(charges.map(c => c.station).filter(Boolean))];
-  const power = getPower();
   const monthToDateWindow = periodWindow(charges, mk, 'mtd');
+  const power = workPowerById(currentWorkId, monthToDateWindow);
   const occInterval = occByInterval(charges, power, monthToDateWindow);
   const occFull = occByFullMonth(charges, mk);
   return {
@@ -2382,7 +2434,7 @@ function buildMonthClosing(mk) {
   };
 }
 
-function monthLiveSummary(mk, power = getPower()) {
+function monthLiveSummary(mk, power = workPowerById(currentWorkId, mk)) {
   const charges = chargesForMonth(mk);
   if (!charges.length) return null;
   const rev = charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
@@ -3825,7 +3877,7 @@ function matrizApplies(item, mk) {
 
 function matrizWeight(row, target, item, mk) {
   if (item.allocation === 'custom') return Number(target.share || 0);
-  if (item.allocation === 'power') return Math.max(0, Number(workPowerById(row.workId) || 0));
+  if (item.allocation === 'power') return Math.max(0, Number(workPowerById(row.workId, mk) || 0));
   const charges = (row.charges || []).filter(charge => chargeMonthKey(charge) === mk);
   if (item.allocation === 'energy') return charges.reduce((sum, charge) => sum + Number(charge.energyKWh || 0), 0);
   if (item.allocation === 'revenue') return charges.reduce((sum, charge) => sum + Number(charge.revenue || 0), 0);
@@ -3974,7 +4026,7 @@ function generalFinanceByUnit(unitData) {
       const settings = financeSettingsForUbyRow(unit, mk);
       const matrixRow = matrizRowForUnit(unit, unitData, mk);
       const matrizCostItems = matrixRow ? matrizCostItemsForRow(matrixRow, mk, unitData) : [];
-      const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId), matrizCostItems, workId: unit.workId, workName: unit.workName, stationName: unit.stationName || unit.station, courtesyConfig: stationAvailabilityFor(unit.workId, unit.stationName || unit.station, unit.workName) });
+      const result = financeForCharges(charges, settings, { monthKey: mk, historyCharges: unit.charges, power: workPowerById(unit.workId, mk), matrizCostItems, workId: unit.workId, workName: unit.workName, stationName: unit.stationName || unit.station, courtesyConfig: stationAvailabilityFor(unit.workId, unit.stationName || unit.station, unit.workName) });
       return { monthKey: mk, result };
     });
     const total = monthly.reduce((acc, { result }) => {
@@ -4140,8 +4192,8 @@ function filterChargesByWindow(charges, window) {
 }
 
 function occByInterval(charges, powerOverride, boundsOverride, context = {}) {
-  const power = Number.isFinite(Number(powerOverride)) ? Number(powerOverride) : getPower();
   const bounds = boundsOverride || periodBounds(charges);
+  const power = Number.isFinite(Number(powerOverride)) ? Number(powerOverride) : workPowerById(String(context.workId || currentWorkId || ''), bounds);
   if (!bounds.start || !bounds.end || !bounds.hours) return { pct: 0, hours: 0, maxKWh: 0, energy: 0, power };
   const workId = String(context.workId || currentWorkId || '');
   const workName = context.workName || currentWorkName;
@@ -4213,7 +4265,7 @@ function courtesyFinanceBreakdown(charges = [], config = {}, energyCostPerKWh = 
 
 function occByFullMonth(charges, mk) {
   const [y, m] = mk.split('-');
-  const power  = getPower();
+  const power  = workPowerById(currentWorkId, mk);
   const start = monthStartDate(mk);
   const end = new Date(Number(y), Number(m), 1, 0, 0, 0);
   const stationName = currentStationReportName || canonicalStationNameForWork(
@@ -5254,13 +5306,18 @@ function stationOccupancyForMonths(row, monthKeys, mode = 'mtd') {
   const operationStart = operationStartForCharges(row.charges, row);
   let energy = 0;
   let hours = 0;
+  let datedMaxKWh = 0;
+  const dated = workPowerHistory(row.workId).length > 0;
   (monthKeys || []).forEach(monthKeyValue => {
     const monthCharges = row.charges.filter(charge => chargeMonthKey(charge) === monthKeyValue);
     const window = periodWindow(monthCharges, monthKeyValue, mode, operationStart);
     energy += monthCharges.reduce((sum, charge) => sum + charge.energyKWh, 0);
-    hours += stationAvailableHours(config, window.start, window.end);
+    const monthHours = stationAvailableHours(config, window.start, window.end);
+    hours += monthHours;
+    // Potência do período de cada mês (troca de carregador no meio do histórico).
+    if (dated) datedMaxKWh += Number(workPowerById(row.workId, window) || 0) * monthHours;
   });
-  const maxKWh = power * hours;
+  const maxKWh = dated ? datedMaxKWh : power * hours;
   return { config, power, energy, hours, maxKWh, operationStart, pct: maxKWh > 0 ? energy / maxKWh * 100 : 0 };
 }
 
@@ -6116,7 +6173,7 @@ function aggregateUbyFinanceRow(row = {}, sourceMonths = [], isMonthView = true,
     const settings = financeSettingsForUbyRow(row, mk);
     const matrizCostItems = matrizCostItemsForRow(row, mk);
     matrizCostTotal += matrizCostItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems, workId: row.workId, workName: row.workName, stationName: row.stationName || row.station, courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
+    return financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId, mk), matrizCostItems, workId: row.workId, workName: row.workName, stationName: row.stationName || row.station, courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
   });
   const totals = results.reduce((acc, result) => {
     ['revenue','extraRevenue','marketingRevenue','totalRevenue','energy','commercialEnergy','courtesyCharges','courtesyEnergy','courtesyEnergyCost','courtesyCostExcluded','energyCost','extraCosts','taxes','matrizTaxCost','areaParticipation','management','platform','ubyRoyalty','totalOperatingCost','operationNet','plannedTotalCost','ubyNet','saRetention','investorDistribution','ubyRetained'].forEach(key => {
@@ -6154,7 +6211,7 @@ function buildUbyMonthlySeries(includedRows = [], sourceMonths = []) {
       const settings = financeSettingsForUbyRow(row, mk);
       const matrizCostItems = matrizCostItemsForRow(row, mk);
       bucket.matrizCost += matrizCostItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-      const result = financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems, workId: row.workId, workName: row.workName, stationName: row.stationName || row.station, courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
+      const result = financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId, mk), matrizCostItems, workId: row.workId, workName: row.workName, stationName: row.stationName || row.station, courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
       bucket.revenue += Number(result.revenue || 0);
       bucket.totalOperatingCost += Number(result.totalOperatingCost || 0);
       bucket.operationNet += Number(result.operationNet || 0);
@@ -7082,6 +7139,7 @@ window.UBY_NUCLEO = {
   workOptionsSignature,
   workOptionsUncached,
   workPowerById,
+  workPowerHistory,
   workSelectorDataScore,
   workSelectorKinds,
   workSelectorLabel,

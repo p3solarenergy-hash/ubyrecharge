@@ -415,7 +415,7 @@
           if (!monthCharges.length) return;
           const window = periodWindow(monthCharges, mk, "mtd", operationStart);
           if (rows === included) windows.push(window);
-          max += occByInterval(monthCharges, workPowerById(row.workId), window, row).maxKWh;
+          max += occByInterval(monthCharges, workPowerById(row.workId, window), window, row).maxKWh;
         });
       });
       return max;
@@ -598,7 +598,7 @@
       const prev = summarizeUbyChargerRow(row, (row.charges || []).filter(c => inRange(c, prevStart, prevEnd)));
       const clean = cleanOperationStats(cur.charges);
       const model = row.included ? normalizeOperationModel(financeSettingsForUbyRow(row, monthKey).operationModel) : "";
-      return { power: Number(workPowerById(row.workId) || 0), workId: row.workId, workName: row.workName, station: row.station, kind: row.kind, included: row.included, model,
+      return { power: Number(workPowerById(row.workId, { start, end }) || 0), workId: row.workId, workName: row.workName, station: row.station, kind: row.kind, included: row.included, model,
         revenue: cur.revenue, energy: cur.energy, sessions: cur.count, valid: clean.executed.length, failures: clean.failed.length, clients: cur.clients,
         prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count };
     }).filter(u => u.sessions || u.prevSessions);
@@ -682,7 +682,7 @@
       const cur = summarizeUbyChargerRow(row, today), prev = summarizeUbyChargerRow(row, before);
       const clean = cleanOperationStats(today);
       const config = stationAvailabilityFor(row.workId, station, row.workName);
-      const power = Number(workPowerById(row.workId) || 0);
+      const power = Number(workPowerById(row.workId, { start: dayStart, end: capEnd }) || 0);
       const hoursAvail = stationAvailableHours(config, dayStart, capEnd);
       const prevHours = stationAvailableHours(config, prevStart, dayStart);
       const model = row.included ? normalizeOperationModel(financeSettingsForUbyRow(row, monthKey).operationModel) : "";
@@ -1752,14 +1752,15 @@
       });
     });
     const bounds = windows.length ? { start: new Date(Math.min(...windows.map(w => w.start))), end: new Date(Math.max(...windows.map(w => w.end))) } : null;
-    const power = kind === "station" ? Number(workPowerById(scope.workId) || 0)
-      : rows.filter(r => (r.charges || []).some(inMonth)).reduce((s, r) => s + Number(workPowerById(r.workId) || 0), 0);
+    const powerWhen = bounds || mk || undefined;
+    const power = kind === "station" ? Number(workPowerById(scope.workId, powerWhen) || 0)
+      : rows.filter(r => (r.charges || []).some(inMonth)).reduce((s, r) => s + Number(workPowerById(r.workId, powerWhen) || 0), 0);
 
     // Capacidade do intervalo: soma, carregador a carregador, potência × horas disponíveis
     // pelo horário de cada um (mesma regra do Resultado do dia). Antes usava a potência
     // somada × o horário de um só carregador, e a ocupação do mesmo dia saía diferente.
     const activeRows = rows.filter(r => (r.charges || []).some(inMonth)).map(r => ({
-      power: Number(workPowerById(r.workId) || 0), config: stationAvailabilityFor(r.workId, r.stationName || r.station, r.workName) }));
+      power: Number(workPowerById(r.workId, powerWhen) || 0), config: stationAvailabilityFor(r.workId, r.stationName || r.station, r.workName) }));
     const capacity = (a, b) => b > a ? activeRows.reduce((s, r) => s + r.power * stationAvailableHours(r.config, new Date(a), new Date(b)), 0) : 0;
     const dayCapacity = ref => {
       if (!bounds) return 0;
@@ -1886,7 +1887,7 @@
     const monthCharges = (row.charges || []).filter(c => chargeMonthKey(c) === mk);
     const settings = financeSettingsForUbyRow(row, mk);
     const matrizCostItems = matrizCostItemsForRow(row, mk);
-    const result = financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId), matrizCostItems,
+    const result = financeForCharges(monthCharges, settings, { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId, mk), matrizCostItems,
       workId: row.workId, workName: row.workName, stationName: row.stationName || row.station,
       courtesyConfig: stationAvailabilityFor(row.workId, row.stationName || row.station, row.workName) });
     return { result, settings, matrizCostItems };
@@ -2167,7 +2168,7 @@
     const weights = active.map(e => {
       if (item.allocation === "power" && fixes.powerPerCharger) {
         const sameLocal = rows.filter(r => String(r.workId) === String(e.row.workId)).length || 1;
-        return Math.max(0, n0(workPowerById(e.row.workId))) / sameLocal;
+        return Math.max(0, n0(workPowerById(e.row.workId, mk))) / sameLocal;
       }
       return matrizWeight(e.row, e.target, item, mk);
     });
@@ -2303,7 +2304,7 @@
     if (fixes.centralTax && ["uby", "hybrid"].includes(cfg.operationModel)) cfg.taxRatePct = 0;
     const stationName = row.stationName || row.station;
     const courtesy = courtesyFinanceBreakdown(charges, stationAvailabilityFor(row.workId, stationName, row.workName), cfg.energyCostPerKWh);
-    const planning = financePlanningContext(charges, mk, cfg, row.charges || [], workPowerById(row.workId));
+    const planning = financePlanningContext(charges, mk, cfg, row.charges || [], workPowerById(row.workId, mk));
     // Valor do repasse ao local ajustado à mão em Parâmetros · Área (substitui o calculado no resultado);
     // saldo levado de um mês para o seguinte ou zerado também entra aqui.
     const areaCfg = fv2AreaConfig(row);
@@ -2403,7 +2404,7 @@
     included.forEach(row => FV2.months.forEach(mk => {
       const charges = FV2.rowMonths.get(row.fv2Id)?.get(mk) || [];
       const stationName = row.stationName || row.station;
-      legacy.set(`${row.fv2Id}|${mk}`, financeForCharges(charges, financeSettingsForUbyRow(row, mk), { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId),
+      legacy.set(`${row.fv2Id}|${mk}`, financeForCharges(charges, financeSettingsForUbyRow(row, mk), { monthKey: mk, historyCharges: row.charges || [], power: workPowerById(row.workId, mk),
         matrizCostItems: matrizCostItemsForRow(row, mk), workId: row.workId, workName: row.workName, stationName, courtesyConfig: stationAvailabilityFor(row.workId, stationName, row.workName) }));
     }));
     const legacyMs = performance.now() - t0;
@@ -2785,7 +2786,8 @@
       const atSource = areaAtSourceIn(cfg, mk);
       let occHours = 0;
       try { occHours = occAvail ? stationAvailableHours(occAvail, first, new Date(Math.min(new Date(y, m, 1).getTime(), Date.now()))) : 0; } catch (_) {}
-      const occupancy = occPower > 0 && occHours > 0 ? n0(r.energy) / (occPower * occHours) * 100 : null;
+      const occPowerMonth = n0(workPowerById(row.workId, mk)) || occPower;
+      const occupancy = occPowerMonth > 0 && occHours > 0 ? n0(r.energy) / (occPowerMonth * occHours) * 100 : null;
       // Uso do ponto (opcional na prestação de contas): recargas executadas, tempo médio, clientes e ocupação por
       // tempo = horas carregando somadas de todos os carregadores ÷ (nº de carregadores × horas disponíveis).
       const exec = charges.filter(c => isExecutedCharge(c) && c.startDate instanceof Date && !Number.isNaN(c.startDate.getTime()));
@@ -3107,7 +3109,7 @@
     const now = lastImported ? new Date(Math.min(clock.getTime(), new Date(lastImported.getFullYear(), lastImported.getMonth(), lastImported.getDate() + 1).getTime())) : clock;
     const live = !!mk && isCurrentMonthKey(mk);
     const inMk = c => okD(c.startDate) && chargeMonthKey(c) === mk;
-    const memberInfo = members.map(m => ({ kind: m.kind, power: n0(workPowerById(m.workId)), config: stationAvailabilityFor(m.workId, m.station, m.workName),
+    const memberInfo = members.map(m => ({ kind: m.kind, power: n0(workPowerById(m.workId, mk || undefined)), config: stationAvailabilityFor(m.workId, m.station, m.workName),
       first: m.charges.filter(c => okD(c.startDate)).reduce((a, c) => !a || c.startDate < a ? c.startDate : a, null) }));
     const sumOps = list => { const v = list.filter(isExecutedCharge); return { revenue: sumBy(list, c => c.revenue), energy: sumBy(list, c => c.energyKWh), sessions: v.length,
       clients: new Set(v.map(clientKeyFromCharge).filter(Boolean)).size }; };
