@@ -35,7 +35,8 @@
       </div>
 
       <div class="grid g5" style="margin-bottom:16px">
-        ${(() => { const cap = rows.reduce((s, r) => s + (Number(r.power) || 0) * (Number(r.hours) || 0), 0); const used = rows.reduce((s, r) => s + (Number(r.occupancy) || 0) / 100 * (Number(r.power) || 0) * (Number(r.hours) || 0), 0);
+        ${(() => { const capOf = r => Number.isFinite(Number(r.maxKWh)) ? Number(r.maxKWh) : (Number(r.power) || 0) * (Number(r.hours) || 0);
+          const cap = rows.reduce((s, r) => s + capOf(r), 0); const used = rows.reduce((s, r) => s + (Number(r.occupancy) || 0) / 100 * capOf(r), 0);
           return kpi("Ocupação média", cap > 0 ? fmt.pct(used / cap * 100) : "—", "ponderada pela potência e horário de cada estação", "", "lead big"); })()}
         ${kpi("Faturamento", fmt.brl(tot.revenue), `${rows.length} estação(ões) no filtro`, "", "lead big")}
         ${kpi("Recargas", fmt.int(tot.sessions), "todas as tentativas registradas")}
@@ -220,7 +221,7 @@
         <section class="section"><div class="section-head"><div><p class="kicker">Histórico</p><h2>Mês a mês</h2></div></div>
           <div class="table-wrap" style="max-height:260px"><table><thead><tr><th>Mês</th><th class="num">Faturamento</th><th class="num">Recargas</th><th class="num">Energia</th></tr></thead>
           <tbody>${d.monthly.slice().reverse().map(x => `<tr><td>${esc(x.label)}</td><td class="num">${fmt.brl(x.revenue)}</td><td class="num">${fmt.int(x.sessions)}</td><td class="num">${fmt.kwh(x.energy)}</td></tr>`).join("")}</tbody></table></div>
-          ${d.connectors.length ? `<h3 style="margin:14px 0 8px">Conectores DC</h3><div class="list">${d.connectors.map(c => `<div class="list-row"><span>${esc(c.label)} <small>· ${c.sessions} sessões · ${fmt.kwh0(c.energy)}${c.failures ? ` · ${c.failures} falhas` : ""}</small></span><strong>${fmt.brl(c.revenue)}</strong></div>`).join("")}</div>` : ""}
+          ${d.connectors.length ? `<h3 style="margin:14px 0 8px">Conectores DC</h3><div class="list">${d.connectors.map(c => `<div class="list-row"><span>${esc(c.label)} <small>· ${c.sessions} sessões · ${fmt.kwh0(c.energy)}${c.failures ? ` · ${c.failures} falhas` : ""}${(c.platforms || []).length > 1 ? ` · ${c.platforms.map(p => `${esc(p.platform)} ${p.sessions}`).join(" · ")}` : ""}</small>${(c.names || []).length > 1 ? `<small style="display:block;color:var(--uby-muted)" title="${esc(c.names.join(" | "))}">mesma pistola com ${c.names.length} nomes nas planilhas</small>` : ""}</span><strong>${fmt.brl(c.revenue)}</strong></div>`).join("")}</div>` : ""}
         </section>
       </div>
 

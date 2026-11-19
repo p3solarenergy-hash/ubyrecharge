@@ -126,7 +126,8 @@
     if (explicitScope) {
       const hash = String(location.hash || "");
       const hit = SCOPE_BY_ROUTE.find(([re, sc]) => sc === explicitScope && re.test(hash));
-      return hit ? explicitScope : null;
+      // Importação em segundo plano: a licença da própria tela vale fora da rota (ver segundoPlano).
+      return hit || licencas.get(explicitScope.name) ? explicitScope : null;
     }
     if (!GRAVACAO_PELA_ROTA) return null;
     try {
@@ -1567,12 +1568,34 @@
   // Grava com o escopo da tela (ex.: "parametros"). Recusa se a tela aberta não for a dona do escopo.
   const SCOPES_BY_NAME = { importacao: IMPORT_SCOPE, parametros: PARAMS_SCOPE, obras: OBRAS_SCOPE, backups: BACKUPS_SCOPE, clube: CLUB_SCOPE };
   let gravacaoFila = Promise.resolve();
+  // Licença de segundo plano (19/11/2026): a importação começada NA tela de importação continua
+  // gravando quando o usuário vai para outra tela. Só a própria tela pode pedir a licença, e ela
+  // vale até a importação terminar (fim()).
+  const licencas = new Map();
+  function segundoPlano(nome) {
+    const scope = SCOPES_BY_NAME[nome];
+    if (!scope) throw new Error(`Escopo de gravação desconhecido: ${nome}`);
+    const hash = String(location.hash || "");
+    if (!SCOPE_BY_ROUTE.some(([re, sc]) => sc === scope && re.test(hash))) throw new Error(`Gravação de ${nome} só pela própria tela.`);
+    licencas.set(scope.name, (licencas.get(scope.name) || 0) + 1);
+    let ativa = true;
+    return () => { if (!ativa) return; ativa = false; const n = (licencas.get(scope.name) || 1) - 1; if (n > 0) licencas.set(scope.name, n); else licencas.delete(scope.name); };
+  }
+  // Fila do motor: o motor é um só; importação e edição trocam a "obra aberta" e esperam o banco no
+  // meio. Com a importação em segundo plano, as duas não podem se intercalar (gravaria na obra errada).
+  let motorFila = Promise.resolve();
+  function exclusivoMotor(fn) {
+    const p = motorFila.then(() => fn(), () => fn());
+    motorFila = p.catch(() => {});
+    return p;
+  }
+  window.UBY_MOTOR_EXCLUSIVO = exclusivoMotor;
   function comGravacao(nome, fn) {
     const scope = SCOPES_BY_NAME[nome];
     if (!scope) return Promise.reject(new Error(`Escopo de gravação desconhecido: ${nome}`));
     const run = async () => {
       const hash = String(location.hash || "");
-      if (!SCOPE_BY_ROUTE.some(([re, sc]) => sc === scope && re.test(hash))) throw new Error(`Gravação de ${nome} só pela própria tela. Nada foi gravado.`);
+      if (!licencas.get(scope.name) && !SCOPE_BY_ROUTE.some(([re, sc]) => sc === scope && re.test(hash))) throw new Error(`Gravação de ${nome} só pela própria tela. Nada foi gravado.`);
       explicitScope = scope;
       // Regras antigas conferem a marca antes de abrir a conexão (ex.: requireWrite das obras).
       window.UBY_WRITE_SCOPE = scope.name; window.UBY_READ_ONLY = false;
@@ -1586,6 +1609,7 @@
 
   window.UBY_SUPABASE = {
     comGravacao,
+    segundoPlano,
     listDocuments, documentHtml, publishDocument, revokeDocument, listMatrixHistory, restoreMatrixVersion, listPlatformSnapshots, platformSnapshot,
     _merge3: (base, local, cloud) => { const conflicts = []; const merged = merge3(base, local, cloud, "", conflicts); return { merged, conflicts }; },
     configured,

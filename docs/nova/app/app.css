@@ -768,3 +768,25 @@ html[data-theme="night"] .sx-panel{background:#0F1F38}
 .bq-paid{grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:12.5px;flex-wrap:wrap}
 .bq-text{white-space:pre-wrap;font-size:11px;max-height:220px;overflow:auto;background:var(--uby-surface-soft);padding:8px;border-radius:8px}
 @media (max-width:720px){.bq-card{grid-template-columns:minmax(0,1fr)}.bq-prev{flex-direction:row}.bq-prev img,.bq-pdf{width:70px;height:90px}.bq-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Importação em segundo plano (toast com progresso) — 19/11/2026 */
+.imp-toast{position:fixed;right:16px;bottom:calc(16px + var(--tabbar-h, 0px) + env(safe-area-inset-bottom, 0px));z-index:9000;width:min(360px,calc(100vw - 32px));background:var(--uby-surface);color:var(--uby-ink);border:1px solid var(--uby-line);border-left:4px solid var(--uby-blue);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:12px 14px;display:none;gap:8px}
+.imp-toast.show{display:grid;animation:impToastIn .22s ease-out}
+.imp-toast.ok{border-left-color:var(--uby-green)}
+.imp-toast.bad{border-left-color:var(--uby-red)}
+.imp-toast-head{display:flex;align-items:flex-start;gap:10px}
+.imp-toast-icon{flex:0 0 22px;height:22px;display:grid;place-items:center;font-weight:800;border-radius:50%}
+.imp-toast-icon .spinner{width:18px;height:18px;margin:0;border-width:2px}
+.imp-toast.ok .imp-toast-icon{background:var(--uby-green-soft);color:var(--uby-green)}
+.imp-toast.bad .imp-toast-icon{background:var(--uby-red-soft);color:var(--uby-red)}
+.imp-toast-text{flex:1;min-width:0;display:grid;gap:2px}
+.imp-toast-text strong{font-size:13.5px}
+.imp-toast-text small,.imp-toast-foot{color:var(--uby-muted);font-size:12px;overflow-wrap:anywhere}
+.imp-toast-x{border:0;background:none;color:var(--uby-muted);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+.imp-toast-bar{height:6px;border-radius:99px;background:var(--uby-surface-soft);overflow:hidden}
+.imp-toast-bar i{display:block;height:100%;background:var(--uby-blue);border-radius:99px;transition:width .3s ease}
+.imp-toast-bar.indet i{animation:impToastIndet 1.2s ease-in-out infinite}
+.imp-toast-go{justify-self:start;border:1px solid var(--uby-line-strong);background:var(--uby-surface-soft);color:var(--uby-ink);border-radius:8px;padding:5px 10px;font-weight:700;font-size:12px;cursor:pointer}
+@keyframes impToastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes impToastIndet{0%{margin-left:-35%}100%{margin-left:100%}}
+@media (prefers-reduced-motion:reduce){.imp-toast.show,.imp-toast-bar.indet i{animation:none}}

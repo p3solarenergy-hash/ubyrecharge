@@ -325,7 +325,7 @@
       ["showAvgTime", "Tempo médio por recarga", x => nil(x.avgMinutes) ? "—" : hm(x.avgMinutes / 60), x => `${hm(x.busyHours)} carregando no período`],
       ["showClients", "Clientes", x => String(n(x.clients)), x => `${n(x.clientsToDate)} desde o início`],
       ["showOccTime", "Ocupação por tempo", x => nil(x.timeOccupancy) ? "—" : fmt.pct1(x.timeOccupancy), x => `${hm(x.busyHours)} carregando de ${hm(n(x.occPoints) * n(x.occHours))} possíveis (${n(x.occPoints)} carregador${n(x.occPoints) > 1 ? "es" : ""})`],
-      ["showOccupancy", "Ocupação real (energia)", x => nil(x.occupancy) ? "—" : fmt.pct1(x.occupancy), x => `${fmt.kwh(x.energy)} de ${fmt.kwh(n(x.occPower) * n(x.occHours))} possíveis`]
+      ["showOccupancy", "Ocupação real (energia)", x => nil(x.occupancy) ? "—" : fmt.pct1(x.occupancy), x => `${fmt.kwh(x.energy)} de ${fmt.kwh(n(x.occCapKWh) || n(x.occPower) * n(x.occHours))} possíveis`]
     ].filter(([k]) => cf[k]);
     return `<div class="sub" style="margin-bottom:10px"><strong>UBY RECHARGE LTDA</strong> · CNPJ 66.737.561/0001-86 · Londrina - PR</div>
       ${header("Prestação de contas do ponto", `${esc(a.workName)} · parceiro da área: <strong>${esc(a.config.payee)}</strong><br>Período do relatório: <strong>${d(m.periodStart)} a ${d(m.periodEnd)}</strong> · competência ${esc(m.label)}`, m.paidAt ? "pago" : "aprovado")}

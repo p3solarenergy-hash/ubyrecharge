@@ -162,8 +162,11 @@
     });
   }
 
+  // Fila única do motor: a importação pode seguir em segundo plano enquanto outra tela edita (dados.js).
+  const fila = fn => (window.UBY_MOTOR_EXCLUSIVO ? window.UBY_MOTOR_EXCLUSIVO(fn) : fn());
   window.UBY_IMPORTACAO = {
-    obras, abrir, atual, estado, limparAviso, arquivos, recargas,
-    importar, desfazer, infoDesfazer, recargasDoMes, excluirMes, clientes, gravar
+    obras, abrir: id => fila(() => abrir(id)), atual, estado, limparAviso, arquivos, recargas,
+    importar: (files, opts) => fila(() => importar(files, opts)), desfazer: () => fila(() => desfazer()), infoDesfazer, recargasDoMes,
+    excluirMes: mk => fila(() => excluirMes(mk)), clientes, gravar
   };
 })();

@@ -390,13 +390,16 @@
   // Gravação de metadados de uma obra (faturas, repasse à área…).
   const salvarMetadados = (workId, payload) => gravar(() => window.UBY_SUPABASE.saveRechargeMetadata(workId, payload));
 
+  // Trechos que trocam a "obra aberta" do motor e esperam o banco entram na fila única do motor
+  // (a importação pode estar rodando em segundo plano — ver UBY_MOTOR_EXCLUSIVO em dados.js).
+  const fila = fn => (window.UBY_MOTOR_EXCLUSIVO ? window.UBY_MOTOR_EXCLUSIVO(fn) : fn());
   window.UBY_EDICAO = {
-    abrir, atual, meses,
+    abrir: (workId, station) => fila(() => abrir(workId, station)), atual, meses,
     formulario: (mk, edits, rules) => noCarregador(() => formulario(mk, edits, rules)),
-    salvarCompetencia: (mk, edits, rules, inherited) => noCarregador(() => salvarCompetencia(mk, edits, rules, inherited)),
+    salvarCompetencia: (mk, edits, rules, inherited) => fila(() => noCarregador(() => salvarCompetencia(mk, edits, rules, inherited))),
     camposDe, configDe,
     salvarMatriz, salvarPolitica, salvarCustoMatriz, desativarCusto, excluirCusto,
     alvosPagamento, salvarPagamento, situacaoPagamento,
-    salvarHorario, salvarPotencia, operacaoUby, salvarMetadados, esperarMatriz, gravar
+    salvarHorario: (...a) => fila(() => salvarHorario(...a)), salvarPotencia: (...a) => fila(() => salvarPotencia(...a)), operacaoUby, salvarMetadados, esperarMatriz, gravar
   };
 })();

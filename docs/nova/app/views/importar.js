@@ -75,6 +75,64 @@
 
   function log(msg, cls = "neutral") { ui.log.unshift({ at: new Date().toISOString(), msg, cls }); ui.log = ui.log.slice(0, 20); }
 
+  // ---- Importação em segundo plano (19/11/2026) ---------------------------------
+  // "Quando eu saio da página, parece que ela não continua": a importação começada aqui segue
+  // gravando em qualquer tela (licença da própria tela em UBY_SUPABASE.segundoPlano) e o
+  // andamento aparece num aviso flutuante (toast) no canto da tela, com barra de progresso.
+  const onRoute = () => location.hash.startsWith("#/importar");
+  const job = { running: false, title: "", step: "", total: 0, done: 0, release: null, hideTimer: null };
+  function toastEl() {
+    let el = document.getElementById("impToast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "impToast"; el.className = "imp-toast"; el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
+      document.body.appendChild(el);
+      el.addEventListener("click", e => {
+        if (e.target.closest("[data-toast-close]")) { el.classList.remove("show"); return; }
+        if (e.target.closest("[data-toast-go]")) { el.classList.remove("show"); if (!onRoute()) location.hash = "#/importar"; }
+      });
+    }
+    return el;
+  }
+  function paintToast(final = null) {
+    const el = toastEl();
+    clearTimeout(job.hideTimer);
+    const pct = job.total > 0 ? Math.min(100, Math.round(job.done / job.total * 100)) : null;
+    const state = final ? (final.bad ? "bad" : "ok") : "run";
+    el.className = `imp-toast show ${state}`;
+    el.innerHTML = `<div class="imp-toast-head">
+        <span class="imp-toast-icon" aria-hidden="true">${state === "run" ? `<span class="spinner"></span>` : state === "ok" ? "✓" : "!"}</span>
+        <div class="imp-toast-text"><strong>${esc(final ? final.title : job.title)}</strong><small>${esc(final ? final.detail : job.step)}</small></div>
+        ${final ? `<button class="imp-toast-x" type="button" data-toast-close aria-label="Fechar aviso">×</button>` : ""}
+      </div>
+      ${final ? "" : `<div class="imp-toast-bar${pct === null ? " indet" : ""}"><i style="width:${pct === null ? 35 : Math.max(pct, 4)}%"></i></div>
+      <small class="imp-toast-foot">${job.total > 0 ? `${job.done} de ${job.total} · ` : ""}pode usar outras telas enquanto importa</small>`}
+      ${onRoute() ? "" : `<button class="imp-toast-go" type="button" data-toast-go>Ver importação</button>`}`;
+    if (final && !final.bad) job.hideTimer = setTimeout(() => el.classList.remove("show"), 9000);
+  }
+  function jobStart(title, total = 0) {
+    job.running = true; job.title = title; job.total = total; job.done = 0; job.step = "Preparando…";
+    try { job.release = window.UBY_SUPABASE?.segundoPlano?.("importacao") || null; } catch (_) { job.release = null; }
+    paintToast();
+  }
+  function jobStep(step, done = job.done) { job.step = step; job.done = done; if (job.running) paintToast(); }
+  function jobEnd(title, detail, bad = false) {
+    job.running = false;
+    try { job.release?.(); } catch (_) {}
+    job.release = null;
+    paintToast({ title, detail, bad });
+  }
+  // Fechar a aba no meio da gravação perderia a importação: o navegador pergunta antes.
+  window.addEventListener("beforeunload", e => { if (job.running) { e.preventDefault(); e.returnValue = ""; } });
+  // O ↻ recarrega o motor inteiro — no meio de uma gravação isso perderia o que está sendo importado.
+  document.addEventListener("click", e => {
+    if (!job.running || !e.target.closest?.("#refreshButton")) return;
+    e.preventDefault(); e.stopPropagation();
+    job.step = "Aguarde terminar para atualizar os painéis (eles atualizam sozinhos no fim)."; paintToast();
+  }, true);
+  // Trocar de tela: o toast ganha/perde o botão "Ver importação".
+  window.addEventListener("hashchange", () => { if (job.running) paintToast(); });
+
   function paintStatus(target, w) {
     const box = target.querySelector("#impStatus");
     if (!box || !w) return;
@@ -383,6 +441,8 @@
   }
 
   function draw(target, w, works) {
+    // Em segundo plano a tela de importação não está aberta: não desenha por cima de outra tela.
+    if (!onRoute()) return;
     const list = files(w);
     const est = I().estado();
     const undoVisible = est.undo, monthVisible = est.hasData;
@@ -448,25 +508,33 @@
       if (!arr.length) { $("#impStatus").innerHTML = `<div class="note">Arquivo não reconhecido. Envie .xlsx, .xls ou .csv.</div>`; return; }
       if (!ui.month) { $("#impStatus").innerHTML = `<div class="note">Escolha o mês da planilha.</div>`; return; }
       if (ui.mode === "replace" && !confirm(`Substituir o mês ${ui.month} completo desta obra pela planilha "${arr[0].name}"?\n\nO mês atual fica salvo no histórico de backups.`)) return;
+      if (job.running) { $("#impStatus").innerHTML = `<div class="note">Já há uma importação em andamento (veja o aviso no canto da tela). Espere terminar.</div>`; return; }
       $("#impDrop").style.opacity = ".5";
-      $("#impStatus").innerHTML = `<div class="note">Importando ${esc(arr.map(f => f.name).join(", "))}…</div>`;
+      $("#impStatus").innerHTML = `<div class="note">Importando ${esc(arr.map(f => f.name).join(", "))}… Pode ir para outras telas: a importação continua e o aviso no canto mostra quando terminar.</div>`;
+      const workLabel = works.find(x => x.id === ui.work)?.label || ui.work, jobMonth = ui.month;
+      jobStart(`Importando ${arr.length === 1 ? "planilha" : `${arr.length} planilhas`}`);
+      jobStep(`${workLabel} · ${jobMonth}`);
+      let jobMsg = "", jobBad = true;
       try {
         I().limparAviso();
         await I().importar(arr, { month: ui.month, mode: ui.mode });
         const finished = true;
         const { msg, bad } = finished ? importOutcome(w) : { msg: "A gravação ainda não terminou após 5 minutos. Confira a base antes de importar de novo.", bad: true };
         log(`${arr.map(f => f.name).join(", ")} → ${msg}`, bad ? "bad" : "ok");
+        jobMsg = msg; jobBad = bad;
         if (!bad) {
+          jobEnd("Importação concluída", `${workLabel} · ${jobMonth}. Painéis atualizados.`);
           // Gravação concluída no Supabase: atualiza os painéis já, sem precisar de F5.
           refreshPanels();
-          if (ui.returnTo) {
+          if (ui.returnTo && onRoute()) {
             $("#impStatus").innerHTML = `<div class="note">Importação concluída: ${esc(msg)}<br>Painéis atualizando · voltando para ${esc(ui.returnLabel || "a estação")}…</div>`;
             UBY.go(ui.returnTo);
             return;
           }
           log("Painéis atualizados com a planilha nova (Comando, Unidades, Financeiro…).", "ok");
         }
-      } catch (err) { log(`${arr.map(f => f.name).join(", ")} → ${err.message}`, "bad"); }
+      } catch (err) { jobMsg = err.message; log(`${arr.map(f => f.name).join(", ")} → ${err.message}`, "bad"); }
+      finally { if (job.running) jobEnd(jobBad ? "Importação com problema" : "Importação concluída", jobBad ? `${workLabel} · ${jobMsg}`.slice(0, 220) : `${workLabel} · ${jobMonth}.`, jobBad); }
       draw(target, w, works);
     };
     const drop = $("#impDrop");
@@ -593,11 +661,14 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
       if (!todo.length) { if (a.groups.length) await logRun(w, robot); publishState(); return; }
       const obras = new Set(todo.map(g => g.workId)).size;
       if (!robot && !confirm(`Importar ${todo.length} planilha(s) (${[...new Set(todo.map(g => g.platform))].join(" e ")}) em ${obras} obra(s), no modo "Consolidar no mês"?\n\nRecargas que já estão na base são reconhecidas e não duplicam. Cada importação pode ser desfeita no histórico de backups.`)) return;
+      if (job.running) { a.errors = ["Já há uma importação em andamento (veja o aviso no canto da tela). Espere terminar."]; draw(target, w, works); return; }
       a.running = true;
-      let okCount = 0;
+      let okCount = 0, idx = 0;
+      jobStart(`Importando ${todo.length} ${todo.length === 1 ? "planilha" : "planilhas"}`, todo.length);
       for (const g of todo) {
-        if (!location.hash.startsWith("#/importar")) break;
+        // Segue mesmo fora da tela de importação (segundo plano); o toast mostra o andamento.
         g.status = "importando"; draw(target, w, works);
+        jobStep(`${g.platform} · ${g.local} · ${g.month}`, idx++);
         try {
           await selectWork(w, g.workId);
           ui.work = g.workId;
@@ -632,10 +703,14 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
         } catch (err) { g.status = "erro"; g.msg = err.message; log(`${g.platform} ${g.local} ${g.month} → ${err.message}`, "bad"); }
       }
       a.running = false;
+      const problems = todo.filter(g => g.status === "erro").length, same = todo.filter(g => g.status === "igual").length;
+      job.done = todo.length;
+      jobEnd(problems ? `Importação terminou com ${problems} problema(s)` : "Importação concluída",
+        `${okCount} gravada(s)${same ? `, ${same} já estava(m) na base` : ""}${problems ? `, ${problems} com problema — veja em Importar` : ""}.`, problems > 0);
       await logRun(w, robot);
       publishState();
       if (okCount) { refreshPanels(); log(`Importação automática: ${okCount} de ${todo.length} planilha(s) gravadas. Painéis atualizados.`, "ok"); }
-      if (location.hash.startsWith("#/importar")) draw(target, w, works);
+      draw(target, w, works);
     };
   }
 

@@ -519,6 +519,22 @@ function workPowerById(workId, when) {
   return Number.isFinite(avg) && avg > 0 ? Math.round(avg * 1000) / 1000 : current;
 }
 
+// Capacidade (kWh) = potência × horas disponíveis, trecho a trecho: com troca de potência no meio
+// do período, cada trecho usa a potência que valia nele (usuário, 19/11/2026: "o 75 não pode jogar
+// a ocupação média lá para baixo do que era 60 até então"). Sem histórico: power × horas, como sempre.
+function capacityKWhFor(workId, config, start, end, power) {
+  const a = start instanceof Date ? start : new Date(start), b = end instanceof Date ? end : new Date(end);
+  const history = workPowerHistory(String(workId || ''));
+  if (!history.length || !(b > a)) return Number(power || 0) * stationAvailableHours(config, a, b);
+  const cuts = history.map(e => powerChangeDate(e.from)).filter(d => d > a && d < b);
+  const points = [a, ...cuts, b];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    total += Number(workPowerById(String(workId), points[i]) || 0) * stationAvailableHours(config, points[i], points[i + 1]);
+  }
+  return total;
+}
+
 function selectorChargesForWork(workId = '') {
   const record = allRechargeRecords[String(workId || '')] || localRecord(workId) || {};
   return Array.isArray(record?.charges) ? record.charges.map(hydrateCharge) : [];
@@ -4204,7 +4220,7 @@ function occByInterval(charges, powerOverride, boundsOverride, context = {}) {
   );
   const config = stationAvailabilityFor(workId, stationName, workName);
   const hours = stationAvailableHours(config, bounds.start, bounds.end);
-  const maxKWh = power * hours;
+  const maxKWh = capacityKWhFor(workId, config, bounds.start, bounds.end, power);
   const energy = charges.reduce((s, c) => s + c.energyKWh, 0);
   return { pct: maxKWh > 0 ? energy / maxKWh * 100 : 0, hours, maxKWh, energy, power };
 }
@@ -4273,8 +4289,9 @@ function occByFullMonth(charges, mk) {
     charges[0]?.station || currentWorkName,
     currentWorkName
   );
-  const hours = stationAvailableHours(stationAvailabilityFor(currentWorkId, stationName, currentWorkName), start, end);
-  const maxKWh = power * hours;
+  const fullConfig = stationAvailabilityFor(currentWorkId, stationName, currentWorkName);
+  const hours = stationAvailableHours(fullConfig, start, end);
+  const maxKWh = capacityKWhFor(currentWorkId, fullConfig, start, end, power);
   const energy = charges.reduce((s, c) => s + c.energyKWh, 0);
   return { pct: maxKWh > 0 ? energy / maxKWh * 100 : 0, hours, maxKWh, energy, power, days: daysInMonth(y, m) };
 }
@@ -4537,7 +4554,8 @@ function occupationBand(value = 0) {
   return { className: 'occ-green', label: 'forte', range: 'acima de 20%' };
 }
 
-function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
+function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null, workId = currentWorkId) {
+  const datedWeekday = workPowerHistory(String(workId || '')).length > 0;
   const groups = {};
   WEEKDAY_ORDER_BR.forEach(idx => {
     groups[idx] = { idx, label: WEEKDAY_LABELS_BR[idx], dates: new Set(), revenue: 0, energy: 0, count: 0, clients: new Set(), failed: 0 };
@@ -4571,6 +4589,9 @@ function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
         new Date(overlapStart),
         new Date(overlapEnd)
       );
+      if (datedWeekday && overlapEnd > overlapStart) {
+        groups[idx].capKWh = (groups[idx].capKWh || 0) + capacityKWhFor(workId, availability, new Date(overlapStart), new Date(overlapEnd), power);
+      }
       cursor.setDate(cursor.getDate() + 1);
       guard++;
     }
@@ -4592,7 +4613,7 @@ function weekdayOccupancyRows(charges = [], power = getPower(), bounds = null) {
     const row = groups[idx];
     const days = row.dates.size || 0;
     const validCount = Math.max(0, row.count - row.failed);
-    const maxKWh = Math.max(Number(power) || 0, 0) * (row.hours || 0);
+    const maxKWh = datedWeekday ? Number(row.capKWh || 0) : Math.max(Number(power) || 0, 0) * (row.hours || 0);
     const occ = maxKWh > 0 ? row.energy / maxKWh * 100 : 0;
     return {
       ...row,
@@ -5315,10 +5336,12 @@ function stationOccupancyForMonths(row, monthKeys, mode = 'mtd') {
     const monthHours = stationAvailableHours(config, window.start, window.end);
     hours += monthHours;
     // Potência do período de cada mês (troca de carregador no meio do histórico).
-    if (dated) datedMaxKWh += Number(workPowerById(row.workId, window) || 0) * monthHours;
+    if (dated) datedMaxKWh += capacityKWhFor(row.workId, config, window.start, window.end, power);
   });
   const maxKWh = dated ? datedMaxKWh : power * hours;
-  return { config, power, energy, hours, maxKWh, operationStart, pct: maxKWh > 0 ? energy / maxKWh * 100 : 0 };
+  // Com troca de potência, a potência mostrada é a do período (ex.: outubro da JK = 60 kW, não os 75 de hoje).
+  const periodPower = dated && hours > 0 ? Math.round(maxKWh / hours * 1000) / 1000 : power;
+  return { config, power: periodPower, energy, hours, maxKWh, operationStart, pct: maxKWh > 0 ? energy / maxKWh * 100 : 0 };
 }
 
 function unitOccupancyMarkup(unit, monthKeys) {
@@ -6497,31 +6520,52 @@ async function ensureAllOverviewSessionsLoaded() {
   return overviewSessionsHydrationPromise;
 }
 
-function dcConnectorLabel(charge = {}) {
+// Identidade física do conector (usuário, 19/11/2026: "o 1 e 2 são a mesma pistola", mesmo com outro
+// nome). Spott "DC 60kW - 1", "ROBERT KOCH DC 60kW - 1", "JK DC 80kW - 1" e Raio "Conector 1" = conector 1.
+// Onde o nome traz o nº do carregador (Aurora DC: "…AURORA DC 3 - 1" e "AURORA DC 3 - 1"), ele entra na
+// identidade (carregador 3 · conector 1). CCS2 A/B = conectores 1/2.
+function connectorIdentity(charge = {}) {
   const raw = safeText(charge.connType || charge.connectorType || charge.connector || '').trim();
-  if (!raw) return '';
-  const normalized = normalizeStationForCompare(raw).replace(/\s+/g, '');
-  const ccsMatch = normalized.match(/CCS(?:2)?([AB])?\b/);
-  if (ccsMatch?.[1]) return `CCS2 ${ccsMatch[1]}`;
-  // Mantem o identificador fornecido pela plataforma quando ela usa outra
-  // convencao (por exemplo, "Plug 1" ou "DC 60 kW - 2").
-  return raw.toLocaleUpperCase('pt-BR');
+  const text = normalizeTextForInsight(raw);
+  let plug = '', base = text;
+  const suffix = text.match(/^(.*?)[\s]*[-–]\s*(\d+)\s*$/);
+  const named = text.match(/(?:conector|connector|plug|pistola|porta|tomada)\s*(\d+)/);
+  const ccs = text.replace(/\s+/g, '').match(/ccs2?([ab])\b/);
+  if (suffix) { plug = String(Number(suffix[2])); base = suffix[1]; }
+  else if (named) { plug = String(Number(named[1])); base = text.replace(named[0], ''); }
+  else if (ccs) { plug = ccs[1] === 'a' ? '1' : '2'; }
+  // Nº do carregador: "dc 3" / "ac 2" no fim do nome, sem unidade de potência (60kW não é carregador 60).
+  const chargerMatch = base.trim().match(/\b(?:dc|ac)\s*(\d{1,2})$/);
+  const charger = chargerMatch ? String(Number(chargerMatch[1])) : '';
+  const key = `${charger ? `c${charger}|` : ''}${plug ? `p${plug}` : 'p?'}`;
+  const label = `${charger ? `Carregador ${charger} · ` : ''}${plug ? `${charger ? 'conector' : 'Conector'} ${plug}` : `${charger ? 'conector' : 'Conector'} não informado`}`;
+  return { key, label, raw };
+}
+
+function dcConnectorLabel(charge = {}) {
+  return connectorIdentity(charge).label;
 }
 
 function dcConnectorKey(charge = {}) {
-  return normalizeStationForCompare(dcConnectorLabel(charge));
+  return connectorIdentity(charge).key;
 }
 
 function dcConnectorGroups(charges = []) {
   const groups = new Map();
   charges.filter(charge => chargerKind(charge) === 'dc').forEach(charge => {
-    const label = dcConnectorLabel(charge);
-    if (!label) return;
-    const key = dcConnectorKey(charge);
-    if (!groups.has(key)) groups.set(key, { key, label, charges: [] });
-    groups.get(key).charges.push(charge);
+    const { key, label, raw } = connectorIdentity(charge);
+    if (!groups.has(key)) groups.set(key, { key, label, charges: [], names: new Set(), platforms: new Map() });
+    const g = groups.get(key);
+    g.charges.push(charge);
+    if (raw) g.names.add(raw);
+    // Plataforma continua separada dentro do mesmo conector (Spott × Raio).
+    const platform = safeText(charge.sourcePlatform || charge.platform || '').trim() || (/^raio$/i.test(safeText(charge.paymentType).trim()) || /^raio/i.test(safeText(charge.rawStation)) ? 'Raio' : 'Spott');
+    const p = g.platforms.get(platform) || { platform, sessions: 0, energy: 0, revenue: 0 };
+    p.sessions += 1; p.energy += Number(charge.energyKWh || 0); p.revenue += Number(charge.revenue || 0);
+    g.platforms.set(platform, p);
   });
-  return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  // "não informado" por último; depois por carregador e conector.
+  return [...groups.values()].sort((a, b) => (a.key.endsWith('p?') - b.key.endsWith('p?')) || a.key.localeCompare(b.key, 'pt-BR', { numeric: true }));
 }
 
 function parseRatingValue(value) {
@@ -6855,6 +6899,7 @@ window.UBY_NUCLEO = {
   daysInMonth,
   dcComparisonRowKey,
   dcConnectorGroups,
+  connectorIdentity,
   dcConnectorKey,
   dcConnectorLabel,
   dcStationIdentity,
@@ -7140,6 +7185,7 @@ window.UBY_NUCLEO = {
   workOptionsUncached,
   workPowerById,
   workPowerHistory,
+  capacityKWhFor,
   workSelectorDataScore,
   workSelectorKinds,
   workSelectorLabel,

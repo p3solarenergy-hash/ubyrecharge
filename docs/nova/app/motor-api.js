@@ -151,6 +151,7 @@
     usageSeries,
     weekdayOccupancyRows,
     workPowerById,
+    capacityKWhFor,
     UBY_APP_VERSION
   } = N;
 
@@ -685,13 +686,16 @@
       const power = Number(workPowerById(row.workId, { start: dayStart, end: capEnd }) || 0);
       const hoursAvail = stationAvailableHours(config, dayStart, capEnd);
       const prevHours = stationAvailableHours(config, prevStart, dayStart);
+      // Capacidade com a potência de cada dia (o dia anterior pode ser de antes de uma troca de potência).
+      const capNow = capacityKWhFor(row.workId, config, dayStart, capEnd, power);
+      const capPrev = capacityKWhFor(row.workId, config, prevStart, dayStart, power);
       const model = row.included ? normalizeOperationModel(financeSettingsForUbyRow(row, monthKey).operationModel) : "";
       const u = { workId: row.workId, workName: row.workName, station, kind: row.kind, included: row.included, model, power,
         revenue: cur.revenue, energy: cur.energy, sessions: cur.count, valid: clean.executed.length, failures: clean.failed.length,
-        clients: cur.clients, hoursAvail, maxKWh: power * hoursAvail,
-        occupancy: power * hoursAvail > 0 ? cur.energy / (power * hoursAvail) * 100 : 0,
-        prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count, prevValid: cleanOperationStats(before).executed.length, prevMaxKWh: power * prevHours,
-        prevOccupancy: power * prevHours > 0 ? prev.energy / (power * prevHours) * 100 : 0,
+        clients: cur.clients, hoursAvail, maxKWh: capNow,
+        occupancy: capNow > 0 ? cur.energy / capNow * 100 : 0,
+        prevRevenue: prev.revenue, prevEnergy: prev.energy, prevSessions: prev.count, prevValid: cleanOperationStats(before).executed.length, prevMaxKWh: capPrev,
+        prevOccupancy: capPrev > 0 ? prev.energy / capPrev * 100 : 0,
         lastStart: iso(today.map(c => c.startDate).filter(valid).sort((a, b) => b - a)[0] || null),
         points: Math.max(1, Number(config.acChargers || 0) + Number(config.dcChargers || 0), Number(config.acPlugs || 0) + Number(config.dcPlugs || 0)),
         hourly: spread(today, power, Math.max(1, Number(config.acChargers || 0) + Number(config.dcChargers || 0), Number(config.acPlugs || 0) + Number(config.dcPlugs || 0))) };
@@ -779,7 +783,7 @@
       return {
         workId: row.workId, workName: row.workName, station: row.stationName, revenue: row.revenue, energy: row.energy,
         sessions: row.count, clients: row.clients, avgTicket: row.avgTicket, occupancy: occ.pct, power: occ.power,
-        hours: occ.hours, band: occupationBand(occ.pct).label, bandClass: occupationBand(occ.pct).className,
+        hours: occ.hours, maxKWh: occ.maxKWh, occEnergy: occ.energy, band: occupationBand(occ.pct).label, bandClass: occupationBand(occ.pct).className,
         valid: clean.executed.length, failures: clean.failed.length, availability: clean.total ? clean.executed.length / clean.total * 100 : 0,
         kind: match?.kind || (kinds.includes("dc") ? "dc" : kinds[0] || "unknown"), included: match ? !!match.included : false,
         model: match ? normalizeOperationModel(financeSettingsForUbyRow(match, monthKey || "").operationModel) : "",
@@ -801,7 +805,8 @@
     const config = stationAvailabilityFor(row.workId, row.stationName, row.workName);
     const connectors = dcConnectorGroups(charges).map(g => ({ label: g.label, sessions: g.charges?.length || g.count || 0,
       energy: g.energy ?? sumBy(g.charges || [], c => c.energyKWh), revenue: g.revenue ?? sumBy(g.charges || [], c => c.revenue),
-      failures: (g.charges || []).filter(isFailedCharge).length }));
+      failures: (g.charges || []).filter(isFailedCharge).length,
+      names: [...(g.names || [])], platforms: [...(g.platforms?.values() || [])] }));
     const histMonths = [...new Set((history?.charges || []).map(chargeMonthKey).filter(k => k !== "unknown"))].sort();
     return {
       workId: row.workId, workName: row.workName, station: row.stationName, power: occ.power, schedule: stationScheduleLabel(config),
@@ -1540,7 +1545,8 @@
       let hoursFull = 0, hoursSoFar = 0;
       try { hoursFull = stationAvailableHours(avail, from, mEnd); hoursSoFar = projected ? stationAvailableHours(avail, from, new Date(Math.min(asOf, mEnd.getTime()))) : hoursFull; } catch (_) {}
       const factor = projected && hoursSoFar > 0 && hoursFull > hoursSoFar ? hoursFull / hoursSoFar : 1;
-      const capacityKwh = power * hoursFull;
+      let capacityKwh = power * hoursFull;
+      try { capacityKwh = capacityKWhFor(row.workId, avail, from, mEnd, power); } catch (_) {}
       const own = ["uby", "hybrid"].includes(f.operationModel);
       const taxRate = own ? taxRateFor(mk) / 100 : 0;
       const taxCost = taxRate * Math.max(0, f.revenue - f.platform - f.management);
@@ -1564,7 +1570,7 @@
         result: { operationNet: netMonth, margin: revMonth ? netMonth / revMonth * 100 : 0 },
         costParts: { area: f.areaParticipation / f.revenue, platform: f.platform / f.revenue, management: f.management / f.revenue, tax: (f.taxes + taxCost) / f.revenue, taxRatePct: taxRate * 100 },
         ladder: core.priceLadder(mine.filter(x => asOf - x.t < 90 * 86400000)),
-        profile: core.loadProfile(mine, asOf, power, 56),
+        profile: core.loadProfile(mine, asOf, n0(workPowerById(row.workId, { start: new Date(asOf - 56 * 86400000), end: new Date(asOf) })) || power, 56),
         freq: { clients: freq.length, active: freq.filter(p => p.n30 > 0).length, kwh30: sum("kwh30"), rev30: sum("rev30"), kwhP30: sum("kwhP30"), price30: sum("kwh30") ? sum("rev30") / sum("kwh30") : 0 }
       };
     }).filter(Boolean);
@@ -1760,8 +1766,16 @@
     // pelo horário de cada um (mesma regra do Resultado do dia). Antes usava a potência
     // somada × o horário de um só carregador, e a ocupação do mesmo dia saía diferente.
     const activeRows = rows.filter(r => (r.charges || []).some(inMonth)).map(r => ({
-      power: Number(workPowerById(r.workId, powerWhen) || 0), config: stationAvailabilityFor(r.workId, r.stationName || r.station, r.workName) }));
-    const capacity = (a, b) => b > a ? activeRows.reduce((s, r) => s + r.power * stationAvailableHours(r.config, new Date(a), new Date(b)), 0) : 0;
+      workId: r.workId, power: Number(workPowerById(r.workId, powerWhen) || 0), config: stationAvailabilityFor(r.workId, r.stationName || r.station, r.workName) }));
+    const capacity = (a, b) => b > a ? activeRows.reduce((s, r) => s + capacityKWhFor(r.workId, r.config, new Date(a), new Date(b), r.power), 0) : 0;
+    // Mesma conta de antes para as horas do dia (potência fixa ÷ potência = horas ponderadas).
+    const capacityFixed = (a, b) => b > a ? activeRows.reduce((s, r) => s + r.power * stationAvailableHours(r.config, new Date(a), new Date(b)), 0) : 0;
+    const dayHoursCap = ref => {
+      if (!bounds) return 0;
+      const dayStart = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+      const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+      return capacityFixed(Math.max(dayStart.getTime(), bounds.start.getTime()), Math.min(dayEnd.getTime(), bounds.end.getTime()));
+    };
     const dayCapacity = ref => {
       if (!bounds) return 0;
       const dayStart = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
@@ -1792,7 +1806,7 @@
         const ref = new Date(d.date);
         if (!bounds || !(power > 0) || Number.isNaN(ref.getTime())) return { ...d, occ: null, occHours: 0 };
         const cap = dayCapacity(ref);
-        return { ...d, occ: cap > 0 ? d.energy / cap * 100 : null, occHours: power > 0 ? cap / power : 0 };
+        return { ...d, occ: cap > 0 ? d.energy / cap * 100 : null, occHours: power > 0 ? dayHoursCap(ref) / power : 0 };
       });
 
       if (kind === "station" && mk && rows[0] && charges.length) {
@@ -2801,10 +2815,13 @@
       const dueAmount = Math.round((own + aa.carryIn) * 100) / 100;
       const total = aa.paidAmount !== null ? aa.paidAmount : dueAmount;
       const atSource = areaAtSourceIn(cfg, mk);
-      let occHours = 0;
-      try { occHours = occAvail ? stationAvailableHours(occAvail, first, new Date(Math.min(new Date(y, m, 1).getTime(), Date.now()))) : 0; } catch (_) {}
-      const occPowerMonth = n0(workPowerById(row.workId, mk)) || occPower;
-      const occupancy = occPowerMonth > 0 && occHours > 0 ? n0(r.energy) / (occPowerMonth * occHours) * 100 : null;
+      let occHours = 0, occCap = 0;
+      try {
+        const occEnd = new Date(Math.min(new Date(y, m, 1).getTime(), Date.now()));
+        occHours = occAvail ? stationAvailableHours(occAvail, first, occEnd) : 0;
+        occCap = occAvail ? capacityKWhFor(row.workId, occAvail, first, occEnd, occPower) : 0;
+      } catch (_) {}
+      const occupancy = occPower > 0 && occHours > 0 && occCap > 0 ? n0(r.energy) / occCap * 100 : null;
       // Uso do ponto (opcional na prestação de contas): recargas executadas, tempo médio, clientes e ocupação por
       // tempo = horas carregando somadas de todos os carregadores ÷ (nº de carregadores × horas disponíveis).
       const exec = charges.filter(c => isExecutedCharge(c) && c.startDate instanceof Date && !Number.isNaN(c.startDate.getTime()));
@@ -2836,7 +2853,7 @@
         carryIn: aa.carryIn, carryFrom: aa.carryFrom, carryFromLabel: aa.carryFrom ? monthLabel(aa.carryFrom) : "",
         paidAmount: aa.paidAmount, paidDiff: aa.paidAmount !== null ? aa.diff : 0, paidDiffMode: aa.diffMode, status, atSource,
         // Recebido inteiro pela UBY: imposto retido = parte do local − valor a repassar.
-        receivedByUby, withheldTax: receivedByUby ? Math.round((computedTotal - own) * 100) / 100 : 0, withheldTaxPct: receivedByUby ? n0(cfg.adjust[mk].taxPct) || taxRateFor(mk) : 0, occupancy, occHours, occPower,
+        receivedByUby, withheldTax: receivedByUby ? Math.round((computedTotal - own) * 100) / 100 : 0, withheldTaxPct: receivedByUby ? n0(cfg.adjust[mk].taxPct) || taxRateFor(mk) : 0, occupancy, occHours, occPower: n0(workPowerById(row.workId, mk)) || occPower, occCapKWh: occCap,
         sessions, busyHours, avgMinutes, occPoints, timeOccupancy, clients: monthClients.size, clientsToDate: seenClients.size,
         newClients, returningClients: monthClients.size - newClients, hourly, weekday, daily, periodDays };
     }).filter(m => m.total !== 0 || m.revenue > 0);
@@ -3042,7 +3059,7 @@
     .split(/\s+/).filter(t => t && t !== "ac" && t !== "dc").join(" ");
   function places() {
     const groups = new Map();
-    getUbyChargerRows(getGeneralUnitData()).filter(r => r.included).forEach(r => {
+    getUbyChargerRows(getGeneralUnitData()).filter(r => r.included && !isPartnerRow(r)).forEach(r => {
       const k = placeKey(r.station);
       if (!k) return;
       if (!groups.has(k)) groups.set(k, []);
@@ -3126,7 +3143,7 @@
     const now = lastImported ? new Date(Math.min(clock.getTime(), new Date(lastImported.getFullYear(), lastImported.getMonth(), lastImported.getDate() + 1).getTime())) : clock;
     const live = !!mk && isCurrentMonthKey(mk);
     const inMk = c => okD(c.startDate) && chargeMonthKey(c) === mk;
-    const memberInfo = members.map(m => ({ kind: m.kind, power: n0(workPowerById(m.workId, mk || undefined)), config: stationAvailabilityFor(m.workId, m.station, m.workName),
+    const memberInfo = members.map(m => ({ workId: m.workId, kind: m.kind, power: n0(workPowerById(m.workId, mk || undefined)), config: stationAvailabilityFor(m.workId, m.station, m.workName),
       first: m.charges.filter(c => okD(c.startDate)).reduce((a, c) => !a || c.startDate < a ? c.startDate : a, null) }));
     const sumOps = list => { const v = list.filter(isExecutedCharge); return { revenue: sumBy(list, c => c.revenue), energy: sumBy(list, c => c.energyKWh), sessions: v.length,
       clients: new Set(v.map(clientKeyFromCharge).filter(Boolean)).size }; };
@@ -3161,7 +3178,7 @@
         const per = members.map((x, i) => {
           const list = x.charges.filter(c => okD(c.startDate) && c.startDate >= a && c.startDate < b);
           const info = memberInfo[i];
-          const cap = info.first && info.first < end ? info.power * stationAvailableHours(info.config, a < info.first ? new Date(info.first.getFullYear(), info.first.getMonth(), info.first.getDate()) : a, end) : 0;
+          const cap = info.first && info.first < end ? capacityKWhFor(info.workId, info.config, a < info.first ? new Date(info.first.getFullYear(), info.first.getMonth(), info.first.getDate()) : a, end, info.power) : 0;
           return { ...sumOps(list), failures: list.filter(isFailedCharge).length, cap };
         });
         const energy = per.reduce((s, x) => s + x.energy, 0), cap = per.reduce((s, x) => s + x.cap, 0);
