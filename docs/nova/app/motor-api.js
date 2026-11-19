@@ -2759,7 +2759,22 @@
     (row.charges || []).filter(c => isExecutedCharge(c)).forEach(c => { const k = clientKeyFromCharge(c), mk0 = chargeMonthKey(c); if (k && mk0 !== "unknown" && (!firstMonthOf.has(k) || mk0 < firstMonthOf.get(k))) firstMonthOf.set(k, mk0); });
     // Carregadores do ponto = nomes distintos no conector das recargas, sem o nº do conector
     // (ex.: "…AURORA DC 3 - 1" → "…AURORA DC 3"), para a ocupação por tempo.
-    const occPoints = Math.max(1, new Set((row.charges || []).map(c => String(c.connType || "").trim().replace(/\s*-\s*\d+$/, "")).filter(Boolean)).size);
+    // Nome que SUBSTITUI outro (troca de equipamento: JK "DC 60kW" → "…CENTRAL JK 80 KW" em 19/11/2026)
+    // não é carregador a mais: conta o máximo de nomes em uso ao mesmo tempo (1ª a última recarga de cada um).
+    const occPoints = (() => {
+      const spans = new Map();
+      (row.charges || []).forEach(c => {
+        const name = String(c.connType || "").trim().replace(/\s*-\s*\d+$/, "");
+        const t = c.startDate instanceof Date ? c.startDate.getTime() : NaN;
+        if (!name || !Number.isFinite(t)) return;
+        const s = spans.get(name);
+        if (!s) spans.set(name, [t, t]); else { if (t < s[0]) s[0] = t; if (t > s[1]) s[1] = t; }
+      });
+      const edges = [...spans.values()].flatMap(([a, b]) => [[a, 1], [b, -1]]).sort((x, y) => x[0] - y[0] || y[1] - x[1]);
+      let open = 0, max = 0;
+      edges.forEach(([, d]) => { open += d; if (open > max) max = open; });
+      return Math.max(1, max);
+    })();
     const months = fv2RowMonths(row, fixes, "").map(mk => {
       const r = fv2Month(row, mk, fixes);
       const charges = FV2.rowMonths.get(row.fv2Id)?.get(mk) || [];
