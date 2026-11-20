@@ -225,11 +225,21 @@
   }
 
   // ---------- Respostas ----------
+  // Ficha do cliente (Clientes › Todos) pelo e-mail do cadastro ou pelo celular das recargas.
+  let dirCache = null, dirEm = 0;
+  function fichaDe(c) {
+    try {
+      if (!dirCache || Date.now() - dirEm > 300000) { dirCache = UBY.data("customerDirectory")?.list || []; dirEm = Date.now(); }
+      const mail = String(c.email || "").toLowerCase(), tel = String(c.tel || "").replace(/\D/g, "").slice(-8);
+      const hit = dirCache.find(x => (mail && String(x.email || "").toLowerCase() === mail) || (tel.length === 8 && String(x.phone || "").replace(/\D/g, "").slice(-8) === tel));
+      return hit ? hit.key : "";
+    } catch (_) { return ""; }
+  }
   function respostasTab() {
     const rs = ui.respostas;
     if (!rs) return `<section class="section"><p>Carregando respostas…</p></section>`;
     const conv = new Map();
-    rs.forEach(r => { const k = String(r.telefone).replace(/\D/g, "").slice(-8); if (!conv.has(k)) conv.set(k, { tel: r.telefone, cliente: r.cliente, nome: r.nome, campanha: r.campanha, msgs: [] }); const c = conv.get(k); c.msgs.push(r); if (!c.cliente && r.cliente) c.cliente = r.cliente; if ((!c.nome || c.nome === "UBY") && !r.de_nos) c.nome = r.nome; });
+    rs.forEach(r => { const k = String(r.telefone).replace(/\D/g, "").slice(-8); if (!conv.has(k)) conv.set(k, { tel: r.telefone, cliente: r.cliente, nome: r.nome, campanha: r.campanha, email: r.email, msgs: [] }); const c = conv.get(k); c.msgs.push(r); if (!c.cliente && r.cliente) c.cliente = r.cliente; if (!c.email && r.email) c.email = r.email; if ((!c.nome || c.nome === "UBY") && !r.de_nos) c.nome = r.nome; });
     const lista = [...conv.values()];
     const titulo = c => { const camp = ui.estado.campanhas.find(x => x.campanha === c.campanha); return camp ? camp.titulo || camp.campanha : c.campanha; };
     return `<section class="section"><div class="section-head"><div><p class="kicker">O que os clientes responderam</p><h2>Respostas</h2>
@@ -240,6 +250,7 @@
         return `<div style="border:1px solid var(--uby-line);border-radius:12px;padding:10px 12px;background:var(--uby-surface)">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:pointer" data-conv="${k}">
             <strong>${esc(c.cliente || c.nome || "Sem nome")}</strong><small style="color:var(--uby-muted)">${esc(telFmt(c.tel))}${c.campanha ? ` · ${esc(titulo(c))}` : ""}</small>
+            ${fichaDe(c) ? `<a href="#/clientes/todos/${encodeURIComponent(fichaDe(c))}" class="btn" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation()" title="Recargas, histórico e anotações deste cliente">Abrir ficha</a>` : ""}
             ${sair ? `<span class="badge bad">Pediu para sair</span>` : nossa ? `<span class="badge ok">Respondida</span>` : `<span class="badge warn">Aguardando</span>`}
             <span class="spacer" style="flex:1"></span><small style="color:var(--uby-muted)">${dt(ultima.recebido_em)}</small></div>
           <div style="font-size:12px;margin-top:4px;color:var(--uby-ink, #233)">${nossa ? "<em>Você:</em> " : ""}${esc(String(ultima.texto || "").slice(0, 160))}</div>

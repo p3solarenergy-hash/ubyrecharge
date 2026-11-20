@@ -139,6 +139,7 @@
     const marRisk = act.reduce((s, a) => { const m = marginAtRisk(a, margin); return s + (m === null ? 0 : m); }, 0);
     const sites = [...new Set(w.alerts.map(a => a.site))].sort();
     const c = w.settings;
+    const wa = !!window.UBY_CONTATO?.isAdmin();
     const sel = (id, label, opts, cur) => `<select class="select" id="${id}"><option value="">${label}</option>${opts.map(([v, l]) => `<option value="${esc(v)}" ${cur === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
     const trend = p => p === null || p === undefined ? "—" : `<span class="badge ${p <= -25 ? "bad" : p <= -10 ? "warn" : p >= 10 ? "ok" : "neutral"}">${p >= 0 ? "+" : ""}${fmt.pct1(p)}</span>`;
     return `
@@ -173,12 +174,12 @@
           ${sel("alSite", "Todos os carregadores", sites.map(s => [s, s]), ui.al.site)}
           <input class="search" id="alSearch" placeholder="Buscar nome, e-mail ou telefone" value="${esc(ui.al.q)}">
           <span class="spacer"></span><button class="btn" type="button" id="alCsv" ${list.length ? "" : "disabled"}>Baixar lista (CSV)</button></div>
-        <div class="table-wrap" style="max-height:620px"><table><thead><tr><th>Cliente</th><th>Carregador</th><th>Perfil</th><th>Situação</th><th>Última recarga</th><th class="num">Preço pago</th><th class="num">Receita/mês em risco</th><th class="num">Margem/mês em risco</th></tr></thead>
+        <div class="table-wrap" style="max-height:620px"><table><thead><tr><th>Cliente</th><th>Carregador</th><th>Perfil</th><th>Situação</th><th>Última recarga</th><th class="num">Preço pago</th><th class="num">Receita/mês em risco</th><th class="num">Margem/mês em risco</th>${wa ? "<th>Contato</th>" : ""}</tr></thead>
           <tbody>${list.slice(0, 120).map(a => { const m = marginAtRisk(a, margin); return `<tr><td><strong>${who(a.name)}</strong><small>${contact(a.phone || a.email)}</small></td><td>${esc(a.site)}</td>
             <td><span class="badge ${SEG[a.segment][0]}">${SEG[a.segment][1]}</span></td>
             <td style="white-space:normal;min-width:260px"><span class="badge ${LV[a.level][0]}">${LV[a.level][1]}</span> <strong>${esc(a.title)}</strong><small style="display:block;white-space:normal">${esc(a.reason)}</small><small style="display:block;white-space:normal">${esc(a.suggest)}</small></td>
             <td>${fmt.date(a.lastT)}<small>${a.daysSince} dia(s)</small></td><td class="num">${fmt.brl(a.pricePaid)}<small>${Math.round(a.voucherShare * 100)}% com cupom</small></td>
-            <td class="num"><strong>${fmt.brl(a.monthlyValue)}</strong></td><td class="num">${m === null ? "—" : fmt.brl(m)}</td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">Nenhum cliente com esse filtro.</td></tr>`}</tbody></table></div>
+            <td class="num"><strong>${fmt.brl(a.monthlyValue)}</strong></td><td class="num">${m === null ? "—" : fmt.brl(m)}</td>${wa ? `<td style="min-width:170px;white-space:normal"><div data-ck="${esc(a.key)}">${window.UBY_CONTATO.celula(undefined)}</div><button class="btn" type="button" data-wa="${esc(a.key)}" style="margin-top:4px;padding:3px 9px;font-size:11px">Conversar</button></td>` : ""}</tr>`; }).join("") || `<tr><td colspan="${wa ? 9 : 8}" class="empty">Nenhum cliente com esse filtro.</td></tr>`}</tbody></table></div>
         ${list.length > 120 ? `<small>Mostrando 120 de ${list.length}; o CSV leva a lista inteira do filtro.</small>` : ""}
         <div class="note" style="margin-top:10px">A <strong>margem</strong> usa o resultado por kWh de cada carregador no último mês completo (energia, área, plataforma, gestão e impostos). Onde a margem é pequena, perder um cliente dói na receita mais do que no resultado: por isso a lista mostra as duas. Detalhes e simulações em <a href="#/precos">Estudos de preço</a>.</div>
       </section>
@@ -194,6 +195,21 @@
           <tbody>${w.keyClients.map((k, i) => `<tr><td>${i + 1}</td><td><strong>${who(k.name)}</strong><small>${contact(k.phone || k.email)}</small></td><td>${esc(k.site)}</td><td><span class="badge ${SEG[k.segment][0]}">${SEG[k.segment][1]}</span></td>
             <td class="num"><strong>${fmt.brl(k.revenue90)}</strong></td><td class="num">${fmt.kwh0(k.kwh30)}</td><td class="num">${trend(k.trendPct)}</td><td class="num">${fmt.brl(k.pricePaid)}</td><td class="num">${fmt.pct1(k.voucherShare * 100)}</td><td>${k.daysSince} d</td></tr>`).join("")}</tbody></table></div>
       </section>`;
+  }
+
+  // Situação de contato de cada cliente da lista (WhatsApp e anotações) e o botão Conversar.
+  // Lida depois de desenhar a tela, para a lista não esperar a função do WhatsApp.
+  function contatoNaLista(target, list) {
+    const porKey = new Map(list.map(a => [a.key, a]));
+    // A tela pode ser redesenhada enquanto a leitura corre (dados chegando): pinta no que estiver na página agora.
+    const pintar = mapa => document.querySelectorAll("[data-ck]").forEach(d => { if (d.dataset.ck in mapa) d.innerHTML = window.UBY_CONTATO.celula(mapa[d.dataset.ck], ui.mask); });
+    const ler = () => window.UBY_CONTATO.contatos(list).then(pintar).catch(err => document.querySelectorAll("[data-ck]").forEach(d => { d.innerHTML = `<small style="color:var(--uby-red)" title="${esc(err.message)}">não foi possível ler</small>`; }));
+    ler();
+    target.querySelectorAll("[data-wa]").forEach(b => b.onclick = () => {
+      const a = porKey.get(b.dataset.wa); if (!a) return;
+      window.UBY_CONTATO.abrir({ key: a.key, name: a.name, email: a.email, phone: a.phone, situacao: a.type === "queda" ? "caiu" : "sumiu",
+        resumo: `${a.title} · ${a.site} · última recarga ${fmt.date(a.lastT)} (${a.daysSince} dia(s))` }, { mask: ui.mask, onChange: ler });
+    });
   }
 
   function alertasCsv(wd) {
@@ -294,6 +310,9 @@
           ${kpi("R$/kWh médio pago", t.perKwh === null ? "—" : fmt.brl(t.perKwh), `${fmt.pct1(t.voucherShare * 100)} das recargas com cupom`)}
         </div>
       </section>
+      ${window.UBY_CONTATO?.isAdmin() ? `<section class="section"><div class="section-head"><div><p class="kicker">WhatsApp e anotações</p><h2>Contato com o cliente</h2>
+          <p>Campanhas que recebeu, o que respondeu, mensagens nossas e anotações da equipe. Nada sai sozinho: só quando você clica em Enviar.</p></div></div>
+        <div id="fichaContato"></div></section>` : ""}
       <section class="section"><div class="section-head"><div><p class="kicker">Uso recente</p><h2>Como está a utilização</h2><p>Janelas contadas a partir da última recarga importada da rede.</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Janela</th><th class="num">Recargas</th><th class="num">Energia</th><th class="num">Faturamento</th><th class="num">kWh por semana</th></tr></thead><tbody>
           ${[["Últimos 7 dias", w.d7, 7], ["Últimos 30 dias", w.d30, 30], ["30 dias anteriores (31 a 60)", w.p30, 30], ["Últimos 90 dias", w.d90, 90]].map(([l, x, n]) => `<tr><td><strong>${l}</strong></td><td class="num">${x.n}</td><td class="num">${fmt.kwh(x.kwh)}</td><td class="num">${fmt.brl(x.revenue)}</td><td class="num">${fmt.n1(x.kwh / n * 7)} kWh</td></tr>`).join("")}
@@ -403,6 +422,11 @@
       if (params[1]) {
         target.querySelector("#fichaBack")?.addEventListener("click", () => UBY.go("#/clientes/todos"));
         fichaCharts(prof);
+        const fc = target.querySelector("#fichaContato");
+        if (fc && prof) {
+          const al = prof.watch?.alert;
+          window.UBY_CONTATO.painel(fc, { key: prof.key, name: prof.name, email: prof.email, phone: prof.phone, situacao: al ? (al.type === "queda" ? "caiu" : "sumiu") : "" }, { mask: ui.mask });
+        }
       } else {
         target.querySelectorAll("tr[data-key]").forEach(tr => tr.onclick = () => UBY.go(`#/clientes/todos/${encodeURIComponent(tr.dataset.key)}`));
         const dir = (k, v) => { ui.dir[k] = v; render(target, ["todos"]); };
@@ -429,6 +453,7 @@
       target.querySelector("#alType").onchange = e => al("type", e.target.value);
       target.querySelector("#alSite").onchange = e => al("site", e.target.value);
       target.querySelector("#alCsv").onclick = () => alertasCsv(wd);
+      if (window.UBY_CONTATO?.isAdmin()) contatoNaLista(target, filteredAlerts(wd.w).slice(0, 120));
       const s = target.querySelector("#alSearch");
       s.oninput = () => { ui.al.q = s.value; clearTimeout(s._t); s._t = setTimeout(() => { render(target, ["alertas"]); const el = target.querySelector("#alSearch"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
       // curva suave com área, como o hora a hora do Comando
