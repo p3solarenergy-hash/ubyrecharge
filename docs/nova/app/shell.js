@@ -322,6 +322,7 @@
       const r = await mw?.UBY_SUPABASE?.loadBankData?.();
       if (!mw) return;
       mw.__UBY_BANK_SCHEDULED = r?.payload?.scheduled || {};
+      state.bankLoaded = true;
       state.cache.clear();
       updateBell();
       if (state.route?.id === "avisos") rerender();
@@ -338,6 +339,9 @@
       badge.hidden = !n;
       bell.classList.toggle("urgent", a.counts.critico > 0);
       bell.title = `${a.counts.critico} urgente(s) · ${a.counts.atencao} de atenção${a.nextBill ? ` · próxima conta ${a.nextBill.dueDate.split("-").reverse().join("/")}` : ""}`;
+      // Avisos no celular: só com o histórico completo e os agendamentos do banco lidos
+      // (antes disso contas já agendadas sairiam como vencidas).
+      if (state.full && state.bankLoaded) window.UBY?.push?.publishAgenda?.(a);
     } catch (err) { console.warn("[avisos]", err.message); }
   }
 

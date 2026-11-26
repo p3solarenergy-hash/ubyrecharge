@@ -94,5 +94,35 @@
     });
   }
 
-  UBY.push = { mount };
+  // Guarda no servidor as contas a vencer e os avisos urgentes calculados pela tela; o
+  // agendamento diário (8h de Brasília) monta o resumo e manda aos aparelhos inscritos.
+  // Só manda de novo se algo mudou ou a cada 6 h, para o servidor ter a lista do dia.
+  const AGENDA_KEY = "uby-push-agenda-v1";
+  let agendaTimer = null;
+  function publishAgenda(alerts) {
+    if (!alerts || !Array.isArray(alerts.bills)) return;
+    clearTimeout(agendaTimer);
+    agendaTimer = setTimeout(async () => {
+      const agenda = {
+        generatedAt: alerts.generatedAt,
+        bills: alerts.bills.filter(b => !["mes", "proximo"].includes(b.bucket) || b.days <= 10)
+          .map(b => ({ name: b.name, amount: b.amount, dueDate: b.dueDate, scheduledDate: b.scheduledDate || "", station: b.station || "" })),
+        items: (alerts.items || []).filter(i => i.level === "critico").map(i => ({ level: i.level, title: i.title }))
+      };
+      // Assinatura curta (o armazenamento do navegador já anda cheio).
+      const json = JSON.stringify([agenda.bills, agenda.items]);
+      let h = 0;
+      for (let i = 0; i < json.length; i++) h = (h * 31 + json.charCodeAt(i)) | 0;
+      const sig = `${json.length}:${h}`;
+      let last = {};
+      try { last = JSON.parse(localStorage.getItem(AGENDA_KEY) || "{}"); } catch (_) {}
+      if (last.sig === sig && Date.now() - (last.at || 0) < 6 * 3600000) return;
+      try {
+        await call("agenda", { agenda });
+        try { localStorage.setItem(AGENDA_KEY, JSON.stringify({ sig, at: Date.now() })); } catch (_) {}
+      } catch (e) { console.warn("[avisos no celular]", e.message); }
+    }, 3000);
+  }
+
+  UBY.push = { mount, publishAgenda };
 })();
