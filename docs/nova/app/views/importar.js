@@ -285,6 +285,20 @@
     });
     groups = groups.filter(g => !g.merged);
     if (!groups.length) return { file: file.name, error: "planilha sem recargas." };
+    // Raio: "Cargas" conta sessões (inclui tentativas e retomadas no mesmo pagamento: 26/11 = 9 cargas,
+    // 3 pagamentos). O motor grava uma recarga por pagamento aprovado. A conferência usa o mesmo leitor
+    // do motor: quantidade, kWh, R$ e ids exatamente como vão para a base.
+    if (rd.platform === "Raio" && typeof w.raioDailyCharges === "function") {
+      try {
+        const gen = w.raioDailyCharges(rows, w.detectRechargeLayout(rows), { name: file.name });
+        groups.forEach(g => {
+          const mine = gen.filter(c => w.monthKey(c.startDate) === g.month);
+          g.sessions = mine.length; g.raioIds = new Set(mine.map(c => c.id));
+          g.uEnergy = mine.reduce((s, c) => s + (Number(c.energyKWh) || 0), 0);
+          g.uRevenue = mine.reduce((s, c) => s + (Number(c.revenue) || 0), 0);
+        });
+      } catch (_) {}
+    }
     const whole = groups.length === 1 || !!rd.whole;
     await w.ensureSpreadsheetLibrary();
     const X = w.XLSX, base = file.name.replace(/\.(xlsx|xls|csv)$/i, "");
@@ -299,7 +313,7 @@
           part = new File([X.write(wb, { type: "array", bookType: "xlsx" })], `${base} (${tag}).xlsx`,
             { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         }
-        return { source: file.name, platform: rd.platform, local: g.local, month: g.month === "unknown" ? "" : g.month, charges: g.charges, unique: rd.count ? g.sessions : g.ids.size, uEnergy: g.uEnergy, uRevenue: g.uRevenue,
+        return { source: file.name, platform: rd.platform, local: g.local, month: g.month === "unknown" ? "" : g.month, charges: g.charges, unique: rd.count ? g.sessions : g.ids.size, raioIds: g.raioIds, uEnergy: g.uEnergy, uRevenue: g.uRevenue,
           energy: g.energy, revenue: g.revenue, starts: g.starts, ...routeLocal(w, rd.routeAs || g.local, hist, works), part, status: "pronto", msg: "" };
       })
     };
@@ -678,7 +692,10 @@ O motor ainda confere o Local oficial de cada obra antes de gravar.`)) { el.valu
           // deste Local no mês. Não grava de novo (cada gravação guarda um backup da base).
           // Raio: confere pela operadora (o motor grava o Local com o nome da obra, ex. "POSTO ROBERT KOCH").
           const k0 = localKey(w, g.local);
-          const inGroup = c => g.platform === "Raio" ? /^raio$/i.test(String(c.paymentType || "").trim()) : localKey(w, c.rawStation || c._sourceStation) === k0;
+          // Com os ids do leitor, só as recargas desta planilha (os testes de 27/10 que contam em 01/11 vêm de outro arquivo).
+          const inGroup = c => g.platform === "Raio"
+            ? /^raio$/i.test(String(c.paymentType || "").trim()) && (!g.raioIds?.size || g.raioIds.has(c.id))
+            : localKey(w, c.rawStation || c._sourceStation) === k0;
           const have = (w.eval("allCharges") || []).filter(c => inGroup(c) && w.chargeMonthKey(c) === g.month);
           const hk = have.reduce((t, c) => t + (Number(c.energyKWh) || 0), 0), hr = have.reduce((t, c) => t + (Number(c.revenue) || 0), 0);
           if (have.length === g.unique && Math.abs(hk - g.uEnergy) < 0.01 && Math.abs(hr - g.uRevenue) < 0.01) {
