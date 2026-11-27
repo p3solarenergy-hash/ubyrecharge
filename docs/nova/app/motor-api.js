@@ -204,6 +204,7 @@
     ["name:emylli machado", "name:emylli rodrigues machado"],       // Pet Capricho Londrina × veterinaria.emylli
     ["name:elaine correa", "name:elaine cristina correa"],          // e-mail Apple (relay) × Yahoo
     ["name:miguel venturini", "name:miguel louis oliveira venturini"], // e-mail com erro: hitmail.com
+    ["name:kelvi leandro", "name:kelvi leandro da silva"],           // um só com e-mail, outro só com telefone
     ["name:marcos martins", "name:marcos martins ferreira junior"],  // um só com telefone, outro só com e-mail; mesmo posto, dias seguidos
   ];
   let registryNames = new Map(); // celular (phoneId) → nome do cadastro de clientes
