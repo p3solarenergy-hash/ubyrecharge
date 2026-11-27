@@ -197,6 +197,16 @@
   // Raio e pela Spott vira um cliente só.
   let lookupClientId = () => null;
   let registryBridge = [];
+  // Mesma pessoa com nome escrito diferente e e-mails diferentes (sem telefone na recarga), então
+  // nada liga os dois automaticamente. Cada item é uma lista de chaves (name:...) que viram um só
+  // cliente. Novos casos são avaliados um a um antes de entrar aqui.
+  const MANUAL_CLIENT_LINKS = [
+    ["name:emylli machado", "name:emylli rodrigues machado"],       // Pet Capricho Londrina × veterinaria.emylli
+    ["name:elaine correa", "name:elaine cristina correa"],          // e-mail Apple (relay) × Yahoo
+    ["name:miguel venturini", "name:miguel louis oliveira venturini"], // e-mail com erro: hitmail.com
+    ["name:kelvi leandro", "name:kelvi leandro da silva"],           // um só com e-mail, outro só com telefone
+    ["name:marcos martins", "name:marcos martins ferreira junior"],  // um só com telefone, outro só com e-mail; mesmo posto, dias seguidos
+  ];
   let registryNames = new Map(); // celular (phoneId) → nome do cadastro de clientes
   let dropClientIndex = () => {};
   const phoneId = value => {
@@ -234,7 +244,8 @@
           ids.slice(1).forEach(i => { const a = find(ids[0]), b = find(i); if (a !== b) parent.set(b, a); });
         }));
         // Cadastro como ponte: só liga ids que já existem nas recargas (não cria cliente).
-        registryBridge.forEach(ids => {
+        // Ligações confirmadas à mão (27/11/2026) entram junto, pela mesma regra.
+        registryBridge.concat(MANUAL_CLIENT_LINKS).forEach(ids => {
           const known = ids.filter(i => parent.has(i));
           known.slice(1).forEach(i => { const a = find(known[0]), b = find(i); if (a !== b) parent.set(b, a); });
         });
